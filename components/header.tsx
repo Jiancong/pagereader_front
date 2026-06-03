@@ -1,7 +1,51 @@
+"use client"
+
 import Link from "next/link"
-import { Presentation } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Presentation, LogOut } from "lucide-react"
+import { authApi, isLoggedIn } from "@/lib/api"
+import { AuthDialog } from "./auth-dialog"
 
 export function Header() {
+  const [logged, setLogged] = useState(false)
+  const [nickName, setNickName] = useState<string>("")
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogMode, setDialogMode] = useState<"login" | "signup">("login")
+
+  // 拉取当前登录态与昵称
+  const refresh = async () => {
+    if (!isLoggedIn()) {
+      setLogged(false)
+      setNickName("")
+      return
+    }
+    setLogged(true)
+    try {
+      const detail = await authApi.getCurrentDetail()
+      setNickName(detail?.nickName || detail?.email || "")
+    } catch {
+      // token 失效等
+      authApi.logout()
+      setLogged(false)
+      setNickName("")
+    }
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  const openDialog = (mode: "login" | "signup") => {
+    setDialogMode(mode)
+    setDialogOpen(true)
+  }
+
+  const handleLogout = () => {
+    authApi.logout()
+    setLogged(false)
+    setNickName("")
+  }
+
   return (
     <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -25,14 +69,42 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <button className="hidden rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:block">
-            登录
-          </button>
-          <button className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-            开始使用
-          </button>
+          {logged ? (
+            <>
+              <span className="hidden text-sm text-muted-foreground sm:block">{nickName}</span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <LogOut className="h-4 w-4" />
+                退出
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => openDialog("login")}
+                className="hidden rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:block"
+              >
+                登录
+              </button>
+              <button
+                onClick={() => openDialog("signup")}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                开始使用
+              </button>
+            </>
+          )}
         </div>
       </div>
+
+      <AuthDialog
+        open={dialogOpen}
+        defaultMode={dialogMode}
+        onClose={() => setDialogOpen(false)}
+        onSuccess={refresh}
+      />
     </header>
   )
 }

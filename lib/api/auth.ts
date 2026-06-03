@@ -41,6 +41,12 @@ export async function userSignUp(req: UserSignUpDto): Promise<unknown> {
   return postJson("/user/userSignUp", req)
 }
 
+// 注册并自动密码登录，返回 JWT
+export async function signUpAndLogin(req: UserSignUpDto): Promise<string> {
+  await userSignUp(req)
+  return passwordLogin({ username: req.email, password: req.password })
+}
+
 // 登出（仅清本地 token）
 export function logout(): void {
   clearToken()

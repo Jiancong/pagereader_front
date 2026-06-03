@@ -1,90 +1,156 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { MessageSquare, Upload, Sparkles, FileText, Loader2, Download, ChevronRight, X } from "lucide-react"
-import { useChat } from "@ai-sdk/react"
+import { MessageSquare, Upload, Sparkles, FileText, Loader2, ExternalLink, X } from "lucide-react"
+import { authApi, fileApi, agentApi, isLoggedIn, ApiError } from "@/lib/api"
+import type { UploadedDocument } from "@/lib/api"
 
 interface GeneratorSectionProps {
   activeTab: "prompt" | "upload"
   setActiveTab: (tab: "prompt" | "upload") => void
 }
 
+// 从 complete 事件里尽量找出可跳转的结果地址
+function pickResultUrl(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null
+  const obj = payload as Record<string, unknown>
+  for (const key of ["url", "shareUrl", "previewUrl", "resultUrl", "projectUrl", "link"]) {
+    const v = obj[key]
+    if (typeof v === "string" && v) return v
+  }
+  return null
+}
+
 export function GeneratorSection({ activeTab, setActiveTab }: GeneratorSectionProps) {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [input, setInput] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedSlides, setGeneratedSlides] = useState<Slide[] | null>(null)
+  const [logs, setLogs] = useState<string[]>([])
+  const [resultUrl, setResultUrl] = useState<string | null>(null)
+  const [resultPayload, setResultPayload] = useState<unknown>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: "/api/generate-ppt",
-    onFinish: (message) => {
-      try {
-        const content = message.content
-        const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/)
-        if (jsonMatch) {
-          const slides = JSON.parse(jsonMatch[1])
-          setGeneratedSlides(slides)
-        } else {
-          const slides = JSON.parse(content)
-          setGeneratedSlides(slides)
-        }
-      } catch {
-        console.log("[v0] Could not parse slides from response")
-      }
-    },
-  })
+  const appendLog = (line: string) => setLogs((prev) => [...prev, line])
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      setUploadedFile(file)
+    if (file) setUploadedFile(file)
+  }
+
+  // 获取当前登录用户 id，未登录返回 null
+  const resolveUserId = async (): Promise<string | null> => {
+    if (!isLoggedIn()) return null
+    try {
+      const detail = await authApi.getCurrentDetail()
+      return detail?.id != null ? String(detail.id) : null
+    } catch {
+      return null
     }
   }
 
-  const handleAnalyzeDocument = async () => {
-    if (!uploadedFile) return
+  // 统一触发生成（prompt 直出 / 上传分析共用）
+  const runGenerate = async (message: string, documents?: UploadedDocument[]) => {
+    setErrorMsg(null)
+    setResultUrl(null)
+    setResultPayload(null)
+    setLogs([])
     setIsGenerating(true)
 
-    const formData = new FormData()
-    formData.append("file", uploadedFile)
-
     try {
-      const response = await fetch("/api/analyze-document", {
-        method: "POST",
-        body: formData,
-      })
-      const data = await response.json()
-      if (data.slides) {
-        setGeneratedSlides(data.slides)
+      const userId = await resolveUserId()
+      if (!userId) {
+        setErrorMsg("请先登录后再生成")
+        return
       }
-    } catch (error) {
-      console.error("[v0] Error analyzing document:", error)
+
+      await agentApi.chatStream(
+        {
+          message,
+          userId,
+          sessionId: agentApi.getOrCreateSessionId(),
+          isAgent: true,
+          uploaded_documents: documents,
+        },
+        {
+          onProgress: (data) => {
+            const text =
+              typeof data === "string"
+                ? data
+                : (data as { message?: string; text?: string })?.message ??
+                  (data as { text?: string })?.text ??
+                  JSON.stringify(data)
+            appendLog(text)
+          },
+          onComplete: (data) => {
+            setResultPayload(data)
+            setResultUrl(pickResultUrl(data))
+            appendLog("生成完成")
+          },
+          onError: (msg) => setErrorMsg(msg),
+        },
+      )
+    } catch (e) {
+      setErrorMsg(e instanceof ApiError ? e.message : (e as Error).message || "生成失败")
     } finally {
       setIsGenerating(false)
     }
   }
 
-  const handleDownloadPPT = async () => {
-    if (!generatedSlides) return
+  const handlePromptSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!input.trim() || isGenerating) return
+    runGenerate(input.trim())
+  }
+
+  const handleAnalyzeDocument = async () => {
+    if (!uploadedFile || isGenerating) return
+    setErrorMsg(null)
+    setResultUrl(null)
+    setResultPayload(null)
+    setLogs([])
+    setIsGenerating(true)
 
     try {
-      const response = await fetch("/api/download-ppt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slides: generatedSlides }),
-      })
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = "presentation.pptx"
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error("[v0] Error downloading PPT:", error)
+      const userId = await resolveUserId()
+      if (!userId) {
+        setErrorMsg("请先登录后再生成")
+        return
+      }
+      appendLog("正在上传文档...")
+      const doc = await fileApi.uploadDocument(uploadedFile)
+      appendLog("文档上传完成，开始分析生成...")
+      // runGenerate 内部会重置 logs，这里直接走 chatStream 保留上传日志
+      await agentApi.chatStream(
+        {
+          message: `请根据上传的文档《${doc.name}》生成一份专业的演示文稿`,
+          userId,
+          sessionId: agentApi.getOrCreateSessionId(),
+          isAgent: true,
+          uploaded_documents: [doc],
+        },
+        {
+          onProgress: (data) => {
+            const text =
+              typeof data === "string"
+                ? data
+                : (data as { message?: string; text?: string })?.message ??
+                  (data as { text?: string })?.text ??
+                  JSON.stringify(data)
+            appendLog(text)
+          },
+          onComplete: (data) => {
+            setResultPayload(data)
+            setResultUrl(pickResultUrl(data))
+            appendLog("生成完成")
+          },
+          onError: (msg) => setErrorMsg(msg),
+        },
+      )
+    } catch (e) {
+      setErrorMsg(e instanceof ApiError ? e.message : (e as Error).message || "生成失败")
+    } finally {
+      setIsGenerating(false)
     }
   }
 
@@ -131,11 +197,11 @@ export function GeneratorSection({ activeTab, setActiveTab }: GeneratorSectionPr
                   </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handlePromptSubmit} className="space-y-4">
                   <div className="relative">
                     <textarea
                       value={input}
-                      onChange={handleInputChange}
+                      onChange={(e) => setInput(e.target.value)}
                       placeholder="例如：帮我生成一个关于人工智能发展历史的10页PPT，包含时间线、关键人物和未来展望..."
                       className="min-h-[140px] w-full resize-none rounded-xl border border-border bg-secondary/50 px-4 py-4 text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
@@ -146,10 +212,10 @@ export function GeneratorSection({ activeTab, setActiveTab }: GeneratorSectionPr
 
                   <button
                     type="submit"
-                    disabled={isLoading || !input?.trim()}
+                    disabled={isGenerating || !input.trim()}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isLoading ? (
+                    {isGenerating ? (
                       <>
                         <Loader2 className="h-5 w-5 animate-spin" />
                         正在生成...
@@ -169,21 +235,11 @@ export function GeneratorSection({ activeTab, setActiveTab }: GeneratorSectionPr
                     快速开始
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {[
-                      "商业计划书",
-                      "项目汇报",
-                      "产品介绍",
-                      "年度总结",
-                      "培训课件",
-                    ].map((prompt) => (
+                    {["商业计划书", "项目汇报", "产品介绍", "年度总结", "培训课件"].map((prompt) => (
                       <button
                         key={prompt}
-                        onClick={() => {
-                          const event = {
-                            target: { value: `帮我生成一个${prompt}的PPT，要求专业、简洁、有吸引力` },
-                          } as React.ChangeEvent<HTMLInputElement>
-                          handleInputChange(event)
-                        }}
+                        type="button"
+                        onClick={() => setInput(`帮我生成一个${prompt}的PPT，要求专业、简洁、有吸引力`)}
                         className="rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
                       >
                         {prompt}
@@ -222,6 +278,7 @@ export function GeneratorSection({ activeTab, setActiveTab }: GeneratorSectionPr
                         </p>
                       </div>
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation()
                           setUploadedFile(null)
@@ -243,6 +300,7 @@ export function GeneratorSection({ activeTab, setActiveTab }: GeneratorSectionPr
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleAnalyzeDocument}
                   disabled={!uploadedFile || isGenerating}
                   className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -262,68 +320,53 @@ export function GeneratorSection({ activeTab, setActiveTab }: GeneratorSectionPr
               </div>
             )}
 
-            {/* Generated Slides Preview */}
-            {generatedSlides && (
-              <div className="border-t border-border bg-secondary/20 p-6 sm:p-8">
-                <div className="mb-4 flex items-center justify-between">
-                  <h4 className="font-semibold text-foreground">生成的幻灯片预览</h4>
-                  <button
-                    onClick={handleDownloadPPT}
-                    className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                  >
-                    <Download className="h-4 w-4" />
-                    下载 PPTX
-                  </button>
-                </div>
+            {/* 错误提示 */}
+            {errorMsg && (
+              <div className="border-t border-border bg-destructive/10 px-6 py-4 text-sm text-destructive sm:px-8">
+                {errorMsg}
+              </div>
+            )}
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {generatedSlides.map((slide, index) => (
-                    <div
-                      key={index}
-                      className="group relative aspect-video overflow-hidden rounded-lg border border-border bg-card p-4 transition-all hover:border-primary/50"
-                    >
-                      <div className="absolute right-2 top-2 rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                        {index + 1}
-                      </div>
-                      <h5 className="line-clamp-2 text-sm font-semibold text-foreground">
-                        {slide.title}
-                      </h5>
-                      <ul className="mt-2 space-y-1">
-                        {slide.content.slice(0, 3).map((item, i) => (
-                          <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                            <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-                            <span className="line-clamp-1">{item}</span>
-                          </li>
-                        ))}
-                        {slide.content.length > 3 && (
-                          <li className="text-xs text-muted-foreground/60">
-                            +{slide.content.length - 3} 更多...
-                          </li>
-                        )}
-                      </ul>
-                    </div>
+            {/* 生成进度日志 */}
+            {logs.length > 0 && (
+              <div className="border-t border-border bg-secondary/20 p-6 sm:p-8">
+                <h4 className="mb-3 font-semibold text-foreground">生成进度</h4>
+                <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border bg-background/50 p-4 text-sm text-muted-foreground">
+                  {logs.map((line, i) => (
+                    <p key={i} className="whitespace-pre-wrap break-words">
+                      {line}
+                    </p>
                   ))}
                 </div>
               </div>
             )}
-          </div>
 
-          {/* AI Response Display */}
-          {messages.length > 0 && !generatedSlides && (
-            <div className="mt-6 rounded-xl border border-border bg-card p-6">
-              <h4 className="mb-4 font-semibold text-foreground">AI 正在思考...</h4>
-              <div className="prose prose-invert max-w-none text-sm text-muted-foreground">
-                {messages[messages.length - 1]?.content}
+            {/* 生成结果 */}
+            {resultPayload != null && (
+              <div className="border-t border-border bg-secondary/20 p-6 sm:p-8">
+                <h4 className="mb-4 font-semibold text-foreground">生成结果</h4>
+                {resultUrl ? (
+                  <a
+                    href={resultUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    查看 / 下载演示文稿
+                  </a>
+                ) : (
+                  <pre className="max-h-72 overflow-auto rounded-lg border border-border bg-background/50 p-4 text-xs text-muted-foreground">
+                    {typeof resultPayload === "string"
+                      ? resultPayload
+                      : JSON.stringify(resultPayload, null, 2)}
+                  </pre>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </section>
   )
-}
-
-interface Slide {
-  title: string
-  content: string[]
 }

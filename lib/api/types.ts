@@ -172,3 +172,48 @@ export interface UserStorageQuota {
   total?: number
   [key: string]: unknown
 }
+
+// OSS 直传：申请上传凭证
+export interface DirectUploadTokenReq {
+  originalName: string
+  contentType: string
+  fileSize: number
+}
+
+export interface DirectUploadTokenVo {
+  uploadUrl: string
+  uploadHeaders?: Record<string, string>
+  fileUrl?: string
+  fileKey: string
+  [key: string]: unknown
+}
+
+// OSS 直传：上传完成回执
+export interface DirectUploadCompleteReq {
+  fileKey: string
+  originalName: string
+  contentType: string
+  fileSize: number
+}
+
+export interface DirectUploadCompleteVo {
+  fileLink?: string
+  [key: string]: unknown
+}
+
+// 传给 Agent 的已上传文档
+export interface UploadedDocument {
+  url: string
+  name: string
+  type: string
+}
+
+// ===== Agent 对话流 =====
+export interface ChatStreamReq {
+  message: string
+  userId: string
+  projectId?: string
+  sessionId?: string
+  isAgent?: boolean
+  uploaded_documents?: UploadedDocument[]
+}
