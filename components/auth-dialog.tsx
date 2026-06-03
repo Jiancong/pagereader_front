@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { X, Loader2, Mail, Lock, User } from "lucide-react"
 import { authApi, ApiError } from "@/lib/api"
 import { loadGsi, parseEmailFromCredential } from "@/lib/google"
@@ -26,7 +27,23 @@ export function AuthDialog({ open, defaultMode = "login", onClose, onSuccess }: 
   const [nickName, setNickName] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
   const googleBtnRef = useRef<HTMLDivElement>(null)
+
+  // 仅客户端挂载后才能 portal 到 body
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // 弹窗打开时锁定背景滚动
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open])
 
   // 每次打开时同步入口模式并清空提示
   useEffect(() => {
@@ -78,7 +95,7 @@ export function AuthDialog({ open, defaultMode = "login", onClose, onSuccess }: 
     }
   }, [open, onClose, onSuccess])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -109,7 +126,7 @@ export function AuthDialog({ open, defaultMode = "login", onClose, onSuccess }: 
     setError(null)
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
@@ -211,6 +228,7 @@ export function AuthDialog({ open, defaultMode = "login", onClose, onSuccess }: 
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
