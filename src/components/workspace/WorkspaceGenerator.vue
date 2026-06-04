@@ -211,6 +211,17 @@ const runStream = async (message: string, documents?: any[]) => {
         if (line) appendLog(line)
       },
       onComplete: async (data: unknown) => {
+        // PPT 已加载则忽略后续的流结束事件（event: complete 仅 {status:complete}，无 url）
+        if (pptData.value) return
+        const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+        const isPptCompletion =
+          o.ppt_data_url != null ||
+          o.remote_url != null ||
+          o.ppt_data != null ||
+          o.is_ppt_response === true ||
+          o.ppt_generation === true
+        // 纯流结束标志（无 PPT 数据）直接跳过，避免覆盖正常结果
+        if (!isPptCompletion) return
         appendLog(t("workspace.loadingPpt"))
         try {
           const resolved = await resolvePptDataFromStreamComplete(data)

@@ -16,14 +16,25 @@ function hasSlides(data: Record<string, unknown>): boolean {
   return Array.isArray(data.slides) && data.slides.length > 0
 }
 
+/** 与原版 normalizePptPayloadFromArtifact：slides 可能在根或 ppt_data 内 */
+function normalizeDeckFromArtifact(obj: Record<string, unknown>): Record<string, unknown> | null {
+  if (hasSlides(obj)) return obj
+  const inner = asRecord(obj.ppt_data) ?? asRecord(obj.pptData)
+  if (inner && hasSlides(inner)) return inner
+  return null
+}
+
 function pickArtifactUrl(payload: Record<string, unknown>): string | null {
   const nested = asRecord(payload.pptData) ?? asRecord(payload.ppt_data)
+  const artifact = asRecord(payload.ppt_data_artifact)
   const candidates = [
     payload.ppt_data_url,
     payload.remote_url,
     payload._artifact_url,
+    artifact?.url,
     nested?._artifact_url,
     nested?.remote_url,
+    nested?.ppt_data_url,
   ]
   for (const c of candidates) {
     const s = String(c ?? "").trim()
@@ -47,7 +58,8 @@ async function fetchPptJson(url: string): Promise<Record<string, unknown> | null
   const json = await res.json()
   const obj = asRecord(json)
   if (!obj) return null
-  return unwrapArtifactEnvelope(obj)
+  const unwrapped = unwrapArtifactEnvelope(obj)
+  return normalizeDeckFromArtifact(unwrapped)
 }
 
 /** 将 complete 顶层元数据合并进 deck（chapter_images 等） */
@@ -82,19 +94,21 @@ export async function resolvePptDataFromStreamComplete(
         ? String(root.project_id)
         : undefined
 
-  if (hasSlides(root)) {
-    return { pptData: finalizePptData(root, root), projectId }
+  const inlineDeck = normalizeDeckFromArtifact(root)
+  if (inlineDeck) {
+    return { pptData: finalizePptData(inlineDeck, root), projectId }
   }
 
   const nested = asRecord(root.pptData) ?? asRecord(root.ppt_data)
   if (nested) {
-    if (hasSlides(nested)) {
-      return { pptData: finalizePptData(nested, root), projectId }
+    const nestedDeck = normalizeDeckFromArtifact(nested)
+    if (nestedDeck) {
+      return { pptData: finalizePptData(nestedDeck, root), projectId }
     }
-    const nestedUrl = pickArtifactUrl({ ppt_data: nested })
+    const nestedUrl = pickArtifactUrl({ ppt_data: nested, ppt_data_artifact: root.ppt_data_artifact })
     if (nestedUrl) {
       const fetched = await fetchPptJson(nestedUrl)
-      if (fetched && hasSlides(fetched)) {
+      if (fetched) {
         return { pptData: finalizePptData(fetched, root), projectId }
       }
     }
@@ -103,7 +117,7 @@ export async function resolvePptDataFromStreamComplete(
   const url = pickArtifactUrl(root)
   if (url) {
     const fetched = await fetchPptJson(url)
-    if (fetched && hasSlides(fetched)) {
+    if (fetched) {
       return { pptData: finalizePptData(fetched, root), projectId }
     }
   }
