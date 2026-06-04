@@ -7,26 +7,37 @@
         </div>
         <span class="text-xl font-bold text-foreground">SlideAI</span>
       </div>
-      
+
       <nav class="hidden items-center gap-8 md:flex">
-        <a href="#features" class="text-sm text-muted-foreground transition-colors hover:text-foreground">
-          功能特性
-        </a>
-        <a href="#pricing" class="text-sm text-muted-foreground transition-colors hover:text-foreground">
-          定价
-        </a>
-        <a href="#docs" class="text-sm text-muted-foreground transition-colors hover:text-foreground">
-          文档
-        </a>
+        <a href="#features" class="text-sm text-muted-foreground transition-colors hover:text-foreground">功能特性</a>
+        <a href="#pricing" class="text-sm text-muted-foreground transition-colors hover:text-foreground">定价</a>
+        <a href="#docs" class="text-sm text-muted-foreground transition-colors hover:text-foreground">文档</a>
       </nav>
-      
+
       <div class="flex items-center gap-3">
-        <button class="hidden rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:block">
-          登录
-        </button>
-        <button class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-          免费试用
-        </button>
+        <template v-if="logged">
+          <span class="hidden text-sm text-muted-foreground sm:block">{{ nickName }}</span>
+          <button
+            class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            @click="$emit('enter')"
+          >
+            进入工作区
+          </button>
+        </template>
+        <template v-else>
+          <button
+            class="hidden rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:block"
+            @click="$emit('open-login', 'login')"
+          >
+            登录
+          </button>
+          <button
+            class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            @click="$emit('open-login', 'signup')"
+          >
+            免费试用
+          </button>
+        </template>
       </div>
     </div>
   </header>
@@ -34,4 +45,10 @@
 
 <script setup>
 import { Presentation } from 'lucide-vue-next'
+
+defineProps({
+  logged: { type: Boolean, default: false },
+  nickName: { type: String, default: '' },
+})
+defineEmits(['open-login', 'enter'])
 </script>

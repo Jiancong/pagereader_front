@@ -1,0 +1,71 @@
+<template>
+  <div class="min-h-screen bg-background">
+    <AppHeader
+      :logged="logged"
+      :nick-name="nickName"
+      @open-login="openLogin"
+      @enter="goWorkspace"
+    />
+    <main class="pt-16">
+      <HeroSection />
+      <GeneratorSection @start="onStart" />
+      <FeatureCards />
+    </main>
+    <AppFooter />
+
+    <AuthDialog
+      :open="dialogOpen"
+      :default-mode="dialogMode"
+      @close="dialogOpen = false"
+      @success="onLoginSuccess"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import AppHeader from '../components/AppHeader.vue'
+import HeroSection from '../components/HeroSection.vue'
+import GeneratorSection from '../components/GeneratorSection.vue'
+import FeatureCards from '../components/FeatureCards.vue'
+import AppFooter from '../components/AppFooter.vue'
+import AuthDialog from '../components/AuthDialog.vue'
+import { authApi, isLoggedIn } from '../api'
+
+const router = useRouter()
+const logged = ref(false)
+const nickName = ref('')
+const dialogOpen = ref(false)
+const dialogMode = ref('login')
+
+const refresh = async () => {
+  logged.value = isLoggedIn()
+  if (!logged.value) return
+  try {
+    const d = await authApi.getCurrentDetail()
+    nickName.value = d?.nickName || d?.email || ''
+  } catch {
+    authApi.logout()
+    logged.value = false
+  }
+}
+
+onMounted(refresh)
+
+const openLogin = (mode) => {
+  dialogMode.value = mode
+  dialogOpen.value = true
+}
+
+const goWorkspace = () => router.push('/workspace')
+
+const onLoginSuccess = () => {
+  router.push('/workspace')
+}
+
+const onStart = () => {
+  if (isLoggedIn()) goWorkspace()
+  else openLogin('signup')
+}
+</script>

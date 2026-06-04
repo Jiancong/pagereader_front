@@ -8,6 +8,7 @@ import type { UploadedDocument } from "@/lib/api"
 interface GeneratorSectionProps {
   activeTab: "prompt" | "upload"
   setActiveTab: (tab: "prompt" | "upload") => void
+  initialPrompt?: string
 }
 
 // 从 complete 事件里尽量找出可跳转的结果地址
@@ -21,9 +22,9 @@ function pickResultUrl(payload: unknown): string | null {
   return null
 }
 
-export function GeneratorSection({ activeTab, setActiveTab }: GeneratorSectionProps) {
+export function GeneratorSection({ activeTab, setActiveTab, initialPrompt = "" }: GeneratorSectionProps) {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [input, setInput] = useState("")
+  const [input, setInput] = useState(initialPrompt)
   const [isGenerating, setIsGenerating] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
   const [resultUrl, setResultUrl] = useState<string | null>(null)
@@ -355,9 +356,14 @@ export function GeneratorSection({ activeTab, setActiveTab }: GeneratorSectionPr
                   </div>
                 )}
 
-                <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border bg-background/50 p-4 text-sm text-muted-foreground">
-                  {logs.map((line, i) => (
-                    <p key={i} className="whitespace-pre-wrap break-words">
+                <div className="space-y-1 rounded-lg border border-border bg-background/50 px-4 py-3 text-sm text-muted-foreground">
+                  {logs.slice(-3).map((line, i, arr) => (
+                    <p
+                      key={logs.length - arr.length + i}
+                      className={`truncate transition-opacity ${
+                        i === arr.length - 1 ? "text-foreground" : "opacity-50"
+                      }`}
+                    >
                       {line}
                     </p>
                   ))}

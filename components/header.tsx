@@ -2,11 +2,13 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Presentation, LogOut } from "lucide-react"
 import { authApi, isLoggedIn } from "@/lib/api"
 import { AuthDialog } from "./auth-dialog"
 
 export function Header() {
+  const router = useRouter()
   const [logged, setLogged] = useState(false)
   const [nickName, setNickName] = useState<string>("")
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -103,7 +105,10 @@ export function Header() {
         open={dialogOpen}
         defaultMode={dialogMode}
         onClose={() => setDialogOpen(false)}
-        onSuccess={refresh}
+        onSuccess={() => {
+          refresh()
+          router.push("/workspace")
+        }}
       />
     </header>
   )

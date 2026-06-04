@@ -195,7 +195,7 @@ import {
   MessageSquare,
   FileUp
 } from 'lucide-vue-next'
-import pptxgen from 'pptxgenjs'
+const emit = defineEmits(['start'])
 
 const activeTab = ref('quick')
 const prompt = ref('')
@@ -239,193 +239,16 @@ const handleFileSelect = (e) => {
   }
 }
 
-// Mock AI generation - replace with actual API call
-const generatePPT = async () => {
-  if (!prompt.value.trim()) return
-  
-  isLoading.value = true
-  slides.value = []
-  
-  try {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    // Mock generated slides
-    slides.value = [
-      {
-        title: '项目概述',
-        points: [
-          '项目背景与目标',
-          '核心价值主张',
-          '目标受众分析'
-        ]
-      },
-      {
-        title: '市场分析',
-        points: [
-          '行业现状与趋势',
-          '竞争格局分析',
-          '市场机会识别'
-        ]
-      },
-      {
-        title: '解决方案',
-        points: [
-          '技术架构设计',
-          '核心功能介绍',
-          '差异化优势'
-        ]
-      },
-      {
-        title: '商业模式',
-        points: [
-          '盈利模式分析',
-          '定价策略',
-          '收入预测'
-        ]
-      },
-      {
-        title: '发展规划',
-        points: [
-          '短期目标（1年）',
-          '中期目标（3年）',
-          '长期愿景'
-        ]
-      }
-    ]
-  } catch (error) {
-    console.error('Generation failed:', error)
-  } finally {
-    isLoading.value = false
-  }
+// 落地页仅作引导：点击生成/分析 → 交由父级处理（登录或进入工作区）
+const generatePPT = () => {
+  emit('start', { mode: 'prompt', prompt: prompt.value })
 }
 
-const analyzeDocument = async () => {
-  if (!selectedFile.value) return
-  
-  isLoading.value = true
-  slides.value = []
-  
-  try {
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    
-    slides.value = [
-      {
-        title: '文档摘要',
-        points: [
-          '文档主要内容概述',
-          '关键信息提取',
-          '核心观点总结'
-        ]
-      },
-      {
-        title: '重点分析',
-        points: [
-          '数据分析结果',
-          '关键发现',
-          '深度洞察'
-        ]
-      },
-      {
-        title: '结论与建议',
-        points: [
-          '主要结论',
-          '行动建议',
-          '后续步骤'
-        ]
-      }
-    ]
-  } catch (error) {
-    console.error('Analysis failed:', error)
-  } finally {
-    isLoading.value = false
-  }
+const analyzeDocument = () => {
+  emit('start', { mode: 'upload' })
 }
 
-const downloadPPT = async () => {
-  if (slides.value.length === 0) return
-  
-  isDownloading.value = true
-  
-  try {
-    const pptx = new pptxgen()
-    
-    pptx.layout = 'LAYOUT_16x9'
-    pptx.title = 'AI Generated Presentation'
-    pptx.author = 'SlideAI'
-    
-    // Title slide
-    const titleSlide = pptx.addSlide()
-    titleSlide.background = { color: '0f1419' }
-    titleSlide.addText('AI 生成的演示文稿', {
-      x: 0.5,
-      y: 2,
-      w: '90%',
-      h: 1.5,
-      fontSize: 44,
-      bold: true,
-      color: 'e7e9ea',
-      align: 'center'
-    })
-    titleSlide.addText('由 SlideAI 智能生成', {
-      x: 0.5,
-      y: 3.5,
-      w: '90%',
-      h: 0.5,
-      fontSize: 20,
-      color: '71767b',
-      align: 'center'
-    })
-    
-    // Content slides
-    slides.value.forEach((slide, index) => {
-      const pptSlide = pptx.addSlide()
-      pptSlide.background = { color: '0f1419' }
-      
-      // Title
-      pptSlide.addText(slide.title, {
-        x: 0.5,
-        y: 0.5,
-        w: '90%',
-        h: 1,
-        fontSize: 32,
-        bold: true,
-        color: 'e7e9ea'
-      })
-      
-      // Points
-      const points = slide.points.map(point => ({
-        text: point,
-        options: { bullet: { type: 'bullet' }, color: 'e7e9ea' }
-      }))
-      
-      pptSlide.addText(points, {
-        x: 0.5,
-        y: 1.8,
-        w: '90%',
-        h: 3,
-        fontSize: 20,
-        color: 'e7e9ea',
-        valign: 'top'
-      })
-      
-      // Page number
-      pptSlide.addText(`${index + 2}`, {
-        x: 9,
-        y: 5,
-        w: 0.5,
-        h: 0.3,
-        fontSize: 12,
-        color: '71767b',
-        align: 'right'
-      })
-    })
-    
-    await pptx.writeFile({ fileName: 'SlideAI-Presentation.pptx' })
-  } catch (error) {
-    console.error('Download failed:', error)
-  } finally {
-    isDownloading.value = false
-  }
+const downloadPPT = () => {
+  emit('start', { mode: 'prompt', prompt: prompt.value })
 }
 </script>
