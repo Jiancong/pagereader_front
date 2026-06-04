@@ -78,6 +78,26 @@ function finalizePptData(
 }
 
 /**
+ * 同步解析「已经拿到的 JSON」为可用 deck（不发起网络请求）。
+ * 兼容：OSS envelope（含 payload）、根 slides、嵌套 ppt_data.slides。
+ * 调试粘贴 / 已缓存数据场景使用。
+ */
+export function resolveLocalPptDeck(payload: unknown): Record<string, unknown> | null {
+  const root = asRecord(payload)
+  if (!root) return null
+  const unwrapped = unwrapArtifactEnvelope(root)
+  const direct = normalizeDeckFromArtifact(unwrapped)
+  if (direct) return finalizePptData(direct, root)
+  const nested = asRecord(unwrapped.pptData) ?? asRecord(unwrapped.ppt_data)
+  if (nested) {
+    const inner = asRecord(nested.payload) ? unwrapArtifactEnvelope(nested) : nested
+    const deck = normalizeDeckFromArtifact(inner)
+    if (deck) return finalizePptData(deck, root)
+  }
+  return null
+}
+
+/**
  * 解析流式 complete 载荷为 PptViewer 可用的 pptData。
  * 支持：内联 slides、嵌套 ppt_data、OSS ppt_data_url / remote_url。
  */

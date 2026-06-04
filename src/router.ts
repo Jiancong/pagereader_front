@@ -16,6 +16,11 @@ const routes = [
     component: () => import("./views/WorkspaceView.vue"),
     meta: { requiresAuth: true },
   },
+  {
+    path: "/debug-ppt",
+    name: "debug-ppt",
+    component: () => import("./views/DebugPptView.vue"),
+  },
 ];
 
 export const router = createRouter({
