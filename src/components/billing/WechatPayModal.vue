@@ -56,7 +56,7 @@
 import { ref, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2, X } from 'lucide-vue-next'
-import QRCode from 'qrcode'
+import { toQrDataUrl } from '@/utils/qrcodeVendor'
 import { wechatSubscriptionApi } from '@/api'
 
 const props = defineProps({
@@ -108,7 +108,7 @@ async function startPayment() {
     })
     orderId = data.orderId
     totalFee.value = data.totalFee ?? null
-    qrDataUrl.value = await QRCode.toDataURL(data.qrCode, { width: 200, margin: 2 })
+    qrDataUrl.value = await toQrDataUrl(data.qrCode, 200, 2)
     loading.value = false
     polling.value = true
     pollTimer = setInterval(checkPayment, 2500)
