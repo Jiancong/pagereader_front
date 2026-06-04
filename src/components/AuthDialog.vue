@@ -124,6 +124,10 @@ watch(
   },
 )
 
+watch(mode, () => {
+  if (props.open && googleClientId) nextTick(renderGoogle)
+})
+
 function renderGoogle() {
   loadGsi()
     .then(() => {
