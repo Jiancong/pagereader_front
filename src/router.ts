@@ -21,11 +21,38 @@ const routes = [
     name: "debug-ppt",
     component: () => import("./views/DebugPptView.vue"),
   },
+  {
+    path: "/about",
+    name: "about",
+    component: () => import("./views/LegalView.vue"),
+    props: { page: "about" },
+  },
+  {
+    path: "/terms",
+    name: "terms",
+    component: () => import("./views/LegalView.vue"),
+    props: { page: "terms" },
+  },
+  {
+    path: "/privacy",
+    name: "privacy",
+    component: () => import("./views/LegalView.vue"),
+    props: { page: "privacy" },
+  },
+  {
+    path: "/contact",
+    name: "contact",
+    component: () => import("./views/LegalView.vue"),
+    props: { page: "contact" },
+  },
 ];
 
 export const router = createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior() {
+    return { top: 0 };
+  },
 });
 
 router.beforeEach((to) => {

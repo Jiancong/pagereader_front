@@ -21,7 +21,7 @@ const zhCN = {
     terms: "使用条款",
     privacy: "隐私政策",
     contact: "联系我们",
-    copyright: "© 2024 SlideAI. All rights reserved.",
+    copyright: "© 2026 Bytelancers Limited. All rights reserved.",
   },
   landing: {
     heroBadge: "AI 驱动的智能演示文稿生成",
@@ -129,6 +129,10 @@ const zhCN = {
     loadingPpt: "正在加载演示文稿...",
     completeNoPptData: "生成完成，但未识别到 PPT 数据",
     loadPptFailed: "演示文稿加载失败，请检查网络或稍后重试",
+  },
+  legal: {
+    backHome: "返回首页",
+    lastUpdated: "最后更新：{date}",
   },
   common: {
     loadFailed: "加载失败",
