@@ -94,8 +94,6 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check } from 'lucide-vue-next'
-import { pushGtmDataLayerObject } from '@/composables/useGtmDataLayer'
-
 const emit = defineEmits(['select-plan'])
 
 const { t } = useI18n()
@@ -141,10 +139,6 @@ const plans = computed(() => [
 ])
 
 function onSelectPlan(planId) {
-  pushGtmDataLayerObject({
-    event: 'pricing_subscribe_intent',
-    plan_id: planId,
-  })
   emit('select-plan', planId)
 }
 </script>

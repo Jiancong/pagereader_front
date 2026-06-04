@@ -1,5 +1,4 @@
 import { defineStore } from "pinia";
-import { pushGtmEvent } from "~/composables/useGtmDataLayer";
 
 // 与 api/token 共用同一 localStorage key，保证 PptViewer 内请求与主应用同源鉴权
 const TOKEN_KEY = "pr_token";
@@ -30,7 +29,6 @@ export const useUserStore = defineStore("user", {
       this.setToken(token);
     },
     logout() {
-      pushGtmEvent("logout");
       this.isLogin = false;
       this.userInfo = {};
       this.setToken('');

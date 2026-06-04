@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
   const apiUrl = env.VITE_API_URL || env.NEXT_PUBLIC_API_BASE || ''
   const googleClientId =
     env.VITE_GOOGLE_CLIENT_ID || env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
+  const gtmId = env.VITE_GTM_ID || env.NEXT_PUBLIC_GTM_ID || ''
 
   return {
     plugins: [vue()],
@@ -20,6 +21,7 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(apiUrl),
       'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(googleClientId),
+      'import.meta.env.VITE_GTM_ID': JSON.stringify(gtmId),
     },
   }
 })

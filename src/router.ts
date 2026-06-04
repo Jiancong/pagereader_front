@@ -3,6 +3,7 @@
 
 import { createRouter, createWebHistory } from "vue-router";
 import { isLoggedIn } from "./api";
+import { pushGtmPageView } from "./composables/useGtmDataLayer";
 
 const routes = [
   {
@@ -67,4 +68,12 @@ router.beforeEach((to) => {
   // 已登录访问落地页直接进工作区（定价页可单独查看）
   if (to.name === "landing" && logged) return { name: "workspace" };
   return true;
+});
+
+router.afterEach((to) => {
+  pushGtmPageView({
+    page_path: to.fullPath,
+    page_location: typeof window !== "undefined" ? window.location.href : to.fullPath,
+    page_title: typeof document !== "undefined" ? document.title : String(to.name ?? ""),
+  });
 });
