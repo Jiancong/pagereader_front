@@ -42,7 +42,8 @@
       </div>
     </div>
 
-    <div class="border-t border-border p-3">
+    <div class="border-t border-border p-3 space-y-3">
+      <LocaleSwitcher />
       <div class="flex items-center justify-between gap-2">
         <span class="truncate text-sm text-muted-foreground">{{ nickName || t('workspace.loggedIn') }}</span>
         <button
@@ -60,6 +61,7 @@
 <script setup>
 import { Presentation, Plus, Compass, LogOut, FileText, Loader2 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import LocaleSwitcher from '../LocaleSwitcher.vue'
 
 defineProps({
   view: { type: String, default: 'new' },

@@ -22,6 +22,11 @@ const routes = [
     component: () => import("./views/DebugPptView.vue"),
   },
   {
+    path: "/pricing",
+    name: "pricing",
+    component: () => import("./views/PricingView.vue"),
+  },
+  {
     path: "/about",
     name: "about",
     component: () => import("./views/LegalView.vue"),
@@ -50,7 +55,8 @@ const routes = [
 export const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior() {
+  scrollBehavior(to) {
+    if (to.hash) return { el: to.hash, top: 80, behavior: "smooth" };
     return { top: 0 };
   },
 });
@@ -58,7 +64,7 @@ export const router = createRouter({
 router.beforeEach((to) => {
   const logged = isLoggedIn();
   if (to.meta.requiresAuth && !logged) return { name: "landing" };
-  // 已登录访问落地页直接进工作区
+  // 已登录访问落地页直接进工作区（定价页可单独查看）
   if (to.name === "landing" && logged) return { name: "workspace" };
   return true;
 });

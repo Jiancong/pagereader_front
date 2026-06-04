@@ -7,13 +7,9 @@
       @enter="goWorkspace"
     />
     <main class="pt-16">
-      <HeroSection />
-      <GeneratorSection @start="onStart" />
-      <FeatureCards />
-      <PricingSection @select-plan="onPricingPlan" />
+      <PricingSection @select-plan="onSelectPlan" />
     </main>
     <AppFooter />
-
     <AuthDialog
       :open="dialogOpen"
       :default-mode="dialogMode"
@@ -27,11 +23,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
-import HeroSection from '../components/HeroSection.vue'
-import GeneratorSection from '../components/GeneratorSection.vue'
-import FeatureCards from '../components/FeatureCards.vue'
-import PricingSection from '../components/PricingSection.vue'
 import AppFooter from '../components/AppFooter.vue'
+import PricingSection from '../components/PricingSection.vue'
 import AuthDialog from '../components/AuthDialog.vue'
 import { authApi, isLoggedIn } from '../api'
 
@@ -39,9 +32,9 @@ const router = useRouter()
 const logged = ref(false)
 const nickName = ref('')
 const dialogOpen = ref(false)
-const dialogMode = ref('login')
+const dialogMode = ref('signup')
 
-const refresh = async () => {
+onMounted(async () => {
   logged.value = isLoggedIn()
   if (!logged.value) return
   try {
@@ -51,28 +44,19 @@ const refresh = async () => {
     authApi.logout()
     logged.value = false
   }
-}
-
-onMounted(refresh)
+})
 
 const openLogin = (mode) => {
-  dialogMode.value = mode
+  dialogMode.value = mode || 'signup'
   dialogOpen.value = true
 }
 
 const goWorkspace = () => router.push('/workspace')
 
-const onLoginSuccess = () => {
-  router.push('/workspace')
-}
-
-const onStart = () => {
+const onSelectPlan = () => {
   if (isLoggedIn()) goWorkspace()
   else openLogin('signup')
 }
 
-const onPricingPlan = () => {
-  if (isLoggedIn()) goWorkspace()
-  else openLogin('signup')
-}
+const onLoginSuccess = () => router.push('/workspace')
 </script>
