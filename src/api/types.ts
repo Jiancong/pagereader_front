@@ -4,9 +4,14 @@
 // 统一响应结构
 export interface R<T> {
   code: number
-  message: string
+  message?: string
+  msg?: string
+  success?: boolean
   data: T
 }
+
+/** 积分不足（chat-stream / 计费） */
+export const CREDITS_INSUFFICIENT = "CREDITS_INSUFFICIENT"
 
 // Spring Data 分页结构
 export interface Page<T> {
@@ -209,6 +214,8 @@ export interface UploadedDocument {
 }
 
 // ===== Agent 对话流 =====
+export type PptQueue = "FAST" | "SLOW"
+
 export interface ChatStreamReq {
   message: string
   userId: string
@@ -216,4 +223,51 @@ export interface ChatStreamReq {
   sessionId?: string
   isAgent?: boolean
   uploaded_documents?: UploadedDocument[]
+  /** FAST 60 credits/run (package only); SLOW 30 credits/run (daily free first) */
+  queue?: PptQueue
+}
+
+// ===== Pricing / subscription =====
+export interface PricingPlanMonthly {
+  recurringMonth?: number
+}
+
+export interface PricingPlanCredits {
+  monthlyFastCredits?: number
+}
+
+export interface PricingPlan {
+  planType: string
+  displayName: string
+  tagline?: string
+  recommended?: boolean
+  visible?: boolean
+  monthly?: PricingPlanMonthly
+  credits?: PricingPlanCredits
+  highlights?: string[]
+  paypalPlanIds?: string[]
+}
+
+export interface CreateUserSubscriptionReq {
+  userId: number | string
+  planId: string
+  subscriptionId: string
+  orderId?: string
+}
+
+export interface SubscribeMyStatus {
+  planType?: string
+  displayName?: string
+  paypalStatus?: string
+  /** PayPal plan_id，取消订阅时使用 */
+  paypalPlanId?: string
+  planId?: string
+  subscriptionActive?: boolean
+  canCancel?: boolean
+  dailyFreeCredits?: number
+  dailyFreeCreditsRemaining?: number
+  packageCredits?: number
+  monthlyCredits?: number
+  monthlyCreditsRemaining?: number
+  [key: string]: unknown
 }

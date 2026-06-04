@@ -1,7 +1,7 @@
 // Agent 对话流（SSE）模块
 // @author hc @date 2026-06-03
 
-import { buildUrl } from "./client"
+import { buildUrl, ApiError } from "./client"
 import { getToken } from "./token"
 import type { ChatStreamReq } from "./types"
 
@@ -103,7 +103,15 @@ export async function chatStream(
 
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => "")
-    throw new Error(text || `请求失败：${res.status}`)
+    try {
+      const body = JSON.parse(text) as { code?: number | string; message?: string; msg?: string }
+      const code = body.code ?? res.status
+      const msg = body.message || body.msg || text || `请求失败：${res.status}`
+      throw new ApiError(code, msg)
+    } catch (e) {
+      if (e instanceof ApiError) throw e
+      throw new Error(text || `请求失败：${res.status}`)
+    }
   }
 
   const dispatch = async (block: string) => {

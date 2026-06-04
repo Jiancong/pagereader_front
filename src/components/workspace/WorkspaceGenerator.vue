@@ -29,6 +29,23 @@
         </div>
       </div>
 
+      <div class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
+        <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
+        <div class="mt-2 flex flex-wrap gap-3">
+          <label class="flex cursor-pointer items-center gap-2 text-sm">
+            <input v-model="queue" type="radio" value="FAST" class="accent-primary" />
+            <span>{{ t('workspace.queueFast') }}</span>
+            <span class="text-muted-foreground">({{ t('pricing.usageFastCredits') }})</span>
+          </label>
+          <label class="flex cursor-pointer items-center gap-2 text-sm">
+            <input v-model="queue" type="radio" value="SLOW" class="accent-primary" />
+            <span>{{ t('workspace.queueSlow') }}</span>
+            <span class="text-muted-foreground">({{ t('pricing.usageSlowCredits') }})</span>
+          </label>
+        </div>
+        <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.queueHint') }}</p>
+      </div>
+
       <div class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <!-- prompt -->
         <div v-if="activeTab === 'prompt'" class="p-6 sm:p-8">
@@ -94,7 +111,14 @@
 
         <!-- 错误 -->
         <div v-if="errorMsg" class="border-t border-border bg-red-500/10 px-6 py-4 text-sm text-red-400 sm:px-8">
-          {{ errorMsg }}
+          <p>{{ errorMsg }}</p>
+          <RouterLink
+            v-if="showCreditsCta"
+            to="/pricing"
+            class="mt-2 inline-block font-medium text-primary hover:underline"
+          >
+            {{ t('workspace.creditsInsufficientCta') }}
+          </RouterLink>
         </div>
 
         <!-- 进度（3 行滚动 + 动画） -->
@@ -132,11 +156,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue"
+import { ref, computed, watch } from "vue"
+import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X } from "lucide-vue-next"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
-import { authApi, fileApi, agentApi, isLoggedIn, ApiError } from "../../api"
+import { authApi, fileApi, agentApi, isLoggedIn, ApiError, isCreditsInsufficient } from "../../api"
+import type { PptQueue } from "@/api/types"
 import { resolvePptDataFromStreamComplete } from "@/utils/pptCompletePayload"
 
 const { t } = useI18n()
@@ -152,6 +178,12 @@ const logs = ref<string[]>([])
 const errorMsg = ref<string | null>(null)
 const pptData = ref<any>(null)
 const projectId = ref<string>("")
+const queue = ref<PptQueue>("FAST")
+const showCreditsCta = ref(false)
+
+watch(activeTab, (tab) => {
+  queue.value = tab === "upload" ? "SLOW" : "FAST"
+}, { immediate: true })
 
 const lastLogs = computed(() => logs.value.slice(-3))
 
@@ -201,8 +233,10 @@ const runStream = async (message: string, documents?: any[]) => {
     {
       message,
       userId,
+      projectId: projectId.value,
       sessionId: agentApi.getOrCreateSessionId(),
       isAgent: true,
+      queue: queue.value,
       uploaded_documents: documents,
     },
     {
@@ -240,11 +274,27 @@ const runStream = async (message: string, documents?: any[]) => {
   )
 }
 
+const newProjectId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `proj-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
 const startCommon = () => {
   errorMsg.value = null
+  showCreditsCta.value = false
   pptData.value = null
+  projectId.value = newProjectId()
   logs.value = []
   isGenerating.value = true
+}
+
+const handleGenerateError = (e: unknown) => {
+  if (isCreditsInsufficient(e)) {
+    showCreditsCta.value = true
+    errorMsg.value = t("workspace.creditsInsufficient")
+    return
+  }
+  errorMsg.value = e instanceof ApiError ? e.message : (e as Error)?.message || t("workspace.generateFailed")
 }
 
 const onPromptSubmit = async () => {
@@ -252,8 +302,8 @@ const onPromptSubmit = async () => {
   startCommon()
   try {
     await runStream(input.value.trim())
-  } catch (e: any) {
-    errorMsg.value = e instanceof ApiError ? e.message : e?.message || t("workspace.generateFailed")
+  } catch (e: unknown) {
+    handleGenerateError(e)
   } finally {
     isGenerating.value = false
   }
@@ -267,8 +317,8 @@ const onAnalyze = async () => {
     const doc = await fileApi.uploadDocument(uploadedFile.value)
     appendLog(t("workspace.uploadDoneAnalyzing"))
     await runStream(t("workspace.docGeneratePrompt", { name: doc.name }), [doc])
-  } catch (e: any) {
-    errorMsg.value = e instanceof ApiError ? e.message : e?.message || t("workspace.generateFailed")
+  } catch (e: unknown) {
+    handleGenerateError(e)
   } finally {
     isGenerating.value = false
   }

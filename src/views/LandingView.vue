@@ -10,7 +10,7 @@
       <HeroSection />
       <GeneratorSection @start="onStart" />
       <FeatureCards />
-      <PricingSection @select-plan="onPricingPlan" />
+      <PricingSection :user-id="userId" @select-plan="onPricingPlan" @subscribed="refresh" />
     </main>
     <AppFooter />
 
@@ -38,15 +38,18 @@ import { authApi, isLoggedIn } from '../api'
 const router = useRouter()
 const logged = ref(false)
 const nickName = ref('')
+const userId = ref(null)
 const dialogOpen = ref(false)
 const dialogMode = ref('login')
 
 const refresh = async () => {
   logged.value = isLoggedIn()
+  userId.value = null
   if (!logged.value) return
   try {
     const d = await authApi.getCurrentDetail()
     nickName.value = d?.nickName || d?.email || ''
+    userId.value = d?.id != null ? d.id : null
   } catch {
     authApi.logout()
     logged.value = false

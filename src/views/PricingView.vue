@@ -7,7 +7,7 @@
       @enter="goWorkspace"
     />
     <main class="pt-16">
-      <PricingSection @select-plan="onSelectPlan" />
+      <PricingSection :user-id="userId" @select-plan="onSelectPlan" @subscribed="refreshAuth" />
     </main>
     <AppFooter />
     <AuthDialog
@@ -31,20 +31,25 @@ import { authApi, isLoggedIn } from '../api'
 const router = useRouter()
 const logged = ref(false)
 const nickName = ref('')
+const userId = ref(null)
 const dialogOpen = ref(false)
 const dialogMode = ref('signup')
 
-onMounted(async () => {
+const refreshAuth = async () => {
   logged.value = isLoggedIn()
+  userId.value = null
   if (!logged.value) return
   try {
     const d = await authApi.getCurrentDetail()
     nickName.value = d?.nickName || d?.email || ''
+    userId.value = d?.id != null ? d.id : null
   } catch {
     authApi.logout()
     logged.value = false
   }
-})
+}
+
+onMounted(refreshAuth)
 
 const openLogin = (mode) => {
   dialogMode.value = mode || 'signup'

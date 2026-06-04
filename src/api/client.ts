@@ -54,8 +54,9 @@ async function unwrap<T>(res: Response): Promise<T> {
   } catch {
     throw new ApiError(res.status, `请求失败：${res.status}`)
   }
-  if (body.code !== 0) {
-    throw new ApiError(body.code, body.message || "请求失败")
+  const msg = body.message || body.msg || "请求失败"
+  if (body.code !== 0 && body.success !== true) {
+    throw new ApiError(body.code, msg)
   }
   return body.data
 }

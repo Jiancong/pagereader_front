@@ -6,7 +6,6 @@
         <p class="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">{{ t('pricing.subtitle') }}</p>
       </div>
 
-      <!-- 积分消耗说明 -->
       <div class="mb-14 rounded-2xl border border-border bg-card p-6 sm:p-8">
         <h3 class="text-lg font-semibold text-foreground">{{ t('pricing.howTitle') }}</h3>
         <p class="mt-1 text-sm text-muted-foreground">{{ t('pricing.howHint') }}</p>
@@ -27,59 +26,94 @@
         </div>
       </div>
 
+      <p v-if="plansLoading" class="mb-8 text-center text-sm text-muted-foreground">
+        <Loader2 class="mx-auto mb-2 h-5 w-5 animate-spin" /> {{ t('pricing.loadingPlans') }}
+      </p>
+      <p v-else-if="plansError" class="mb-8 text-center text-sm text-red-400">{{ plansError }}</p>
+
       <p class="mb-6 text-center text-sm font-medium text-muted-foreground">{{ t('pricing.packsTitle') }}</p>
       <p class="mb-8 text-center text-xs text-muted-foreground">{{ t('pricing.packsHint') }}</p>
 
-      <!-- 两档积分包 -->
       <div class="grid gap-6 md:grid-cols-2 md:gap-8">
         <div
-          v-for="plan in plans"
-          :key="plan.id"
+          v-for="plan in displayPlans"
+          :key="plan.planType"
           :class="[
             'relative flex flex-col rounded-2xl border p-6 sm:p-8',
-            plan.highlight
+            plan.recommended
               ? 'border-primary bg-card shadow-lg shadow-primary/10'
               : 'border-border bg-card',
           ]"
         >
           <span
-            v-if="plan.badge"
+            v-if="plan.tagline"
             :class="[
               'absolute -top-3 left-6 rounded-full px-3 py-1 text-xs font-semibold',
-              plan.highlight ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground',
+              plan.recommended ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground',
             ]"
           >
-            {{ plan.badge }}
+            {{ plan.tagline }}
           </span>
-          <h3 class="text-xl font-bold text-foreground">{{ plan.name }}</h3>
-          <p class="mt-2 text-3xl font-bold tracking-tight text-foreground">{{ plan.price }}</p>
-          <p class="mt-1 text-lg font-medium text-primary">{{ plan.credits }}</p>
-          <p class="mt-2 text-sm text-muted-foreground">{{ plan.equiv }}</p>
+          <h3 class="text-xl font-bold text-foreground">{{ plan.displayName }}</h3>
+          <p class="mt-2 text-3xl font-bold tracking-tight text-foreground">
+            ${{ plan.monthly?.recurringMonth ?? '—' }}<span class="text-base font-normal text-muted-foreground">/mo</span>
+          </p>
+          <p class="mt-1 text-lg font-medium text-primary">
+            {{ t('pricing.creditsPerMonth', { n: plan.credits?.monthlyFastCredits ?? '—' }) }}
+          </p>
           <ul class="mt-6 flex-1 space-y-2 text-sm text-muted-foreground">
-            <li v-for="(f, i) in plan.features" :key="i" class="flex items-start gap-2">
+            <li
+              v-for="(h, i) in plan.highlights || []"
+              :key="i"
+              class="flex items-start gap-2"
+            >
               <Check class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <span>{{ f }}</span>
+              <span>{{ h }}</span>
             </li>
           </ul>
+
+          <div v-if="userId" class="mt-8 space-y-2">
+            <div
+              v-if="paypalPlanId(plan) && paypalReady"
+              :id="paypalContainerId(plan.planType)"
+              class="min-h-[48px]"
+            />
+            <button
+              type="button"
+              class="w-full rounded-xl border border-border bg-secondary/50 py-3 text-sm font-semibold text-foreground transition-all hover:border-primary/50"
+              @click="openWechat(plan)"
+            >
+              {{ t('pricing.wechatPay') }}
+            </button>
+            <p
+              v-if="!paypalReady && paypalPlanId(plan)"
+              class="text-center text-xs text-muted-foreground"
+            >
+              {{ t('pricing.paypalNotConfigured') }}
+            </p>
+          </div>
           <button
+            v-else
             type="button"
             :class="[
               'mt-8 w-full rounded-xl py-3 text-sm font-semibold transition-all',
-              plan.highlight
+              plan.recommended
                 ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                 : 'border border-border bg-secondary/50 text-foreground hover:border-primary/50',
             ]"
-            @click="onSelectPlan(plan.id)"
+            @click="onSelectPlan(plan.planType)"
           >
-            {{ plan.cta }}
+            {{ t('pricing.starterCta') }}
           </button>
         </div>
       </div>
 
+      <p v-if="subscribeSuccess" class="mt-6 text-center text-sm text-emerald-400">{{ subscribeSuccess }}</p>
+
       <div class="mt-10 flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-center">
         <p class="text-sm text-muted-foreground">{{ t('pricing.contactHint') }}</p>
         <a
-          href="mailto:bd@bytelancers.com?subject=SlideAI%20%E7%A7%AF%E5%88%86%E5%A5%97%E9%A4%90"
+          href="mailto:bd@bytelancers.com?subject=SlideAI%20subscription"
           class="text-sm font-medium text-primary hover:underline"
         >
           {{ t('pricing.contactCta') }}
@@ -87,17 +121,43 @@
       </div>
       <p class="mt-6 text-center text-xs text-muted-foreground">{{ t('pricing.footnote') }}</p>
     </div>
+
+    <WechatPayModal
+      :open="wechatOpen"
+      :user-id="userId"
+      :plan-type="wechatPlanType"
+      :plan-name="wechatPlanName"
+      @close="wechatOpen = false"
+      @success="onWechatSuccess"
+    />
   </section>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check } from 'lucide-vue-next'
-const emit = defineEmits(['select-plan'])
+import { Check, Loader2 } from 'lucide-vue-next'
+import { pricingApi } from '@/api'
+import { isPaypalConfigured, renderPaypalSubscribeButton } from '@/utils/paypalSubscribe'
+import { notifyCreditsRefresh } from '@/composables/useCreditsRefresh'
+import WechatPayModal from '@/components/billing/WechatPayModal.vue'
+
+const props = defineProps({
+  userId: { type: [String, Number], default: null },
+})
+
+const emit = defineEmits(['select-plan', 'subscribed'])
 
 const { t } = useI18n()
 
+const plansLoading = ref(true)
+const plansError = ref(null)
+const apiPlans = ref([])
+const subscribeSuccess = ref(null)
+const paypalReady = isPaypalConfigured()
+const wechatOpen = ref(false)
+const wechatPlanType = ref('')
+const wechatPlanName = ref('')
 const usageItems = computed(() => [
   {
     key: 'slow',
@@ -113,32 +173,66 @@ const usageItems = computed(() => [
   },
 ])
 
-const plans = computed(() => [
-  {
-    id: 'starter',
-    name: t('pricing.starterName'),
-    badge: t('pricing.starterBadge'),
-    price: t('pricing.starterPrice'),
-    credits: t('pricing.starterCredits'),
-    equiv: t('pricing.starterEquiv'),
-    features: [t('pricing.starterF1'), t('pricing.starterF2'), t('pricing.starterF3')],
-    cta: t('pricing.starterCta'),
-    highlight: false,
-  },
-  {
-    id: 'pro',
-    name: t('pricing.proName'),
-    badge: t('pricing.proBadge'),
-    price: t('pricing.proPrice'),
-    credits: t('pricing.proCredits'),
-    equiv: t('pricing.proEquiv'),
-    features: [t('pricing.proF1'), t('pricing.proF2'), t('pricing.proF3')],
-    cta: t('pricing.proCta'),
-    highlight: true,
-  },
-])
+const displayPlans = computed(() => apiPlans.value)
 
-function onSelectPlan(planId) {
-  emit('select-plan', planId)
+function paypalPlanId(plan) {
+  const ids = plan.paypalPlanIds
+  return Array.isArray(ids) && ids.length ? ids[0] : null
+}
+
+function paypalContainerId(planType) {
+  return `paypal-plan-${planType}`
+}
+
+async function mountPaypalButtons() {
+  if (!props.userId || !paypalReady) return
+  await nextTick()
+  for (const plan of displayPlans.value) {
+    const planId = paypalPlanId(plan)
+    const el = document.getElementById(paypalContainerId(plan.planType))
+    if (!planId || !el) continue
+    try {
+      await renderPaypalSubscribeButton(el, planId, props.userId, async () => {
+        subscribeSuccess.value = t('pricing.subscribeSuccess')
+        await notifyCreditsRefresh()
+        emit('subscribed')
+      })
+    } catch (e) {
+      console.warn('PayPal button', plan.planType, e)
+    }
+  }
+}
+
+onMounted(async () => {
+  try {
+    apiPlans.value = await pricingApi.getPlans()
+  } catch (e) {
+    plansError.value = e?.message || t('pricing.loadPlansFailed')
+  } finally {
+    plansLoading.value = false
+    await mountPaypalButtons()
+  }
+})
+
+watch(() => props.userId, () => mountPaypalButtons())
+
+function onSelectPlan(planType) {
+  emit('select-plan', planType)
+}
+
+function openWechat(plan) {
+  if (!props.userId) {
+    onSelectPlan(plan.planType)
+    return
+  }
+  wechatPlanType.value = plan.planType
+  wechatPlanName.value = plan.displayName || plan.planType
+  wechatOpen.value = true
+}
+
+async function onWechatSuccess() {
+  subscribeSuccess.value = t('pricing.subscribeSuccess')
+  await notifyCreditsRefresh()
+  emit('subscribed')
 }
 </script>
