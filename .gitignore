@@ -11,6 +11,6 @@ __v0_jsx-dev-runtime.ts
 
 # Common ignores
 node_modules
-vue-export/dist
-.next/
+dist
+dist-ssr
 .DS_Store
