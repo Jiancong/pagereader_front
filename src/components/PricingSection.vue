@@ -10,7 +10,7 @@
       <div class="mb-14 rounded-2xl border border-border bg-card p-6 sm:p-8">
         <h3 class="text-lg font-semibold text-foreground">{{ t('pricing.howTitle') }}</h3>
         <p class="mt-1 text-sm text-muted-foreground">{{ t('pricing.howHint') }}</p>
-        <div class="mt-6 grid gap-4 sm:grid-cols-3">
+        <div class="mt-6 grid gap-4 sm:grid-cols-2">
           <div
             v-for="item in usageItems"
             :key="item.key"
@@ -102,22 +102,16 @@ const { t } = useI18n()
 
 const usageItems = computed(() => [
   {
-    key: 'outline',
-    title: t('pricing.usageOutline'),
-    credits: t('pricing.usageOutlineCredits'),
-    desc: t('pricing.usageOutlineDesc'),
+    key: 'slow',
+    title: t('pricing.usageSlow'),
+    credits: t('pricing.usageSlowCredits'),
+    desc: t('pricing.usageSlowDesc'),
   },
   {
-    key: 'ppt',
-    title: t('pricing.usagePpt'),
-    credits: t('pricing.usagePptCredits'),
-    desc: t('pricing.usagePptDesc'),
-  },
-  {
-    key: 'quick',
-    title: t('pricing.usageQuick'),
-    credits: t('pricing.usageQuickCredits'),
-    desc: t('pricing.usageQuickDesc'),
+    key: 'fast',
+    title: t('pricing.usageFast'),
+    credits: t('pricing.usageFastCredits'),
+    desc: t('pricing.usageFastDesc'),
   },
 ])
 
