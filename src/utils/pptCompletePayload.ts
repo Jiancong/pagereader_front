@@ -32,11 +32,22 @@ function pickArtifactUrl(payload: Record<string, unknown>): string | null {
   return null
 }
 
+/** OSS 产物为 artifact envelope，真正 ppt_data 在 envelope.payload */
+function unwrapArtifactEnvelope(obj: Record<string, unknown>): Record<string, unknown> {
+  const payload = asRecord(obj.payload)
+  const isEnvelope =
+    payload != null &&
+    (obj.artifact_kind != null || obj.schema_version != null || obj.sha256 != null)
+  return isEnvelope ? (payload as Record<string, unknown>) : obj
+}
+
 async function fetchPptJson(url: string): Promise<Record<string, unknown> | null> {
   const res = await fetch(url, { credentials: "omit" })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const json = await res.json()
-  return asRecord(json)
+  const obj = asRecord(json)
+  if (!obj) return null
+  return unwrapArtifactEnvelope(obj)
 }
 
 /** 将 complete 顶层元数据合并进 deck（chapter_images 等） */
