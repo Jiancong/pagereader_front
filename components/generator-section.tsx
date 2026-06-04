@@ -328,9 +328,33 @@ export function GeneratorSection({ activeTab, setActiveTab }: GeneratorSectionPr
             )}
 
             {/* 生成进度日志 */}
-            {logs.length > 0 && (
+            {(logs.length > 0 || isGenerating) && (
               <div className="border-t border-border bg-secondary/20 p-6 sm:p-8">
-                <h4 className="mb-3 font-semibold text-foreground">生成进度</h4>
+                <h4 className="mb-3 flex items-center gap-2 font-semibold text-foreground">
+                  {isGenerating && (
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                    </span>
+                  )}
+                  生成进度
+                </h4>
+
+                {/* 当前状态高亮卡片 + 流光进度条 */}
+                {isGenerating && (
+                  <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 flex-shrink-0 animate-spin text-primary" />
+                      <p className="flex-1 text-sm font-medium text-foreground">
+                        {logs.length > 0 ? logs[logs.length - 1] : "正在准备..."}
+                      </p>
+                    </div>
+                    <div className="relative mt-3 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                      <div className="pr-indeterminate-bar" />
+                    </div>
+                  </div>
+                )}
+
                 <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border bg-background/50 p-4 text-sm text-muted-foreground">
                   {logs.map((line, i) => (
                     <p key={i} className="whitespace-pre-wrap break-words">

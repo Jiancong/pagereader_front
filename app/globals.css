@@ -139,3 +139,33 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* 生成进度：不确定型流光进度条 */
+@keyframes pr-indeterminate {
+  0% {
+    left: -40%;
+    width: 40%;
+  }
+  50% {
+    width: 55%;
+  }
+  100% {
+    left: 100%;
+    width: 40%;
+  }
+}
+
+.pr-indeterminate-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--primary),
+    var(--accent),
+    transparent
+  );
+  animation: pr-indeterminate 1.4s ease-in-out infinite;
+}

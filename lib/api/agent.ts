@@ -85,7 +85,8 @@ export async function chatStream(
           ? data
           : (data as { message?: string })?.message ?? "生成失败"
       cb.onError?.(msg, data)
-    } else if (parsed.event === "progress") cb.onProgress?.(data)
+    } else if (parsed.event === "progress" || parsed.event === "ppt_progress")
+      cb.onProgress?.(data)
   }
 
   const reader = res.body.getReader()
