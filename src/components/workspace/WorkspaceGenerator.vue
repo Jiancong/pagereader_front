@@ -1,44 +1,56 @@
 <template>
-  <div :class="pptData ? 'mx-auto w-full max-w-[min(100%,96rem)]' : 'mx-auto max-w-3xl'">
-    <!-- 已生成：展示 PptViewer -->
-    <div v-if="pptData" class="rounded-2xl border border-border bg-card">
+  <div :class="activeTask.pptData ? 'mx-auto w-full max-w-[min(100%,96rem)]' : 'mx-auto max-w-3xl'">
+    <!-- Tab 切换：两套任务状态独立，可并行生成 -->
+    <div class="mb-8 flex items-center justify-center">
+        <div class="inline-flex rounded-xl border border-border bg-secondary/30 p-1.5">
+          <button :class="tabClass('prompt')" @click="activeTab = 'prompt'">
+            <MessageSquare class="h-4 w-4" />
+            {{ t('workspace.tabQuick') }}
+            <span
+              v-if="promptTask.isGenerating && activeTab !== 'prompt'"
+              class="relative ml-1 flex h-2 w-2"
+              :title="t('workspace.taskRunning')"
+            >
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+            </span>
+          </button>
+          <button :class="tabClass('upload')" @click="activeTab = 'upload'">
+            <Upload class="h-4 w-4" />
+            {{ t('workspace.tabUpload') }}
+            <span
+              v-if="ragTask.isGenerating && activeTab !== 'upload'"
+              class="relative ml-1 flex h-2 w-2"
+              :title="t('workspace.taskRunning')"
+            >
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+            </span>
+          </button>
+        </div>
+    </div>
+
+    <!-- 已生成：展示当前标签对应任务的 PptViewer -->
+    <div v-if="activeTask.pptData" class="rounded-2xl border border-border bg-card">
       <PptViewer
-        :ppt-data="pptData"
-        :project-id="projectId"
-        @close="reset"
-        @update:ppt-data="(d) => (pptData = d)"
+        :ppt-data="activeTask.pptData"
+        :project-id="activeTask.projectId"
+        @close="resetActiveTask"
+        @update:ppt-data="(d) => (activeTask.pptData = d)"
       />
     </div>
 
     <template v-else>
-      <!-- Tab 切换 -->
-      <div class="mb-8 flex items-center justify-center">
-        <div class="inline-flex rounded-xl border border-border bg-secondary/30 p-1.5">
-          <button
-            :class="tabClass('prompt')"
-            @click="activeTab = 'prompt'"
-          >
-            <MessageSquare class="h-4 w-4" /> {{ t('workspace.tabQuick') }}
-          </button>
-          <button
-            :class="tabClass('upload')"
-            @click="activeTab = 'upload'"
-          >
-            <Upload class="h-4 w-4" /> {{ t('workspace.tabUpload') }}
-          </button>
-        </div>
-      </div>
-
       <div class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
           <label class="flex cursor-pointer items-center gap-2 text-sm">
-            <input v-model="queue" type="radio" value="FAST" class="accent-primary" />
+            <input v-model="activeTask.queue" type="radio" value="FAST" class="accent-primary" />
             <span>{{ t('workspace.queueFast') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageFastCredits') }})</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2 text-sm">
-            <input v-model="queue" type="radio" value="SLOW" class="accent-primary" />
+            <input v-model="activeTask.queue" type="radio" value="SLOW" class="accent-primary" />
             <span>{{ t('workspace.queueSlow') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageSlowCredits') }})</span>
           </label>
@@ -47,7 +59,7 @@
       </div>
 
       <div class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        <!-- prompt -->
+        <!-- 一句话 / 联网搜索 -->
         <div v-if="activeTab === 'prompt'" class="p-6 sm:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.promptTitle') }}</h3>
@@ -59,19 +71,32 @@
               :placeholder="t('workspace.promptPlaceholder')"
               class="min-h-[140px] w-full resize-none rounded-xl border border-border bg-secondary/50 px-4 py-4 text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
+            <div class="flex items-start gap-3 rounded-xl border border-border bg-secondary/30 px-4 py-3">
+              <input
+                id="enable-search"
+                v-model="enableSearch"
+                type="checkbox"
+                class="mt-0.5 accent-primary"
+                :disabled="promptTask.isGenerating"
+              />
+              <label for="enable-search" class="cursor-pointer select-none">
+                <span class="text-sm font-medium text-foreground">{{ t('workspace.enableSearchLabel') }}</span>
+                <p class="mt-0.5 text-xs text-muted-foreground">{{ t('workspace.enableSearchHint') }}</p>
+              </label>
+            </div>
             <button
               type="submit"
-              :disabled="isGenerating || !input.trim()"
+              :disabled="promptTask.isGenerating || !input.trim()"
               class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Loader2 v-if="isGenerating" class="h-5 w-5 animate-spin" />
+              <Loader2 v-if="promptTask.isGenerating" class="h-5 w-5 animate-spin" />
               <Sparkles v-else class="h-5 w-5" />
-              {{ isGenerating ? t('workspace.generating') : t('workspace.generateDeck') }}
+              {{ promptTask.isGenerating ? t('workspace.generating') : t('workspace.generateDeck') }}
             </button>
           </form>
         </div>
 
-        <!-- upload -->
+        <!-- RAG 上传分析 -->
         <div v-else class="p-6 sm:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.uploadTitle') }}</h3>
@@ -104,26 +129,26 @@
             <textarea
               v-model="uploadPrompt"
               :placeholder="t('workspace.uploadPromptPlaceholder')"
-              :disabled="isGenerating"
+              :disabled="ragTask.isGenerating"
               class="min-h-[120px] w-full resize-y rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
             />
           </div>
           <button
-            :disabled="!uploadedFile || !uploadPrompt.trim() || isGenerating"
+            :disabled="!uploadedFile || !uploadPrompt.trim() || ragTask.isGenerating"
             class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             @click="onAnalyze"
           >
-            <Loader2 v-if="isGenerating" class="h-5 w-5 animate-spin" />
+            <Loader2 v-if="ragTask.isGenerating" class="h-5 w-5 animate-spin" />
             <Sparkles v-else class="h-5 w-5" />
-            {{ isGenerating ? t('workspace.analyzingDoc') : t('workspace.analyzeAndGenerate') }}
+            {{ ragTask.isGenerating ? t('workspace.analyzingDoc') : t('workspace.analyzeAndGenerate') }}
           </button>
         </div>
 
-        <!-- 错误 -->
-        <div v-if="errorMsg" class="border-t border-border bg-red-500/10 px-6 py-4 text-sm text-red-400 sm:px-8">
-          <p>{{ errorMsg }}</p>
+        <!-- 错误（当前标签任务） -->
+        <div v-if="activeTask.errorMsg" class="border-t border-border bg-red-500/10 px-6 py-4 text-sm text-red-400 sm:px-8">
+          <p>{{ activeTask.errorMsg }}</p>
           <RouterLink
-            v-if="showCreditsCta"
+            v-if="activeTask.showCreditsCta"
             to="/pricing"
             class="mt-2 inline-block font-medium text-primary hover:underline"
           >
@@ -131,19 +156,21 @@
           </RouterLink>
         </div>
 
-        <!-- 进度（3 行滚动 + 动画） -->
-        <div v-if="logs.length || isGenerating" class="border-t border-border bg-secondary/20 p-6 sm:p-8">
+        <!-- 进度（当前标签任务） -->
+        <div v-if="activeTask.logs.length || activeTask.isGenerating" class="border-t border-border bg-secondary/20 p-6 sm:p-8">
           <h4 class="mb-3 flex items-center gap-2 font-semibold text-foreground">
-            <span v-if="isGenerating" class="relative flex h-2.5 w-2.5">
+            <span v-if="activeTask.isGenerating" class="relative flex h-2.5 w-2.5">
               <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
               <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
             </span>
             {{ t('workspace.progressTitle') }}
           </h4>
-          <div v-if="isGenerating" class="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <div v-if="activeTask.isGenerating" class="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
             <div class="flex items-center gap-3">
               <Loader2 class="h-5 w-5 flex-shrink-0 animate-spin text-primary" />
-              <p class="flex-1 text-sm font-medium text-foreground">{{ logs.length ? logs[logs.length - 1] : t('workspace.preparing') }}</p>
+              <p class="flex-1 text-sm font-medium text-foreground">
+                {{ activeTask.logs.length ? activeTask.logs[activeTask.logs.length - 1] : t('workspace.preparing') }}
+              </p>
             </div>
             <div class="relative mt-3 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
               <div class="ppt-indeterminate-bar" />
@@ -151,10 +178,10 @@
           </div>
           <div class="space-y-1 rounded-lg border border-border bg-background/50 px-4 py-3 text-sm text-muted-foreground">
             <p
-              v-for="(line, i) in lastLogs"
+              v-for="(line, i) in activeLastLogs"
               :key="i"
               class="truncate"
-              :class="i === lastLogs.length - 1 ? 'text-foreground' : 'opacity-50'"
+              :class="i === activeLastLogs.length - 1 ? 'text-foreground' : 'opacity-50'"
             >
               {{ line }}
             </p>
@@ -165,8 +192,9 @@
   </div>
 </template>
 
+
 <script setup lang="ts">
-import { ref, computed, watch } from "vue"
+import { ref, computed, reactive } from "vue"
 import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X } from "lucide-vue-next"
@@ -184,31 +212,49 @@ const { t } = useI18n()
 
 const props = defineProps<{ initialPrompt?: string }>()
 
+type GeneratorTask = {
+  isGenerating: boolean
+  logs: string[]
+  errorMsg: string | null
+  pptData: any
+  projectId: string
+  queue: PptQueue
+  showCreditsCta: boolean
+}
+
+function createTask(defaultQueue: PptQueue): GeneratorTask {
+  return {
+    isGenerating: false,
+    logs: [],
+    errorMsg: null,
+    pptData: null,
+    projectId: "",
+    queue: defaultQueue,
+    showCreditsCta: false,
+  }
+}
+
+/** 一句话 / 联网搜索：独立任务 */
+const promptTask = reactive<GeneratorTask>(createTask("FAST"))
+/** RAG 文档分析：独立任务 */
+const ragTask = reactive<GeneratorTask>(createTask("SLOW"))
+
 const activeTab = ref<"prompt" | "upload">("prompt")
 const input = ref(props.initialPrompt || "")
+const enableSearch = ref(false)
 const uploadedFile = ref<File | null>(null)
 const uploadPrompt = ref("")
 const fileInput = ref<HTMLInputElement | null>(null)
-const isGenerating = ref(false)
-const logs = ref<string[]>([])
-const errorMsg = ref<string | null>(null)
-const pptData = ref<any>(null)
-const projectId = ref<string>("")
-const queue = ref<PptQueue>("FAST")
-const showCreditsCta = ref(false)
 
-watch(activeTab, (tab) => {
-  queue.value = tab === "upload" ? "SLOW" : "FAST"
-}, { immediate: true })
-
-const lastLogs = computed(() => logs.value.slice(-3))
+const activeTask = computed(() => (activeTab.value === "prompt" ? promptTask : ragTask))
+const activeLastLogs = computed(() => activeTask.value.logs.slice(-3))
 
 const tabClass = (tab: "prompt" | "upload") => [
   "flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-all",
   activeTab.value === tab ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground",
 ]
 
-const appendLog = (line: string) => logs.value.push(line)
+const appendLog = (task: GeneratorTask, line: string) => task.logs.push(line)
 
 function docBaseName(filename: string): string {
   const base = filename.split(/[/\\]/).pop() || filename
@@ -253,33 +299,40 @@ const toText = (data: unknown): string => {
   return ""
 }
 
-const runStream = async (message: string, documents?: any[], projectName?: string) => {
+const runStream = async (
+  task: GeneratorTask,
+  message: string,
+  documents?: any[],
+  projectName?: string,
+  options?: { enableSearch?: boolean },
+) => {
   const userId = await resolveUserId()
   if (!userId) {
-    errorMsg.value = t("workspace.loginRequiredGenerate")
-    isGenerating.value = false
+    task.errorMsg = t("workspace.loginRequiredGenerate")
+    task.isGenerating = false
     return
   }
+  const hasDocuments = Boolean(documents?.length)
   await agentApi.chatStream(
     {
       message,
       userId,
-      projectId: projectId.value,
-      sessionId: projectId.value,
+      projectId: task.projectId,
+      sessionId: task.projectId,
       isAgent: true,
-      queue: queue.value,
+      queue: task.queue,
       uploaded_documents: documents,
       ...(projectName ? { projectName } : {}),
+      ...(!hasDocuments ? { enable_search: options?.enableSearch ?? false } : {}),
     },
     {
-      onStarted: () => emit("project-started", projectId.value),
+      onStarted: () => emit("project-started", task.projectId),
       onProgress: (data: unknown) => {
         const line = toText(data)
-        if (line) appendLog(line)
+        if (line) appendLog(task, line)
       },
       onComplete: async (data: unknown) => {
-        // PPT 已加载则忽略后续的流结束事件（event: complete 仅 {status:complete}，无 url）
-        if (pptData.value) return
+        if (task.pptData) return
         const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
         const isPptCompletion =
           o.ppt_data_url != null ||
@@ -287,23 +340,22 @@ const runStream = async (message: string, documents?: any[], projectName?: strin
           o.ppt_data != null ||
           o.is_ppt_response === true ||
           o.ppt_generation === true
-        // 纯流结束标志（无 PPT 数据）直接跳过，避免覆盖正常结果
         if (!isPptCompletion) return
-        appendLog(t("workspace.loadingPpt"))
+        appendLog(task, t("workspace.loadingPpt"))
         try {
           const resolved = await resolvePptDataFromStreamComplete(data)
           if (resolved) {
-            pptData.value = resolved.pptData
-            if (resolved.projectId) projectId.value = resolved.projectId
-            emit("project-complete", projectId.value)
+            task.pptData = resolved.pptData
+            if (resolved.projectId) task.projectId = resolved.projectId
+            emit("project-complete", task.projectId)
           } else {
-            errorMsg.value = t("workspace.completeNoPptData")
+            task.errorMsg = t("workspace.completeNoPptData")
           }
         } catch {
-          errorMsg.value = t("workspace.loadPptFailed")
+          task.errorMsg = t("workspace.loadPptFailed")
         }
       },
-      onError: (msg: string) => (errorMsg.value = msg),
+      onError: (msg: string) => (task.errorMsg = msg),
     },
   )
 }
@@ -313,56 +365,58 @@ const newProjectId = () =>
     ? crypto.randomUUID()
     : `proj-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
-const startCommon = () => {
-  errorMsg.value = null
-  showCreditsCta.value = false
-  pptData.value = null
-  projectId.value = newProjectId()
-  logs.value = []
-  isGenerating.value = true
+const startTask = (task: GeneratorTask) => {
+  task.errorMsg = null
+  task.showCreditsCta = false
+  task.pptData = null
+  task.projectId = newProjectId()
+  task.logs = []
+  task.isGenerating = true
 }
 
-const handleGenerateError = (e: unknown) => {
+const handleGenerateError = (task: GeneratorTask, e: unknown) => {
   if (isCreditsInsufficient(e)) {
-    showCreditsCta.value = true
-    errorMsg.value = t("workspace.creditsInsufficient")
+    task.showCreditsCta = true
+    task.errorMsg = t("workspace.creditsInsufficient")
     return
   }
-  errorMsg.value = e instanceof ApiError ? e.message : (e as Error)?.message || t("workspace.generateFailed")
+  task.errorMsg = e instanceof ApiError ? e.message : (e as Error)?.message || t("workspace.generateFailed")
 }
 
 const onPromptSubmit = async () => {
-  if (!input.value.trim() || isGenerating.value) return
-  startCommon()
+  if (!input.value.trim() || promptTask.isGenerating) return
+  startTask(promptTask)
   try {
-    await runStream(input.value.trim())
+    await runStream(promptTask, input.value.trim(), undefined, undefined, {
+      enableSearch: enableSearch.value,
+    })
   } catch (e: unknown) {
-    handleGenerateError(e)
+    handleGenerateError(promptTask, e)
   } finally {
-    isGenerating.value = false
+    promptTask.isGenerating = false
   }
 }
 
 const onAnalyze = async () => {
-  if (!uploadedFile.value || isGenerating.value) return
+  if (!uploadedFile.value || ragTask.isGenerating) return
   const message = uploadPrompt.value.trim()
   if (!message) return
-  startCommon()
+  startTask(ragTask)
   try {
-    appendLog(t("workspace.uploadingDoc"))
+    appendLog(ragTask, t("workspace.uploadingDoc"))
     const doc = await fileApi.uploadDocument(uploadedFile.value)
-    appendLog(t("workspace.uploadDoneAnalyzing"))
-    await runStream(message, [doc], docBaseName(doc.name))
+    appendLog(ragTask, t("workspace.uploadDoneAnalyzing"))
+    await runStream(ragTask, message, [doc], docBaseName(doc.name))
   } catch (e: unknown) {
-    handleGenerateError(e)
+    handleGenerateError(ragTask, e)
   } finally {
-    isGenerating.value = false
+    ragTask.isGenerating = false
   }
 }
 
-const reset = () => {
-  pptData.value = null
-  projectId.value = ""
+const resetActiveTask = () => {
+  activeTask.value.pptData = null
+  activeTask.value.projectId = ""
 }
 </script>
 

@@ -229,6 +229,8 @@ export interface ChatStreamReq {
   projectName?: string
   /** FAST 60 credits/run (package only); SLOW 30 credits/run (daily free first) */
   queue?: PptQueue
+  /** 一句话生成：是否启用联网搜索；上传文档时不传 */
+  enable_search?: boolean
 }
 
 // ===== Pricing / subscription =====

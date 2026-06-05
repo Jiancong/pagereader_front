@@ -7,21 +7,22 @@
       :avatar="avatar"
       :my-projects="myProjects"
       :loading-projects="loadingProjects"
-      @new="goNew('')"
+      @new="returnToGenerator"
       @explore="view = 'explore'"
       @open-project="openProject"
       @logout="handleLogout"
     />
 
     <main class="min-w-0 flex-1 overflow-y-auto p-6 sm:p-8">
+      <!-- v-show：切换探索/历史时保持生成状态与 SSE 连接 -->
       <WorkspaceGenerator
-        v-if="view === 'new'"
+        v-show="view === 'new'"
         :key="genKey"
         :initial-prompt="genPrompt"
         @project-started="onProjectStarted"
         @project-complete="onProjectComplete"
       />
-      <ExploreGrid v-else-if="view === 'explore'" @open="openExploreItem" />
+      <ExploreGrid v-if="view === 'explore'" @open="openExploreItem" />
       <ProjectPreview
         v-else-if="view === 'project' && activeProjectId"
         :project-id="activeProjectId"
@@ -33,6 +34,8 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'WorkspaceView' })
+
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar.vue'
@@ -75,6 +78,13 @@ onMounted(async () => {
   loadProjects()
 })
 
+/** 从探索/历史回到生成页，保留进行中的任务与已生成 PPT */
+const returnToGenerator = () => {
+  activeProjectId.value = null
+  view.value = 'new'
+}
+
+/** 新建空白任务（fork 等），重置生成器 */
 const goNew = (prompt = '') => {
   genPrompt.value = typeof prompt === 'string' ? prompt : ''
   genKey.value++
@@ -109,6 +119,10 @@ const openExploreItem = (item) => {
 
 const handleLogout = () => {
   authApi.logout()
+  genKey.value++
+  view.value = 'new'
+  activeProjectId.value = null
+  myProjects.value = []
   router.push('/')
 }
 </script>
