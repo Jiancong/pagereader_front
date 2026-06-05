@@ -9179,6 +9179,39 @@ function colorRelativeLuminance(color: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+/** WCAG 对比度（1~21）；任一颜色无法解析时返回 21（视为安全，不强改） */
+function colorContrastRatio(a: string, b: string): number {
+  if (!parseCssColorToRgb(a) || !parseCssColorToRgb(b)) return 21;
+  const la = colorRelativeLuminance(a);
+  const lb = colorRelativeLuminance(b);
+  const lighter = Math.max(la, lb);
+  const darker = Math.min(la, lb);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/** 按背景亮度选可读的文字色 */
+function readableTextOn(bg: string): string {
+  return colorRelativeLuminance(bg) > 0.5 ? "#0a0a0a" : "#f5f5f5";
+}
+
+/**
+ * 兜底修正 palette 自相矛盾的情况（如后端把 text_color 与 bg_color 设成同色），
+ * 保证正文/次要文字与背景有足够对比度，避免「黑底黑字」完全不可读。
+ */
+function ensureReadablePaletteVars(vars: Record<string, string>): void {
+  const bg = vars["--ppt-bg"];
+  if (!bg || !parseCssColorToRgb(bg)) return;
+  const fallbackText = readableTextOn(bg);
+  const text = vars["--ppt-text"];
+  if (!text || colorContrastRatio(text, bg) < 3) {
+    vars["--ppt-text"] = fallbackText;
+  }
+  const textSecondary = vars["--ppt-text-secondary"];
+  if (textSecondary && colorContrastRatio(textSecondary, bg) < 2.5) {
+    vars["--ppt-text-secondary"] = fallbackText;
+  }
+}
+
 /** 将 Y 轴上限取整到「好看」的刻度，避免柱子超出最顶网格线 */
 function ceilToNiceAxisMax(value: number, tickCount = 5): number {
   if (value <= 0) return 1;
@@ -9349,10 +9382,16 @@ function resolveChartColorList(
 }
 
 const isLightPalette = computed(() => {
-  const fromScheme = resolvePptSchemeIsLight(pptSource.value.palette);
-  if (fromScheme !== null) return fromScheme;
   const bg = pptSource.value.palette?.bg_color;
-  if (bg) return colorRelativeLuminance(bg) > 0.55;
+  const bgIsLight =
+    bg && parseCssColorToRgb(bg) ? colorRelativeLuminance(bg) > 0.55 : null;
+  const fromScheme = resolvePptSchemeIsLight(pptSource.value.palette);
+  // scheme 与实际背景亮度矛盾时（如 scheme=light 但 bg 近黑），以背景为准
+  if (fromScheme !== null) {
+    if (bgIsLight !== null && bgIsLight !== fromScheme) return bgIsLight;
+    return fromScheme;
+  }
+  if (bgIsLight !== null) return bgIsLight;
   return false;
 });
 
@@ -9442,6 +9481,7 @@ const paletteStyle = computed(() => {
   accentColors.forEach((c, i) => {
     vars[`--ppt-accent-${i + 1}`] = c;
   });
+  ensureReadablePaletteVars(vars);
   return vars;
 });
 
