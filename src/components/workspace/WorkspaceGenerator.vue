@@ -88,7 +88,7 @@
                 <p class="font-medium text-foreground">{{ uploadedFile.name }}</p>
                 <p class="text-sm text-muted-foreground">{{ (uploadedFile.size / 1024 / 1024).toFixed(2) }} MB</p>
               </div>
-              <button class="ml-4 rounded-lg p-1 hover:bg-secondary" @click.stop="uploadedFile = null">
+              <button type="button" class="ml-4 rounded-lg p-1 hover:bg-secondary" @click.stop="clearUploadedFile">
                 <X class="h-5 w-5 text-muted-foreground" />
               </button>
             </div>
@@ -98,8 +98,18 @@
               <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.uploadFormatsShort') }}</p>
             </template>
           </div>
+          <div v-if="uploadedFile" class="mt-6">
+            <label class="mb-2 block text-sm font-medium text-foreground">{{ t('workspace.uploadPromptLabel') }}</label>
+            <p class="mb-2 text-xs text-muted-foreground">{{ t('workspace.uploadPromptHint') }}</p>
+            <textarea
+              v-model="uploadPrompt"
+              :placeholder="t('workspace.uploadPromptPlaceholder')"
+              :disabled="isGenerating"
+              class="min-h-[120px] w-full resize-y rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+            />
+          </div>
           <button
-            :disabled="!uploadedFile || isGenerating"
+            :disabled="!uploadedFile || !uploadPrompt.trim() || isGenerating"
             class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             @click="onAnalyze"
           >
@@ -165,6 +175,11 @@ import { authApi, fileApi, agentApi, isLoggedIn, ApiError, isCreditsInsufficient
 import type { PptQueue } from "@/api/types"
 import { resolvePptDataFromStreamComplete } from "@/utils/pptCompletePayload"
 
+const emit = defineEmits<{
+  "project-started": [projectId: string]
+  "project-complete": [projectId: string]
+}>()
+
 const { t } = useI18n()
 
 const props = defineProps<{ initialPrompt?: string }>()
@@ -172,6 +187,7 @@ const props = defineProps<{ initialPrompt?: string }>()
 const activeTab = ref<"prompt" | "upload">("prompt")
 const input = ref(props.initialPrompt || "")
 const uploadedFile = ref<File | null>(null)
+const uploadPrompt = ref("")
 const fileInput = ref<HTMLInputElement | null>(null)
 const isGenerating = ref(false)
 const logs = ref<string[]>([])
@@ -194,9 +210,24 @@ const tabClass = (tab: "prompt" | "upload") => [
 
 const appendLog = (line: string) => logs.value.push(line)
 
+function docBaseName(filename: string): string {
+  const base = filename.split(/[/\\]/).pop() || filename
+  const dot = base.lastIndexOf(".")
+  return dot > 0 ? base.slice(0, dot) : base
+}
+
 const onFileChange = (e: Event) => {
   const f = (e.target as HTMLInputElement).files?.[0]
-  if (f) uploadedFile.value = f
+  if (f) {
+    uploadedFile.value = f
+    uploadPrompt.value = t("workspace.uploadPromptDefault")
+  }
+}
+
+const clearUploadedFile = () => {
+  uploadedFile.value = null
+  uploadPrompt.value = ""
+  if (fileInput.value) fileInput.value.value = ""
 }
 
 const resolveUserId = async (): Promise<string | null> => {
@@ -222,7 +253,7 @@ const toText = (data: unknown): string => {
   return ""
 }
 
-const runStream = async (message: string, documents?: any[]) => {
+const runStream = async (message: string, documents?: any[], projectName?: string) => {
   const userId = await resolveUserId()
   if (!userId) {
     errorMsg.value = t("workspace.loginRequiredGenerate")
@@ -234,12 +265,14 @@ const runStream = async (message: string, documents?: any[]) => {
       message,
       userId,
       projectId: projectId.value,
-      sessionId: agentApi.getOrCreateSessionId(),
+      sessionId: projectId.value,
       isAgent: true,
       queue: queue.value,
       uploaded_documents: documents,
+      ...(projectName ? { projectName } : {}),
     },
     {
+      onStarted: () => emit("project-started", projectId.value),
       onProgress: (data: unknown) => {
         const line = toText(data)
         if (line) appendLog(line)
@@ -262,6 +295,7 @@ const runStream = async (message: string, documents?: any[]) => {
           if (resolved) {
             pptData.value = resolved.pptData
             if (resolved.projectId) projectId.value = resolved.projectId
+            emit("project-complete", projectId.value)
           } else {
             errorMsg.value = t("workspace.completeNoPptData")
           }
@@ -311,12 +345,14 @@ const onPromptSubmit = async () => {
 
 const onAnalyze = async () => {
   if (!uploadedFile.value || isGenerating.value) return
+  const message = uploadPrompt.value.trim()
+  if (!message) return
   startCommon()
   try {
     appendLog(t("workspace.uploadingDoc"))
     const doc = await fileApi.uploadDocument(uploadedFile.value)
     appendLog(t("workspace.uploadDoneAnalyzing"))
-    await runStream(t("workspace.docGeneratePrompt", { name: doc.name }), [doc])
+    await runStream(message, [doc], docBaseName(doc.name))
   } catch (e: unknown) {
     handleGenerateError(e)
   } finally {

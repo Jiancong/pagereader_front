@@ -30,7 +30,7 @@
           :title="p.name || p.title || p.id"
           :class="[
             'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors',
-            view === 'project' && activeProjectId === p.id
+            activeProjectId === p.id
               ? 'bg-secondary text-foreground'
               : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
           ]"

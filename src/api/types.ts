@@ -223,6 +223,8 @@ export interface ChatStreamReq {
   sessionId?: string
   isAgent?: boolean
   uploaded_documents?: UploadedDocument[]
+  /** 显式项目标题；上传 PDF 时建议传去后缀书名 */
+  projectName?: string
   /** FAST 60 credits/run (package only); SLOW 30 credits/run (daily free first) */
   queue?: PptQueue
 }

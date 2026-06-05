@@ -210,6 +210,11 @@ export default {
     uploadHint: "PDF, Word, TXT, etc.—AI extracts key content for your deck",
     pickFile: "Choose file",
     uploadFormatsShort: "PDF, Word, TXT, Markdown",
+    uploadPromptLabel: "Your analysis request",
+    uploadPromptHint: "Describe what you want from this document—you can edit the default text below.",
+    uploadPromptDefault:
+      "Extract the book's core ideas into a 12-slide reading share deck; focus on character relationships and thematic shifts…",
+    uploadPromptPlaceholder: "Edit the default request as needed…",
     analyzingDoc: "Analyzing document…",
     analyzeAndGenerate: "Analyze & generate",
     progressTitle: "Progress",

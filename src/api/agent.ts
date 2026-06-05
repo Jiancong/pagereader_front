@@ -21,6 +21,8 @@ export function getOrCreateSessionId(): string {
 
 export interface ChatStreamCallbacks {
   onEvent?: (event: string, data: unknown, raw: string) => void
+  /** SSE 连接建立、开始读流时触发（用于立刻刷新侧边栏历史） */
+  onStarted?: () => void
   onProgress?: (data: unknown) => void
   onComplete?: (data: unknown) => void | Promise<void>
   onError?: (message: string, data?: unknown) => void
@@ -113,6 +115,8 @@ export async function chatStream(
       throw new Error(text || `请求失败：${res.status}`)
     }
   }
+
+  cb.onStarted?.()
 
   const dispatch = async (block: string) => {
     const parsed = parseBlock(block)

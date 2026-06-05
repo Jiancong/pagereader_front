@@ -107,19 +107,21 @@ export async function resolvePptDataFromStreamComplete(
   const root = asRecord(payload)
   if (!root) return null
 
+  const nested = asRecord(root.pptData) ?? asRecord(root.ppt_data)
   const projectId =
     root.projectId != null
       ? String(root.projectId)
       : root.project_id != null
         ? String(root.project_id)
-        : undefined
+        : nested?.projectId != null
+          ? String(nested.projectId)
+          : undefined
 
   const inlineDeck = normalizeDeckFromArtifact(root)
   if (inlineDeck) {
     return { pptData: finalizePptData(inlineDeck, root), projectId }
   }
 
-  const nested = asRecord(root.pptData) ?? asRecord(root.ppt_data)
   if (nested) {
     const nestedDeck = normalizeDeckFromArtifact(nested)
     if (nestedDeck) {
