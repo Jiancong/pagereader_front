@@ -11,11 +11,13 @@
 | 项 | 值 |
 |----|-----|
 | 生产 Base | `https://{host}:8446/api2/...`（按部署域名） |
-| 前端来源 | `https://page2.top`（调试 `http://localhost:3000`） |
+| 前端来源 | `https://page2.top`、`https://www.page2.top`（调试 `http://localhost:3000`） |
 | CORS 允许头 | `Authorization`、`Content-Type`、`X-Project-Id`、`X-Session-Id` |
 | CORS 方法 | `GET` / `POST` / `PUT` / `DELETE` / `OPTIONS` |
 
-OSS 直传 PUT 需在阿里云控制台为 bucket **`page2top`** 配置 CORS，来源含 `https://page2.top`。
+OSS 直传 PUT 需在阿里云控制台为 bucket **`page2top`** 配置 CORS，来源含 `https://page2.top` 与 `https://www.page2.top`。
+
+预检 `OPTIONS` 须返回 200/204（见 [`BACKEND_REQUIREMENTS.md`](BACKEND_REQUIREMENTS.md) §0.1）。
 
 ---
 

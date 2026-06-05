@@ -8,9 +8,69 @@
 
 | 项 | 要求 |
 |----|------|
-| CORS | 放行来源 `https://page2.top`（及调试用 `http://localhost:3000`）；允许头含 `Authorization`、`Content-Type`、`X-Project-Id`、`X-Session-Id`；允许方法 `GET/POST/PUT/DELETE/OPTIONS`；预检 `OPTIONS` 返回 200 |
+| CORS | 见 **§0.1**（含 `www` 子域与预检验收） |
 | 统一响应 | JSON 接口返回 `{ code, message, data }`，`code=0` 成功，非 0 为业务错误 |
 | 401 | token 失效返回 HTTP 401，前端清 token 并提示重新登录 |
+
+### 0.1 CORS（Google 登录 403 根因）
+
+**现象**：用户从 `https://www.page2.top` 打开站点，前端请求 `https://page2.top/api2/...` 时，浏览器先发 **OPTIONS 预检**；当前预检返回 **403**，导致 `POST /google/login` 等接口无法调用。
+
+**根因**：前端页面 Origin 为 `https://www.page2.top`，与 API 域名 `https://page2.top` 不同，属于跨域；后端 CORS 未放行 `www` 来源，或 **Spring Security / 网关拦截了 OPTIONS**。
+
+**后端需实现**：
+
+| 项 | 要求 |
+|----|------|
+| 允许来源（Allow-Origin） | `https://page2.top`、`https://www.page2.top`、`http://localhost:3000`（开发） |
+| 允许方法 | `GET`、`POST`、`PUT`、`DELETE`、`OPTIONS` |
+| 允许请求头 | `Authorization`、`Content-Type`、`X-Project-Id`、`X-Session-Id` |
+| 预检 OPTIONS | 对 `/api2/**`（含 `/api2/google/login`）返回 **HTTP 200 或 204**，**不得 403** |
+| Allow-Credentials | 若前端带 Cookie / 凭证，需 `Access-Control-Allow-Credentials: true`，且 Allow-Origin **不能** 用 `*`，须回显具体 Origin |
+| 鉴权链 | **OPTIONS 请求不走 JWT 校验**；Security 配置中显式 `permitAll()` 或 `cors().and()` 处理预检 |
+
+**Spring Boot 参考（示意，按项目现有结构改）**：
+
+```java
+// WebMvcConfigurer 或 CorsConfigurationSource
+registry.addMapping("/api2/**")
+    .allowedOrigins(
+        "https://page2.top",
+        "https://www.page2.top",
+        "http://localhost:3000")
+    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+    .allowedHeaders("Authorization", "Content-Type", "X-Project-Id", "X-Session-Id")
+    .allowCredentials(true)
+    .maxAge(3600);
+```
+
+**验收命令**（部署后必须通过）：
+
+```bash
+# 1) www 来源预检 — 须 200/204，响应头含 Access-Control-Allow-Origin: https://www.page2.top
+curl -i -X OPTIONS "https://page2.top/api2/google/login" \
+  -H "Origin: https://www.page2.top" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type"
+
+# 2) apex 来源预检 — 同样通过
+curl -i -X OPTIONS "https://page2.top/api2/google/login" \
+  -H "Origin: https://page2.top" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type"
+
+# 3) 本地开发
+curl -i -X OPTIONS "https://page2.top/api2/google/login" \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type,authorization"
+```
+
+**说明（给后端，非本仓库改动）**：
+
+- 前端生产环境 `VITE_API_URL=https://page2.top`；用户可能从 **www** 或 **apex** 任一域名进入，两 Origin 都须放行。
+- Nginx 层做 www→apex 301 可减轻跨域，但 **不能替代** 后端 CORS；只要存在跨域 API 调用，后端就必须正确响应 OPTIONS。
+- Google OAuth：除 CORS 外，Google Cloud Console「已授权的 JavaScript 来源」需同时包含 `https://page2.top` 与 `https://www.page2.top`（前端 Google 按钮所在页面域名）。
 
 ## 1. 认证（多数已存在，确认即可）
 
