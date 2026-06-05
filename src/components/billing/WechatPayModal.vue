@@ -2,10 +2,15 @@
   <Teleport to="body">
     <div
       v-if="open"
-      class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
-      @click.self="$emit('close')"
+      class="fixed inset-0 z-[100000] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
     >
-      <div class="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
+      <div
+        class="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        @click="$emit('close')"
+      />
+      <div class="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
         <div class="flex items-start justify-between gap-3">
           <div>
             <h3 class="text-lg font-semibold text-foreground">{{ t('billing.wechatTitle') }}</h3>
@@ -134,9 +139,15 @@ async function checkPayment() {
   }
 }
 
+function setBodyScrollLocked(locked) {
+  if (typeof document === 'undefined') return
+  document.body.style.overflow = locked ? 'hidden' : ''
+}
+
 watch(
   () => [props.open, props.planType, props.userId],
   ([isOpen]) => {
+    setBodyScrollLocked(!!isOpen)
     if (isOpen) startPayment()
     else {
       stopPolling()
@@ -147,5 +158,8 @@ watch(
   },
 )
 
-onUnmounted(stopPolling)
+onUnmounted(() => {
+  stopPolling()
+  setBodyScrollLocked(false)
+})
 </script>

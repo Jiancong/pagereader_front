@@ -76,7 +76,7 @@
             <div
               v-if="paypalPlanId(plan) && paypalReady"
               :id="paypalContainerId(plan.planType)"
-              class="min-h-[48px]"
+              :class="['min-h-[48px]', wechatOpen && 'invisible pointer-events-none']"
             />
             <button
               type="button"
