@@ -1160,13 +1160,12 @@
                                   Math.abs(mapBarY(groupedBarValue(ci, si)) - barZeroY)
                                 )
                               "
-                              :fill="getSeriesColor(si)"
+                              :style="groupedBarRectStyle(si, groupedBarValue(ci, si))"
                               :class="[
                                 'ppt-bar-rect',
                                 groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
                               ]"
                               rx="2"
-                              opacity="0.88"
                             />
                           </template>
                           <text
@@ -3223,13 +3222,12 @@
                                     )
                                   )
                                 "
-                                :fill="getSeriesColor(si)"
+                                :style="groupedBarRectStyle(si, groupedBarValue(ci, si))"
                                 :class="[
                                   'ppt-bar-rect',
                                   groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
                                 ]"
                                 rx="2"
-                                opacity="0.88"
                               />
                             </template>
                             <text
@@ -4287,13 +4285,12 @@
                               Math.abs(mapBarY(groupedBarValue(ci, si)) - barZeroY)
                             )
                           "
-                          :fill="getSeriesColor(si)"
+                          :style="groupedBarRectStyle(si, groupedBarValue(ci, si))"
                           :class="[
                             'ppt-bar-rect',
                             groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
                           ]"
                           rx="3"
-                          opacity="0.88"
                         />
                       </template>
                       <text
@@ -5524,13 +5521,12 @@
                                   Math.abs(mapBarY(groupedBarValue(ci, si)) - barZeroY)
                                 )
                               "
-                              :fill="getSeriesColor(si)"
+                              :style="groupedBarRectStyle(si, groupedBarValue(ci, si))"
                               :class="[
                                 'ppt-bar-rect',
                                 groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
                               ]"
                               rx="3"
-                              opacity="0.88"
                             />
                           </template>
                           <text
@@ -6936,13 +6932,12 @@
                               Math.abs(mapBarY(groupedBarValue(ci, si)) - barZeroY)
                             )
                           "
-                          :fill="getSeriesColor(si)"
+                          :style="groupedBarRectStyle(si, groupedBarValue(ci, si))"
                           :class="[
                             'ppt-bar-rect',
                             groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
                           ]"
                           rx="3"
-                          opacity="0.88"
                         />
                       </template>
                       <text
@@ -11294,6 +11289,14 @@ function groupedBarValue(catIndex: number, seriesIndex: number): number {
   const raw = series?.values?.[catIndex];
   const n = typeof raw === "number" ? raw : Number(raw);
   return Number.isFinite(n) ? n : 0;
+}
+
+/** 分组柱 SVG 用 inline style，避免 .ppt-bar-rect { fill } 覆盖系列色 */
+function groupedBarRectStyle(seriesIndex: number, value: number): Record<string, string> {
+  return {
+    fill: value < 0 ? "#e74c3c" : getSeriesColor(seriesIndex),
+    opacity: "0.88",
+  };
 }
 
 const maxChartValue = computed(() => {
@@ -17134,6 +17137,12 @@ defineExpose({
 .ppt-chart-area .ppt-chart-svg,
 .ppt-data-chart .ppt-chart-svg {
   max-height: 160px;
+}
+
+.ppt-grouped-bar-wrap .ppt-bar-rect {
+  /* 系列色由 groupedBarRectStyle inline style 提供 */
+  fill: unset;
+  opacity: unset;
 }
 
 .ppt-bar-rect {

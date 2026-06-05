@@ -33,6 +33,12 @@ export default {
     contact: "联系我们",
     copyright: "© 2026 Bytelancers Limited. All rights reserved.",
   },
+  notFound: {
+    documentTitle: "页面未找到 — {brand}",
+    title: "页面未找到",
+    description: "您访问的页面不存在，或已被移动。",
+    backHome: "返回首页",
+  },
   common: {
     loadFailed: "加载失败",
     language: "语言",

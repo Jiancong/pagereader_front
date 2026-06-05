@@ -33,6 +33,12 @@ export default {
     contact: "Contact",
     copyright: "© 2026 Bytelancers Limited. All rights reserved.",
   },
+  notFound: {
+    documentTitle: "Page not found — {brand}",
+    title: "Page not found",
+    description: "The page you’re looking for doesn’t exist or may have been moved.",
+    backHome: "Back to home",
+  },
   common: {
     loadFailed: "Failed to load",
     language: "Language",

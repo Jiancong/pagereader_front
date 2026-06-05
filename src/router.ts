@@ -56,6 +56,11 @@ const routes = [
     component: () => import("./views/LegalView.vue"),
     props: { page: "contact" },
   },
+  {
+    path: "/:pathMatch(.*)*",
+    name: "not-found",
+    component: () => import("./views/NotFoundView.vue"),
+  },
 ];
 
 export const router = createRouter({

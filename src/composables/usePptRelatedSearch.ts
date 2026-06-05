@@ -1,7 +1,7 @@
 import { ref } from "vue";
+import { authApi, isLoggedIn } from "@/api";
 import { sendAgentChatWithStream } from "@/request/agent";
 import type { UploadedDocument } from "@/utils/pptDocumentRag";
-import { useUserStore } from "~/composables/user";
 
 export interface PptRelatedSearchImage {
   url: string;
@@ -95,8 +95,17 @@ function extractImageResults(data: Record<string, unknown>): PptRelatedSearchIma
   return results;
 }
 
+async function resolveUserId(): Promise<string | null> {
+  if (!isLoggedIn()) return null;
+  try {
+    const d = await authApi.getCurrentDetail();
+    return d?.id != null ? String(d.id) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function usePptRelatedSearch() {
-  const userStore = useUserStore();
   const state = ref<PptRelatedSearchState>({
     visible: false,
     term: "",
@@ -151,22 +160,6 @@ export function usePptRelatedSearch() {
     const term = String(options.term || "").trim();
     if (!term) return;
 
-    const userId = userStore.userInfo?.id?.toString();
-    if (!userId) {
-      state.value = {
-        visible: true,
-        term,
-        content: "",
-        imageResults: [],
-        loading: false,
-        error: "login_required",
-        isRagResponse: false,
-        knowledgeBased: false,
-        isSearchResponse: false,
-      };
-      return;
-    }
-
     closeStream();
     resetStreamFlags();
 
@@ -181,6 +174,13 @@ export function usePptRelatedSearch() {
       knowledgeBased: false,
       isSearchResponse: false,
     };
+
+    const userId = await resolveUserId();
+    if (!userId) {
+      state.value.loading = false;
+      state.value.error = "login_required";
+      return;
+    }
 
     const uploadedDocs = options.uploadedDocuments ?? [];
     const message = options.buildMessage(term, options.pptTitle);
