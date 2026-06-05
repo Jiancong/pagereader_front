@@ -1,7 +1,7 @@
 /** 简体中文 */
 export default {
   app: {
-    brand: "SlideAI",
+    brand: "Page2Top",
     company: "Bytelancers Limited",
   },
   nav: {

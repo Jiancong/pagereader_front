@@ -76,12 +76,10 @@ export async function incrementProjectView(id: string): Promise<number> {
   return postJson<number>(`/project/${encodeURIComponent(id)}/view/increment`)
 }
 
-// 我的项目列表（需登录）
-// 待后端实现契约：GET /api2/project/user/list?page={0基}&size={n}
-// 返回 R<Page<ProjectVo>>，按 updateTime 倒序
+// 我的项目列表（需登录）；page 为 0 基，按 updateTime 倒序
 export async function getMyProjects(
   page = 0,
-  size = 20,
+  size = 30,
 ): Promise<Page<ProjectVo>> {
   return get<Page<ProjectVo>>(`/project/user/list`, { query: { page, size } })
 }

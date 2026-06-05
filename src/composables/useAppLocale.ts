@@ -3,6 +3,7 @@
 
 import { watch } from "vue"
 import { useI18n } from "vue-i18n"
+import { DOCUMENT_META } from "@/documentMeta"
 
 export const LOCALE_STORAGE_KEY = "pr_locale"
 export type AppLocale = "zh-cn" | "en"
@@ -16,9 +17,29 @@ export function getSavedLocale(): AppLocale {
   return normalizeLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY))
 }
 
-export function applyDocumentLang(locale: AppLocale) {
+function setMetaDescription(content: string) {
   if (typeof document === "undefined") return
-  document.documentElement.lang = locale === "zh-cn" ? "zh-CN" : "en"
+  let el = document.querySelector('meta[name="description"]')
+  if (!el) {
+    el = document.createElement("meta")
+    el.setAttribute("name", "description")
+    document.head.appendChild(el)
+  }
+  el.setAttribute("content", content)
+}
+
+/** 同步 html lang、document.title 与 meta description */
+export function applyDocumentI18n(locale: AppLocale) {
+  if (typeof document === "undefined") return
+  const meta = DOCUMENT_META[locale]
+  document.documentElement.lang = meta.htmlLang
+  document.title = meta.title
+  setMetaDescription(meta.description)
+}
+
+/** @deprecated 使用 applyDocumentI18n */
+export function applyDocumentLang(locale: AppLocale) {
+  applyDocumentI18n(locale)
 }
 
 export function useAppLocale() {
@@ -29,7 +50,7 @@ export function useAppLocale() {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(LOCALE_STORAGE_KEY, code)
     }
-    applyDocumentLang(code)
+    applyDocumentI18n(code)
   }
 
   return {
@@ -42,9 +63,9 @@ export function useAppLocale() {
   }
 }
 
-/** 在 App 根组件挂载：同步 html lang 与 locale 变化 */
+/** 在 App 根组件挂载：同步 document 元数据与 locale 变化 */
 export function useLocaleDocumentSync() {
   const { locale } = useI18n()
-  applyDocumentLang(normalizeLocale(locale.value))
-  watch(locale, (v) => applyDocumentLang(normalizeLocale(v)))
+  applyDocumentI18n(normalizeLocale(locale.value))
+  watch(locale, (v) => applyDocumentI18n(normalizeLocale(v)))
 }

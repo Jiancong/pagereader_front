@@ -142,6 +142,8 @@ export interface ProjectVo {
   tags?: string[]
   lifecycleStatus?: string
   thumbnailUrl?: string
+  /** complete 后 PPT deck JSON 的 OSS 地址 */
+  configFilePath?: string
   categoryId?: string
   isPrivate?: boolean
   viewCount?: number
@@ -153,7 +155,7 @@ export interface ProjectVo {
 }
 
 export interface ConversationHistoryVo {
-  id: string
+  id: string | number
   projectId: string
   sessionId?: string
   role: "user" | "assistant"

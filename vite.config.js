@@ -1,6 +1,20 @@
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
+import { DOCUMENT_META } from './src/documentMeta.ts'
+
+function documentMetaBootstrapPlugin() {
+  const bootstrap = `<script>(function(){try{var K="pr_locale",M=${JSON.stringify(
+    DOCUMENT_META,
+  )};var l=localStorage.getItem(K)==="en"?"en":"zh-cn";var m=M[l];document.documentElement.lang=m.htmlLang;document.title=m.title;var e=document.querySelector('meta[name="description"]');if(e)e.setAttribute("content",m.description)}catch(x){}})()</script>`
+
+  return {
+    name: 'html-document-meta-bootstrap',
+    transformIndexHtml(html) {
+      return html.replace('</head>', `${bootstrap}\n</head>`)
+    },
+  }
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -13,7 +27,7 @@ export default defineConfig(({ mode }) => {
     env.VITE_PAYPAL_CLIENT_ID || env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || ''
 
   return {
-    plugins: [vue()],
+    plugins: [vue(), documentMetaBootstrapPlugin()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

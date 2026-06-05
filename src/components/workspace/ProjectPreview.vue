@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto max-w-5xl">
+  <div :class="pptData ? 'mx-auto w-full max-w-[min(100%,96rem)]' : 'mx-auto max-w-5xl'">
     <button
       class="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       @click="$emit('back')"
@@ -26,7 +26,15 @@
         </button>
       </div>
 
-      <div v-if="images.length" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div v-if="pptData" class="mb-8 rounded-2xl border border-border bg-card">
+        <PptViewer
+          :ppt-data="pptData"
+          :project-id="projectId"
+          @update:ppt-data="(d) => (pptData = d)"
+        />
+      </div>
+
+      <div v-else-if="images.length" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <img
           v-for="(src, i) in images"
           :key="i"
@@ -36,7 +44,15 @@
           class="w-full rounded-xl border border-border"
         />
       </div>
-      <p v-else class="rounded-xl border border-border bg-secondary/20 px-4 py-8 text-center text-sm text-muted-foreground">{{ t('workspace.noPreviewImages') }}</p>
+      <p
+        v-else-if="!loadingDeck"
+        class="rounded-xl border border-border bg-secondary/20 px-4 py-8 text-center text-sm text-muted-foreground"
+      >
+        {{ t('workspace.noPreviewImages') }}
+      </p>
+      <p v-else class="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+        <Loader2 class="h-5 w-5 animate-spin" /> {{ t('workspace.loadingPpt') }}
+      </p>
 
       <div v-if="history.length" class="mt-8">
         <h3 class="mb-3 font-semibold text-foreground">{{ t('workspace.chatHistory') }}</h3>
@@ -62,7 +78,9 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2, Sparkles, ArrowLeft } from 'lucide-vue-next'
-import { feedApi } from '../../api'
+import PptViewer from '@/components/editor/chat/PptViewer.vue'
+import { projectApi } from '../../api'
+import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
 
 const props = defineProps({ projectId: { type: String, required: true } })
 const emit = defineEmits(['back', 'fork'])
@@ -71,24 +89,75 @@ const { t } = useI18n()
 
 const project = ref(null)
 const history = ref([])
+const pptData = ref(null)
 const loading = ref(false)
+const loadingDeck = ref(false)
 const error = ref(null)
 
-const images = computed(() => history.value.flatMap((h) => h.imageUrls ?? []))
+const previewImageUrls = computed(() =>
+  history.value.flatMap((h) => (h.imageUrls ?? []).filter((u) => !looksLikeDeckJson(u))),
+)
+
+const images = computed(() => {
+  if (project.value?.thumbnailUrl) {
+    return [project.value.thumbnailUrl, ...previewImageUrls.value]
+  }
+  return previewImageUrls.value
+})
+
 const firstUserMsg = computed(() => history.value.find((h) => h.role === 'user')?.content || '')
+
+function looksLikeDeckJson(url) {
+  const s = String(url || '').toLowerCase()
+  return s.endsWith('.json') || s.includes('/projects/') || s.includes('ppt_data')
+}
+
+function collectDeckUrls(proj, hist) {
+  const urls = []
+  if (proj?.configFilePath) urls.push(proj.configFilePath)
+  const assistantRows = [...hist].reverse().filter((h) => h.role === 'assistant')
+  for (const row of assistantRows) {
+    for (const url of row.imageUrls ?? []) {
+      if (looksLikeDeckJson(url)) urls.push(url)
+    }
+  }
+  return [...new Set(urls)]
+}
+
+async function loadPptDeck(id, proj, hist) {
+  const urls = collectDeckUrls(proj, hist)
+  if (!urls.length) return
+  loadingDeck.value = true
+  try {
+    for (const ppt_data_url of urls) {
+      const resolved = await resolvePptDataFromStreamComplete({ projectId: id, ppt_data_url })
+      if (resolved?.pptData) {
+        pptData.value = resolved.pptData
+        return
+      }
+    }
+  } catch {
+    /* 无 deck 时降级为缩略图/对话历史 */
+  } finally {
+    loadingDeck.value = false
+  }
+}
 
 const run = async (id) => {
   loading.value = true
+  loadingDeck.value = false
   error.value = null
   project.value = null
   history.value = []
+  pptData.value = null
   try {
     const [proj, hist] = await Promise.all([
-      feedApi.getProject(id),
-      feedApi.getProjectConversationHistory(id).catch(() => []),
+      projectApi.getProject(id),
+      projectApi.getProjectConversationHistory(id).catch(() => []),
     ])
     project.value = proj
     history.value = hist
+    await loadPptDeck(id, proj, hist)
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')
   } finally {

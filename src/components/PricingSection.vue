@@ -122,7 +122,7 @@
       <div class="mt-10 flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-center">
         <p class="text-sm text-muted-foreground">{{ t('pricing.contactHint') }}</p>
         <a
-          href="mailto:bd@bytelancers.com?subject=SlideAI%20subscription"
+          href="mailto:bd@bytelancers.com?subject=page2top%20subscription"
           class="text-sm font-medium text-primary hover:underline"
         >
           {{ t('pricing.contactCta') }}

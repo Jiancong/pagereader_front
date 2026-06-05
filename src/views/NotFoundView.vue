@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Home } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
@@ -47,7 +47,7 @@ import AppHeader from '../components/AppHeader.vue'
 import AppFooter from '../components/AppFooter.vue'
 import { isLoggedIn } from '../api'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -60,9 +60,12 @@ const attemptedPath = computed(() => {
   return typeof raw === 'string' && raw ? `/${raw}` : route.fullPath
 })
 
-onMounted(() => {
+const syncDocumentTitle = () => {
   document.title = t('notFound.documentTitle', { brand: t('app.brand') })
-})
+}
+
+onMounted(syncDocumentTitle)
+watch(locale, syncDocumentTitle)
 
 const goHome = () => router.push('/')
 const goWorkspace = () => router.push('/workspace')

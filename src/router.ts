@@ -4,6 +4,8 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { isLoggedIn } from "./api";
 import { pushGtmPageView } from "./composables/useGtmDataLayer";
+import { applyDocumentI18n, normalizeLocale } from "./composables/useAppLocale";
+import { i18n } from "./i18n";
 
 const routes = [
   {
@@ -81,6 +83,9 @@ router.beforeEach((to) => {
 });
 
 router.afterEach((to) => {
+  if (to.name !== "not-found") {
+    applyDocumentI18n(normalizeLocale(i18n.global.locale.value));
+  }
   pushGtmPageView({
     page_path: to.fullPath,
     page_location: typeof window !== "undefined" ? window.location.href : to.fullPath,

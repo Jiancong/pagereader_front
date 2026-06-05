@@ -36,7 +36,14 @@
           ]"
           @click="$emit('open-project', p.id)"
         >
-          <FileText class="h-4 w-4 flex-shrink-0" />
+          <img
+            v-if="p.thumbnailUrl"
+            :src="p.thumbnailUrl"
+            alt=""
+            class="h-8 w-8 flex-shrink-0 rounded object-cover"
+            loading="lazy"
+          />
+          <FileText v-else class="h-4 w-4 flex-shrink-0" />
           <span class="truncate">{{ p.name || p.title || t('workspace.unnamedProject') }}</span>
         </button>
       </div>
