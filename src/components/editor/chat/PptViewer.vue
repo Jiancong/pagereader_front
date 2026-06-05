@@ -960,9 +960,9 @@
                   <!-- 折线图 line -->
                   <div v-if="slide.chart.type === 'line'" class="ppt-line-chart-wrap">
                     <!-- 图例 -->
-                    <div v-if="slide.chart.series_names?.length" class="ppt-line-legend">
+                    <div v-if="lineChartLegendItems.length" class="ppt-line-legend">
                       <span
-                        v-for="(sn, si) in slide.chart.series_names"
+                        v-for="(sn, si) in lineChartLegendItems"
                         :key="'sleg' + si"
                         class="ppt-line-legend-item"
                       >
@@ -1016,6 +1016,57 @@
                           stroke-width="0.5"
                         />
                       </template>
+                      <template v-if="isMultiSeriesLine">
+                        <template
+                          v-for="(s, si) in lineChartSeriesList"
+                          :key="'cml' + si"
+                        >
+                          <polyline
+                            :points="lineSeriesPoints(si)"
+                            class="ppt-polyline"
+                            fill="none"
+                            :style="chartStrokeStyle(si)"
+                          />
+                        </template>
+                        <template
+                          v-for="(cat, ci) in lineChartCategories"
+                          :key="'clx' + ci"
+                        >
+                          <text
+                            :x="lineCategoryLabelX(ci)"
+                            :y="
+                              shouldRotateLabels
+                                ? LINE_CHART_X_CAT_Y_ROTATED
+                                : LINE_CHART_X_CAT_Y
+                            "
+                            class="ppt-chart-label"
+                            :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
+                            :transform="
+                              shouldRotateLabels
+                                ? `rotate(-45, ${lineCategoryLabelX(ci)}, ${LINE_CHART_X_CAT_Y_ROTATED})`
+                                : undefined
+                            "
+                            :style="shouldRotateLabels ? 'font-size: 8px' : ''"
+                          >
+                            {{ cat }}
+                          </text>
+                        </template>
+                        <template
+                          v-for="(s, si) in lineChartSeriesList"
+                          :key="'cld' + si"
+                        >
+                          <circle
+                            v-for="(cat, ci) in lineChartCategories"
+                            :key="'cld' + si + '-' + ci"
+                            :cx="lineCategoryLabelX(ci)"
+                            :cy="mapLineY(lineSeriesValue(ci, si))"
+                            r="4"
+                            class="ppt-line-dot"
+                            :style="chartFillStyle(si)"
+                          />
+                        </template>
+                      </template>
+                      <template v-else>
                       <!-- 主线 -->
                       <polyline
                         :points="linePoints"
@@ -1029,6 +1080,7 @@
                         :points="multiLinePoints.secondary"
                         class="ppt-polyline ppt-line-secondary"
                         fill="none"
+                        :style="chartStrokeStyle(1)"
                       />
                       <!-- 第三条线 (tertiary) -->
                       <polyline
@@ -1036,6 +1088,7 @@
                         :points="multiLinePoints.tertiary"
                         class="ppt-polyline ppt-line-tertiary"
                         fill="none"
+                        :style="chartStrokeStyle(2)"
                       />
                       <template v-for="(d, di) in slide.chart.data" :key="'cl' + di">
                         <circle
@@ -1065,6 +1118,7 @@
                         >
                           {{ d.label }}
                         </text>
+                      </template>
                       </template>
                     </svg>
                   </div>
@@ -5660,12 +5714,28 @@
                   </template>
 
                   <!-- ═══ 折线图 line（支持多线） ═══ -->
-                  <svg
+                  <div
                     v-else-if="slide.chart.type === 'line'"
-                    class="ppt-chart-svg"
-                    :viewBox="LINE_CHART_VIEWBOX"
-                    preserveAspectRatio="xMidYMid meet"
+                    class="ppt-line-chart-wrap"
                   >
+                    <div v-if="lineChartLegendItems.length" class="ppt-line-legend">
+                      <span
+                        v-for="(label, si) in lineChartLegendItems"
+                        :key="'dl-leg' + si"
+                        class="ppt-line-legend-item"
+                      >
+                        <span
+                          class="ppt-line-legend-dot"
+                          :style="{ background: getSeriesColor(si) }"
+                        ></span>
+                        {{ label }}
+                      </span>
+                    </div>
+                    <svg
+                      class="ppt-chart-svg"
+                      :viewBox="LINE_CHART_VIEWBOX"
+                      preserveAspectRatio="xMidYMid meet"
+                    >
                     <!-- Y轴标签（左） -->
                     <text
                       v-if="slide.chart.y_label"
@@ -5706,6 +5776,57 @@
                         stroke-width="0.5"
                       />
                     </template>
+                    <template v-if="isMultiSeriesLine">
+                      <template
+                        v-for="(s, si) in lineChartSeriesList"
+                        :key="'dml' + si"
+                      >
+                        <polyline
+                          :points="lineSeriesPoints(si)"
+                          class="ppt-polyline"
+                          fill="none"
+                          :style="chartStrokeStyle(si)"
+                        />
+                      </template>
+                      <template
+                        v-for="(cat, ci) in lineChartCategories"
+                        :key="'dlx' + ci"
+                      >
+                        <text
+                          :x="lineCategoryLabelX(ci)"
+                          :y="
+                            shouldRotateLabels
+                              ? LINE_CHART_X_CAT_Y_ROTATED
+                              : LINE_CHART_X_CAT_Y
+                          "
+                          class="ppt-chart-label"
+                          :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
+                          :transform="
+                            shouldRotateLabels
+                              ? `rotate(-45, ${lineCategoryLabelX(ci)}, ${LINE_CHART_X_CAT_Y_ROTATED})`
+                              : undefined
+                          "
+                          :style="shouldRotateLabels ? 'font-size: 8px' : ''"
+                        >
+                          {{ cat }}
+                        </text>
+                      </template>
+                      <template
+                        v-for="(s, si) in lineChartSeriesList"
+                        :key="'dld' + si"
+                      >
+                        <circle
+                          v-for="(cat, ci) in lineChartCategories"
+                          :key="'dld' + si + '-' + ci"
+                          :cx="lineCategoryLabelX(ci)"
+                          :cy="mapLineY(lineSeriesValue(ci, si))"
+                          r="4"
+                          class="ppt-line-dot"
+                          :style="chartFillStyle(si)"
+                        />
+                      </template>
+                    </template>
+                    <template v-else>
                     <!-- 主线 -->
                     <polyline
                       :points="linePoints"
@@ -5748,6 +5869,7 @@
                       :points="multiLinePoints.secondary"
                       class="ppt-polyline ppt-line-secondary"
                       fill="none"
+                      :style="chartStrokeStyle(1)"
                     />
                     <!-- 第三条线 (tertiary) -->
                     <polyline
@@ -5755,8 +5877,9 @@
                       :points="multiLinePoints.tertiary"
                       class="ppt-polyline ppt-line-tertiary"
                       fill="none"
+                      :style="chartStrokeStyle(2)"
                     />
-                    <!-- 图例 -->
+                    <!-- 图例（legacy 内嵌） -->
                     <template v-if="slide.chart.primary_data_label">
                       <rect
                         x="55"
@@ -5796,7 +5919,9 @@
                         </text>
                       </template>
                     </template>
-                  </svg>
+                    </template>
+                    </svg>
+                  </div>
 
                   <!-- ═══ 面积图 area ═══ -->
                   <svg
@@ -7235,11 +7360,11 @@
                 class="ppt-line-chart-wrap"
               >
                 <div
-                  v-if="slide.chart.series_names?.length"
+                  v-if="lineChartLegendItems.length"
                   class="ppt-line-legend"
                 >
                   <span
-                    v-for="(sn, si) in slide.chart.series_names"
+                    v-for="(sn, si) in lineChartLegendItems"
                     :key="'dfl-leg' + si"
                     class="ppt-line-legend-item"
                   >
@@ -7293,6 +7418,55 @@
                     stroke-width="0.5"
                   />
                 </template>
+                <template v-if="isMultiSeriesLine">
+                  <template
+                    v-for="(s, si) in lineChartSeriesList"
+                    :key="'dfml' + si"
+                  >
+                    <polyline
+                      :points="lineSeriesPoints(si)"
+                      class="ppt-polyline"
+                      fill="none"
+                      :style="chartStrokeStyle(si)"
+                    />
+                  </template>
+                  <template
+                    v-for="(cat, ci) in lineChartCategories"
+                    :key="'dfxl' + ci"
+                  >
+                    <text
+                      :x="lineCategoryLabelX(ci)"
+                      :y="
+                        shouldRotateLabels ? LINE_CHART_X_CAT_Y_ROTATED : LINE_CHART_X_CAT_Y
+                      "
+                      class="ppt-chart-label"
+                      :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
+                      :transform="
+                        shouldRotateLabels
+                          ? `rotate(-45, ${lineCategoryLabelX(ci)}, ${LINE_CHART_X_CAT_Y_ROTATED})`
+                          : undefined
+                      "
+                      :style="shouldRotateLabels ? 'font-size: 8px' : ''"
+                    >
+                      {{ cat }}
+                    </text>
+                  </template>
+                  <template
+                    v-for="(s, si) in lineChartSeriesList"
+                    :key="'dfld' + si"
+                  >
+                    <circle
+                      v-for="(cat, ci) in lineChartCategories"
+                      :key="'dfld' + si + '-' + ci"
+                      :cx="lineCategoryLabelX(ci)"
+                      :cy="mapLineY(lineSeriesValue(ci, si))"
+                      r="4"
+                      class="ppt-line-dot"
+                      :style="chartFillStyle(si)"
+                    />
+                  </template>
+                </template>
+                <template v-else>
                 <polyline
                   :points="linePoints"
                   class="ppt-polyline"
@@ -7347,6 +7521,7 @@
                   >
                     {{ d.label }}
                   </text>
+                </template>
                 </template>
               </svg>
               </div>
@@ -9664,8 +9839,35 @@ function normalizeCategoriesSeriesChart(
   }
 
   if (chart.type === "line" || chart.type === "area") {
-    const built = buildLineAreaChartFromSeriesList(axisLabels, seriesList);
-    if (built) return { ...chart, categories: axisLabels, labels: axisLabels, ...built };
+    if (seriesList.length === 1) {
+      const built = buildLineAreaChartFromSeriesList(axisLabels, seriesList);
+      if (built) {
+        const names = built.series_names ?? [];
+        return {
+          ...chart,
+          categories: axisLabels,
+          labels: axisLabels,
+          data: built.data,
+          ...(names.length ? { series_names: names } : {}),
+          ...(chart.y_label?.trim() || chart.yLabel?.trim()
+            ? { y_label: chart.y_label?.trim() || chart.yLabel?.trim() }
+            : built.y_label
+              ? { y_label: built.y_label }
+              : {}),
+        };
+      }
+    }
+    const names = data.map((s) => s.name).filter(Boolean);
+    return {
+      ...chart,
+      categories: axisLabels,
+      labels: axisLabels,
+      data: data as ChartDataItem[],
+      ...(names.length ? { series_names: names } : {}),
+      ...(chart.y_label?.trim() || chart.yLabel?.trim()
+        ? { y_label: chart.y_label?.trim() || chart.yLabel?.trim() }
+        : {}),
+    };
   }
 
   const rowChartTypes = ["pie", "funnel", "horizontal_bar", "waterfall"] as const;
@@ -9738,6 +9940,14 @@ function normalizeLineAreaFromLabelsDatasets(chart: PptChart): PptChart | undefi
   if (chart.type !== "line" && chart.type !== "area") return undefined;
   const pack = readChartLabelsAndDatasets(chart);
   if (!pack?.labels.length || !pack.datasets.length) return undefined;
+  if (pack.datasets.length > 1) {
+    return normalizeCategoriesSeriesChart(chart, {
+      labels: pack.labels,
+      categories: pack.labels,
+      datasets: pack.datasets,
+      series: pack.datasets,
+    });
+  }
   const built = buildLineAreaChartFromSeriesList(pack.labels, pack.datasets);
   if (!built) return undefined;
   return {
@@ -11299,11 +11509,102 @@ function groupedBarRectStyle(seriesIndex: number, value: number): Record<string,
   };
 }
 
+function getLineChartSeriesRows(chart: PptChart | undefined): ChartDataItem[] {
+  if (!chart || (chart.type !== "line" && chart.type !== "area")) return [];
+  return (chart.data ?? []).filter((d) => Array.isArray(d.values) && d.values.length > 0);
+}
+
+function isMultiSeriesLineChart(chart: PptChart | undefined): boolean {
+  if (!chart || (chart.type !== "line" && chart.type !== "area")) return false;
+  const rows = chart.data ?? [];
+  const seriesRows = getLineChartSeriesRows(chart);
+  if (seriesRows.length <= 1) return false;
+  const simpleRows = rows.filter(
+    (d) =>
+      d.label != null &&
+      d.value != null &&
+      Number.isFinite(Number(d.value)) &&
+      !(Array.isArray(d.values) && d.values.length)
+  );
+  if (simpleRows.length === rows.length) return false;
+  const cats = chart.categories ?? chart.labels ?? [];
+  return cats.length > 0 && seriesRows.length > 1;
+}
+
+const isMultiSeriesLine = computed(() => isMultiSeriesLineChart(slide.value?.chart));
+
+const lineChartCategories = computed(() => {
+  const chart = slide.value?.chart;
+  if (!chart || !isMultiSeriesLine.value) return [] as string[];
+  return (chart.categories ?? chart.labels ?? []).map((c) => String(c));
+});
+
+const lineChartSeriesList = computed(() => {
+  if (!isMultiSeriesLine.value) return [] as ChartDataItem[];
+  return getLineChartSeriesRows(slide.value?.chart);
+});
+
+const lineChartLegendItems = computed(() => {
+  const chart = slide.value?.chart;
+  if (!chart) return [] as string[];
+  if (isMultiSeriesLine.value) {
+    return lineChartSeriesList.value.map(groupedBarSeriesLabel).filter(Boolean);
+  }
+  if (chart.series_names?.length) return chart.series_names;
+  return [chart.primary_data_label, chart.secondary_data_label, chart.tertiary_data_label]
+    .filter((l): l is string => !!String(l || "").trim())
+    .map((l) => String(l).trim());
+});
+
+function lineSeriesValue(catIndex: number, seriesIndex: number): number {
+  const series = lineChartSeriesList.value[seriesIndex];
+  const raw = series?.values?.[catIndex];
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function lineCategoryLabelX(
+  catIndex: number,
+  layout: keyof typeof GROUPED_BAR_PLOT = "full"
+): number {
+  const n = lineChartCategories.value.length || 1;
+  const left = layout === "compact" ? 35 : 55;
+  const width = layout === "compact" ? 340 : 400;
+  return left + catIndex * (width / Math.max(n - 1, 1));
+}
+
+function lineSeriesPoints(
+  seriesIndex: number,
+  layout: keyof typeof GROUPED_BAR_PLOT = "full"
+): string {
+  const cats = lineChartCategories.value;
+  if (!cats.length) return "";
+  const n = cats.length;
+  if (layout === "compact") {
+    const { min: yMin, range: yRange } = lineChartYRange.value;
+    return cats
+      .map((_, ci) => {
+        const x = lineCategoryLabelX(ci, layout);
+        const y =
+          165 - ((lineSeriesValue(ci, seriesIndex) - yMin) / yRange) * 140;
+        return `${x},${y}`;
+      })
+      .join(" ");
+  }
+  return cats
+    .map((_, ci) => {
+      const x = lineCategoryLabelX(ci, layout);
+      const y = mapLineY(lineSeriesValue(ci, seriesIndex));
+      return `${x},${y}`;
+    })
+    .join(" ");
+}
+
 const maxChartValue = computed(() => {
   const chart = slide.value?.chart;
   if (!chart || !chart.data?.length) return 1;
-  // For grouped bar, find max across all values arrays
-  if (isGroupedBar.value) {
+  // For grouped bar / multi-series line, find max across all values arrays
+  if (isGroupedBar.value || isMultiSeriesLine.value) {
     let mx = 0;
     chart.data.forEach((d) => {
       if (d.values?.length)
@@ -11579,14 +11880,24 @@ const lineChartYRange = computed(() => {
   const chart = slide.value?.chart;
   if (!chart || !["line", "area"].includes(chart.type) || !chart.data?.length)
     return { min: 0, max: 1, range: 1 };
-  let allVals: number[] = chart.data.map((d) => d.value);
-  // 也考虑 secondary_value / tertiary_value
-  chart.data.forEach((d) => {
-    if (d.secondary_value !== undefined) allVals.push(d.secondary_value);
-    if (d.tertiary_value !== undefined) allVals.push(d.tertiary_value);
-  });
-  if (chart.secondary_data?.length) {
-    allVals = allVals.concat(chartSecondarySeries(chart).map((d) => d.value));
+  let allVals: number[] = [];
+  if (isMultiSeriesLine.value) {
+    lineChartSeriesList.value.forEach((s) => {
+      (s.values ?? []).forEach((v) => {
+        const n = typeof v === "number" ? v : Number(v);
+        if (Number.isFinite(n)) allVals.push(n);
+      });
+    });
+  } else {
+    allVals = chart.data.map((d) => d.value);
+    // 也考虑 secondary_value / tertiary_value
+    chart.data.forEach((d) => {
+      if (d.secondary_value !== undefined) allVals.push(d.secondary_value);
+      if (d.tertiary_value !== undefined) allVals.push(d.tertiary_value);
+    });
+    if (chart.secondary_data?.length) {
+      allVals = allVals.concat(chartSecondarySeries(chart).map((d) => d.value));
+    }
   }
   let yMin = Math.min(...allVals);
   let yMax = Math.max(...allVals);
@@ -13842,6 +14153,31 @@ async function exportPPTX() {
 
       // ── 折线图 line ──
       if (chart.type === "line") {
+        if (isMultiSeriesLineChart(chart)) {
+          const cats = (chart.categories ?? chart.labels ?? []).map((c) => String(c));
+          const seriesRows = getLineChartSeriesRows(chart);
+          const series = seriesRows.map((s) => ({
+            name: groupedBarSeriesLabel(s) || t("agent.pptValueLabel"),
+            labels: cats,
+            values: cats.map((_, i) => s.values?.[i] ?? 0),
+          }));
+          pptSlide.addChart((pptx as any).ChartType.line, series, {
+            x,
+            y,
+            w,
+            h,
+            chartColors: seriesColors,
+            showLegend: series.length > 1,
+            legendPos: "b",
+            legendFontSize: 9,
+            legendColor: textHex,
+            valAxisLabelColor: textHex,
+            catAxisLabelColor: textHex,
+            lineDataSymbol: "circle",
+            lineDataSymbolSize: 6,
+          });
+          return;
+        }
         const series: any[] = [
           {
             name: chart.y_label || t("agent.pptValueLabel"),
