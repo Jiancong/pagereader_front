@@ -9,14 +9,24 @@
       </div>
 
       <nav class="hidden items-center gap-8 md:flex">
-        <a href="#features" class="text-sm text-muted-foreground transition-colors hover:text-foreground">{{ t('nav.features') }}</a>
+        <RouterLink
+          :to="{ path: '/', hash: '#features' }"
+          class="text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {{ t('nav.features') }}
+        </RouterLink>
         <RouterLink
           to="/pricing"
           class="text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           {{ t('nav.pricing') }}
         </RouterLink>
-        <a href="#docs" class="text-sm text-muted-foreground transition-colors hover:text-foreground">{{ t('nav.docs') }}</a>
+        <RouterLink
+          to="/story"
+          class="text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {{ t('nav.story') }}
+        </RouterLink>
       </nav>
 
       <div class="flex items-center gap-3">

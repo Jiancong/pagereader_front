@@ -34,7 +34,7 @@
       <p class="mb-6 text-center text-sm font-medium text-muted-foreground">{{ t('pricing.packsTitle') }}</p>
       <p class="mb-8 text-center text-xs text-muted-foreground">{{ t('pricing.packsHint') }}</p>
 
-      <div class="grid gap-6 md:grid-cols-2 md:gap-8">
+      <div class="grid gap-6 md:grid-cols-3 md:gap-8">
         <div
           v-for="plan in displayPlans"
           :key="plan.planType"
@@ -56,10 +56,15 @@
           </span>
           <h3 class="text-xl font-bold text-foreground">{{ plan.displayName }}</h3>
           <p class="mt-2 text-3xl font-bold tracking-tight text-foreground">
-            ${{ plan.monthly?.recurringMonth ?? '—' }}<span class="text-base font-normal text-muted-foreground">/mo</span>
+            <template v-if="plan.isFree">{{ t('pricing.freeName') }}</template>
+            <template v-else>
+              ${{ plan.monthly?.recurringMonth ?? '—' }}<span class="text-base font-normal text-muted-foreground">/mo</span>
+            </template>
           </p>
-          <p class="mt-1 text-lg font-medium text-primary">
-            {{ t('pricing.creditsPerMonth', { n: plan.credits?.monthlyFastCredits ?? '—' }) }}
+          <p class="mt-1 text-lg font-medium text-primary">{{ creditsLabel(plan) }}</p>
+          <p class="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <HardDrive class="h-4 w-4 shrink-0 text-primary" />
+            {{ t('pricing.storageLabel', { size: storageLabel(plan) }) }}
           </p>
           <ul class="mt-6 flex-1 space-y-2 text-sm text-muted-foreground">
             <li
@@ -72,19 +77,23 @@
             </li>
           </ul>
 
-          <div v-if="userId" class="mt-8 space-y-2">
+          <button
+            v-if="plan.isFree"
+            type="button"
+            class="mt-8 w-full rounded-xl border border-border bg-secondary/50 py-3 text-sm font-semibold text-foreground transition-all hover:border-primary/50"
+            @click="onSelectPlan(plan.planType)"
+          >
+            {{ t('pricing.freeCta') }}
+          </button>
+          <div v-else-if="userId" class="mt-8 space-y-2">
             <div
               v-if="paypalPlanId(plan) && paypalReady"
               :id="paypalContainerId(plan.planType)"
               :class="['min-h-[48px]', wechatOpen && 'invisible pointer-events-none']"
             />
-            <button
-              type="button"
-              class="w-full rounded-xl border border-border bg-secondary/50 py-3 text-sm font-semibold text-foreground transition-all hover:border-primary/50"
-              @click="openWechat(plan)"
-            >
+            <WechatPayButton @click="openWechat(plan)">
               {{ t('pricing.wechatPay') }}
-            </button>
+            </WechatPayButton>
             <p
               v-if="!paypalReady && paypalPlanId(plan)"
               class="text-center text-xs text-muted-foreground"
@@ -136,11 +145,12 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check, Loader2 } from 'lucide-vue-next'
+import { Check, Loader2, HardDrive } from 'lucide-vue-next'
 import { pricingApi } from '@/api'
 import { isPaypalConfigured, renderPaypalSubscribeButton } from '@/utils/paypalSubscribe'
 import { notifyCreditsRefresh } from '@/composables/useCreditsRefresh'
 import WechatPayModal from '@/components/billing/WechatPayModal.vue'
+import WechatPayButton from '@/components/billing/WechatPayButton.vue'
 
 const props = defineProps({
   userId: { type: [String, Number], default: null },
@@ -173,7 +183,42 @@ const usageItems = computed(() => [
   },
 ])
 
-const displayPlans = computed(() => apiPlans.value)
+const freePlan = computed(() => ({
+  planType: 'FREE',
+  isFree: true,
+  displayName: t('pricing.freeName'),
+  tagline: t('pricing.freeBadge'),
+  recommended: false,
+  monthly: { recurringMonth: 0 },
+  highlights: [t('pricing.freeF1'), t('pricing.freeF2'), t('pricing.freeF3')],
+}))
+
+const displayPlans = computed(() => [freePlan.value, ...apiPlans.value])
+
+/** 各档云空间（MB）：FREE 100 / Starter 1000 / PRO 5000，按 planType 关键字匹配，价格兜底 */
+const STORAGE_MB_BY_PLAN = { FREE: 100, STARTER: 1000, PRO: 5000 }
+
+function storageMbForPlan(plan) {
+  const key = String(plan.planType || '').toUpperCase()
+  if (STORAGE_MB_BY_PLAN[key] != null) return STORAGE_MB_BY_PLAN[key]
+  if (key.includes('FREE') || plan.isFree) return STORAGE_MB_BY_PLAN.FREE
+  if (key.includes('STARTER') || key.includes('BASIC')) return STORAGE_MB_BY_PLAN.STARTER
+  if (key.includes('PRO')) return STORAGE_MB_BY_PLAN.PRO
+  const price = Number(plan.monthly?.recurringMonth ?? 0)
+  if (price <= 0) return STORAGE_MB_BY_PLAN.FREE
+  if (price < 20) return STORAGE_MB_BY_PLAN.STARTER
+  return STORAGE_MB_BY_PLAN.PRO
+}
+
+function storageLabel(plan) {
+  const mb = storageMbForPlan(plan)
+  return mb >= 1000 ? `${mb / 1000} GB` : `${mb} MB`
+}
+
+function creditsLabel(plan) {
+  if (plan.isFree) return t('pricing.freeCredits')
+  return t('pricing.creditsPerMonth', { n: plan.credits?.monthlyFastCredits ?? '—' })
+}
 
 function paypalPlanId(plan) {
   const ids = plan.paypalPlanIds

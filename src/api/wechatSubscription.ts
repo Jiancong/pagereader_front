@@ -8,7 +8,7 @@ export type BillingCycle = "MONTHLY"
 export interface WechatSubscriptionCreateResult {
   orderId: string
   qrCode: string
-  totalFee?: number
+  totalFee?: number // 单位：分（微信支付 total_fee）
 }
 
 export async function createSubscription(params: {

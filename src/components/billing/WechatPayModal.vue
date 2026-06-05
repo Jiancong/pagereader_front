@@ -13,7 +13,10 @@
       <div class="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <h3 class="text-lg font-semibold text-foreground">{{ t('billing.wechatTitle') }}</h3>
+            <div class="flex items-center gap-2">
+              <WechatIcon class="h-6 w-6 shrink-0 text-[#07C160]" />
+              <h3 class="text-lg font-semibold text-foreground">{{ t('billing.wechatTitle') }}</h3>
+            </div>
             <p v-if="planName" class="mt-1 text-sm text-muted-foreground">{{ planName }}</p>
           </div>
           <button
@@ -43,8 +46,8 @@
               class="h-[200px] w-[200px] rounded-lg border border-border bg-white p-2"
             />
           </div>
-          <p v-if="totalFee != null" class="mt-3 text-center text-sm text-muted-foreground">
-            {{ t('billing.wechatAmount', { fee: totalFee }) }}
+          <p v-if="displayFeeYuan != null" class="mt-3 text-center text-sm text-muted-foreground">
+            {{ t('billing.wechatAmount', { fee: displayFeeYuan }) }}
           </p>
           <p class="mt-2 text-center text-xs text-muted-foreground">{{ t('billing.wechatScanHint') }}</p>
           <p class="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -58,9 +61,10 @@
 </template>
 
 <script setup>
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2, X } from 'lucide-vue-next'
+import WechatIcon from '@/components/billing/WechatIcon.vue'
 import { toQrDataUrl } from '@/utils/qrcodeVendor'
 import { wechatSubscriptionApi } from '@/api'
 
@@ -80,6 +84,13 @@ const error = ref(null)
 const qrDataUrl = ref(null)
 const totalFee = ref(null)
 const polling = ref(false)
+
+/** 后端 totalFee 为微信支付单位「分」，展示需换算为元 */
+const displayFeeYuan = computed(() => {
+  const v = totalFee.value
+  if (v == null || !Number.isFinite(Number(v))) return null
+  return (Number(v) / 100).toFixed(2)
+})
 
 let pollTimer = null
 let orderId = null
