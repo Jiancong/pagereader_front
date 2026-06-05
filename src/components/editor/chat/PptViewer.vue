@@ -1074,18 +1074,18 @@
                     <div v-if="isGroupedBar" class="ppt-grouped-bar-wrap">
                       <div
                         class="ppt-grouped-bar-legend"
-                        v-if="slide.chart.categories?.length"
+                        v-if="groupedBarSeriesList.length"
                       >
                         <span
-                          v-for="(cat, ci) in slide.chart.categories"
-                          :key="'gbl' + ci"
+                          v-for="(s, si) in groupedBarSeriesList"
+                          :key="'gbl' + si"
                           class="ppt-grouped-bar-legend-item"
                         >
                           <span
                             class="ppt-pie-dot"
-                            :style="{ background: getSeriesColor(ci) }"
+                            :style="{ background: getSeriesColor(si) }"
                           ></span>
-                          {{ cat }}
+                          {{ groupedBarSeriesLabel(s) }}
                         </span>
                       </div>
                       <svg
@@ -1140,54 +1140,51 @@
                           stroke="var(--ppt-chart-zero-line)"
                           stroke-width="1"
                         />
-                        <template v-for="(d, di) in slide.chart.data" :key="'gb' + di">
+                        <template
+                          v-for="(cat, ci) in groupedBarCategories"
+                          :key="'gb-cat-' + ci"
+                        >
                           <template
-                            v-for="(v, vi) in d.values || [d.value]"
-                            :key="'gbv' + di + '-' + vi"
+                            v-for="(s, si) in groupedBarSeriesList"
+                            :key="'gb-bar-' + ci + '-' + si"
                           >
                             <rect
-                              :x="
-                                55 +
-                                di * (400 / slide.chart.data.length) +
-                                vi *
-                                  (((400 / slide.chart.data.length) * 0.65) /
-                                    (slide.chart.categories?.length || 1))
+                              :x="groupedBarRectX(ci, si)"
+                              :y="
+                                Math.min(mapBarY(groupedBarValue(ci, si)), barZeroY)
                               "
-                              :y="Math.min(mapBarY(v), barZeroY)"
-                              :width="
-                                ((400 / slide.chart.data.length) * 0.65) /
-                                  (slide.chart.categories?.length || 1) -
-                                2
+                              :width="groupedBarRectWidth()"
+                              :height="
+                                Math.max(
+                                  1,
+                                  Math.abs(mapBarY(groupedBarValue(ci, si)) - barZeroY)
+                                )
                               "
-                              :height="Math.max(1, Math.abs(mapBarY(v) - barZeroY))"
-                              :fill="getSeriesColor(vi)"
-                              :class="['ppt-bar-rect', v < 0 ? 'ppt-bar-negative' : '']"
+                              :fill="getSeriesColor(si)"
+                              :class="[
+                                'ppt-bar-rect',
+                                groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
+                              ]"
                               rx="2"
                               opacity="0.88"
                             />
                           </template>
                           <text
-                            :x="
-                              55 +
-                              di * (400 / slide.chart.data.length) +
-                              (400 / slide.chart.data.length) * 0.3
-                            "
+                            :x="groupedBarCategoryLabelX(ci)"
                             :y="shouldRotateLabels ? BAR_CHART_X_CAT_Y_ROTATED : BAR_CHART_X_CAT_Y"
                             class="ppt-chart-label"
                             :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
                             :transform="
                               shouldRotateLabels
                                 ? chartXCatLabelTransform(
-                                    55 +
-                                      di * (400 / slide.chart.data.length) +
-                                      (400 / slide.chart.data.length) * 0.3,
+                                    groupedBarCategoryLabelX(ci),
                                     BAR_CHART_X_CAT_Y_ROTATED
                                   )
                                 : undefined
                             "
                             :style="shouldRotateLabels ? 'font-size: 8px' : ''"
                           >
-                            {{ d.label }}
+                            {{ cat }}
                           </text>
                         </template>
                       </svg>
@@ -3149,18 +3146,18 @@
                       <div v-if="isGroupedBar" class="ppt-grouped-bar-wrap">
                         <div
                           class="ppt-grouped-bar-legend"
-                          v-if="slide.chart.categories?.length"
+                          v-if="groupedBarSeriesList.length"
                         >
                           <span
-                            v-for="(cat, ci) in slide.chart.categories"
-                            :key="'tcgl' + ci"
+                            v-for="(s, si) in groupedBarSeriesList"
+                            :key="'tcgl' + si"
                             class="ppt-grouped-bar-legend-item"
                           >
                             <span
                               class="ppt-pie-dot"
-                              :style="{ background: getSeriesColor(ci) }"
+                              :style="{ background: getSeriesColor(si) }"
                             ></span
-                            >{{ cat }}
+                            >{{ groupedBarSeriesLabel(s) }}
                           </span>
                         </div>
                         <svg
@@ -3201,51 +3198,49 @@
                             stroke-width="1"
                           />
                           <template
-                            v-for="(d, di) in slide.chart.data"
-                            :key="'tcgb' + di"
+                            v-for="(cat, ci) in groupedBarCategories"
+                            :key="'tcgb-cat-' + ci"
                           >
                             <template
-                              v-for="(v, vi) in d.values || [d.value]"
-                              :key="'tcgv' + di + '-' + vi"
+                              v-for="(s, si) in groupedBarSeriesList"
+                              :key="'tcgb-bar-' + ci + '-' + si"
                             >
                               <rect
-                                :x="
-                                  30 +
-                                  di * (340 / slide.chart.data.length) +
-                                  vi *
-                                    (((340 / slide.chart.data.length) * 0.65) /
-                                      (slide.chart.categories?.length || 1))
+                                :x="groupedBarRectX(ci, si, 'compact')"
+                                :y="
+                                  Math.min(
+                                    mapBarYSmall(groupedBarValue(ci, si)),
+                                    mapBarYSmall(0)
+                                  )
                                 "
-                                :y="Math.min(mapBarYSmall(v), mapBarYSmall(0))"
-                                :width="
-                                  ((340 / slide.chart.data.length) * 0.65) /
-                                    (slide.chart.categories?.length || 1) -
-                                  2
-                                "
+                                :width="groupedBarRectWidth('compact')"
                                 :height="
-                                  Math.max(1, Math.abs(mapBarYSmall(v) - mapBarYSmall(0)))
+                                  Math.max(
+                                    1,
+                                    Math.abs(
+                                      mapBarYSmall(groupedBarValue(ci, si)) -
+                                        mapBarYSmall(0)
+                                    )
+                                  )
                                 "
-                                :fill="getSeriesColor(vi)"
-                                :class="['ppt-bar-rect', v < 0 ? 'ppt-bar-negative' : '']"
+                                :fill="getSeriesColor(si)"
+                                :class="[
+                                  'ppt-bar-rect',
+                                  groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
+                                ]"
                                 rx="2"
                                 opacity="0.88"
                               />
                             </template>
                             <text
-                              :x="
-                                30 +
-                                di * (340 / slide.chart.data.length) +
-                                (340 / slide.chart.data.length) * 0.3
-                              "
+                              :x="groupedBarCategoryLabelX(ci, 'compact')"
                               :y="shouldRotateLabels ? 185 : 195"
                               class="ppt-chart-label"
                               :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
                               :transform="
                                 shouldRotateLabels
                                   ? chartXCatLabelTransform(
-                                      30 +
-                                        di * (340 / slide.chart.data.length) +
-                                        (340 / slide.chart.data.length) * 0.3,
+                                      groupedBarCategoryLabelX(ci, 'compact'),
                                       185
                                     )
                                   : undefined
@@ -3254,7 +3249,7 @@
                                 shouldRotateLabels ? 'font-size: 7px' : 'font-size: 9px'
                               "
                             >
-                              {{ d.label }}
+                              {{ cat }}
                             </text>
                           </template>
                         </svg>
@@ -4208,18 +4203,18 @@
                 <div v-if="isGroupedBar" class="ppt-grouped-bar-wrap">
                   <div
                     class="ppt-grouped-bar-legend"
-                    v-if="slide.chart.categories?.length"
+                    v-if="groupedBarSeriesList.length"
                   >
                     <span
-                      v-for="(cat, ci) in slide.chart.categories"
-                      :key="'twgl' + ci"
+                      v-for="(s, si) in groupedBarSeriesList"
+                      :key="'twgl' + si"
                       class="ppt-grouped-bar-legend-item"
                     >
                       <span
                         class="ppt-pie-dot"
-                        :style="{ background: getSeriesColor(ci) }"
+                        :style="{ background: getSeriesColor(si) }"
                       ></span
-                      >{{ cat }}
+                      >{{ groupedBarSeriesLabel(s) }}
                     </span>
                   </div>
                   <svg
@@ -4274,54 +4269,49 @@
                       stroke="var(--ppt-chart-zero-line)"
                       stroke-width="1"
                     />
-                    <template v-for="(d, di) in slide.chart.data" :key="'twgb' + di">
+                    <template
+                      v-for="(cat, ci) in groupedBarCategories"
+                      :key="'twgb-cat-' + ci"
+                    >
                       <template
-                        v-for="(v, vi) in d.values || [d.value]"
-                        :key="'twgv' + di + '-' + vi"
+                        v-for="(s, si) in groupedBarSeriesList"
+                        :key="'twgb-bar-' + ci + '-' + si"
                       >
                         <rect
-                          :x="
-                            55 +
-                            di * (400 / slide.chart.data.length) +
-                            vi *
-                              (((400 / slide.chart.data.length) * 0.65) /
-                                (slide.chart.categories?.length || 1))
+                          :x="groupedBarRectX(ci, si)"
+                          :y="Math.min(mapBarY(groupedBarValue(ci, si)), barZeroY)"
+                          :width="groupedBarRectWidth()"
+                          :height="
+                            Math.max(
+                              1,
+                              Math.abs(mapBarY(groupedBarValue(ci, si)) - barZeroY)
+                            )
                           "
-                          :y="Math.min(mapBarY(v), barZeroY)"
-                          :width="
-                            ((400 / slide.chart.data.length) * 0.65) /
-                              (slide.chart.categories?.length || 1) -
-                            2
-                          "
-                          :height="Math.max(1, Math.abs(mapBarY(v) - barZeroY))"
-                          :fill="getSeriesColor(vi)"
-                          :class="['ppt-bar-rect', v < 0 ? 'ppt-bar-negative' : '']"
+                          :fill="getSeriesColor(si)"
+                          :class="[
+                            'ppt-bar-rect',
+                            groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
+                          ]"
                           rx="3"
                           opacity="0.88"
                         />
                       </template>
                       <text
-                        :x="
-                          55 +
-                          di * (400 / slide.chart.data.length) +
-                          (400 / slide.chart.data.length) * 0.3
-                        "
+                        :x="groupedBarCategoryLabelX(ci)"
                         :y="shouldRotateLabels ? BAR_CHART_X_CAT_Y_ROTATED : BAR_CHART_X_CAT_Y"
                         class="ppt-chart-label"
                         :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
                         :transform="
                           shouldRotateLabels
                             ? chartXCatLabelTransform(
-                                55 +
-                                  di * (400 / slide.chart.data.length) +
-                                  (400 / slide.chart.data.length) * 0.3,
+                                groupedBarCategoryLabelX(ci),
                                 BAR_CHART_X_CAT_Y_ROTATED
                               )
                             : undefined
                         "
                         :style="shouldRotateLabels ? 'font-size: 8px' : ''"
                       >
-                        {{ d.label }}
+                        {{ cat }}
                       </text>
                     </template>
                   </svg>
@@ -5448,18 +5438,18 @@
                     <div v-if="isGroupedBar" class="ppt-grouped-bar-wrap">
                       <div
                         class="ppt-grouped-bar-legend"
-                        v-if="slide.chart.categories?.length"
+                        v-if="groupedBarSeriesList.length"
                       >
                         <span
-                          v-for="(cat, ci) in slide.chart.categories"
-                          :key="'dgl' + ci"
+                          v-for="(s, si) in groupedBarSeriesList"
+                          :key="'dgl' + si"
                           class="ppt-grouped-bar-legend-item"
                         >
                           <span
                             class="ppt-pie-dot"
-                            :style="{ background: getSeriesColor(ci) }"
+                            :style="{ background: getSeriesColor(si) }"
                           ></span
-                          >{{ cat }}
+                          >{{ groupedBarSeriesLabel(s) }}
                         </span>
                       </div>
                       <svg
@@ -5514,54 +5504,51 @@
                           stroke="var(--ppt-chart-zero-line)"
                           stroke-width="1"
                         />
-                        <template v-for="(d, di) in slide.chart.data" :key="'dgb' + di">
+                        <template
+                          v-for="(cat, ci) in groupedBarCategories"
+                          :key="'dgb-cat-' + ci"
+                        >
                           <template
-                            v-for="(v, vi) in d.values || [d.value]"
-                            :key="'dgv' + di + '-' + vi"
+                            v-for="(s, si) in groupedBarSeriesList"
+                            :key="'dgb-bar-' + ci + '-' + si"
                           >
                             <rect
-                              :x="
-                                55 +
-                                di * (400 / slide.chart.data.length) +
-                                vi *
-                                  (((400 / slide.chart.data.length) * 0.65) /
-                                    (slide.chart.categories?.length || 1))
+                              :x="groupedBarRectX(ci, si)"
+                              :y="
+                                Math.min(mapBarY(groupedBarValue(ci, si)), barZeroY)
                               "
-                              :y="Math.min(mapBarY(v), barZeroY)"
-                              :width="
-                                ((400 / slide.chart.data.length) * 0.65) /
-                                  (slide.chart.categories?.length || 1) -
-                                2
+                              :width="groupedBarRectWidth()"
+                              :height="
+                                Math.max(
+                                  1,
+                                  Math.abs(mapBarY(groupedBarValue(ci, si)) - barZeroY)
+                                )
                               "
-                              :height="Math.max(1, Math.abs(mapBarY(v) - barZeroY))"
-                              :fill="getSeriesColor(vi)"
-                              :class="['ppt-bar-rect', v < 0 ? 'ppt-bar-negative' : '']"
+                              :fill="getSeriesColor(si)"
+                              :class="[
+                                'ppt-bar-rect',
+                                groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
+                              ]"
                               rx="3"
                               opacity="0.88"
                             />
                           </template>
                           <text
-                            :x="
-                              55 +
-                              di * (400 / slide.chart.data.length) +
-                              (400 / slide.chart.data.length) * 0.3
-                            "
+                            :x="groupedBarCategoryLabelX(ci)"
                             :y="shouldRotateLabels ? BAR_CHART_X_CAT_Y_ROTATED : BAR_CHART_X_CAT_Y"
                             class="ppt-chart-label"
                             :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
                             :transform="
                               shouldRotateLabels
                                 ? chartXCatLabelTransform(
-                                    55 +
-                                      di * (400 / slide.chart.data.length) +
-                                      (400 / slide.chart.data.length) * 0.3,
+                                    groupedBarCategoryLabelX(ci),
                                     BAR_CHART_X_CAT_Y_ROTATED
                                   )
                                 : undefined
                             "
                             :style="shouldRotateLabels ? 'font-size: 8px' : ''"
                           >
-                            {{ d.label }}
+                            {{ cat }}
                           </text>
                         </template>
                       </svg>
@@ -6865,18 +6852,18 @@
                 <div v-if="isGroupedBar" class="ppt-grouped-bar-wrap">
                   <div
                     class="ppt-grouped-bar-legend"
-                    v-if="slide.chart.categories?.length"
+                    v-if="groupedBarSeriesList.length"
                   >
                     <span
-                      v-for="(cat, ci) in slide.chart.categories"
-                      :key="'dfgl' + ci"
+                      v-for="(s, si) in groupedBarSeriesList"
+                      :key="'dfgl' + si"
                       class="ppt-grouped-bar-legend-item"
                     >
                       <span
                         class="ppt-pie-dot"
-                        :style="{ background: getSeriesColor(ci) }"
+                        :style="{ background: getSeriesColor(si) }"
                       ></span
-                      >{{ cat }}
+                      >{{ groupedBarSeriesLabel(s) }}
                     </span>
                   </div>
                   <svg
@@ -6931,54 +6918,49 @@
                       stroke="var(--ppt-chart-zero-line)"
                       stroke-width="1"
                     />
-                    <template v-for="(d, di) in slide.chart.data" :key="'dfgb' + di">
+                    <template
+                      v-for="(cat, ci) in groupedBarCategories"
+                      :key="'dfgb-cat-' + ci"
+                    >
                       <template
-                        v-for="(v, vi) in d.values || [d.value]"
-                        :key="'dfgv' + di + '-' + vi"
+                        v-for="(s, si) in groupedBarSeriesList"
+                        :key="'dfgb-bar-' + ci + '-' + si"
                       >
                         <rect
-                          :x="
-                            55 +
-                            di * (400 / slide.chart.data.length) +
-                            vi *
-                              (((400 / slide.chart.data.length) * 0.65) /
-                                (slide.chart.categories?.length || 1))
+                          :x="groupedBarRectX(ci, si)"
+                          :y="Math.min(mapBarY(groupedBarValue(ci, si)), barZeroY)"
+                          :width="groupedBarRectWidth()"
+                          :height="
+                            Math.max(
+                              1,
+                              Math.abs(mapBarY(groupedBarValue(ci, si)) - barZeroY)
+                            )
                           "
-                          :y="Math.min(mapBarY(v), barZeroY)"
-                          :width="
-                            ((400 / slide.chart.data.length) * 0.65) /
-                              (slide.chart.categories?.length || 1) -
-                            2
-                          "
-                          :height="Math.max(1, Math.abs(mapBarY(v) - barZeroY))"
-                          :fill="getSeriesColor(vi)"
-                          :class="['ppt-bar-rect', v < 0 ? 'ppt-bar-negative' : '']"
+                          :fill="getSeriesColor(si)"
+                          :class="[
+                            'ppt-bar-rect',
+                            groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
+                          ]"
                           rx="3"
                           opacity="0.88"
                         />
                       </template>
                       <text
-                        :x="
-                          55 +
-                          di * (400 / slide.chart.data.length) +
-                          (400 / slide.chart.data.length) * 0.3
-                        "
+                        :x="groupedBarCategoryLabelX(ci)"
                         :y="shouldRotateLabels ? BAR_CHART_X_CAT_Y_ROTATED : BAR_CHART_X_CAT_Y"
                         class="ppt-chart-label"
                         :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
                         :transform="
                           shouldRotateLabels
                             ? chartXCatLabelTransform(
-                                55 +
-                                  di * (400 / slide.chart.data.length) +
-                                  (400 / slide.chart.data.length) * 0.3,
+                                groupedBarCategoryLabelX(ci),
                                 BAR_CHART_X_CAT_Y_ROTATED
                               )
                             : undefined
                         "
                         :style="shouldRotateLabels ? 'font-size: 8px' : ''"
                       >
-                        {{ d.label }}
+                        {{ cat }}
                       </text>
                     </template>
                   </svg>
@@ -11252,6 +11234,68 @@ const isGroupedBar = computed(() => {
   return !!(chart.categories?.length && seriesRows.length > 1);
 });
 
+const GROUPED_BAR_PLOT = {
+  full: { left: 55, width: 400, labelRatio: 0.3 },
+  compact: { left: 30, width: 340, labelRatio: 0.3 },
+} as const;
+
+const groupedBarCategories = computed(() => {
+  const chart = slide.value?.chart;
+  if (!chart || !isGroupedBar.value) return [] as string[];
+  return (chart.categories ?? chart.labels ?? []).map((c) => String(c));
+});
+
+const groupedBarSeriesList = computed(() => {
+  const chart = slide.value?.chart;
+  if (!chart || !isGroupedBar.value) return [] as ChartDataItem[];
+  return (chart.data ?? []).filter(
+    (d) => Array.isArray(d.values) && d.values.length > 0
+  );
+});
+
+function groupedBarSeriesLabel(s: ChartDataItem): string {
+  return String(s.name ?? s.label ?? "").trim();
+}
+
+function groupedBarRectX(
+  catIndex: number,
+  seriesIndex: number,
+  layout: keyof typeof GROUPED_BAR_PLOT = "full"
+): number {
+  const { left, width } = GROUPED_BAR_PLOT[layout];
+  const catCount = groupedBarCategories.value.length || 1;
+  const seriesCount = groupedBarSeriesList.value.length || 1;
+  const groupW = width / catCount;
+  const barAreaW = groupW * 0.65;
+  const slotW = barAreaW / seriesCount;
+  return left + catIndex * groupW + seriesIndex * slotW;
+}
+
+function groupedBarRectWidth(layout: keyof typeof GROUPED_BAR_PLOT = "full"): number {
+  const { width } = GROUPED_BAR_PLOT[layout];
+  const catCount = groupedBarCategories.value.length || 1;
+  const seriesCount = groupedBarSeriesList.value.length || 1;
+  const groupW = width / catCount;
+  return (groupW * 0.65) / seriesCount - 2;
+}
+
+function groupedBarCategoryLabelX(
+  catIndex: number,
+  layout: keyof typeof GROUPED_BAR_PLOT = "full"
+): number {
+  const { left, width, labelRatio } = GROUPED_BAR_PLOT[layout];
+  const catCount = groupedBarCategories.value.length || 1;
+  const groupW = width / catCount;
+  return left + catIndex * groupW + groupW * labelRatio;
+}
+
+function groupedBarValue(catIndex: number, seriesIndex: number): number {
+  const series = groupedBarSeriesList.value[seriesIndex];
+  const raw = series?.values?.[catIndex];
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
 const maxChartValue = computed(() => {
   const chart = slide.value?.chart;
   if (!chart || !chart.data?.length) return 1;
@@ -11411,12 +11455,18 @@ const barChartYRange = computed(() => {
   const chart = slide.value?.chart;
   if (!chart || !["bar", "combo"].includes(chart.type) || !chart.data?.length)
     return { min: 0, max: 1, range: 1 };
-  let allVals: number[] = chart.data.map((d) => d.value);
-  // 如果是 grouped bar，也要考虑 values 数组
+  let allVals: number[] = [];
   if (isGroupedBar.value) {
     chart.data.forEach((d) => {
-      if (d.values?.length) allVals = allVals.concat(d.values);
+      d.values?.forEach((v) => {
+        const n = typeof v === "number" ? v : Number(v);
+        if (Number.isFinite(n)) allVals.push(n);
+      });
     });
+  } else {
+    allVals = chart.data
+      .map((d) => (typeof d.value === "number" ? d.value : Number(d.value)))
+      .filter((n) => Number.isFinite(n));
   }
   // combo 次轴独立比例，勿将 secondary 并入主轴
   let yMin = Math.min(...allVals);
