@@ -70,6 +70,8 @@ const packageRemaining = computed(() => {
 const planLabel = computed(() => {
   const s = status.value
   if (!s) return t('billing.noPlan')
+  const pt = String(s.planType ?? '').toUpperCase()
+  if (pt === 'FREE') return t('pricing.freeName')
   return String(s.displayName ?? s.planType ?? t('billing.noPlan'))
 })
 

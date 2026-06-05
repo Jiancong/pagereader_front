@@ -255,6 +255,36 @@ export interface CreateUserSubscriptionReq {
   orderId?: string
 }
 
+export interface SubscribeMyStatusCredits {
+  monthlyFastCredits?: number
+  dailyFreeCredits?: number
+  currentPlanCredits?: number
+  currentDailyCredits?: number
+  totalCredits?: number
+  creditsExpireAt?: string | null
+}
+
+export interface SubscribeMyStatusPlanInfo {
+  planId?: string | null
+  planType?: string
+  planName?: string
+  billingCycle?: string
+  productId?: string | null
+}
+
+/** GET /subscribe/my/status 原始 data 结构 */
+export interface SubscribeMyStatusRaw {
+  hasActiveSubscription?: boolean
+  subscriptionStatus?: string
+  subscriptionType?: string
+  planInfo?: SubscribeMyStatusPlanInfo
+  credits?: SubscribeMyStatusCredits
+  limits?: Record<string, unknown>
+  billing?: Record<string, unknown> | null
+  subscription?: Record<string, unknown> | null
+}
+
+/** 供 UI 使用的扁平化订阅/积分状态 */
 export interface SubscribeMyStatus {
   planType?: string
   displayName?: string
@@ -269,5 +299,6 @@ export interface SubscribeMyStatus {
   packageCredits?: number
   monthlyCredits?: number
   monthlyCreditsRemaining?: number
+  totalCredits?: number
   [key: string]: unknown
 }
