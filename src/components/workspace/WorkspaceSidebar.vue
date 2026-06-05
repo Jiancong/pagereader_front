@@ -46,7 +46,22 @@
       <WorkspaceCreditsBar />
       <LocaleSwitcher />
       <div class="flex items-center justify-between gap-2">
-        <span class="truncate text-sm text-muted-foreground">{{ nickName || t('workspace.loggedIn') }}</span>
+        <div class="flex min-w-0 items-center gap-2">
+          <img
+            v-if="avatar"
+            :src="avatar"
+            :alt="nickName || t('workspace.loggedIn')"
+            referrerpolicy="no-referrer"
+            class="h-7 w-7 flex-shrink-0 rounded-full object-cover"
+          />
+          <span
+            v-else
+            class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"
+          >
+            <User class="h-4 w-4" />
+          </span>
+          <span class="truncate text-sm text-muted-foreground">{{ nickName || t('workspace.loggedIn') }}</span>
+        </div>
         <button
           :title="t('workspace.logout')"
           class="flex flex-shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
@@ -60,7 +75,7 @@
 </template>
 
 <script setup>
-import { Presentation, Plus, Compass, LogOut, FileText, Loader2 } from 'lucide-vue-next'
+import { Presentation, Plus, Compass, LogOut, FileText, Loader2, User } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import LocaleSwitcher from '../LocaleSwitcher.vue'
 import WorkspaceCreditsBar from './WorkspaceCreditsBar.vue'
@@ -69,6 +84,7 @@ defineProps({
   view: { type: String, default: 'new' },
   activeProjectId: { type: String, default: null },
   nickName: { type: String, default: '' },
+  avatar: { type: String, default: '' },
   myProjects: { type: Array, default: () => [] },
   loadingProjects: { type: Boolean, default: false },
 })

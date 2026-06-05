@@ -4,6 +4,7 @@
       :view="view"
       :active-project-id="activeProjectId"
       :nick-name="nickName"
+      :avatar="avatar"
       :my-projects="myProjects"
       :loading-projects="loadingProjects"
       @new="goNew('')"
@@ -38,13 +39,14 @@ import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar.vue'
 import WorkspaceGenerator from '../components/workspace/WorkspaceGenerator.vue'
 import ExploreGrid from '../components/workspace/ExploreGrid.vue'
 import ProjectPreview from '../components/workspace/ProjectPreview.vue'
-import { authApi, feedApi } from '../api'
+import { authApi, feedApi, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 
 const router = useRouter()
 const view = ref('new')
 const activeProjectId = ref(null)
 const nickName = ref('')
+const avatar = ref(getLocalAvatar())
 const myProjects = ref([])
 const loadingProjects = ref(false)
 const genPrompt = ref('')
@@ -66,6 +68,7 @@ onMounted(async () => {
   try {
     const d = await authApi.getCurrentDetail()
     nickName.value = d?.nickName || d?.email || ''
+    avatar.value = d?.avatar || getLocalAvatar()
   } catch {
     /* ignore */
   }

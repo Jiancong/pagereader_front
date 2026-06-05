@@ -95,8 +95,8 @@
 import { ref, watch, nextTick } from "vue"
 import { useI18n } from "vue-i18n"
 import { X, Loader2, Mail, Lock, User } from "lucide-vue-next"
-import { authApi, ApiError } from "../api"
-import { loadGsi, parseEmailFromCredential } from "../utils/google"
+import { authApi, ApiError, setLocalAvatar } from "../api"
+import { loadGsi, parseProfileFromCredential } from "../utils/google"
 
 const { t } = useI18n()
 
@@ -139,8 +139,9 @@ function renderGoogle() {
           error.value = null
           loading.value = true
           try {
-            const mail = parseEmailFromCredential(resp.credential)
-            await authApi.googleLogin({ googleEmail: mail })
+            const profile = parseProfileFromCredential(resp.credential)
+            await authApi.googleLogin({ googleEmail: profile.email })
+            setLocalAvatar(profile.picture || "")
             emit("success")
             emit("close")
           } catch (e: any) {

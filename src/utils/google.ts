@@ -31,9 +31,16 @@ export function loadGsi(): Promise<void> {
   return loadPromise
 }
 
-// 从 GSI credential（JWT）里解析出邮箱
-export function parseEmailFromCredential(credential: string): string {
-  const payload = JSON.parse(
+// Google 凭证里可用的用户信息
+export interface GoogleProfile {
+  email: string
+  name?: string
+  picture?: string
+}
+
+// 解析 GSI credential（JWT）的 payload
+function decodeCredentialPayload(credential: string): Record<string, unknown> {
+  return JSON.parse(
     decodeURIComponent(
       atob(credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
         .split("")
@@ -41,5 +48,19 @@ export function parseEmailFromCredential(credential: string): string {
         .join(""),
     ),
   )
-  return payload.email as string
+}
+
+// 从 GSI credential（JWT）里解析出邮箱
+export function parseEmailFromCredential(credential: string): string {
+  return decodeCredentialPayload(credential).email as string
+}
+
+// 从 GSI credential（JWT）里解析出邮箱、昵称与头像
+export function parseProfileFromCredential(credential: string): GoogleProfile {
+  const payload = decodeCredentialPayload(credential)
+  return {
+    email: payload.email as string,
+    name: (payload.name as string) || undefined,
+    picture: (payload.picture as string) || undefined,
+  }
 }

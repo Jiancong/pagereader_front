@@ -2,7 +2,7 @@
 // @author hc @date 2026-06-03
 
 import { get, postJson } from "./client"
-import { setToken, clearToken } from "./token"
+import { setToken, clearToken, clearLocalAvatar } from "./token"
 import type {
   PasswordLoginReq,
   EmailLoginReq,
@@ -47,9 +47,10 @@ export async function signUpAndLogin(req: UserSignUpDto): Promise<string> {
   return passwordLogin({ username: req.email, password: req.password })
 }
 
-// 登出（仅清本地 token）
+// 登出（清本地 token 与缓存头像）
 export function logout(): void {
   clearToken()
+  clearLocalAvatar()
 }
 
 // 图形验证码

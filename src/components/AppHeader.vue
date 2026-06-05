@@ -32,7 +32,16 @@
       <div class="flex items-center gap-3">
         <LocaleSwitcher />
         <template v-if="logged">
-          <span class="hidden text-sm text-muted-foreground sm:block">{{ nickName }}</span>
+          <div class="hidden items-center gap-2 sm:flex">
+            <img
+              v-if="avatar"
+              :src="avatar"
+              :alt="nickName"
+              referrerpolicy="no-referrer"
+              class="h-8 w-8 rounded-full object-cover"
+            />
+            <span class="text-sm text-muted-foreground">{{ nickName }}</span>
+          </div>
           <button
             class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             @click="$emit('enter')"
@@ -68,6 +77,7 @@ import LocaleSwitcher from './LocaleSwitcher.vue'
 defineProps({
   logged: { type: Boolean, default: false },
   nickName: { type: String, default: '' },
+  avatar: { type: String, default: '' },
 })
 defineEmits(['open-login', 'enter'])
 

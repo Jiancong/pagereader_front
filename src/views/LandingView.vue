@@ -3,6 +3,7 @@
     <AppHeader
       :logged="logged"
       :nick-name="nickName"
+      :avatar="avatar"
       @open-login="openLogin"
       @enter="goWorkspace"
     />
@@ -33,11 +34,12 @@ import FeatureCards from '../components/FeatureCards.vue'
 import PricingSection from '../components/PricingSection.vue'
 import AppFooter from '../components/AppFooter.vue'
 import AuthDialog from '../components/AuthDialog.vue'
-import { authApi, isLoggedIn } from '../api'
+import { authApi, isLoggedIn, getLocalAvatar } from '../api'
 
 const router = useRouter()
 const logged = ref(false)
 const nickName = ref('')
+const avatar = ref(getLocalAvatar())
 const userId = ref(null)
 const dialogOpen = ref(false)
 const dialogMode = ref('login')
@@ -45,10 +47,15 @@ const dialogMode = ref('login')
 const refresh = async () => {
   logged.value = isLoggedIn()
   userId.value = null
-  if (!logged.value) return
+  if (!logged.value) {
+    avatar.value = ''
+    return
+  }
+  avatar.value = getLocalAvatar()
   try {
     const d = await authApi.getCurrentDetail()
     nickName.value = d?.nickName || d?.email || ''
+    avatar.value = d?.avatar || getLocalAvatar()
     userId.value = d?.id != null ? d.id : null
   } catch {
     authApi.logout()
