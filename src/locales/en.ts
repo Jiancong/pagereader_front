@@ -231,6 +231,7 @@ export default {
     analyzingDoc: "Analyzing document…",
     analyzeAndGenerate: "Analyze & generate",
     progressTitle: "Progress",
+    elapsedTime: "Elapsed {time}",
     preparing: "Preparing…",
     loginRequiredGenerate: "Please log in to generate",
     generateFailed: "Generation failed",

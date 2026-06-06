@@ -144,13 +144,21 @@
         </div>
 
         <!-- 进度（当前标签任务） -->
-        <div v-if="activeTask.logs.length || activeTask.isGenerating" class="border-t border-border bg-secondary/20 p-6 sm:p-8">
-          <h4 class="mb-3 flex items-center gap-2 font-semibold text-foreground">
-            <span v-if="activeTask.isGenerating" class="relative flex h-2.5 w-2.5">
-              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-              <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+        <div v-if="activeTask.logs.length || activeTask.isGenerating || activeTask.elapsedMs != null" class="border-t border-border bg-secondary/20 p-6 sm:p-8">
+          <h4 class="mb-3 flex items-center justify-between gap-3 font-semibold text-foreground">
+            <span class="flex items-center gap-2">
+              <span v-if="activeTask.isGenerating" class="relative flex h-2.5 w-2.5">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+              </span>
+              {{ t('workspace.progressTitle') }}
             </span>
-            {{ t('workspace.progressTitle') }}
+            <span
+              v-if="activeElapsedDisplay"
+              class="shrink-0 font-mono text-sm font-normal tabular-nums text-muted-foreground"
+            >
+              {{ t('workspace.elapsedTime', { time: activeElapsedDisplay }) }}
+            </span>
           </h4>
           <div v-if="activeTask.isGenerating" class="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
             <div class="flex items-center gap-3">
@@ -181,7 +189,7 @@
 
 
 <script setup lang="ts">
-import { ref, computed, reactive } from "vue"
+import { ref, computed, reactive, onBeforeUnmount } from "vue"
 import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X } from "lucide-vue-next"
@@ -218,6 +226,9 @@ type GeneratorTask = {
   projectId: string
   queue: PptQueue
   showCreditsCta: boolean
+  /** 点击生成时记录；complete 时写入总耗时 */
+  timerStartAt: number | null
+  elapsedMs: number | null
 }
 
 function createTask(defaultQueue: PptQueue): GeneratorTask {
@@ -229,6 +240,8 @@ function createTask(defaultQueue: PptQueue): GeneratorTask {
     projectId: "",
     queue: defaultQueue,
     showCreditsCta: false,
+    timerStartAt: null,
+    elapsedMs: null,
   }
 }
 
@@ -245,6 +258,50 @@ const fileInput = ref<HTMLInputElement | null>(null)
 
 const activeTask = computed(() => (activeTab.value === "prompt" ? promptTask : ragTask))
 const activeLastLogs = computed(() => activeTask.value.logs.slice(-3))
+
+const timerNow = ref(Date.now())
+let timerTickId: ReturnType<typeof setInterval> | null = null
+
+function formatElapsed(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+  if (m > 0) return `${m}:${String(s).padStart(2, "0")}`
+  return `${s}s`
+}
+
+function ensureTimerTick() {
+  if (timerTickId != null) return
+  timerTickId = setInterval(() => {
+    timerNow.value = Date.now()
+  }, 1000)
+}
+
+function stopTimerTickIfIdle() {
+  if (promptTask.isGenerating || ragTask.isGenerating) return
+  if (timerTickId != null) {
+    clearInterval(timerTickId)
+    timerTickId = null
+  }
+}
+
+function stopTaskTimer(task: GeneratorTask) {
+  if (task.timerStartAt != null && task.elapsedMs == null) {
+    task.elapsedMs = Date.now() - task.timerStartAt
+  }
+  stopTimerTickIfIdle()
+}
+
+const activeElapsedDisplay = computed(() => {
+  const task = activeTask.value
+  if (task.elapsedMs != null) return formatElapsed(task.elapsedMs)
+  if (task.isGenerating && task.timerStartAt != null) {
+    return formatElapsed(timerNow.value - task.timerStartAt)
+  }
+  return null
+})
 
 const tabClass = (tab: "prompt" | "upload") => [
   "flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-all",
@@ -366,6 +423,7 @@ const runStream = async (
           o.is_ppt_response === true ||
           o.ppt_generation === true
         if (!isPptCompletion) return
+        stopTaskTimer(task)
         appendLog(task, t("workspace.loadingPpt"))
         try {
           const resolved = await resolvePptDataFromStreamComplete(data)
@@ -383,6 +441,7 @@ const runStream = async (
         }
       },
       onError: (msg: string) => {
+        stopTaskTimer(task)
         applyStreamError(task, msg)
         refreshCreditsBar()
       },
@@ -401,7 +460,11 @@ const startTask = (task: GeneratorTask) => {
   task.pptData = null
   task.projectId = newProjectId()
   task.logs = []
+  task.timerStartAt = Date.now()
+  task.elapsedMs = null
   task.isGenerating = true
+  timerNow.value = Date.now()
+  ensureTimerTick()
 }
 
 const handleGenerateError = (task: GeneratorTask, e: unknown) => {
@@ -418,6 +481,7 @@ const onPromptSubmit = async () => {
   if (!input.value.trim() || promptTask.isGenerating) return
   startTask(promptTask)
   if (!(await ensureCreditsForTask(promptTask))) {
+    stopTaskTimer(promptTask)
     promptTask.isGenerating = false
     return
   }
@@ -426,6 +490,7 @@ const onPromptSubmit = async () => {
   } catch (e: unknown) {
     handleGenerateError(promptTask, e)
   } finally {
+    stopTaskTimer(promptTask)
     promptTask.isGenerating = false
     await refreshCreditsBar()
   }
@@ -437,6 +502,7 @@ const onAnalyze = async () => {
   if (!message) return
   startTask(ragTask)
   if (!(await ensureCreditsForTask(ragTask))) {
+    stopTaskTimer(ragTask)
     ragTask.isGenerating = false
     return
   }
@@ -448,10 +514,15 @@ const onAnalyze = async () => {
   } catch (e: unknown) {
     handleGenerateError(ragTask, e)
   } finally {
+    stopTaskTimer(ragTask)
     ragTask.isGenerating = false
     await refreshCreditsBar()
   }
 }
+
+onBeforeUnmount(() => {
+  if (timerTickId != null) clearInterval(timerTickId)
+})
 
 const resetActiveTask = () => {
   activeTask.value.pptData = null

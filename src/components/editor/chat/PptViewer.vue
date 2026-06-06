@@ -8277,6 +8277,7 @@ import PptRelatedSearchPanel from "@/components/editor/chat/PptRelatedSearchPane
 import { usePptRelatedSearch, type PptRelatedSearchContext } from "@/composables/usePptRelatedSearch";
 import { uploadedDocumentsFromPptData } from "@/utils/pptDocumentRag";
 import { resolveContextSelectionText } from "@/utils/pptContextSelection";
+import { prepareHtml2CanvasClone } from "@/utils/pptExportHtml2Canvas";
 import type { PptPageReference } from "@/utils/pptInlineMarkdown";
 import {
   buildPptxBulletTextRuns,
@@ -13371,8 +13372,11 @@ async function capturePptSlideDecorativeBackground(
       scale: 2,
       useCORS: true,
       logging: false,
-      onclone: (doc) => {
-        const root = doc.querySelector(".ppt-slide-wrapper");
+      onclone: (doc, clonedEl) => {
+        if (clonedEl instanceof HTMLElement) {
+          prepareHtml2CanvasClone(doc, slideEl, clonedEl);
+        }
+        const root = doc.querySelector(".ppt-slide-wrapper") ?? clonedEl;
         if (root instanceof HTMLElement) {
           root.style.setProperty("font-family", bodyCss, "important");
           root.style.setProperty("--ppt-font-body", bodyCss);
@@ -13638,8 +13642,11 @@ async function capturePptSlideToCanvas(
     scale: 2,
     useCORS: true,
     logging: false,
-    onclone: (doc) => {
-      const root = doc.querySelector(".ppt-slide-wrapper");
+    onclone: (doc, clonedEl) => {
+      if (clonedEl instanceof HTMLElement) {
+        prepareHtml2CanvasClone(doc, target, clonedEl);
+      }
+      const root = doc.querySelector(".ppt-slide-wrapper") ?? clonedEl;
       if (root instanceof HTMLElement) {
         root.style.setProperty("font-family", bodyCss, "important");
         root.style.setProperty("--ppt-font-body", bodyCss);

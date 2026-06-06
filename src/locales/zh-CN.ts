@@ -229,6 +229,7 @@ export default {
     analyzingDoc: "正在分析文档...",
     analyzeAndGenerate: "分析并生成 PPT",
     progressTitle: "生成进度",
+    elapsedTime: "用时 {time}",
     preparing: "正在准备...",
     loginRequiredGenerate: "请先登录后再生成",
     generateFailed: "生成失败",
