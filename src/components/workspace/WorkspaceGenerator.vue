@@ -71,19 +71,6 @@
               :placeholder="t('workspace.promptPlaceholder')"
               class="min-h-[140px] w-full resize-none rounded-xl border border-border bg-secondary/50 px-4 py-4 text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
-            <div class="flex items-start gap-3 rounded-xl border border-border bg-secondary/30 px-4 py-3">
-              <input
-                id="enable-search"
-                v-model="enableSearch"
-                type="checkbox"
-                class="mt-0.5 accent-primary"
-                :disabled="promptTask.isGenerating"
-              />
-              <label for="enable-search" class="cursor-pointer select-none">
-                <span class="text-sm font-medium text-foreground">{{ t('workspace.enableSearchLabel') }}</span>
-                <p class="mt-0.5 text-xs text-muted-foreground">{{ t('workspace.enableSearchHint') }}</p>
-              </label>
-            </div>
             <button
               type="submit"
               :disabled="promptTask.isGenerating || !input.trim()"
@@ -252,7 +239,6 @@ const ragTask = reactive<GeneratorTask>(createTask("SLOW"))
 
 const activeTab = ref<"prompt" | "upload">("prompt")
 const input = ref(props.initialPrompt || "")
-const enableSearch = ref(false)
 const uploadedFile = ref<File | null>(null)
 const uploadPrompt = ref("")
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -343,7 +329,6 @@ const runStream = async (
   message: string,
   documents?: any[],
   projectName?: string,
-  options?: { enableSearch?: boolean },
 ) => {
   const userId = await resolveUserId()
   if (!userId) {
@@ -351,7 +336,6 @@ const runStream = async (
     task.isGenerating = false
     return
   }
-  const hasDocuments = Boolean(documents?.length)
   await agentApi.chatStream(
     {
       message,
@@ -362,7 +346,6 @@ const runStream = async (
       queue: task.queue,
       uploaded_documents: documents,
       ...(projectName ? { projectName } : {}),
-      ...(!hasDocuments ? { enable_search: options?.enableSearch ?? false } : {}),
     },
     {
       onStarted: () => {
@@ -439,9 +422,7 @@ const onPromptSubmit = async () => {
     return
   }
   try {
-    await runStream(promptTask, input.value.trim(), undefined, undefined, {
-      enableSearch: enableSearch.value,
-    })
+    await runStream(promptTask, input.value.trim())
   } catch (e: unknown) {
     handleGenerateError(promptTask, e)
   } finally {
