@@ -37,8 +37,11 @@ const dialogMode = ref('signup')
 
 const refreshAuth = async () => {
   logged.value = isLoggedIn()
-  userId.value = null
-  if (!logged.value) return
+  if (!logged.value) {
+    userId.value = null
+    nickName.value = ''
+    return
+  }
   try {
     const d = await authApi.getCurrentDetail()
     nickName.value = d?.nickName || d?.email || ''
@@ -46,6 +49,8 @@ const refreshAuth = async () => {
   } catch {
     authApi.logout()
     logged.value = false
+    userId.value = null
+    nickName.value = ''
   }
 }
 

@@ -108,6 +108,10 @@ const formattedFeeHkd = computed(() => formatHkdFromFen(totalFee.value))
 let pollTimer = null
 let closeSuccessTimer = null
 let orderId = null
+/** 当前会话代次：SUCCESS/关弹窗后递增，丢弃过期的 create/poll 结果 */
+let sessionGen = 0
+/** 已 SUCCESS/FAILED 终态，禁止再次 create 或 poll */
+let paymentSettled = false
 
 function clearCloseSuccessTimer() {
   if (closeSuccessTimer) {
@@ -124,7 +128,35 @@ function stopPolling() {
   polling.value = false
 }
 
+function resetPaymentSession() {
+  sessionGen += 1
+  paymentSettled = false
+  stopPolling()
+  clearCloseSuccessTimer()
+  orderId = null
+  loading.value = false
+  error.value = null
+  paidSuccess.value = false
+  qrDataUrl.value = null
+  totalFee.value = null
+}
+
+function handlePaymentSuccess() {
+  if (paymentSettled) return
+  paymentSettled = true
+  sessionGen += 1
+  stopPolling()
+  orderId = null
+  paidSuccess.value = true
+  emit('success')
+  clearCloseSuccessTimer()
+  closeSuccessTimer = setTimeout(() => emit('close'), 1600)
+}
+
 async function startPayment() {
+  if (paymentSettled || !props.open) return
+
+  const gen = sessionGen
   stopPolling()
   clearCloseSuccessTimer()
   loading.value = true
@@ -145,6 +177,8 @@ async function startPayment() {
       userId: props.userId,
       planType: props.planType,
     })
+    if (gen !== sessionGen || paymentSettled || !props.open) return
+
     orderId = data.orderId
     totalFee.value = data.totalFee ?? null
     qrDataUrl.value = await toQrDataUrl(data.qrCode, 200, 2)
@@ -153,25 +187,30 @@ async function startPayment() {
     pollTimer = setInterval(checkPayment, 2500)
     await checkPayment()
   } catch (e) {
+    if (gen !== sessionGen || paymentSettled || !props.open) return
     error.value = e?.message || t('billing.wechatCreateFailed')
     loading.value = false
   }
 }
 
 async function checkPayment() {
-  if (!orderId) return
+  const activeOrderId = orderId
+  if (!activeOrderId || paymentSettled) return
+
+  const gen = sessionGen
   try {
-    const data = await wechatSubscriptionApi.getPaymentStatus(orderId)
+    const data = await wechatSubscriptionApi.getPaymentStatus(activeOrderId)
+    if (gen !== sessionGen || paymentSettled || orderId !== activeOrderId) return
+
     if (isWechatPaymentSuccess(data)) {
-      stopPolling()
-      paidSuccess.value = true
-      emit('success')
-      clearCloseSuccessTimer()
-      closeSuccessTimer = setTimeout(() => emit('close'), 1600)
+      handlePaymentSuccess()
       return
     }
     if (isWechatPaymentFailed(data)) {
+      paymentSettled = true
+      sessionGen += 1
       stopPolling()
+      orderId = null
       error.value = t('billing.wechatPaymentFailed')
     }
   } catch (e) {
@@ -185,24 +224,20 @@ function setBodyScrollLocked(locked) {
 }
 
 watch(
-  () => [props.open, props.planType, props.userId],
-  ([isOpen]) => {
+  () => props.open,
+  (isOpen, wasOpen) => {
     setBodyScrollLocked(!!isOpen)
-    if (isOpen) startPayment()
-    else {
-      stopPolling()
-      clearCloseSuccessTimer()
-      loading.value = false
-      error.value = null
-      paidSuccess.value = false
-      qrDataUrl.value = null
+    if (isOpen && !wasOpen) {
+      resetPaymentSession()
+      startPayment()
+    } else if (!isOpen) {
+      resetPaymentSession()
     }
   },
 )
 
 onUnmounted(() => {
-  stopPolling()
-  clearCloseSuccessTimer()
+  resetPaymentSession()
   setBodyScrollLocked(false)
 })
 </script>

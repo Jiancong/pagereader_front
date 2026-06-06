@@ -46,8 +46,8 @@ const dialogMode = ref('login')
 
 const refresh = async () => {
   logged.value = isLoggedIn()
-  userId.value = null
   if (!logged.value) {
+    userId.value = null
     avatar.value = ''
     return
   }
@@ -60,6 +60,8 @@ const refresh = async () => {
   } catch {
     authApi.logout()
     logged.value = false
+    userId.value = null
+    avatar.value = ''
   }
 }
 
