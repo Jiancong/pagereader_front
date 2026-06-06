@@ -137,6 +137,65 @@ export default {
     freeF3: "支持导出 PPTX / PDF",
     freeCta: "免费开始",
     storageLabel: "云空间：{size}",
+    faq: {
+      title: "常见问题",
+      credits: {
+        q: "积分如何扣费？",
+        agentTitle: "Agent 生成演示文稿",
+        agentP1:
+          "与简单工具不同，PageReader 使用 Agent 工作流：先理解并拆解你的书籍/文档与诉求，再调用模型生成高保真 PPT。每次生成按所选队列扣费。",
+        agentP2: "单次扣费取决于：",
+        liSlow: "<strong>慢速队列：</strong>每次 {slow} 积分；优先消耗每日 {daily} 免费积分，不足再扣套餐积分。",
+        liFast: "<strong>快速队列：</strong>每次 {fast} 积分；仅扣套餐积分，优先处理。",
+        liDaily: "<strong>每日免费积分：</strong>每天 {daily} 积分，仅可用于慢速队列，当日未用完不结转。",
+        liFollowUp: "<strong>同一项目追问：</strong>划词追问、补充说明不重复扣生成积分。",
+        note: "<strong>提示：</strong>工作区生成前会预检余额；积分不足时请升级套餐或联系商务。",
+      },
+      rollover: {
+        q: "积分会过期吗？（结转政策）",
+        intro: "我们提供灵活的结转政策，在鼓励活跃使用的同时保护你的订阅投入。",
+        monthlyTitle: "套餐月积分（订阅）",
+        liRoll: "当月未用完的套餐积分可结转至下一账单周期，但受<strong>最大结转上限</strong>约束。",
+        liCap: "<strong>上限规则：</strong>账户套餐积分余额不得超过当前月套餐积分的 <strong>2 倍</strong>。",
+        liHow: "<strong>续费时：</strong>若「结转余额 + 新月积分」超过上限，超出部分在续费日自动清零。",
+        liExample:
+          "<strong>示例：</strong>体验包每月 {monthly} 积分，上限为 {cap} 积分。若剩余 {remain} 积分并续费，余额封顶 {cap}，超出 {surplus} 积分过期。",
+        dailyTitle: "每日免费积分",
+        dailyP: "每日 {daily} 积分仅可用于慢速队列，<strong>不累计、不结转</strong>，次日重置。",
+        topupTitle: "加购积分",
+        topupP: "单独购买的加购积分（如有）在账户有效期内不过期；具体以账单与商务约定为准。",
+      },
+      extra: {
+        q: "可以额外购买积分吗？",
+        p: "可以升级至更高套餐以增加每月积分与云空间，或联系商务购买积分包。加购积分即时到账，可用于快速/慢速队列（每日免费额度规则不变）。",
+      },
+      renewal: {
+        q: "订阅会自动续费吗？",
+        p: "会。PayPal 与微信扫码订阅均在每个账单周期结束时自动续费，以保证服务不中断。你可随时在工作区「管理订阅」或 PayPal 账户中取消；取消后当前周期仍可使用至到期。",
+      },
+      slow: {
+        q: "慢速队列如何运作？（公平使用说明）",
+        disclosure:
+          "<strong>重要说明：</strong>慢速队列指在资源空闲时排队生成，<strong>不保证完成时间</strong>；高峰时段等待可能显著延长。",
+        queueTitle: "资源调度",
+        queueP:
+          "慢速任务在快速队列（每次 {fast} 积分）任务完成后，使用空闲算力处理；每日 {daily} 免费积分仅可用于慢速队列。",
+        priorityTitle: "队列优先级",
+        priorityP: "等待顺序与套餐档位相关，档位越高相对优先：",
+        liPro: "<strong>专业包：</strong>较高优先级",
+        liStarter: "<strong>体验包：</strong>标准优先级",
+        liFree: "<strong>免费版：</strong>基础优先级（仅慢速 + 每日免费额度）",
+        timeTitle: "完成时间",
+        timeP: "受全球算力负载影响，我们无法保证慢速任务的具体完成时间：",
+        liIdle: "<strong>空闲时段：</strong>通常数分钟级。",
+        liPeak: "<strong>高峰时段：</strong>可能延长至数十分钟或更长。",
+        liFast: "<strong>需要立即出稿：</strong>请使用快速队列（每次 {fast} 积分）跳过慢速排队。",
+      },
+      upgrade: {
+        q: "可以升级套餐吗？",
+        p: "订阅生效后可随时升级至更高档位；PayPal 将按差价处理，微信用户可重新扫码订阅更高套餐。若升级入口不可用，请先订阅目标套餐后联系 bd@bytelancers.com 协助处理差额退款。",
+      },
+    },
   },
   billing: {
     loading: "加载积分…",

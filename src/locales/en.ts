@@ -138,6 +138,73 @@ export default {
     freeF3: "Export PPTX / PDF",
     freeCta: "Start for free",
     storageLabel: "Cloud storage: {size}",
+    faq: {
+      title: "Frequently Asked Questions",
+      credits: {
+        q: "How do credits work?",
+        agentTitle: "Agent-based deck generation",
+        agentP1:
+          "Unlike simple tools, PageReader uses an agent workflow: it understands your book or document and intent, then generates a high-fidelity deck. Each run is charged by the queue you choose.",
+        agentP2: "Credits per run depend on:",
+        liSlow:
+          "<strong>Slow queue:</strong> {slow} credits per run—daily {daily} free credits are used first, then package credits.",
+        liFast: "<strong>Fast queue:</strong> {fast} credits per run—package credits only, with priority processing.",
+        liDaily:
+          "<strong>Daily free credits:</strong> {daily} per day, slow queue only; unused daily credits do not roll over.",
+        liFollowUp: "<strong>Same-project follow-ups:</strong> in-deck Q&amp;A does not charge another generation fee.",
+        note: "<strong>Note:</strong> The workspace pre-checks your balance before generation. Upgrade or contact sales if you run low.",
+      },
+      rollover: {
+        q: "Will my credits expire? (Rollover policy)",
+        intro:
+          "We offer a flexible rollover policy that protects your subscription while encouraging active use.",
+        monthlyTitle: "Monthly subscription credits",
+        liRoll:
+          "Unused package credits from your monthly plan roll over to the next billing cycle, subject to a <strong>maximum rollover cap</strong>.",
+        liCap:
+          "<strong>The cap:</strong> Your package credit balance cannot exceed <strong>2×</strong> your current plan's monthly allocation.",
+        liHow:
+          "<strong>On renewal:</strong> If rollover plus new monthly credits exceed the cap, the excess expires on your renewal date.",
+        liExample:
+          "<strong>Example:</strong> Starter plan ({monthly} credits/month), cap {cap}. With {remain} credits left at renewal, balance is capped at {cap} and {surplus} credits expire.",
+        dailyTitle: "Daily free credits",
+        dailyP:
+          "{daily} free credits per day apply to the slow queue only—they <strong>do not roll over</strong> and reset each day.",
+        topupTitle: "Top-up credits",
+        topupP:
+          "Separately purchased top-up credits (when available) do not expire while your account stays active, per your invoice or sales agreement.",
+      },
+      extra: {
+        q: "Can I purchase extra credits?",
+        p: "Upgrade to a higher plan for more monthly credits and storage, or contact sales for credit packs. Top-ups apply instantly; daily free-credit rules still apply to the slow queue.",
+      },
+      renewal: {
+        q: "Is my subscription automatically renewed?",
+        p: "Yes. PayPal and WeChat scan subscriptions renew at the end of each billing cycle. Cancel anytime from workspace billing or PayPal; access continues through the current period.",
+      },
+      slow: {
+        q: 'How does the slow queue work? (Fair usage)',
+        disclosure:
+          "<strong>Important:</strong> The slow queue runs when spare capacity is available—<strong>completion time is not guaranteed</strong> and can be much longer at peak load.",
+        queueTitle: "Resource allocation",
+        queueP:
+          "Slow tasks run after fast-queue jobs ({fast} credits per run) using idle capacity. Daily {daily} free credits apply to the slow queue only.",
+        priorityTitle: "Queue priority",
+        priorityP: "Wait order depends on your plan tier—higher tiers are dispatched sooner:",
+        liPro: "<strong>Pro:</strong> higher priority",
+        liStarter: "<strong>Starter:</strong> standard priority",
+        liFree: "<strong>Free:</strong> base priority (slow queue + daily free credits only)",
+        timeTitle: "Completion time",
+        timeP: "We cannot guarantee how long slow-queue jobs will take:",
+        liIdle: "<strong>Off-peak:</strong> often a few minutes.",
+        liPeak: "<strong>Peak:</strong> may extend to tens of minutes or longer.",
+        liFast: "<strong>Need it now:</strong> use the fast queue ({fast} credits) to skip the slow waitlist.",
+      },
+      upgrade: {
+        q: "Can I upgrade my plan?",
+        p: "Upgrade anytime while subscribed; PayPal charges the price difference. For WeChat, subscribe to the higher tier via scan. If upgrade is unavailable in UI, subscribe to the target plan and email bd@bytelancers.com for prorated refund assistance.",
+      },
+    },
   },
   billing: {
     loading: "Loading credits…",

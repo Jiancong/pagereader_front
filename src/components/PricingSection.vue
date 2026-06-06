@@ -132,6 +132,43 @@
         <p class="text-sm font-medium text-emerald-400">{{ subscribeSuccess }}</p>
       </div>
 
+      <!-- FAQ：积分、结转上限、订阅 -->
+      <div class="faq-section mt-16 max-w-3xl mx-auto">
+        <h2 class="faq-title text-center text-2xl font-bold text-foreground">{{ t('pricing.faq.title') }}</h2>
+        <div class="faq-accordion mt-8 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+          <div v-for="item in faqItems" :key="item.id" class="faq-accordion-item">
+            <button
+              type="button"
+              class="faq-accordion-trigger flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40 sm:px-6"
+              :aria-expanded="openFaqId === item.id"
+              @click="toggleFaq(item.id)"
+            >
+              <h4 class="faq-accordion-question text-sm font-semibold text-foreground sm:text-base">
+                {{ t(item.questionKey) }}
+              </h4>
+              <ChevronUp
+                class="faq-accordion-icon h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200"
+                :class="openFaqId === item.id ? '' : 'rotate-180'"
+              />
+            </button>
+            <div
+              v-show="openFaqId === item.id"
+              class="faq-accordion-content border-t border-border/60 bg-background/40 px-5 py-4 sm:px-6"
+            >
+              <div class="faq-accordion-inner space-y-3 text-sm leading-relaxed text-muted-foreground">
+                <template v-for="(block, bi) in item.blocks" :key="bi">
+                  <p v-if="block.type === 'p'" v-html="t(block.key, block.params)" />
+                  <p v-else-if="block.type === 'strong'" class="font-semibold text-foreground" v-html="t(block.key)" />
+                  <ul v-else-if="block.type === 'ul'" class="list-disc space-y-1.5 pl-5">
+                    <li v-for="(li, lii) in block.items" :key="lii" v-html="t(li.key, li.params)" />
+                  </ul>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="mt-10 flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-center">
         <p class="text-sm text-muted-foreground">{{ t('pricing.contactHint') }}</p>
         <a
@@ -158,7 +195,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check, Loader2, HardDrive } from 'lucide-vue-next'
+import { Check, Loader2, HardDrive, ChevronUp } from 'lucide-vue-next'
 import { pricingApi, formatHkd, resolveWechatMonthlyHkd } from '@/api'
 import { isPaypalConfigured, renderPaypalSubscribeButton } from '@/utils/paypalSubscribe'
 import { notifyCreditsRefresh } from '@/composables/useCreditsRefresh'
@@ -182,6 +219,127 @@ const paypalReady = isPaypalConfigured()
 const wechatOpen = ref(false)
 const wechatPlanType = ref('')
 const wechatPlanName = ref('')
+const openFaqId = ref(null)
+
+/** 结转示例：取体验包月积分，默认 300 */
+const rolloverExampleMonthly = computed(() => {
+  const starter = apiPlans.value.find((p) => {
+    const key = String(p.planType || '').toUpperCase()
+    return key.includes('STARTER') || key.includes('BASIC')
+  })
+  const n = Number(starter?.credits?.monthlyFastCredits)
+  return Number.isFinite(n) && n > 0 ? n : 300
+})
+
+const rolloverParams = computed(() => {
+  const monthly = rolloverExampleMonthly.value
+  const cap = monthly * 2
+  const remain = Math.round(monthly * 1.17)
+  const surplus = Math.max(remain + monthly - cap, 0)
+  return { monthly, cap, remain, surplus }
+})
+
+const creditCostParams = computed(() => ({
+  slow: 30,
+  fast: 60,
+  daily: 30,
+}))
+
+const faqItems = computed(() => {
+  const rp = rolloverParams.value
+  const cp = creditCostParams.value
+  return [
+    {
+      id: 'credits',
+      questionKey: 'pricing.faq.credits.q',
+      blocks: [
+        { type: 'strong', key: 'pricing.faq.credits.agentTitle' },
+        { type: 'p', key: 'pricing.faq.credits.agentP1' },
+        { type: 'p', key: 'pricing.faq.credits.agentP2' },
+        {
+          type: 'ul',
+          items: [
+            { key: 'pricing.faq.credits.liSlow', params: cp },
+            { key: 'pricing.faq.credits.liFast', params: cp },
+            { key: 'pricing.faq.credits.liDaily', params: cp },
+            { key: 'pricing.faq.credits.liFollowUp' },
+          ],
+        },
+        { type: 'p', key: 'pricing.faq.credits.note', params: cp },
+      ],
+    },
+    {
+      id: 'rollover',
+      questionKey: 'pricing.faq.rollover.q',
+      blocks: [
+        { type: 'p', key: 'pricing.faq.rollover.intro' },
+        { type: 'strong', key: 'pricing.faq.rollover.monthlyTitle' },
+        {
+          type: 'ul',
+          items: [
+            { key: 'pricing.faq.rollover.liRoll' },
+            { key: 'pricing.faq.rollover.liCap' },
+            { key: 'pricing.faq.rollover.liHow' },
+            { key: 'pricing.faq.rollover.liExample', params: rp },
+          ],
+        },
+        { type: 'strong', key: 'pricing.faq.rollover.dailyTitle' },
+        { type: 'p', key: 'pricing.faq.rollover.dailyP', params: cp },
+        { type: 'strong', key: 'pricing.faq.rollover.topupTitle' },
+        { type: 'p', key: 'pricing.faq.rollover.topupP' },
+      ],
+    },
+    {
+      id: 'extra',
+      questionKey: 'pricing.faq.extra.q',
+      blocks: [{ type: 'p', key: 'pricing.faq.extra.p' }],
+    },
+    {
+      id: 'renewal',
+      questionKey: 'pricing.faq.renewal.q',
+      blocks: [{ type: 'p', key: 'pricing.faq.renewal.p' }],
+    },
+    {
+      id: 'slow',
+      questionKey: 'pricing.faq.slow.q',
+      blocks: [
+        { type: 'p', key: 'pricing.faq.slow.disclosure' },
+        { type: 'strong', key: 'pricing.faq.slow.queueTitle' },
+        { type: 'p', key: 'pricing.faq.slow.queueP', params: cp },
+        { type: 'strong', key: 'pricing.faq.slow.priorityTitle' },
+        { type: 'p', key: 'pricing.faq.slow.priorityP' },
+        {
+          type: 'ul',
+          items: [
+            { key: 'pricing.faq.slow.liPro' },
+            { key: 'pricing.faq.slow.liStarter' },
+            { key: 'pricing.faq.slow.liFree' },
+          ],
+        },
+        { type: 'strong', key: 'pricing.faq.slow.timeTitle' },
+        { type: 'p', key: 'pricing.faq.slow.timeP' },
+        {
+          type: 'ul',
+          items: [
+            { key: 'pricing.faq.slow.liIdle' },
+            { key: 'pricing.faq.slow.liPeak' },
+            { key: 'pricing.faq.slow.liFast', params: cp },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'upgrade',
+      questionKey: 'pricing.faq.upgrade.q',
+      blocks: [{ type: 'p', key: 'pricing.faq.upgrade.p' }],
+    },
+  ]
+})
+
+function toggleFaq(id) {
+  openFaqId.value = openFaqId.value === id ? null : id
+}
+
 const usageItems = computed(() => [
   {
     key: 'slow',
