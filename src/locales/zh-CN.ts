@@ -163,6 +163,7 @@ export default {
     wechatWaiting: "支付完成后将自动刷新积分",
     wechatMissingParams: "缺少用户或套餐信息",
     wechatCreateFailed: "创建支付订单失败",
+    wechatPaymentFailed: "支付未完成或已关闭，请重新扫码",
   },
   auth: {
     loginTitle: "登录账号",

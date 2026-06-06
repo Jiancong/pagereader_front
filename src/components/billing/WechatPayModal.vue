@@ -68,7 +68,12 @@ import { useI18n } from 'vue-i18n'
 import { Loader2, X } from 'lucide-vue-next'
 import WechatIcon from '@/components/billing/WechatIcon.vue'
 import { toQrDataUrl } from '@/utils/qrcodeVendor'
-import { wechatSubscriptionApi, formatHkdFromFen } from '@/api'
+import {
+  wechatSubscriptionApi,
+  formatHkdFromFen,
+  isWechatPaymentSuccess,
+  isWechatPaymentFailed,
+} from '@/api'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -137,14 +142,18 @@ async function checkPayment() {
   if (!orderId) return
   try {
     const data = await wechatSubscriptionApi.getPaymentStatus(orderId)
-    const status = String(data.paymentStatus ?? '').toUpperCase()
-    if (status === 'SUCCESS') {
+    if (isWechatPaymentSuccess(data)) {
       stopPolling()
       emit('success')
       emit('close')
+      return
     }
-  } catch {
-    /* keep polling */
+    if (isWechatPaymentFailed(data)) {
+      stopPolling()
+      error.value = t('billing.wechatPaymentFailed')
+    }
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn('[WechatPay] poll failed', e)
   }
 }
 

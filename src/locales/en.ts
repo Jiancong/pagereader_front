@@ -164,6 +164,7 @@ export default {
     wechatWaiting: "Credits refresh automatically after payment",
     wechatMissingParams: "Missing user or plan",
     wechatCreateFailed: "Could not create payment order",
+    wechatPaymentFailed: "Payment was not completed or was closed. Please scan again.",
   },
   auth: {
     loginTitle: "Log in",

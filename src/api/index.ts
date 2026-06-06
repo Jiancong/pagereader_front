@@ -13,6 +13,11 @@ export * as pricingApi from "./pricing"
 export * as subscribeApi from "./subscribe"
 export * as wechatSubscriptionApi from "./wechatSubscription"
 export {
+  parseWechatPaymentStatus,
+  isWechatPaymentSuccess,
+  isWechatPaymentFailed,
+} from "./wechatSubscription"
+export {
   isCreditsInsufficient,
   isCreditsInsufficientMessage,
   canAffordQueue,

@@ -335,8 +335,16 @@ Header: Authorization: <JWT>
 ### 7.3 `GET /api2/wechat-subscription/payment/{orderId}`
 
 ```
-返回 data: { "paymentStatus": "SUCCESS" | "PENDING" | "FAILED" | ... }
+返回 data 可为对象或状态字符串，前端均兼容，例如：
+{ "paymentStatus": "SUCCESS" }
+或
+"SUCCESS"
 ```
+
+| 字段（任选其一） | 成功取值 | 进行中 | 失败 |
+|------------------|----------|--------|------|
+| `paymentStatus` / `status` / `payment_status` | `SUCCESS`、`PAID`、`COMPLETED` | `PENDING` | `FAILED`、`CLOSED`、`CANCELLED` |
+| `paid` / `success` | `true` | — | — |
 
 支付成功后须入账套餐积分（与 PayPal 订阅成功逻辑一致），前端会调 `GET /subscribe/my/status` 刷新余额。
 
