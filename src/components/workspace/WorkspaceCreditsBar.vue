@@ -102,15 +102,15 @@ const canCancel = computed(() => {
   return !!resolveCancelPlanId(s)
 })
 
-async function refresh() {
-  loading.value = true
+async function refresh(silent = false) {
+  if (!silent) loading.value = true
   cancelError.value = null
   try {
     status.value = await subscribeApi.getMyStatus()
   } catch {
-    status.value = null
+    if (!silent) status.value = null
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -144,7 +144,7 @@ onMounted(async () => {
   } catch {
     userId.value = null
   }
-  unregisterRefresh = registerCreditsRefresh(refresh)
+  unregisterRefresh = registerCreditsRefresh(() => refresh(true))
   await refresh()
 })
 

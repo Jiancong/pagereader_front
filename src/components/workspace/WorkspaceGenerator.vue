@@ -199,9 +199,20 @@ import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X } from "lucide-vue-next"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
-import { authApi, fileApi, agentApi, isLoggedIn, ApiError, isCreditsInsufficient } from "../../api"
+import {
+  authApi,
+  fileApi,
+  agentApi,
+  subscribeApi,
+  isLoggedIn,
+  ApiError,
+  isCreditsInsufficient,
+  isCreditsInsufficientMessage,
+  canAffordQueue,
+} from "../../api"
 import type { PptQueue } from "@/api/types"
 import { resolvePptDataFromStreamComplete } from "@/utils/pptCompletePayload"
+import { notifyCreditsRefresh } from "@/composables/useCreditsRefresh"
 
 const emit = defineEmits<{
   "project-started": [projectId: string]
@@ -255,6 +266,34 @@ const tabClass = (tab: "prompt" | "upload") => [
 ]
 
 const appendLog = (task: GeneratorTask, line: string) => task.logs.push(line)
+
+const refreshCreditsBar = () => notifyCreditsRefresh().catch(() => {})
+
+const applyStreamError = (task: GeneratorTask, msg: string) => {
+  if (isCreditsInsufficientMessage(msg)) {
+    task.showCreditsCta = true
+    task.errorMsg = t("workspace.creditsInsufficient")
+  } else {
+    task.errorMsg = msg
+  }
+}
+
+/** 生成前拉取最新余额并校验（GET /subscribe/my/status） */
+async function ensureCreditsForTask(task: GeneratorTask): Promise<boolean> {
+  try {
+    const status = await subscribeApi.getMyStatus()
+    if (!canAffordQueue(status, task.queue)) {
+      task.showCreditsCta = true
+      task.errorMsg = t("workspace.creditsInsufficient")
+      await refreshCreditsBar()
+      return false
+    }
+    await refreshCreditsBar()
+    return true
+  } catch {
+    return true
+  }
+}
 
 function docBaseName(filename: string): string {
   const base = filename.split(/[/\\]/).pop() || filename
@@ -326,7 +365,10 @@ const runStream = async (
       ...(!hasDocuments ? { enable_search: options?.enableSearch ?? false } : {}),
     },
     {
-      onStarted: () => emit("project-started", task.projectId),
+      onStarted: () => {
+        emit("project-started", task.projectId)
+        refreshCreditsBar()
+      },
       onProgress: (data: unknown) => {
         const line = toText(data)
         if (line) appendLog(task, line)
@@ -353,9 +395,14 @@ const runStream = async (
           }
         } catch {
           task.errorMsg = t("workspace.loadPptFailed")
+        } finally {
+          refreshCreditsBar()
         }
       },
-      onError: (msg: string) => (task.errorMsg = msg),
+      onError: (msg: string) => {
+        applyStreamError(task, msg)
+        refreshCreditsBar()
+      },
     },
   )
 }
@@ -378,6 +425,7 @@ const handleGenerateError = (task: GeneratorTask, e: unknown) => {
   if (isCreditsInsufficient(e)) {
     task.showCreditsCta = true
     task.errorMsg = t("workspace.creditsInsufficient")
+    refreshCreditsBar()
     return
   }
   task.errorMsg = e instanceof ApiError ? e.message : (e as Error)?.message || t("workspace.generateFailed")
@@ -386,6 +434,10 @@ const handleGenerateError = (task: GeneratorTask, e: unknown) => {
 const onPromptSubmit = async () => {
   if (!input.value.trim() || promptTask.isGenerating) return
   startTask(promptTask)
+  if (!(await ensureCreditsForTask(promptTask))) {
+    promptTask.isGenerating = false
+    return
+  }
   try {
     await runStream(promptTask, input.value.trim(), undefined, undefined, {
       enableSearch: enableSearch.value,
@@ -394,6 +446,7 @@ const onPromptSubmit = async () => {
     handleGenerateError(promptTask, e)
   } finally {
     promptTask.isGenerating = false
+    await refreshCreditsBar()
   }
 }
 
@@ -402,6 +455,10 @@ const onAnalyze = async () => {
   const message = uploadPrompt.value.trim()
   if (!message) return
   startTask(ragTask)
+  if (!(await ensureCreditsForTask(ragTask))) {
+    ragTask.isGenerating = false
+    return
+  }
   try {
     appendLog(ragTask, t("workspace.uploadingDoc"))
     const doc = await fileApi.uploadDocument(uploadedFile.value)
@@ -411,6 +468,7 @@ const onAnalyze = async () => {
     handleGenerateError(ragTask, e)
   } finally {
     ragTask.isGenerating = false
+    await refreshCreditsBar()
   }
 }
 

@@ -12,4 +12,11 @@ export * as agentApi from "./agent"
 export * as pricingApi from "./pricing"
 export * as subscribeApi from "./subscribe"
 export * as wechatSubscriptionApi from "./wechatSubscription"
-export { isCreditsInsufficient } from "./billing"
+export {
+  isCreditsInsufficient,
+  isCreditsInsufficientMessage,
+  canAffordQueue,
+  getDailyCreditsRemaining,
+  getPackageCreditsRemaining,
+  QUEUE_CREDIT_COST,
+} from "./billing"
