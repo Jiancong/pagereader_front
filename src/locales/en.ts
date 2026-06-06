@@ -125,7 +125,7 @@ export default {
     loadPlansFailed: "Could not load plans. Please refresh.",
     creditsPerMonth: "{n} credits / month",
     paypalNotConfigured: "PayPal is not configured",
-    subscribeSuccess: "Subscription active—credits will update shortly",
+    subscribeSuccess: "Subscription successful! Your credits are updated—you're ready to go.",
     dailyFreeNote: "30 free credits / day · slow queue only",
     wechatPay: "WeChat Pay (scan)",
     wechatMonthlyPrice: "{price} / mo",

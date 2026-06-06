@@ -120,7 +120,17 @@
         </div>
       </div>
 
-      <p v-if="subscribeSuccess" class="mt-6 text-center text-sm text-emerald-400">{{ subscribeSuccess }}</p>
+      <div
+        v-if="subscribeSuccess"
+        ref="subscribeSuccessEl"
+        class="mx-auto mt-8 flex max-w-lg items-center gap-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-5 py-4"
+        role="status"
+      >
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
+          <Check class="h-5 w-5 text-emerald-400" />
+        </div>
+        <p class="text-sm font-medium text-emerald-400">{{ subscribeSuccess }}</p>
+      </div>
 
       <div class="mt-10 flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-center">
         <p class="text-sm text-muted-foreground">{{ t('pricing.contactHint') }}</p>
@@ -167,6 +177,7 @@ const plansLoading = ref(true)
 const plansError = ref(null)
 const apiPlans = ref([])
 const subscribeSuccess = ref(null)
+const subscribeSuccessEl = ref(null)
 const paypalReady = isPaypalConfigured()
 const wechatOpen = ref(false)
 const wechatPlanType = ref('')
@@ -250,11 +261,7 @@ async function mountPaypalButtons() {
     const el = document.getElementById(paypalContainerId(plan.planType))
     if (!planId || !el) continue
     try {
-      await renderPaypalSubscribeButton(el, planId, props.userId, async () => {
-        subscribeSuccess.value = t('pricing.subscribeSuccess')
-        await notifyCreditsRefresh()
-        emit('subscribed')
-      })
+      await renderPaypalSubscribeButton(el, planId, props.userId, () => showSubscribeSuccess())
     } catch (e) {
       console.warn('PayPal button', plan.planType, e)
     }
@@ -288,9 +295,15 @@ function openWechat(plan) {
   wechatOpen.value = true
 }
 
-async function onWechatSuccess() {
+async function showSubscribeSuccess() {
   subscribeSuccess.value = t('pricing.subscribeSuccess')
   await notifyCreditsRefresh()
   emit('subscribed')
+  await nextTick()
+  subscribeSuccessEl.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+}
+
+function onWechatSuccess() {
+  showSubscribeSuccess()
 }
 </script>

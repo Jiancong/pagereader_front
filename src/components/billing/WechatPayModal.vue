@@ -34,6 +34,15 @@
           <p class="mt-3 text-sm text-muted-foreground">{{ t('billing.wechatCreating') }}</p>
         </div>
 
+        <div v-else-if="paidSuccess" class="mt-8 flex flex-col items-center py-6">
+          <div class="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15">
+            <Check class="h-8 w-8 text-emerald-400" />
+          </div>
+          <p class="mt-4 text-center text-base font-semibold text-emerald-400">
+            {{ t('pricing.subscribeSuccess') }}
+          </p>
+        </div>
+
         <div v-else-if="error" class="mt-6 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {{ error }}
         </div>
@@ -65,7 +74,7 @@
 <script setup>
 import { ref, watch, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Loader2, X } from 'lucide-vue-next'
+import { Check, Loader2, X } from 'lucide-vue-next'
 import WechatIcon from '@/components/billing/WechatIcon.vue'
 import { toQrDataUrl } from '@/utils/qrcodeVendor'
 import {
@@ -91,12 +100,21 @@ const error = ref(null)
 const qrDataUrl = ref(null)
 const totalFee = ref(null)
 const polling = ref(false)
+const paidSuccess = ref(false)
 
-/** 后端 totalFee 为微信支付单位「分」 */
+/** 后端 totalFee 为微信支付单位「港仙」 */
 const formattedFeeHkd = computed(() => formatHkdFromFen(totalFee.value))
 
 let pollTimer = null
+let closeSuccessTimer = null
 let orderId = null
+
+function clearCloseSuccessTimer() {
+  if (closeSuccessTimer) {
+    clearTimeout(closeSuccessTimer)
+    closeSuccessTimer = null
+  }
+}
 
 function stopPolling() {
   if (pollTimer) {
@@ -108,8 +126,10 @@ function stopPolling() {
 
 async function startPayment() {
   stopPolling()
+  clearCloseSuccessTimer()
   loading.value = true
   error.value = null
+  paidSuccess.value = false
   qrDataUrl.value = null
   totalFee.value = null
   orderId = null
@@ -144,8 +164,10 @@ async function checkPayment() {
     const data = await wechatSubscriptionApi.getPaymentStatus(orderId)
     if (isWechatPaymentSuccess(data)) {
       stopPolling()
+      paidSuccess.value = true
       emit('success')
-      emit('close')
+      clearCloseSuccessTimer()
+      closeSuccessTimer = setTimeout(() => emit('close'), 1600)
       return
     }
     if (isWechatPaymentFailed(data)) {
@@ -169,8 +191,10 @@ watch(
     if (isOpen) startPayment()
     else {
       stopPolling()
+      clearCloseSuccessTimer()
       loading.value = false
       error.value = null
+      paidSuccess.value = false
       qrDataUrl.value = null
     }
   },
@@ -178,6 +202,7 @@ watch(
 
 onUnmounted(() => {
   stopPolling()
+  clearCloseSuccessTimer()
   setBodyScrollLocked(false)
 })
 </script>

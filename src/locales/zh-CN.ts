@@ -124,7 +124,7 @@ export default {
     loadPlansFailed: "套餐加载失败，请稍后刷新",
     creditsPerMonth: "每月 {n} 积分",
     paypalNotConfigured: "PayPal 未配置，请联系管理员",
-    subscribeSuccess: "订阅成功，积分将很快到账",
+    subscribeSuccess: "订阅成功！积分已刷新，可以开始使用了",
     dailyFreeNote: "每日 30 免费积分 · 仅慢速队列",
     wechatPay: "微信支付（扫码）",
     wechatMonthlyPrice: "{price} / 月",
