@@ -46,6 +46,59 @@ export function isCreditsInsufficientMessage(msg: string): boolean {
   return m.includes("CREDITS_INSUFFICIENT") || msg.includes("积分不足")
 }
 
+/** 微信支付 totalFee（港分）→ 港币展示 */
+export function formatHkdFromFen(fen: number | null | undefined): string | null {
+  if (fen == null || !Number.isFinite(Number(fen))) return null
+  const hkd = Number(fen) / 100
+  return new Intl.NumberFormat("zh-HK", {
+    style: "currency",
+    currency: "HKD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(hkd)
+}
+
+/** 美元→港币展示汇率（仅用于标价展示；实扣以微信订单 totalFee 为准） */
+export function getUsdHkdRate(): number {
+  const n = Number(import.meta.env.VITE_USD_HKD_RATE)
+  return Number.isFinite(n) && n > 0 ? n : 7.8
+}
+
+export function usdToHkd(usd: number): number {
+  return Math.round(Number(usd) * getUsdHkdRate() * 100) / 100
+}
+
+type WechatPricePlan = {
+  monthly?: { recurringMonth?: number; recurringMonthHkd?: number }
+}
+
+/**
+ * 微信套餐展示价（港币元）。
+ * 优先 `recurringMonthHkd`；否则用 `recurringMonth`（USD）× 汇率估算。
+ */
+export function resolveWechatMonthlyHkd(
+  plan: WechatPricePlan,
+): { hkd: number; estimated: boolean } | null {
+  const hkd = plan.monthly?.recurringMonthHkd
+  if (hkd != null && Number.isFinite(Number(hkd))) {
+    return { hkd: Number(hkd), estimated: false }
+  }
+  const usd = plan.monthly?.recurringMonth
+  if (usd == null || !Number.isFinite(Number(usd)) || Number(usd) <= 0) return null
+  return { hkd: usdToHkd(Number(usd)), estimated: true }
+}
+
+/** 套餐标价（港币元）→ 港币展示 */
+export function formatHkd(hkd: number | null | undefined): string | null {
+  if (hkd == null || !Number.isFinite(Number(hkd))) return null
+  return new Intl.NumberFormat("zh-HK", {
+    style: "currency",
+    currency: "HKD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(Number(hkd))
+}
+
 export function isCreditsInsufficient(err: unknown): boolean {
   if (typeof err === "string") return isCreditsInsufficientMessage(err)
   if (!(err instanceof ApiError)) return false

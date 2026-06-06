@@ -19,4 +19,8 @@ export {
   getDailyCreditsRemaining,
   getPackageCreditsRemaining,
   QUEUE_CREDIT_COST,
+  formatHkdFromFen,
+  formatHkd,
+  resolveWechatMonthlyHkd,
+  getUsdHkdRate,
 } from "./billing"

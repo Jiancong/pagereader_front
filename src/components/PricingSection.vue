@@ -94,6 +94,9 @@
             <WechatPayButton @click="openWechat(plan)">
               {{ t('pricing.wechatPay') }}
             </WechatPayButton>
+            <p v-if="wechatPriceLine(plan)" class="text-center text-xs text-muted-foreground">
+              {{ wechatPriceLine(plan) }}
+            </p>
             <p
               v-if="!paypalReady && paypalPlanId(plan)"
               class="text-center text-xs text-muted-foreground"
@@ -146,7 +149,7 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Loader2, HardDrive } from 'lucide-vue-next'
-import { pricingApi } from '@/api'
+import { pricingApi, formatHkd, resolveWechatMonthlyHkd } from '@/api'
 import { isPaypalConfigured, renderPaypalSubscribeButton } from '@/utils/paypalSubscribe'
 import { notifyCreditsRefresh } from '@/composables/useCreditsRefresh'
 import WechatPayModal from '@/components/billing/WechatPayModal.vue'
@@ -218,6 +221,16 @@ function storageLabel(plan) {
 function creditsLabel(plan) {
   if (plan.isFree) return t('pricing.freeCredits')
   return t('pricing.creditsPerMonth', { n: plan.credits?.monthlyFastCredits ?? '—' })
+}
+
+function wechatPriceLine(plan) {
+  const resolved = resolveWechatMonthlyHkd(plan)
+  if (!resolved) return null
+  const price = formatHkd(resolved.hkd)
+  if (!price) return null
+  return resolved.estimated
+    ? t('pricing.wechatMonthlyPriceApprox', { price })
+    : t('pricing.wechatMonthlyPrice', { price })
 }
 
 function paypalPlanId(plan) {

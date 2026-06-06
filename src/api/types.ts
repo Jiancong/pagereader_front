@@ -235,7 +235,10 @@ export interface ChatStreamReq {
 
 // ===== Pricing / subscription =====
 export interface PricingPlanMonthly {
+  /** PayPal 等：美元月费 */
   recurringMonth?: number
+  /** 微信扫码：港币月费（元） */
+  recurringMonthHkd?: number
 }
 
 export interface PricingPlanCredits {

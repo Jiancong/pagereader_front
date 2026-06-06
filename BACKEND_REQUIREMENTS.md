@@ -241,6 +241,123 @@ PptViewer 的「划词追问」也走 `POST /api2/agent/chat-stream`，并带 `X
 
 ---
 
+## 7. 【新增/确认】定价套餐与微信扫码（`recurringMonthHkd`）
+
+前端定价页 **PayPal 用美元、微信用港币**，两套标价需后端分别提供。微信弹窗**实付金额**以创建订单返回的 `totalFee`（港分）为准，须与 `recurringMonthHkd` 一致。
+
+### 7.1 `GET /api2/pricing/plans`
+
+返回 `R<PricingPlan[]>`（或 `{ plans: [...] }`，前端已兼容）。
+
+每个套餐 `monthly` 对象需同时支持：
+
+| 字段 | 类型 | 单位 | 用途 |
+|------|------|------|------|
+| `recurringMonth` | number | **美元** | PayPal 订阅展示与扣款（已有） |
+| `recurringMonthHkd` | number | **港币元** | 微信支付按钮旁标价、运营对齐 |
+
+**示例**（测试包 + 正式包）：
+
+```json
+{
+  "code": 0,
+  "data": [
+    {
+      "planType": "TEST",
+      "displayName": "测试包",
+      "visible": true,
+      "recommended": false,
+      "monthly": {
+        "recurringMonth": 0.01,
+        "recurringMonthHkd": 0.08
+      },
+      "credits": { "monthlyFastCredits": 10 },
+      "highlights": ["用于联调微信支付"],
+      "paypalPlanIds": []
+    },
+    {
+      "planType": "STARTER",
+      "displayName": "体验包",
+      "visible": true,
+      "monthly": {
+        "recurringMonth": 9.9,
+        "recurringMonthHkd": 68
+      },
+      "credits": { "monthlyFastCredits": 300 },
+      "paypalPlanIds": ["P-xxx"]
+    }
+  ]
+}
+```
+
+**规则**：
+
+- `recurringMonthHkd` 为**正数，最多 2 位小数**（如 `68`、`68.00`、`0.08`）。
+- 免费档 `FREE` 可省略 `monthly` 或 `recurringMonthHkd: 0`。
+- 仅微信、不走 PayPal 的套餐也须填 `recurringMonthHkd`；`recurringMonth` 可填对标美元或 `0`。
+- 若缺 `recurringMonthHkd`，前端会临时用 `recurringMonth × VITE_USD_HKD_RATE` **估算**并标「约合」，**不推荐**作为正式售价。
+
+### 7.2 `POST /api2/wechat-subscription/create`
+
+```
+Query: userId, planType, billingCycle=MONTHLY
+Header: Authorization: <JWT>
+返回 data:
+{
+  "orderId": "wx-order-xxx",
+  "qrCode": "weixin://wxpay/...",
+  "totalFee": 8
+}
+```
+
+| 字段 | 要求 |
+|------|------|
+| `totalFee` | **微信支付 `total_fee`，单位：港分（整数）**；`totalFee = round(recurringMonthHkd × 100)` |
+| `qrCode` | 微信 Native 扫码链接或可被前端生成二维码的 payload |
+| `orderId` | 用于 `GET /wechat-subscription/payment/{orderId}` 轮询 |
+
+**与 `recurringMonthHkd` 对齐（必验）**：
+
+| `recurringMonthHkd` | `totalFee`（港分） | 用户扫码看到 |
+|---------------------|-------------------|--------------|
+| `0.08` | `8` | HK$0.08 |
+| `68` | `6800` | HK$68.00 |
+| `68.88` | `6888` | HK$68.88 |
+
+> 常见错误：`recurringMonthHkd=8` 却返回 `totalFee=8`（8 港分 = HK$0.08）。**港币元与港分勿混用。**
+
+创建订单时后端应：
+
+1. 按 `planType` 读取配置中的 **`recurringMonthHkd`（港币元）**，勿用 `recurringMonth`（美元）直接当 `totalFee`。
+2. `totalFee = (int) Math.round(recurringMonthHkd * 100)`。
+3. 与微信下单 API 使用同一金额。
+
+### 7.3 `GET /api2/wechat-subscription/payment/{orderId}`
+
+```
+返回 data: { "paymentStatus": "SUCCESS" | "PENDING" | "FAILED" | ... }
+```
+
+支付成功后须入账套餐积分（与 PayPal 订阅成功逻辑一致），前端会调 `GET /subscribe/my/status` 刷新余额。
+
+### 7.4 前端使用方式（供联调）
+
+| 场景 | 前端行为 |
+|------|----------|
+| 定价卡微信按钮下 | 有 `recurringMonthHkd` → 显示 `{price} / 月`；无则美元×汇率显示「约合」 |
+| 扫码弹窗 | 仅展示 `create` 返回的 `totalFee` 换算：`HK$(totalFee/100)` |
+| PayPal | 仍用 `recurringMonth`（USD），与微信无关 |
+
+### 7.5 验收用例
+
+1. `GET /pricing/plans` 中测试包 `monthly.recurringMonthHkd = 0.08`。
+2. `POST /wechat-subscription/create?planType=TEST` 返回 `totalFee: 8`。
+3. 弹窗显示 **HK$0.08**，扫码金额与微信收银台一致。
+4. 体验包 `recurringMonthHkd: 68` → `totalFee: 6800` → 显示 **HK$68.00**。
+5. 支付成功后 `GET /subscribe/my/status` 积分增加。
+
+---
+
 ## 最需先做
 
 1. **chat-stream 收到请求时**：按 `projectId` upsert Project，标题取 `uploaded_documents[0].name`（去后缀），并写入首条 user 对话（见 **2.1**）

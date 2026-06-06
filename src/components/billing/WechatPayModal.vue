@@ -46,9 +46,11 @@
               class="h-[200px] w-[200px] rounded-lg border border-border bg-white p-2"
             />
           </div>
-          <p v-if="displayFeeYuan != null" class="mt-3 text-center text-sm text-muted-foreground">
-            {{ t('billing.wechatAmount', { fee: displayFeeYuan }) }}
-          </p>
+          <div v-if="formattedFeeHkd" class="mt-4 text-center">
+            <p class="text-sm text-muted-foreground">{{ t('billing.wechatAmountLabel') }}</p>
+            <p class="mt-1 text-2xl font-semibold tracking-tight text-foreground">{{ formattedFeeHkd }}</p>
+            <p class="mt-1 text-xs text-muted-foreground">{{ t('billing.wechatCurrencyNote') }}</p>
+          </div>
           <p class="mt-2 text-center text-xs text-muted-foreground">{{ t('billing.wechatScanHint') }}</p>
           <p class="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 v-if="polling" class="h-4 w-4 animate-spin text-primary" />
@@ -66,7 +68,7 @@ import { useI18n } from 'vue-i18n'
 import { Loader2, X } from 'lucide-vue-next'
 import WechatIcon from '@/components/billing/WechatIcon.vue'
 import { toQrDataUrl } from '@/utils/qrcodeVendor'
-import { wechatSubscriptionApi } from '@/api'
+import { wechatSubscriptionApi, formatHkdFromFen } from '@/api'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -85,12 +87,8 @@ const qrDataUrl = ref(null)
 const totalFee = ref(null)
 const polling = ref(false)
 
-/** 后端 totalFee 为微信支付单位「分」，展示需换算为元 */
-const displayFeeYuan = computed(() => {
-  const v = totalFee.value
-  if (v == null || !Number.isFinite(Number(v))) return null
-  return (Number(v) / 100).toFixed(2)
-})
+/** 后端 totalFee 为微信支付单位「分」 */
+const formattedFeeHkd = computed(() => formatHkdFromFen(totalFee.value))
 
 let pollTimer = null
 let orderId = null
