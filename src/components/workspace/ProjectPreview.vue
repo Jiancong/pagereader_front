@@ -61,7 +61,6 @@
             type="button"
             class="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="sharing || sharedToCommunity || !canShare"
-            :title="shareButtonTitle"
             @click="onShareToCommunity"
           >
             {{ shareButtonLabel }}
@@ -112,19 +111,18 @@ const error = ref(null)
 const sharing = ref(false)
 
 const sharedToCommunity = computed(() => isSharedToCommunity(project.value))
-const canShare = computed(() => canShareToCommunity(project.value))
+
+/** deck 已就绪：本地已加载 pptData，或 project / 对话历史里能拿到 deck JSON 地址 */
+const canShare = computed(() => {
+  if (pptData.value) return true
+  if (canShareToCommunity(project.value)) return true
+  return collectDeckUrls(project.value, history.value).length > 0
+})
 
 const shareButtonLabel = computed(() => {
   if (sharedToCommunity.value) return t('workspace.shareInCommunity')
   if (sharing.value) return t('workspace.sharing')
-  if (!canShare.value) return t('workspace.shareWhenReady')
   return t('workspace.shareToCommunity')
-})
-
-const shareButtonTitle = computed(() => {
-  if (!project.value?.configFilePath) return t('workspace.shareWaitPpt')
-  if (!project.value?.thumbnailUrl) return t('workspace.shareWaitCover')
-  return ''
 })
 
 const previewImageUrls = computed(() =>
@@ -204,7 +202,11 @@ watch(() => props.refreshKey, () => {
 })
 
 async function onShareToCommunity() {
-  if (!project.value?.id || !canShare.value || sharedToCommunity.value) return
+  if (!project.value?.id || sharedToCommunity.value) return
+  if (!canShare.value) {
+    ElMessage.warning(t('workspace.shareWaitPpt'))
+    return
+  }
   sharing.value = true
   try {
     const result = await projectApi.shareToCommunity(project.value.id)

@@ -9,8 +9,9 @@ export function isSharedToCommunity(proj: ProjectVo | null | undefined): boolean
   return false
 }
 
+/** PPT deck 已生成即可分享；封面由后端在分享时补全或从 deck 推导 */
 export function canShareToCommunity(proj: ProjectVo | null | undefined): boolean {
-  return !!proj?.configFilePath && !!proj?.thumbnailUrl
+  return !!proj?.configFilePath
 }
 
 export function formatCommentTime(iso: string): string {
