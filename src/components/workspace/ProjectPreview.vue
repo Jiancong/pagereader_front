@@ -59,7 +59,7 @@
           <h3 class="font-semibold text-foreground">{{ t('workspace.chatHistory') }}</h3>
           <button
             type="button"
-            class="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
+            class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="sharing || sharedToCommunity || !canShare"
             @click="onShareToCommunity"
           >
@@ -92,7 +92,12 @@ import { Loader2, Sparkles, ArrowLeft } from 'lucide-vue-next'
 import PptViewer from '@/components/editor/chat/PptViewer.vue'
 import { projectApi } from '../../api'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
-import { canShareToCommunity, isSharedToCommunity } from '@/utils/projectCommunity'
+import {
+  buildShareToCommunityBody,
+  canShareToCommunity,
+  isSharedToCommunity,
+  looksLikeDeckJson,
+} from '@/utils/projectCommunity'
 
 const props = defineProps({
   projectId: { type: String, required: true },
@@ -137,11 +142,6 @@ const images = computed(() => {
 })
 
 const firstUserMsg = computed(() => history.value.find((h) => h.role === 'user')?.content || '')
-
-function looksLikeDeckJson(url) {
-  const s = String(url || '').toLowerCase()
-  return s.endsWith('.json') || s.includes('/projects/') || s.includes('ppt_data')
-}
 
 function collectDeckUrls(proj, hist) {
   const urls = []
@@ -209,7 +209,8 @@ async function onShareToCommunity() {
   }
   sharing.value = true
   try {
-    const result = await projectApi.shareToCommunity(project.value.id)
+    const body = buildShareToCommunityBody(project.value, history.value)
+    const result = await projectApi.shareToCommunity(project.value.id, body)
     project.value = {
       ...project.value,
       ...result,

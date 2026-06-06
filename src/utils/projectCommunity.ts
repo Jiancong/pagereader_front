@@ -1,4 +1,48 @@
-import type { ProjectVo } from "@/api/types"
+import type { ConversationHistoryVo, ProjectVo } from "@/api/types"
+
+export function looksLikeDeckJson(url: string): boolean {
+  const s = String(url || "").toLowerCase()
+  return s.endsWith(".json") || s.includes("/projects/") || s.includes("ppt_data")
+}
+
+/** 从对话历史收集非 deck JSON 的预览图（assistant 优先，取最新） */
+export function collectPreviewImageUrls(
+  hist: ConversationHistoryVo[] | Array<{ role?: string; imageUrls?: string[] }>,
+): string[] {
+  const urls: string[] = []
+  const assistantRows = [...hist].reverse().filter((h) => h.role === "assistant")
+  for (const row of assistantRows) {
+    for (const url of row.imageUrls ?? []) {
+      if (url && !looksLikeDeckJson(url)) urls.push(url)
+    }
+  }
+  for (const row of hist) {
+    for (const url of row.imageUrls ?? []) {
+      if (url && !looksLikeDeckJson(url) && !urls.includes(url)) urls.push(url)
+    }
+  }
+  return [...new Set(urls)]
+}
+
+/** 分享用封面：优先 project.thumbnailUrl，否则取历史预览图 */
+export function resolveThumbnailForShare(
+  proj: ProjectVo | null | undefined,
+  hist: ConversationHistoryVo[] | Array<{ role?: string; imageUrls?: string[] }>,
+): string | undefined {
+  const fromProject = String(proj?.thumbnailUrl ?? "").trim()
+  if (fromProject) return fromProject
+  return collectPreviewImageUrls(hist)[0]
+}
+
+export function buildShareToCommunityBody(
+  proj: ProjectVo | null | undefined,
+  hist: ConversationHistoryVo[] | Array<{ role?: string; imageUrls?: string[] }>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {}
+  const thumbnailUrl = resolveThumbnailForShare(proj, hist)
+  if (thumbnailUrl) body.thumbnailUrl = thumbnailUrl
+  return body
+}
 
 export function isSharedToCommunity(proj: ProjectVo | null | undefined): boolean {
   if (!proj) return false
