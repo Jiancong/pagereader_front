@@ -202,7 +202,7 @@ export default {
       },
       upgrade: {
         q: "Can I upgrade my plan?",
-        p: "Upgrade anytime while subscribed; PayPal charges the price difference. For WeChat, subscribe to the higher tier via scan. If upgrade is unavailable in UI, subscribe to the target plan and email bd@bytelancers.com for prorated refund assistance.",
+        p: "Upgrade anytime while subscribed; PayPal charges the price difference. For WeChat, subscribe to the higher tier via scan. If upgrade is unavailable in UI, subscribe to the target plan and email bd&#64;bytelancers.com for prorated refund assistance.",
       },
     },
   },
