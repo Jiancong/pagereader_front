@@ -26,6 +26,7 @@
       <ProjectPreview
         v-else-if="view === 'project' && activeProjectId"
         :project-id="activeProjectId"
+        :refresh-key="projectRefreshKey"
         @back="view = 'explore'"
         @fork="goNew"
       />
@@ -54,6 +55,7 @@ const myProjects = ref([])
 const loadingProjects = ref(false)
 const genPrompt = ref('')
 const genKey = ref(0)
+const projectRefreshKey = ref(0)
 
 const loadProjects = async () => {
   loadingProjects.value = true
@@ -106,13 +108,20 @@ const onProjectStarted = async (projectId) => {
   await loadProjects()
 }
 
-const onProjectComplete = async () => {
+const onProjectComplete = async (projectId) => {
   await loadProjects()
+  if (projectId && activeProjectId.value === projectId) {
+    projectRefreshKey.value++
+  }
 }
 
 const openExploreItem = (item) => {
   const target = resolveFeedOpenTarget(item)
   if (!target) return
+  if (target.kind === 'community') {
+    router.push({ name: 'project-community', params: { projectId: target.projectId } })
+    return
+  }
   if (target.kind === 'project') openProject(target.projectId)
   else goNew(target.prompt)
 }

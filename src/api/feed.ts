@@ -13,6 +13,8 @@ import type {
   ProjectVo,
   ConversationHistoryVo,
   ProjectPromptHistoryVo,
+  ShareToCommunityResult,
+  ProjectCommentVo,
 } from "./types"
 
 // Feed 流分页（匿名可访问，登录后返回 likedByMe）
@@ -82,4 +84,32 @@ export async function getMyProjects(
   size = 30,
 ): Promise<Page<ProjectVo>> {
   return get<Page<ProjectVo>>(`/project/user/list`, { query: { page, size } })
+}
+
+// 分享到社区（需登录且为 owner）
+export async function shareToCommunity(
+  id: string,
+  body: Record<string, unknown> = {},
+): Promise<ShareToCommunityResult> {
+  return postJson<ShareToCommunityResult>(
+    `/project/${encodeURIComponent(id)}/share-to-community`,
+    body,
+  )
+}
+
+// 留言列表（树形结构）
+export async function listComments(id: string): Promise<ProjectCommentVo[]> {
+  return get<ProjectCommentVo[]>(`/project/${encodeURIComponent(id)}/comments`)
+}
+
+// 发表/回复留言（需登录）
+export async function postComment(
+  id: string,
+  content: string,
+  parentId?: number | null,
+): Promise<ProjectCommentVo> {
+  return postJson<ProjectCommentVo>(`/project/${encodeURIComponent(id)}/comments`, {
+    content,
+    parentId: parentId ?? null,
+  })
 }

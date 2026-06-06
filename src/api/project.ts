@@ -7,4 +7,7 @@ export {
   getProjectPromptHistory,
   incrementProjectView,
   getMyProjects,
+  shareToCommunity,
+  listComments,
+  postComment,
 } from "./feed"

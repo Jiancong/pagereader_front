@@ -55,7 +55,18 @@
       </p>
 
       <div v-if="history.length" class="mt-8">
-        <h3 class="mb-3 font-semibold text-foreground">{{ t('workspace.chatHistory') }}</h3>
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <h3 class="font-semibold text-foreground">{{ t('workspace.chatHistory') }}</h3>
+          <button
+            type="button"
+            class="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="sharing || sharedToCommunity || !canShare"
+            :title="shareButtonTitle"
+            @click="onShareToCommunity"
+          >
+            {{ shareButtonLabel }}
+          </button>
+        </div>
         <div class="space-y-3">
           <div
             v-for="h in history"
@@ -77,12 +88,17 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import { Loader2, Sparkles, ArrowLeft } from 'lucide-vue-next'
 import PptViewer from '@/components/editor/chat/PptViewer.vue'
 import { projectApi } from '../../api'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
+import { canShareToCommunity, isSharedToCommunity } from '@/utils/projectCommunity'
 
-const props = defineProps({ projectId: { type: String, required: true } })
+const props = defineProps({
+  projectId: { type: String, required: true },
+  refreshKey: { type: Number, default: 0 },
+})
 const emit = defineEmits(['back', 'fork'])
 
 const { t } = useI18n()
@@ -93,6 +109,23 @@ const pptData = ref(null)
 const loading = ref(false)
 const loadingDeck = ref(false)
 const error = ref(null)
+const sharing = ref(false)
+
+const sharedToCommunity = computed(() => isSharedToCommunity(project.value))
+const canShare = computed(() => canShareToCommunity(project.value))
+
+const shareButtonLabel = computed(() => {
+  if (sharedToCommunity.value) return t('workspace.shareInCommunity')
+  if (sharing.value) return t('workspace.sharing')
+  if (!canShare.value) return t('workspace.shareWhenReady')
+  return t('workspace.shareToCommunity')
+})
+
+const shareButtonTitle = computed(() => {
+  if (!project.value?.configFilePath) return t('workspace.shareWaitPpt')
+  if (!project.value?.thumbnailUrl) return t('workspace.shareWaitCover')
+  return ''
+})
 
 const previewImageUrls = computed(() =>
   history.value.flatMap((h) => (h.imageUrls ?? []).filter((u) => !looksLikeDeckJson(u))),
@@ -166,6 +199,29 @@ const run = async (id) => {
 }
 
 watch(() => props.projectId, (id) => { if (id) run(id) }, { immediate: true })
+watch(() => props.refreshKey, () => {
+  if (props.projectId) run(props.projectId)
+})
+
+async function onShareToCommunity() {
+  if (!project.value?.id || !canShare.value || sharedToCommunity.value) return
+  sharing.value = true
+  try {
+    const result = await projectApi.shareToCommunity(project.value.id)
+    project.value = {
+      ...project.value,
+      ...result,
+      sharedToCommunity: true,
+      isPrivate: 0,
+      isRecommended: 1,
+    }
+    ElMessage.success(t('workspace.shareToCommunitySuccess'))
+  } catch (e) {
+    ElMessage.error(e?.message || t('common.actionFailed'))
+  } finally {
+    sharing.value = false
+  }
+}
 
 const fork = () => {
   const base = project.value?.name || project.value?.title || ''

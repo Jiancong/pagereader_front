@@ -74,7 +74,12 @@ const load = async (p) => {
   loading.value = true
   error.value = null
   try {
-    const res = await feedApi.getFeedStream({ page: p, pageSize: PAGE_SIZE, sort: 1 })
+    const res = await feedApi.getFeedStream({
+      page: p,
+      pageSize: PAGE_SIZE,
+      sort: 1,
+      includeUserProjects: true,
+    })
     items.value = p === 1 ? res.data : [...items.value, ...res.data]
     total.value = res.total
     page.value = p

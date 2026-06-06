@@ -20,6 +20,11 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/explore/project/:projectId",
+    name: "project-community",
+    component: () => import("./views/ProjectCommunityView.vue"),
+  },
+  {
     path: "/debug-ppt",
     name: "debug-ppt",
     component: () => import("./views/DebugPptView.vue"),

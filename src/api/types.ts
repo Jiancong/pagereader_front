@@ -143,15 +143,44 @@ export interface ProjectVo {
   lifecycleStatus?: string
   thumbnailUrl?: string
   /** complete 后 PPT deck JSON 的 OSS 地址 */
-  configFilePath?: string
+  configFilePath?: string | null
   categoryId?: string
-  isPrivate?: boolean
+  sourceBookTitle?: string | null
+  sourceBookAuthor?: string | null
+  /** true = 已公开且推荐到社区 */
+  sharedToCommunity?: boolean
+  isPrivate?: boolean | number
+  isRecommended?: boolean | number
   viewCount?: number
   likeCount?: number
   shareCount?: number
   createTime?: string
   updateTime?: string
   [key: string]: unknown
+}
+
+export interface ShareToCommunityResult {
+  projectId: string
+  isPrivate: number
+  isRecommended: number
+  sourceBookTitle?: string
+  sourceBookAuthor?: string
+  thumbnailUrl?: string
+  categoryId?: string
+  visibleInFeed?: boolean
+}
+
+export interface ProjectCommentVo {
+  id: number
+  projectId: string
+  userId: number
+  userNickname?: string
+  userAvatarUrl?: string
+  parentId?: number | null
+  rootId?: number | null
+  content: string
+  createTime: string
+  replies: ProjectCommentVo[]
 }
 
 export interface ConversationHistoryVo {
