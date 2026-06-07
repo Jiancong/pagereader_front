@@ -14,6 +14,13 @@ type PptDeckSummary = {
 type DisplayLabels = {
   deckReady: (title: string, slides: number) => string
   relatedAsk: (term: string) => string
+  noAnswer?: string
+}
+
+export type RelatedSearchSessionEntry = {
+  term: string
+  content: string
+  error?: string
 }
 
 const NOISE_ASSISTANT_RE =
@@ -69,16 +76,49 @@ function isNoiseAssistantContent(content: string): boolean {
   return false
 }
 
+function assistantTextFromRow(row: ConversationHistoryVo): string | null {
+  const meta = asMeta(row)
+  if (meta?.intent === "ppt_generation" || meta?.type === "ppt_generation") return null
+
+  const metaText = [meta?.response, meta?.responseContent, meta?.knowledge_response, meta?.content]
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .find((v) => v && !isNoiseAssistantContent(v))
+  if (metaText) return metaText
+
+  const text = String(row.content || "").trim()
+  if (!text || isNoiseAssistantContent(text)) return null
+  return text
+}
+
 function pickAssistantResponse(rows: ConversationHistoryVo[], fromIndex: number): string | null {
   for (let i = fromIndex; i < rows.length; i++) {
     const row = rows[i]
+    if (row.role === "user") break
     if (row.role !== "assistant") continue
-    const meta = asMeta(row)
-    if (meta?.intent === "ppt_generation" || meta?.type === "ppt_generation") continue
-    const text = String(row.content || "").trim()
-    if (isNoiseAssistantContent(text)) continue
-    return text
+    const text = assistantTextFromRow(row)
+    if (text) return text
   }
+  return null
+}
+
+function relatedUserContentMatchesTerm(
+  userContent: string,
+  term: string,
+  relatedAsk: (term: string) => string,
+): boolean {
+  const normalizedTerm = term.trim().toLowerCase()
+  if (!normalizedTerm) return false
+  if (userContent === relatedAsk(term)) return true
+  return userContent.toLowerCase().includes(normalizedTerm)
+}
+
+function sessionAssistantContent(
+  entry: RelatedSearchSessionEntry,
+  noAnswer?: string,
+): string | null {
+  const text = String(entry.content || "").trim()
+  if (text) return text
+  if (entry.error && noAnswer) return noAnswer
   return null
 }
 
@@ -150,8 +190,101 @@ export function buildPptChatHistoryDisplay(
         role: "assistant",
         content: answer,
       })
+    } else if (labels.noAnswer) {
+      items.push({
+        id: `${row.id}-no-answer`,
+        role: "assistant",
+        content: labels.noAnswer,
+      })
     }
   }
 
   return items
+}
+
+/**
+ * 将当前会话内划词追问的实时回答补进展示列表（后端未持久化时仍可显示）。
+ */
+export function mergeRelatedSearchAnswersIntoDisplay(
+  items: ChatHistoryDisplayItem[],
+  sessions: RelatedSearchSessionEntry[],
+  labels: Pick<DisplayLabels, "relatedAsk" | "noAnswer">,
+): ChatHistoryDisplayItem[] {
+  if (!sessions.length) return items
+
+  const result = [...items]
+  const filledTerms = new Set<string>()
+
+  for (let i = 0; i < result.length; i++) {
+    const row = result[i]
+    if (row.role !== "user") continue
+    const next = result[i + 1]
+    if (next?.role !== "assistant") continue
+    for (const session of sessions) {
+      if (relatedUserContentMatchesTerm(row.content, session.term, labels.relatedAsk)) {
+        filledTerms.add(session.term.trim().toLowerCase())
+      }
+    }
+  }
+
+  for (const session of sessions) {
+    const term = session.term.trim()
+    if (!term) continue
+    const dedupeKey = term.toLowerCase()
+    const assistantContent = sessionAssistantContent(session, labels.noAnswer)
+    if (!assistantContent) continue
+
+    if (filledTerms.has(dedupeKey)) {
+      for (let i = 0; i < result.length; i++) {
+        const row = result[i]
+        if (row.role !== "user") continue
+        if (!relatedUserContentMatchesTerm(row.content, term, labels.relatedAsk)) continue
+        const next = result[i + 1]
+        if (next?.role === "assistant" && next.content === labels.noAnswer) {
+          result[i + 1] = {
+            ...next,
+            content: assistantContent,
+          }
+        }
+        break
+      }
+      continue
+    }
+
+    let inserted = false
+    for (let i = 0; i < result.length; i++) {
+      const row = result[i]
+      if (row.role !== "user") continue
+      if (!relatedUserContentMatchesTerm(row.content, term, labels.relatedAsk)) continue
+      if (result[i + 1]?.role === "assistant") {
+        filledTerms.add(dedupeKey)
+        inserted = true
+        break
+      }
+      result.splice(i + 1, 0, {
+        id: `session-${dedupeKey}-answer`,
+        role: "assistant",
+        content: assistantContent,
+      })
+      filledTerms.add(dedupeKey)
+      inserted = true
+      break
+    }
+
+    if (!inserted) {
+      result.push({
+        id: `session-${dedupeKey}-user`,
+        role: "user",
+        content: labels.relatedAsk(term),
+      })
+      result.push({
+        id: `session-${dedupeKey}-answer`,
+        role: "assistant",
+        content: assistantContent,
+      })
+      filledTerms.add(dedupeKey)
+    }
+  }
+
+  return result
 }

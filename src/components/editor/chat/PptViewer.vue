@@ -8262,12 +8262,7 @@
     <PptChatHistoryRail
       v-if="showChatHistoryRail && !isPresentationFullscreen"
       v-model:collapsed="chatHistoryRailCollapsed"
-      :items="chatHistory"
-      :can-share="canShareToCommunity"
-      :sharing="sharingToCommunity"
-      :shared="sharedToCommunity"
-      :share-label="shareButtonLabel"
-      @share="emit('share-to-community')"
+      :items="chatHistoryRailItems"
     />
   </div>
 </template>
@@ -8292,7 +8287,11 @@ import PptContextMenu from "@/components/editor/chat/PptContextMenu.vue";
 import PptRelatedSearchPanel from "@/components/editor/chat/PptRelatedSearchPanel.vue";
 import PptChatHistoryRail from "@/components/editor/chat/PptChatHistoryRail.vue";
 import { usePptRelatedSearch, type PptRelatedSearchContext } from "@/composables/usePptRelatedSearch";
-import type { ConversationHistoryVo } from "@/api/types";
+import {
+  mergeRelatedSearchAnswersIntoDisplay,
+  type ChatHistoryDisplayItem,
+  type RelatedSearchSessionEntry,
+} from "@/utils/pptChatHistoryDisplay";
 import { uploadedDocumentsFromPptData } from "@/utils/pptDocumentRag";
 import { resolveContextSelectionText } from "@/utils/pptContextSelection";
 import { prepareHtml2CanvasClone } from "@/utils/pptExportHtml2Canvas";
@@ -8577,24 +8576,27 @@ const props = defineProps<{
   initialSlide?: number;
   /** 项目 ID，用于生成 /share?projectId= 链接 */
   projectId?: string;
-  /** 对话记录，有内容时在右侧展示可折叠栏 */
-  chatHistory?: ConversationHistoryVo[];
-  canShareToCommunity?: boolean;
-  sharingToCommunity?: boolean;
-  sharedToCommunity?: boolean;
-  shareButtonLabel?: string;
+  /** 右侧栏展示项（由 ProjectPreview 经 buildPptChatHistoryDisplay 整理） */
+  chatHistory?: ChatHistoryDisplayItem[];
 }>();
 
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "update:pptData", data: PptData): void;
-  (e: "share-to-community"): void;
 }>();
 
 const chatHistoryRailCollapsed = ref(false);
-const showChatHistoryRail = computed(
-  () => Array.isArray(props.chatHistory) && props.chatHistory.length > 0,
-);
+const relatedSearchSessionEntries = ref<RelatedSearchSessionEntry[]>([]);
+
+const chatHistoryRailItems = computed(() => {
+  const base = Array.isArray(props.chatHistory) ? props.chatHistory : [];
+  return mergeRelatedSearchAnswersIntoDisplay(base, relatedSearchSessionEntries.value, {
+    relatedAsk: (term) => t("workspace.chatHistoryPanel.relatedAsk", { term }),
+    noAnswer: t("workspace.chatHistoryPanel.noAnswer"),
+  });
+});
+
+const showChatHistoryRail = computed(() => chatHistoryRailItems.value.length > 0);
 
 const { t, locale } = useI18n();
 const currentSlide = ref(props.initialSlide ?? 0);
@@ -8653,6 +8655,26 @@ function buildPptRelatedSearchMessage(term: string, pptTitle?: string): string {
   return t("agent.pptRelatedSearchPromptGeneric", { term: q });
 }
 
+function recordRelatedSearchSession(term: string) {
+  const q = term.trim();
+  if (!q) return;
+  const s = relatedSearchState.value;
+  const content = String(s.content || "").trim();
+  const error = s.error ? String(s.error) : undefined;
+  if (!content && !error) return;
+
+  const key = q.toLowerCase();
+  const entry: RelatedSearchSessionEntry = { term: q, content, error };
+  const idx = relatedSearchSessionEntries.value.findIndex(
+    (e) => e.term.trim().toLowerCase() === key,
+  );
+  if (idx >= 0) {
+    relatedSearchSessionEntries.value[idx] = entry;
+  } else {
+    relatedSearchSessionEntries.value.push(entry);
+  }
+}
+
 async function onPptRelatedSearch() {
   const term = pptContextSelection.value.trim();
   if (!term) {
@@ -8667,6 +8689,7 @@ async function onPptRelatedSearch() {
     uploadedDocuments: uploadedDocumentsFromPptData(props.pptData),
     buildMessage: buildPptRelatedSearchMessage,
   });
+  recordRelatedSearchSession(term);
 }
 
 function onRelatedSearchPanelClose() {

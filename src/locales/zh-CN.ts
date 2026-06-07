@@ -277,6 +277,7 @@ export default {
       deckReady: "演示文稿已生成：{title}（共 {slides} 页）",
       deckReadyNoSlides: "演示文稿已生成：{title}",
       relatedAsk: "关于「{term}」",
+      noAnswer: "该追问暂无已保存的回答。",
     },
     shareToCommunity: "分享到社区",
     shareToCommunitySuccess: "已分享到社区",

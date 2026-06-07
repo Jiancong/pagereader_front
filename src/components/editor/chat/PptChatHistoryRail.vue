@@ -15,18 +15,7 @@
         <PanelRightOpen v-if="collapsed" class="h-4 w-4" />
         <PanelRightClose v-else class="h-4 w-4" />
       </button>
-      <template v-if="!collapsed">
-        <h3 class="ppt-chat-rail-title">{{ t('workspace.chatHistory') }}</h3>
-        <button
-          v-if="showShare"
-          type="button"
-          class="ppt-chat-rail-share"
-          :disabled="sharing || shared || !canShare"
-          @click="$emit('share')"
-        >
-          {{ shareLabel }}
-        </button>
-      </template>
+      <h3 v-if="!collapsed" class="ppt-chat-rail-title">{{ t('workspace.chatHistory') }}</h3>
     </div>
 
     <div v-if="!collapsed" class="ppt-chat-rail-body">
@@ -49,16 +38,9 @@
 import { useI18n } from 'vue-i18n'
 import { PanelRightClose, PanelRightOpen } from 'lucide-vue-next'
 
-const props = defineProps({
+defineProps({
   items: { type: Array, default: () => [] },
-  canShare: { type: Boolean, default: false },
-  sharing: { type: Boolean, default: false },
-  shared: { type: Boolean, default: false },
-  shareLabel: { type: String, default: '' },
-  showShare: { type: Boolean, default: true },
 })
-
-defineEmits(['share'])
 
 const collapsed = defineModel('collapsed', { type: Boolean, default: false })
 
@@ -127,29 +109,6 @@ const { t } = useI18n()
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.ppt-chat-rail-share {
-  flex-shrink: 0;
-  border: none;
-  border-radius: 0.5rem;
-  padding: 0.3rem 0.55rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  line-height: 1.2;
-  color: #fff;
-  background: #4f6ef7;
-  cursor: pointer;
-  transition: opacity 0.15s;
-
-  &:hover:not(:disabled) {
-    opacity: 0.9;
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
 }
 
 .ppt-chat-rail-body {

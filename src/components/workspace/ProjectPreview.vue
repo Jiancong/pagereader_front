@@ -18,12 +18,23 @@
           <h2 class="text-2xl font-bold text-foreground">{{ project.name || project.title || t('workspace.unnamedProject') }}</h2>
           <p v-if="project.description" class="mt-1 text-sm text-muted-foreground">{{ project.description }}</p>
         </div>
-        <button
-          class="flex flex-shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-          @click="fork"
-        >
-          <Sparkles class="h-4 w-4" /> {{ t('workspace.fork') }}
-        </button>
+        <div class="flex flex-shrink-0 items-center gap-2">
+          <button
+            type="button"
+            class="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-primary/50 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="sharing || sharedToCommunity || !canShare"
+            @click="onShareToCommunity"
+          >
+            {{ shareButtonLabel }}
+          </button>
+          <button
+            type="button"
+            class="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            @click="fork"
+          >
+            <Sparkles class="h-4 w-4" /> {{ t('workspace.fork') }}
+          </button>
+        </div>
       </div>
 
       <div v-if="pptData" class="mb-8">
@@ -31,12 +42,7 @@
           :ppt-data="pptData"
           :project-id="projectId"
           :chat-history="displayChatHistory"
-          :can-share-to-community="canShare"
-          :sharing-to-community="sharing"
-          :shared-to-community="sharedToCommunity"
-          :share-button-label="shareButtonLabel"
           @update:ppt-data="(d) => (pptData = d)"
-          @share-to-community="onShareToCommunity"
         />
       </div>
 
@@ -131,6 +137,7 @@ const displayChatHistory = computed(() =>
         ? t('workspace.chatHistoryPanel.deckReady', { title, slides })
         : t('workspace.chatHistoryPanel.deckReadyNoSlides', { title }),
     relatedAsk: (term) => t('workspace.chatHistoryPanel.relatedAsk', { term }),
+    noAnswer: t('workspace.chatHistoryPanel.noAnswer'),
   }),
 )
 
