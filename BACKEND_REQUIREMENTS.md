@@ -273,7 +273,20 @@ SSE 事件（前端按 `event:` 名分发）：
 | `fileSize` | number | 推荐 | 字节 |
 | `contentType` | string | 推荐 | 如 `application/pdf`、`image/png` |
 | **`thumbnailUrl`** | string | **推荐** | **网格预览图**；无则非图片只能占位 |
-| `thumbUrl` / `previewUrl` | string | 可选 | 与 `thumbnailUrl` 同义，前端会兼容 |
+| `thumbUrl` / `coverUrl` | string | 可选 | 与 `thumbnailUrl` 同义 |
+| **`previewUrl`** | string | 可选 | 见下方「前端临时方案」 |
+
+#### 前端临时方案（后端未就绪时，已实现）
+
+在 `src/utils/userAssets.ts` → `resolveAssetPreviewUrl`：
+
+| 类型 | 行为 |
+|------|------|
+| **图片** | 优先 `previewUrl` → `thumbnailUrl` → `fileUrl` + OSS `image/resize` |
+| **视频** | 优先 `previewUrl` → `thumbnailUrl`（须为图片地址，如海报帧） |
+| **PDF** | **仅**当 `previewUrl` / `thumbnailUrl` 指向 `*_cover.png`、`*_ppt-cover.png` 等**图片**时显示缩略图；否则继续 **PDF 占位图标** |
+
+即：后端若暂只返回 PDF 的 `fileUrl`，前端**不会**用 doc/preview 或 PDF 本身当缩略图；待 Python 产出 `_cover.png` 或 Java 列表接口带上封面 URL 后自动生效。
 
 #### 缩略图生成规则
 

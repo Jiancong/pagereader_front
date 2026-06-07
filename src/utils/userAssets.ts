@@ -29,6 +29,25 @@ export function isPdfAsset(name: string, url = "", contentType = ""): boolean {
   return /\.pdf(\?|$)/i.test(probe)
 }
 
+export function isVideoAsset(name: string, url = "", contentType = ""): boolean {
+  const ct = contentType.toLowerCase()
+  if (ct.startsWith("video/")) return true
+  const probe = `${name} ${url}`.toLowerCase()
+  return /\.(mp4|webm|mov|m4v|avi|mkv)(\?|$)/i.test(probe)
+}
+
+/** 是否为可当作网格缩略图展示的图片地址（含 _cover.png / ppt-cover） */
+export function looksLikeImagePreviewUrl(url: string): boolean {
+  const u = String(url || "").trim().toLowerCase()
+  if (!u) return false
+  if (/\.pdf(\?|$)/i.test(u)) return false
+  return (
+    /_cover\.(png|jpe?g|webp|gif)/i.test(u) ||
+    /ppt-cover\.(png|jpe?g|webp)/i.test(u) ||
+    /\.(png|jpe?g|gif|webp|bmp|svg|avif)(\?|$)/i.test(u)
+  )
+}
+
 export function buildAssetThumbUrl(url: string): string {
   if (!url) return url
   if (url.includes("x-oss-process=")) return url
@@ -47,9 +66,8 @@ export function normalizeUserAssetItem(raw: unknown): UserAssetItem | null {
   const url = String(item.fileUrl ?? item.fileLink ?? item.url ?? item.ossUrl ?? item.link ?? "").trim()
   if (!fileKey && !url) return null
 
-  const thumbnailUrl = String(
-    item.thumbnailUrl ?? item.thumbUrl ?? item.previewUrl ?? item.coverUrl ?? "",
-  ).trim() || undefined
+  const previewUrl = String(item.previewUrl ?? "").trim() || undefined
+  const thumbnailUrl = String(item.thumbnailUrl ?? item.thumbUrl ?? item.coverUrl ?? "").trim() || undefined
 
   const sizeRaw = item.fileSize ?? item.size ?? item.bytes
   const size = Number(sizeRaw)
@@ -61,19 +79,43 @@ export function normalizeUserAssetItem(raw: unknown): UserAssetItem | null {
     name: name || "file",
     url,
     thumbnailUrl,
+    previewUrl,
     size: Number.isFinite(size) && size >= 0 ? size : undefined,
     contentType,
     lastModified,
   }
 }
 
+/**
+ * 临时缩略图策略（后端未统一 thumbnailUrl 前）：
+ * - 图片/视频：优先 previewUrl，其次 thumbnailUrl，图片可回退 fileUrl + OSS resize
+ * - PDF：仅当 previewUrl/thumbnailUrl 为 _cover.png 等图片地址时展示；否则 null → 占位图标
+ */
 export function resolveAssetPreviewUrl(asset: UserAssetItem): string | null {
+  const preview = String(asset.previewUrl || "").trim()
   const thumb = String(asset.thumbnailUrl || "").trim()
-  if (thumb) return buildAssetThumbUrl(thumb)
-  if (isImageAsset(asset.name, asset.url, asset.contentType)) {
-    return buildAssetThumbUrl(asset.url)
+  const { name, url, contentType } = asset
+
+  const pickImageCandidate = (...candidates: string[]) => {
+    for (const c of candidates) {
+      if (c && looksLikeImagePreviewUrl(c)) return buildAssetThumbUrl(c)
+    }
+    return null
   }
-  return null
+
+  if (isPdfAsset(name, url, contentType)) {
+    return pickImageCandidate(thumb, preview)
+  }
+
+  if (isVideoAsset(name, url, contentType)) {
+    return pickImageCandidate(preview, thumb)
+  }
+
+  if (isImageAsset(name, url, contentType)) {
+    return pickImageCandidate(preview, thumb) ?? buildAssetThumbUrl(url)
+  }
+
+  return pickImageCandidate(preview, thumb)
 }
 
 export function normalizeUserAssetsPage(data: unknown): UserAssetsPage {

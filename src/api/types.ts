@@ -232,7 +232,10 @@ export interface UserAssetItem {
   fileKey: string
   name: string
   url: string
+  /** 后端 thumbnailUrl / thumbUrl / coverUrl */
   thumbnailUrl?: string
+  /** 临时：列表项 previewUrl，图片/视频可作缩略图；PDF 需为 _cover.png 才展示 */
+  previewUrl?: string
   size?: number
   contentType?: string
   lastModified?: string
