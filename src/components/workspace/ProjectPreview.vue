@@ -26,11 +26,17 @@
         </button>
       </div>
 
-      <div v-if="pptData" class="mb-8 rounded-2xl border border-border bg-card">
+      <div v-if="pptData" class="mb-8">
         <PptViewer
           :ppt-data="pptData"
           :project-id="projectId"
+          :chat-history="history"
+          :can-share-to-community="canShare"
+          :sharing-to-community="sharing"
+          :shared-to-community="sharedToCommunity"
+          :share-button-label="shareButtonLabel"
           @update:ppt-data="(d) => (pptData = d)"
+          @share-to-community="onShareToCommunity"
         />
       </div>
 
@@ -54,32 +60,6 @@
         <Loader2 class="h-5 w-5 animate-spin" /> {{ t('workspace.loadingPpt') }}
       </p>
 
-      <div v-if="history.length" class="mt-8">
-        <div class="mb-3 flex items-center justify-between gap-3">
-          <h3 class="font-semibold text-foreground">{{ t('workspace.chatHistory') }}</h3>
-          <button
-            type="button"
-            class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="sharing || sharedToCommunity || !canShare"
-            @click="onShareToCommunity"
-          >
-            {{ shareButtonLabel }}
-          </button>
-        </div>
-        <div class="space-y-3">
-          <div
-            v-for="h in history"
-            :key="h.id"
-            class="rounded-xl border border-border p-4 text-sm"
-            :class="h.role === 'user' ? 'bg-secondary/30' : 'bg-card'"
-          >
-            <p class="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {{ h.role === 'user' ? t('workspace.roleUser') : t('workspace.roleAi') }}
-            </p>
-            <p class="whitespace-pre-wrap break-words text-foreground">{{ h.content }}</p>
-          </div>
-        </div>
-      </div>
     </template>
   </div>
 </template>

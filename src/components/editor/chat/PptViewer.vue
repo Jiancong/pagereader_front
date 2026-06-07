@@ -1,5 +1,9 @@
 <template>
   <div
+    class="ppt-viewer-shell"
+    :class="{ 'ppt-viewer-shell--rail-open': showChatHistoryRail && !chatHistoryRailCollapsed }"
+  >
+  <div
     class="ppt-viewer"
     :class="{ 'ppt-viewer--presentation': isPresentationFullscreen }"
     ref="viewerRef"
@@ -8254,6 +8258,18 @@
       @close="onRelatedSearchPanelClose"
     />
   </div>
+
+    <PptChatHistoryRail
+      v-if="showChatHistoryRail && !isPresentationFullscreen"
+      v-model:collapsed="chatHistoryRailCollapsed"
+      :items="chatHistory"
+      :can-share="canShareToCommunity"
+      :sharing="sharingToCommunity"
+      :shared="sharedToCommunity"
+      :share-label="shareButtonLabel"
+      @share="emit('share-to-community')"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -8274,7 +8290,9 @@ import PptMetricCardsRow from "@/components/editor/chat/PptMetricCardsRow.vue";
 import PptChartSourceLine from "@/components/editor/chat/PptChartSourceLine.vue";
 import PptContextMenu from "@/components/editor/chat/PptContextMenu.vue";
 import PptRelatedSearchPanel from "@/components/editor/chat/PptRelatedSearchPanel.vue";
+import PptChatHistoryRail from "@/components/editor/chat/PptChatHistoryRail.vue";
 import { usePptRelatedSearch, type PptRelatedSearchContext } from "@/composables/usePptRelatedSearch";
+import type { ConversationHistoryVo } from "@/api/types";
 import { uploadedDocumentsFromPptData } from "@/utils/pptDocumentRag";
 import { resolveContextSelectionText } from "@/utils/pptContextSelection";
 import { prepareHtml2CanvasClone } from "@/utils/pptExportHtml2Canvas";
@@ -8559,12 +8577,24 @@ const props = defineProps<{
   initialSlide?: number;
   /** 项目 ID，用于生成 /share?projectId= 链接 */
   projectId?: string;
+  /** 对话记录，有内容时在右侧展示可折叠栏 */
+  chatHistory?: ConversationHistoryVo[];
+  canShareToCommunity?: boolean;
+  sharingToCommunity?: boolean;
+  sharedToCommunity?: boolean;
+  shareButtonLabel?: string;
 }>();
 
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "update:pptData", data: PptData): void;
+  (e: "share-to-community"): void;
 }>();
+
+const chatHistoryRailCollapsed = ref(false);
+const showChatHistoryRail = computed(
+  () => Array.isArray(props.chatHistory) && props.chatHistory.length > 0,
+);
 
 const { t, locale } = useI18n();
 const currentSlide = ref(props.initialSlide ?? 0);
@@ -15549,13 +15579,24 @@ defineExpose({
    PPT 渲染器样式（不使用 scoped，确保 Teleport 场景也能正常显示）
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.ppt-viewer {
+.ppt-viewer-shell {
+  display: flex;
   width: 100%;
+  min-width: 0;
+  align-items: stretch;
   border-radius: 12px;
   overflow: hidden;
   background: #1a1d27;
   border: 1px solid rgba(255, 255, 255, 0.1);
   margin: 4px 0;
+}
+
+.ppt-viewer {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  background: #1a1d27;
   display: flex;
   flex-direction: column;
 

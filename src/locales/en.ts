@@ -280,6 +280,10 @@ export default {
     slideAlt: "Slide {n}",
     noPreviewImages: "No preview images for this project",
     chatHistory: "Chat history",
+    chatHistoryPanel: {
+      collapse: "Collapse chat history",
+      expand: "Expand chat history",
+    },
     shareToCommunity: "Share to community",
     shareToCommunitySuccess: "Shared to community",
     shareInCommunity: "In community",

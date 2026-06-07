@@ -271,6 +271,10 @@ export default {
     slideAlt: "第 {n} 页",
     noPreviewImages: "该作品暂无可预览的图片",
     chatHistory: "对话记录",
+    chatHistoryPanel: {
+      collapse: "收起对话记录",
+      expand: "展开对话记录",
+    },
     shareToCommunity: "分享到社区",
     shareToCommunitySuccess: "已分享到社区",
     shareInCommunity: "已在社区",
