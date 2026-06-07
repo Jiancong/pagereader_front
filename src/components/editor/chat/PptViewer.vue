@@ -8257,12 +8257,23 @@
       :search-context="pptRelatedSearchContext"
       @close="onRelatedSearchPanelClose"
     />
+    <PptRelatedSearchPanel
+      v-if="chatHistoryDetail.visible"
+      :visible="chatHistoryDetail.visible"
+      :term="chatHistoryDetail.term"
+      :content="chatHistoryDetail.content"
+      :loading="false"
+      :error="null"
+      :search-context="pptRelatedSearchContext"
+      @close="closeChatHistoryDetail"
+    />
   </div>
 
     <PptChatHistoryRail
       v-if="showChatHistoryRail && !isPresentationFullscreen"
       v-model:collapsed="chatHistoryRailCollapsed"
       :items="chatHistoryRailItems"
+      @open-detail="openChatHistoryDetail"
     />
   </div>
 </template>
@@ -8653,6 +8664,26 @@ function buildPptRelatedSearchMessage(term: string, pptTitle?: string): string {
     return t("agent.pptRelatedSearchPromptWithTitle", { title, term: q });
   }
   return t("agent.pptRelatedSearchPromptGeneric", { term: q });
+}
+
+const chatHistoryDetail = ref<{ visible: boolean; term: string; content: string }>({
+  visible: false,
+  term: "",
+  content: "",
+});
+
+function openChatHistoryDetail(payload: { term?: string; content?: string }) {
+  const content = String(payload?.content || "").trim();
+  if (!content) return;
+  chatHistoryDetail.value = {
+    visible: true,
+    term: String(payload?.term || "").trim(),
+    content,
+  };
+}
+
+function closeChatHistoryDetail() {
+  chatHistoryDetail.value.visible = false;
 }
 
 function recordRelatedSearchSession(term: string) {

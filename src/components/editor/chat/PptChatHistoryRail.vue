@@ -20,17 +20,28 @@
       </div>
 
       <div v-if="!collapsed" class="ppt-chat-rail-body">
-        <div
+        <component
+          :is="isExpandable(item) ? 'button' : 'div'"
           v-for="item in items"
           :key="item.id"
+          type="button"
           class="ppt-chat-rail-item"
-          :class="item.role === 'user' ? 'ppt-chat-rail-item--user' : 'ppt-chat-rail-item--ai'"
+          :class="[
+            item.role === 'user' ? 'ppt-chat-rail-item--user' : 'ppt-chat-rail-item--ai',
+            { 'ppt-chat-rail-item--expandable': isExpandable(item) },
+          ]"
+          @click="isExpandable(item) && $emit('open-detail', { term: item.term, content: item.content })"
         >
           <p class="ppt-chat-rail-role">
             {{ item.role === 'user' ? t('workspace.roleUser') : t('workspace.roleAi') }}
           </p>
-          <p class="ppt-chat-rail-content">{{ item.content }}</p>
-        </div>
+          <p class="ppt-chat-rail-content" :class="{ 'ppt-chat-rail-content--clamp': isExpandable(item) }">
+            {{ isExpandable(item) ? toPreview(item.content) : item.content }}
+          </p>
+          <span v-if="isExpandable(item)" class="ppt-chat-rail-expand">
+            {{ t('workspace.chatHistoryPanel.viewFull') }}
+          </span>
+        </component>
       </div>
     </div>
   </aside>
@@ -44,9 +55,30 @@ defineProps({
   items: { type: Array, default: () => [] },
 })
 
+defineEmits(['open-detail'])
+
 const collapsed = defineModel('collapsed', { type: Boolean, default: false })
 
 const { t } = useI18n()
+
+function isExpandable(item) {
+  return item.role === 'assistant' && !!item.term && !!String(item.content || '').trim()
+}
+
+function toPreview(content) {
+  return String(content || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 </script>
 
 <style scoped lang="scss">
@@ -133,10 +165,15 @@ const { t } = useI18n()
 }
 
 .ppt-chat-rail-item {
+  display: block;
+  width: 100%;
+  text-align: left;
   border-radius: 0.625rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 0.625rem 0.75rem;
   font-size: 0.8125rem;
+  font-family: inherit;
+  color: inherit;
 }
 
 .ppt-chat-rail-item--user {
@@ -145,6 +182,31 @@ const { t } = useI18n()
 
 .ppt-chat-rail-item--ai {
   background: rgba(79, 110, 247, 0.08);
+}
+
+button.ppt-chat-rail-item {
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ppt-chat-rail-item--expandable:hover {
+  border-color: rgba(79, 110, 247, 0.55);
+  background: rgba(79, 110, 247, 0.16);
+}
+
+.ppt-chat-rail-content--clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ppt-chat-rail-expand {
+  display: inline-block;
+  margin-top: 0.45rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #8ea2ff;
 }
 
 .ppt-chat-rail-role {

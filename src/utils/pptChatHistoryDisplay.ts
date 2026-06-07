@@ -4,6 +4,8 @@ export interface ChatHistoryDisplayItem {
   id: string | number
   role: "user" | "assistant"
   content: string
+  /** 划词追问的检索词，存在时该 AI 气泡可点击展开为检索结果面板 */
+  term?: string
 }
 
 type PptDeckSummary = {
@@ -189,6 +191,7 @@ export function buildPptChatHistoryDisplay(
         id: `${row.id}-answer`,
         role: "assistant",
         content: answer,
+        term: term || raw,
       })
     } else if (labels.noAnswer) {
       items.push({
@@ -244,6 +247,7 @@ export function mergeRelatedSearchAnswersIntoDisplay(
           result[i + 1] = {
             ...next,
             content: assistantContent,
+            term,
           }
         }
         break
@@ -265,6 +269,7 @@ export function mergeRelatedSearchAnswersIntoDisplay(
         id: `session-${dedupeKey}-answer`,
         role: "assistant",
         content: assistantContent,
+        term,
       })
       filledTerms.add(dedupeKey)
       inserted = true
@@ -281,6 +286,7 @@ export function mergeRelatedSearchAnswersIntoDisplay(
         id: `session-${dedupeKey}-answer`,
         role: "assistant",
         content: assistantContent,
+        term,
       })
       filledTerms.add(dedupeKey)
     }

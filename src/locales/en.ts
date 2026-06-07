@@ -287,6 +287,7 @@ export default {
       deckReadyNoSlides: "Deck ready: {title}",
       relatedAsk: 'About "{term}"',
       noAnswer: "No saved response for this question yet.",
+      viewFull: "Tap to view full answer",
     },
     shareToCommunity: "Share to community",
     shareToCommunitySuccess: "Shared to community",
