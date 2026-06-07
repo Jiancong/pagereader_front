@@ -4,31 +4,33 @@
     :class="{ 'ppt-chat-rail--collapsed': collapsed }"
     :aria-label="t('workspace.chatHistory')"
   >
-    <div class="ppt-chat-rail-header">
-      <button
-        type="button"
-        class="ppt-chat-rail-toggle"
-        :title="collapsed ? t('workspace.chatHistoryPanel.expand') : t('workspace.chatHistoryPanel.collapse')"
-        :aria-label="collapsed ? t('workspace.chatHistoryPanel.expand') : t('workspace.chatHistoryPanel.collapse')"
-        @click="collapsed = !collapsed"
-      >
-        <PanelRightOpen v-if="collapsed" class="h-4 w-4" />
-        <PanelRightClose v-else class="h-4 w-4" />
-      </button>
-      <h3 v-if="!collapsed" class="ppt-chat-rail-title">{{ t('workspace.chatHistory') }}</h3>
-    </div>
+    <div class="ppt-chat-rail-inner">
+      <div class="ppt-chat-rail-header">
+        <button
+          type="button"
+          class="ppt-chat-rail-toggle"
+          :title="collapsed ? t('workspace.chatHistoryPanel.expand') : t('workspace.chatHistoryPanel.collapse')"
+          :aria-label="collapsed ? t('workspace.chatHistoryPanel.expand') : t('workspace.chatHistoryPanel.collapse')"
+          @click="collapsed = !collapsed"
+        >
+          <PanelRightOpen v-if="collapsed" class="h-4 w-4" />
+          <PanelRightClose v-else class="h-4 w-4" />
+        </button>
+        <h3 v-if="!collapsed" class="ppt-chat-rail-title">{{ t('workspace.chatHistory') }}</h3>
+      </div>
 
-    <div v-if="!collapsed" class="ppt-chat-rail-body">
-      <div
-        v-for="item in items"
-        :key="item.id"
-        class="ppt-chat-rail-item"
-        :class="item.role === 'user' ? 'ppt-chat-rail-item--user' : 'ppt-chat-rail-item--ai'"
-      >
-        <p class="ppt-chat-rail-role">
-          {{ item.role === 'user' ? t('workspace.roleUser') : t('workspace.roleAi') }}
-        </p>
-        <p class="ppt-chat-rail-content">{{ item.content }}</p>
+      <div v-if="!collapsed" class="ppt-chat-rail-body">
+        <div
+          v-for="item in items"
+          :key="item.id"
+          class="ppt-chat-rail-item"
+          :class="item.role === 'user' ? 'ppt-chat-rail-item--user' : 'ppt-chat-rail-item--ai'"
+        >
+          <p class="ppt-chat-rail-role">
+            {{ item.role === 'user' ? t('workspace.roleUser') : t('workspace.roleAi') }}
+          </p>
+          <p class="ppt-chat-rail-content">{{ item.content }}</p>
+        </div>
       </div>
     </div>
   </aside>
@@ -49,19 +51,28 @@ const { t } = useI18n()
 
 <style scoped lang="scss">
 .ppt-chat-rail {
-  display: flex;
-  flex-direction: column;
+  position: relative;
   flex: 0 0 18rem;
   width: 18rem;
   min-width: 0;
+  align-self: stretch;
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   background: #14161e;
+  overflow: hidden;
   transition: width 0.25s ease, flex-basis 0.25s ease;
 
   &--collapsed {
     flex: 0 0 2.5rem;
     width: 2.5rem;
   }
+}
+
+.ppt-chat-rail-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .ppt-chat-rail-header {
