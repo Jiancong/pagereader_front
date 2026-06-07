@@ -261,9 +261,203 @@ SSE 事件（前端按 `event:` 名分发）：
 
 > 前端已按 [`FRONTEND_INTEGRATION.md`](FRONTEND_INTEGRATION.md) §7 处理：有 `projectId` 才打开 `/project/{id}`；manifest 无 `projectId` 时走「新建生成」而非误用数字 `id`。
 
-## 6. 划词追问（PptViewer 内置，可选）
+## 6. 【新增】PPT 知识点追问 — 右侧栏展示 + 持久化
 
-PptViewer 的「划词追问」也走 `POST /api2/agent/chat-stream`，并带 `X-Project-Id` / `X-Session-Id` 头。不需要该功能可忽略；需要则确认接口能处理此类上下文请求。
+### 6.0 前端目标（供后端对齐）
+
+- PptViewer **右侧固定栏**展示该项目下**全部**知识点追问（划词触发 + PPT 完成后自动抽取的知识点搜索）。
+- 每条记录包含：**划词/知识点 term**、**完整回答 markdown**、**配图 `image_results`**、状态（搜索中/完成/失败）。
+- 用户刷新页面、从历史项目重新打开时，右侧栏应从后端**恢复全部历史追问**，而不是只保留内存中的最后一次。
+
+当前前端实现（待改 UI）：
+
+- 追问走 `POST /api2/agent/chat-stream`，`sessionId` 为临时值 `ppt-related-{timestamp}`，**不落库**。
+- 结果面板为居中弹层（`PptRelatedSearchPanel`），关闭即丢失列表。
+- 监听 SSE：`knowledge_response`、`llm_text_stream_delta`、`llm_text_stream_end`、`chat_response`、`complete`、`error`。
+
+### 6.1 请求标识（区分「主生成」与「知识点追问」）
+
+追问请求在现有 body 上**增加**（推荐根字段 + `extra_body` 双写，便于网关/日志过滤）：
+
+```json
+{
+  "message": "请结合 PPT《…》解释「Mama's plan details」…",
+  "userId": "1",
+  "projectId": "550e8400-…",
+  "sessionId": "ppt-related-1717750000123",
+  "isAgent": true,
+  "uploaded_documents": [{ "url": "…", "name": "book.pdf", "type": "pdf" }],
+  "intent": "ppt_related_search",
+  "extra_body": {
+    "intent": "ppt_related_search",
+    "term": "Mama's plan details",
+    "pptTitle": "The Great Alone",
+    "slideIndex": 3,
+    "source": "MANUAL_SELECTION"
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `intent` | 固定 `ppt_related_search`，后端据此走追问分支、写追问表，**不要**混入主 PPT 生成会话 |
+| `extra_body.term` | 用户划词或自动抽取的知识点短语 |
+| `extra_body.pptTitle` | 当前 deck 标题 |
+| `extra_body.slideIndex` | 可选，划词时所在页码（0-based） |
+| `extra_body.source` | `MANUAL_SELECTION`（划词）或 `AUTO_KEYPOINT`（PPT 完成后自动） |
+
+Header 保持：`Authorization`；`X-Project-Id` / `X-Session-Id` 与 `projectId` / `sessionId` 一致。
+
+### 6.2 数据模型 `ProjectRelatedSearch`（建议独立表）
+
+与 `conversation/history` 主对话**分表存储**（避免污染生成记录、便于右侧栏分页）。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string / long | 主键 |
+| `projectId` | string | 关联项目 |
+| `userId` | long | 所属用户 |
+| `term` | string | 知识点/划词，如 `Mama's plan details` |
+| `promptMessage` | text | 发给 Agent 的完整 prompt |
+| `responseContent` | text | 最终回答（markdown 纯文本） |
+| `imageResults` | json | 配图数组，见 §6.4 |
+| `status` | enum | `PENDING` / `STREAMING` / `COMPLETED` / `FAILED` |
+| `source` | enum | `MANUAL_SELECTION` / `AUTO_KEYPOINT` |
+| `slideIndex` | int? | 可选 |
+| `pptTitle` | string? | 可选 |
+| `sessionId` | string | 与 chat-stream 一致 |
+| `isRagResponse` | bool | 来自 SSE |
+| `knowledgeBased` | bool | 来自 SSE |
+| `isSearchResponse` | bool | 来自 SSE |
+| `errorMessage` | string? | 失败原因 |
+| `sequenceNumber` | int | 项目内排序（创建顺序） |
+| `createTime` / `updateTime` | datetime | |
+
+**删除项目时**（`DELETE /project/{id}`）级联删除该项目下全部 `ProjectRelatedSearch`。
+
+### 6.3 REST 接口
+
+#### `GET /api2/project/{projectId}/related-searches`
+
+- 鉴权：仅项目 owner。
+- 返回：`R<ProjectRelatedSearchVo[]>`，按 `sequenceNumber` 或 `createTime` **升序**（右侧栏从上到下为时间线）。
+
+```json
+{
+  "code": 0,
+  "data": [
+    {
+      "id": "rs-001",
+      "projectId": "550e8400-…",
+      "term": "Mama's plan details",
+      "promptMessage": "请结合 PPT《The Great Alone》…",
+      "responseContent": "Mama's plan refers to…",
+      "imageResults": [{ "url": "https://…", "title": "…", "thumbnail": "…", "pageUrl": "…" }],
+      "status": "COMPLETED",
+      "source": "MANUAL_SELECTION",
+      "slideIndex": 3,
+      "pptTitle": "The Great Alone",
+      "isRagResponse": true,
+      "knowledgeBased": false,
+      "isSearchResponse": true,
+      "sequenceNumber": 1,
+      "createTime": "2026-06-07T10:00:00Z"
+    }
+  ]
+}
+```
+
+#### `POST /api2/project/{projectId}/related-searches`（可选，二选一）
+
+若由 **chat-stream 服务端自动建记录**，此接口可省略；否则前端在发起 SSE 前创建 `PENDING` 记录：
+
+```json
+{ "term": "…", "promptMessage": "…", "source": "MANUAL_SELECTION", "slideIndex": 3, "pptTitle": "…", "sessionId": "…" }
+```
+
+返回：`{ id, status: "PENDING" }`。
+
+#### `PATCH /api2/project/{projectId}/related-searches/{id}`（可选）
+
+流式过程中可由后端内部更新；若不做服务端流式落库，则 `complete` 后由前端 PATCH 最终内容（不推荐，优先服务端在 SSE 结束时写库）。
+
+#### `DELETE /api2/project/{projectId}/related-searches/{id}`（可选）
+
+单条删除，供后续 UI「清除本条追问」。
+
+### 6.4 SSE 事件与落库时机
+
+追问类 `chat-stream` 在现有事件基础上，需保证：
+
+| 阶段 | SSE event | 后端动作 |
+|------|-----------|----------|
+| 流开始 | `connected` 或首个业务事件 | 创建/关联 `ProjectRelatedSearch`，`status=STREAMING`；data 带 **`relatedSearchId`** |
+| 流式正文 | `llm_text_stream_delta` | 可选：增量写 `responseContent` 或仅内存缓冲 |
+| 知识回答 | `knowledge_response` | 写 `responseContent`、`image_results`、三个 bool 标记 |
+| 结束 | `complete` | `status=COMPLETED`；若仅有 delta 无 knowledge_response，用缓冲全文落库 |
+| 失败 | `error` | `status=FAILED`，写 `errorMessage` |
+
+**`knowledge_response` / `complete` data 需与前端 `usePptRelatedSearch` 对齐：**
+
+```json
+{
+  "relatedSearchId": "rs-001",
+  "response": "markdown 正文",
+  "full_text": "同上，二选一",
+  "is_rag_response": true,
+  "knowledge_based": false,
+  "is_search_response": true,
+  "image_results": [
+    {
+      "url": "https://…",
+      "thumbnail": "https://…",
+      "title": "caption",
+      "caption": "…",
+      "source": "google",
+      "page_url": "https://…",
+      "license": "…"
+    }
+  ],
+  "selected_image": { "url": "…" }
+}
+```
+
+前端字段映射：`page_url` → `pageUrl`，`image_results` / `selected_image` → 配图列表。
+
+### 6.5 PPT 完成后自动知识点搜索（若后端已有/计划有）
+
+若 Agent 在 `ppt_complete` 后自动对 deck 抽取 N 个知识点并搜索：
+
+1. **每个知识点一条** `ProjectRelatedSearch`，`source=AUTO_KEYPOINT`。
+2. 推荐在 `ppt_complete` 的 data 中附带任务列表，便于前端立即在右侧栏占位：
+
+```json
+{
+  "projectId": "…",
+  "title": "…",
+  "slides": [ … ],
+  "related_search_tasks": [
+    { "relatedSearchId": "rs-010", "term": "Mama's plan details", "status": "STREAMING" },
+    { "relatedSearchId": "rs-011", "term": "The Great Alone setting", "status": "PENDING" }
+  ]
+}
+```
+
+3. 各任务完成后照常推 `knowledge_response` + `complete`，或走独立 SSE；**必须**能靠 `GET …/related-searches` 恢复终态。
+
+### 6.6 与 `conversation/history` 的关系
+
+- **主生成**（上传分析 / 一句话生成）仍写 `conversation/history`，`role=user|assistant`。
+- **知识点追问**写 `ProjectRelatedSearch` 专表；**不要**仅依赖 `conversation/history` 的 `metadata`（前端右侧栏不会从主对话里解析追问）。
+- 若短期无法新表：至少在 `conversation/history` 的 `metadata` 中标准化 `type: "ppt_related_search"` + 全字段（见 §6.2），并提供 `GET /project/{id}/conversation/history?types=ppt_related_search` 过滤——**仍推荐独立表**。
+
+### 6.7 验收用例
+
+1. 打开已生成 PPT → 划词「某知识点」→ 追问完成 → `GET /project/{id}/related-searches` 返回 1 条 `COMPLETED`，含 `term`、`responseContent`、`imageResults`。
+2. 同一项目连续追问 3 次 → 列表 3 条，`sequenceNumber` 递增。
+3. 刷新页面 / 从历史重新进入 → 前端 `GET` 恢复 3 条，右侧栏全部展示。
+4. （若有自动抽取）PPT `complete` 后自动生成 M 条追问 → 列表含 `source=AUTO_KEYPOINT`，终态均可 GET 恢复。
+5. `DELETE /project/{id}` 后，对应 `related-searches` 为空或 404。
 
 ---
 

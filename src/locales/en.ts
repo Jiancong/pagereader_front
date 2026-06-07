@@ -256,6 +256,10 @@ export default {
   workspace: {
     newGenerate: "New deck",
     explore: "Explore",
+    sidebar: {
+      collapse: "Collapse sidebar",
+      expand: "Expand sidebar",
+    },
     myHistory: "My history",
     deleteProject: "Delete",
     deleteProjectConfirm: "Delete this project? This cannot be undone. Shared community posts will be removed too.",

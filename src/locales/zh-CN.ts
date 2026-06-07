@@ -247,6 +247,10 @@ export default {
   workspace: {
     newGenerate: "新建生成",
     explore: "探索 Explore",
+    sidebar: {
+      collapse: "收起侧边栏",
+      expand: "展开侧边栏",
+    },
     myHistory: "我的历史",
     deleteProject: "删除",
     deleteProjectConfirm: "确定删除该项目？删除后无法恢复，已分享到社区的作品也会一并移除。",
