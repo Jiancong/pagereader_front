@@ -1,16 +1,21 @@
 // 文件模块
 // @author hc @date 2026-06-03
 
-import { get, postForm, postJson, getBlob, buildUrl } from "./client"
+import { get, postForm, postJson, getBlob, buildUrl, del } from "./client"
 import { getToken } from "./token"
 import type {
   UserStorageQuota,
+  UserAssetsPage,
+  UserFilesStats,
+  UserPrivateAssetType,
+  UserPrivateAssetSort,
   DirectUploadTokenReq,
   DirectUploadTokenVo,
   DirectUploadCompleteReq,
   DirectUploadCompleteVo,
   UploadedDocument,
 } from "./types"
+import { normalizeUserAssetsPage } from "@/utils/userAssets"
 
 // 上传
 export async function putFile(file: File): Promise<unknown> {
@@ -36,16 +41,59 @@ export function buildImageUrl(query: Record<string, unknown>): string {
   return buildUrl("/file/get/image", query)
 }
 
-// 用户文件列表
-export async function getUserFiles<T = unknown>(
-  query?: Record<string, unknown>,
-): Promise<T> {
-  return get<T>("/file/user/files", { query })
+// 用户上传文件列表（OSS user-upload）
+export async function listUserUploadedFiles(params: {
+  userId: number | string
+  pageSize?: number
+  marker?: string
+  projectId?: string
+}): Promise<UserAssetsPage> {
+  const data = await get<unknown>("/file/user/files", {
+    query: {
+      userId: params.userId,
+      pageSize: params.pageSize ?? 20,
+      marker: params.marker,
+      projectId: params.projectId,
+    },
+  })
+  return normalizeUserAssetsPage(data)
+}
+
+// 用户生成素材列表（OSS user-private）
+export async function listUserGeneratedAssets(params: {
+  userId: number | string
+  pageSize?: number
+  marker?: string
+  projectId?: string
+  assetType?: UserPrivateAssetType
+  sort?: UserPrivateAssetSort
+}): Promise<UserAssetsPage> {
+  const data = await get<unknown>("/file/user/private/assets", {
+    query: {
+      userId: params.userId,
+      pageSize: params.pageSize ?? 20,
+      marker: params.marker,
+      projectId: params.projectId,
+      assetType: params.assetType ?? "ALL",
+      sort: params.sort ?? "NEWEST",
+    },
+  })
+  return normalizeUserAssetsPage(data)
+}
+
+// 用户文件统计
+export async function getUserFilesStats(userId: number | string): Promise<UserFilesStats> {
+  return get<UserFilesStats>("/file/user/files/stats", { query: { userId } })
 }
 
 // 存储配额
 export async function getUserStorageQuota(): Promise<UserStorageQuota> {
   return get<UserStorageQuota>("/file/user/storage/quota")
+}
+
+// 删除单个 OSS 文件
+export async function deleteUserFile(fileKey: string): Promise<unknown> {
+  return del<unknown>("/file/user/file", { query: { fileKey } })
 }
 
 // ===== OSS 直传（大文件走对象存储，绕过应用 413） =====

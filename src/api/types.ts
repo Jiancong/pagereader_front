@@ -208,8 +208,45 @@ export interface ProjectPromptHistoryVo {
 
 // ===== 文件 =====
 export interface UserStorageQuota {
+  planType?: string
+  usedBytes?: number
+  usedFormatted?: string
+  limitBytes?: number
+  limitGb?: number
+  limitFormatted?: string
+  remainingBytes?: number
+  remainingFormatted?: string
+  exceeded?: boolean
+  wouldExceed?: boolean
+  usagePercentage?: number
+  totalCount?: number
   used?: number
   total?: number
+  [key: string]: unknown
+}
+
+export type UserPrivateAssetType = "ALL" | "IMAGE" | "VIDEO"
+export type UserPrivateAssetSort = "NEWEST" | "OLDEST" | "SIZE_DESC" | "SIZE_ASC"
+
+export interface UserAssetItem {
+  fileKey: string
+  name: string
+  url: string
+  size?: number
+  contentType?: string
+  lastModified?: string
+}
+
+export interface UserAssetsPage {
+  items: UserAssetItem[]
+  nextMarker?: string | null
+  hasMore: boolean
+}
+
+export interface UserFilesStats {
+  totalCount?: number
+  totalBytes?: number
+  totalSizeFormatted?: string
   [key: string]: unknown
 }
 

@@ -14,6 +14,12 @@
       <button :class="btnClass(view === 'explore')" @click="$emit('explore')">
         <Compass class="h-4 w-4" /> {{ t('workspace.explore') }}
       </button>
+      <button
+        :class="btnClass(assetsOpen)"
+        @click="assetsOpen = !assetsOpen"
+      >
+        <Images class="h-4 w-4" /> {{ t('workspace.assets.nav') }}
+      </button>
     </div>
 
     <div class="flex min-h-0 flex-1 flex-col px-3">
@@ -95,17 +101,27 @@
         </button>
       </div>
     </div>
+
+    <WorkspaceAssetsDrawer
+      :open="assetsOpen"
+      :user-id="userId"
+      :active-project-id="activeProjectId"
+      @close="assetsOpen = false"
+    />
   </aside>
 </template>
 
 <script setup>
-import { Presentation, Plus, Compass, LogOut, FileText, Loader2, User, Trash2 } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { Presentation, Plus, Compass, LogOut, FileText, Loader2, User, Trash2, Images } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import LocaleSwitcher from '../LocaleSwitcher.vue'
 import WorkspaceCreditsBar from './WorkspaceCreditsBar.vue'
+import WorkspaceAssetsDrawer from './WorkspaceAssetsDrawer.vue'
 
 defineProps({
   view: { type: String, default: 'new' },
+  userId: { type: [String, Number], default: null },
   activeProjectId: { type: String, default: null },
   nickName: { type: String, default: '' },
   avatar: { type: String, default: '' },
@@ -114,6 +130,8 @@ defineProps({
   deletingProjectId: { type: String, default: null },
 })
 defineEmits(['new', 'explore', 'open-project', 'delete-project', 'logout'])
+
+const assetsOpen = ref(false)
 
 const { t } = useI18n()
 

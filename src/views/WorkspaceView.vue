@@ -2,6 +2,7 @@
   <div class="flex h-screen overflow-hidden bg-background">
     <WorkspaceSidebar
       :view="view"
+      :user-id="userId"
       :active-project-id="activeProjectId"
       :nick-name="nickName"
       :avatar="avatar"
