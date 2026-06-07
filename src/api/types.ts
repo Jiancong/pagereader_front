@@ -232,6 +232,7 @@ export interface UserAssetItem {
   fileKey: string
   name: string
   url: string
+  thumbnailUrl?: string
   size?: number
   contentType?: string
   lastModified?: string

@@ -30,7 +30,7 @@
         <PptViewer
           :ppt-data="pptData"
           :project-id="projectId"
-          :chat-history="history"
+          :chat-history="displayChatHistory"
           :can-share-to-community="canShare"
           :sharing-to-community="sharing"
           :shared-to-community="sharedToCommunity"
@@ -78,6 +78,7 @@ import {
   isSharedToCommunity,
   looksLikeDeckJson,
 } from '@/utils/projectCommunity'
+import { buildPptChatHistoryDisplay } from '@/utils/pptChatHistoryDisplay'
 
 const props = defineProps({
   projectId: { type: String, required: true },
@@ -122,6 +123,16 @@ const images = computed(() => {
 })
 
 const firstUserMsg = computed(() => history.value.find((h) => h.role === 'user')?.content || '')
+
+const displayChatHistory = computed(() =>
+  buildPptChatHistoryDisplay(history.value, pptData.value, {
+    deckReady: (title, slides) =>
+      slides > 0
+        ? t('workspace.chatHistoryPanel.deckReady', { title, slides })
+        : t('workspace.chatHistoryPanel.deckReadyNoSlides', { title }),
+    relatedAsk: (term) => t('workspace.chatHistoryPanel.relatedAsk', { term }),
+  }),
+)
 
 function collectDeckUrls(proj, hist) {
   const urls = []

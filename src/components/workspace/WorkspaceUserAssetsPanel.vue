@@ -76,8 +76,8 @@
           >
             <div class="relative aspect-square overflow-hidden bg-secondary/40">
               <img
-                v-if="isImageAsset(asset.name, asset.url, asset.contentType)"
-                :src="buildAssetThumbUrl(asset.url)"
+                v-if="resolveAssetPreviewUrl(asset)"
+                :src="resolveAssetPreviewUrl(asset)"
                 :alt="asset.name"
                 loading="lazy"
                 class="h-full w-full object-cover"
@@ -132,10 +132,10 @@ import { ElMessage } from 'element-plus'
 import { Loader2, Trash2, FileText, File, ExternalLink } from 'lucide-vue-next'
 import { fileApi } from '@/api'
 import {
-  buildAssetThumbUrl,
   formatBytes,
   isImageAsset,
   isPdfAsset,
+  resolveAssetPreviewUrl,
 } from '@/utils/userAssets'
 
 const props = defineProps({

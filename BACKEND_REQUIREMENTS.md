@@ -250,6 +250,71 @@ SSE 事件（前端按 `event:` 名分发）：
 
 - OSS bucket `aidesigns` 的跨域来源需包含 `https://page2.top`（阿里云控制台配置，非后端代码）。
 
+### 4.1 【新增/确认】用户资源列表缩略图（Assets 面板）
+
+工作区侧边栏 **Assets** 调用：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/file/user/files` | 已上传文件（`user-upload/{userId}/...`） |
+| GET | `/file/user/private/assets` | 生成素材（`user-private/images\|videos/{userId}/...`） |
+
+**现状**：列表项仅有 `fileUrl` + 文件名 + `fileSize`，**无 `thumbnailUrl`**。PDF 等非图片类型前端只能显示 PDF/文件占位图标。
+
+**要求**：每个文件对象需返回可展示的缩略图 URL（与 aidesigns 编辑器资源库一致）。
+
+#### 列表项字段（`files[]` / `items[]` 单条）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `fileKey` | string | 是 | OSS 对象 key，删除时用 |
+| `originalName` / `fileName` | string | 是 | 原始文件名 |
+| `fileUrl` / `fileLink` | string | 是 | 可访问地址（可带签名） |
+| `fileSize` | number | 推荐 | 字节 |
+| `contentType` | string | 推荐 | 如 `application/pdf`、`image/png` |
+| **`thumbnailUrl`** | string | **推荐** | **网格预览图**；无则非图片只能占位 |
+| `thumbUrl` / `previewUrl` | string | 可选 | 与 `thumbnailUrl` 同义，前端会兼容 |
+
+#### 缩略图生成规则
+
+| 类型 | 后端行为 |
+|------|----------|
+| **图片** | `thumbnailUrl` = 原图 URL + OSS 处理参数，或预生成小图；前端也会自行追加 `x-oss-process=image/resize,m_lfit,w_480,h_480/quality,q_20` |
+| **PDF** | 上传完成或列表查询时提供**首页预览图** URL（PNG/JPEG）。可选方案：① 上传后服务端/异步任务渲染 PDF 第 1 页存 OSS；② 返回带 `x-oss-process=doc/preview,export_1,format_png` 的 URL（需 bucket 开通文档预览） |
+| **Word 等** | 同 PDF，首页或图标预览 URL |
+| **生成图** | `user-private/images` 下对象必须带 `thumbnailUrl`（可与 `fileUrl` 相同或缩小版） |
+
+参考命名（与现有 PPT 封面一致）：`{timestamp}_{basename}_cover.png` 或 `{timestamp}_ppt-cover.png`。
+
+#### 响应示例
+
+```json
+{
+  "code": 0,
+  "data": {
+    "files": [
+      {
+        "fileKey": "user-upload/4/20260607/1025043812_The_Great_Alone_-_Kristin_Hannah.pdf",
+        "originalName": "The_Great_Alone_-_Kristin_Hannah.pdf",
+        "fileUrl": "https://page2top.oss-cn-hongkong.aliyuncs.com/user-upload/4/...pdf?...",
+        "fileSize": 2211840,
+        "contentType": "application/pdf",
+        "thumbnailUrl": "https://page2top.oss-cn-hongkong.aliyuncs.com/user-upload/4/.../1025043812_cover.png?..."
+      }
+    ],
+    "nextMarker": null,
+    "hasMore": false
+  }
+}
+```
+
+#### 验收
+
+1. 上传 PDF 后刷新 Assets → 网格显示**首页缩略图**，非 PDF 字样占位。
+2. 上传 PNG → 显示图片预览。
+3. 生成类图片素材 → `private/assets` 列表同样含 `thumbnailUrl`。
+4. `thumbnailUrl` 须浏览器可加载（CORS / 签名有效期与 `fileUrl` 一致或更长）。
+
 ## 5. Explore / 项目预览（已存在，确认即可）
 
 | 方法 | 路径 | 说明 |

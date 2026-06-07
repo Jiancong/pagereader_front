@@ -47,6 +47,10 @@ export function normalizeUserAssetItem(raw: unknown): UserAssetItem | null {
   const url = String(item.fileUrl ?? item.fileLink ?? item.url ?? item.ossUrl ?? item.link ?? "").trim()
   if (!fileKey && !url) return null
 
+  const thumbnailUrl = String(
+    item.thumbnailUrl ?? item.thumbUrl ?? item.previewUrl ?? item.coverUrl ?? "",
+  ).trim() || undefined
+
   const sizeRaw = item.fileSize ?? item.size ?? item.bytes
   const size = Number(sizeRaw)
   const contentType = String(item.contentType ?? item.mimeType ?? item.type ?? "").trim() || undefined
@@ -56,10 +60,20 @@ export function normalizeUserAssetItem(raw: unknown): UserAssetItem | null {
     fileKey: fileKey || url,
     name: name || "file",
     url,
+    thumbnailUrl,
     size: Number.isFinite(size) && size >= 0 ? size : undefined,
     contentType,
     lastModified,
   }
+}
+
+export function resolveAssetPreviewUrl(asset: UserAssetItem): string | null {
+  const thumb = String(asset.thumbnailUrl || "").trim()
+  if (thumb) return buildAssetThumbUrl(thumb)
+  if (isImageAsset(asset.name, asset.url, asset.contentType)) {
+    return buildAssetThumbUrl(asset.url)
+  }
+  return null
 }
 
 export function normalizeUserAssetsPage(data: unknown): UserAssetsPage {

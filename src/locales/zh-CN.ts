@@ -274,6 +274,9 @@ export default {
     chatHistoryPanel: {
       collapse: "收起对话记录",
       expand: "展开对话记录",
+      deckReady: "演示文稿已生成：{title}（共 {slides} 页）",
+      deckReadyNoSlides: "演示文稿已生成：{title}",
+      relatedAsk: "关于「{term}」",
     },
     shareToCommunity: "分享到社区",
     shareToCommunitySuccess: "已分享到社区",

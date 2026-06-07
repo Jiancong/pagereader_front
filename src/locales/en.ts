@@ -283,6 +283,9 @@ export default {
     chatHistoryPanel: {
       collapse: "Collapse chat history",
       expand: "Expand chat history",
+      deckReady: "Deck ready: {title} ({slides} slides)",
+      deckReadyNoSlides: "Deck ready: {title}",
+      relatedAsk: 'About "{term}"',
     },
     shareToCommunity: "Share to community",
     shareToCommunitySuccess: "Shared to community",
