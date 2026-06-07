@@ -7,9 +7,11 @@
       :avatar="avatar"
       :my-projects="myProjects"
       :loading-projects="loadingProjects"
+      :deleting-project-id="deletingProjectId"
       @new="returnToGenerator"
       @explore="view = 'explore'"
       @open-project="openProject"
+      @delete-project="onDeleteProject"
       @logout="handleLogout"
     />
 
@@ -22,7 +24,12 @@
         @project-started="onProjectStarted"
         @project-complete="onProjectComplete"
       />
-      <ExploreGrid v-if="view === 'explore'" @open="openExploreItem" />
+      <ExploreGrid
+        v-if="view === 'explore'"
+        :user-id="userId"
+        @open="openExploreItem"
+        @deleted="onExploreProjectDeleted"
+      />
       <ProjectPreview
         v-else-if="view === 'project' && activeProjectId"
         :project-id="activeProjectId"
@@ -39,6 +46,8 @@ defineOptions({ name: 'WorkspaceView' })
 
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar.vue'
 import WorkspaceGenerator from '../components/workspace/WorkspaceGenerator.vue'
 import ExploreGrid from '../components/workspace/ExploreGrid.vue'
@@ -47,12 +56,15 @@ import { authApi, feedApi, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 
 const router = useRouter()
+const { t } = useI18n()
 const view = ref('new')
 const activeProjectId = ref(null)
+const userId = ref(null)
 const nickName = ref('')
 const avatar = ref(getLocalAvatar())
 const myProjects = ref([])
 const loadingProjects = ref(false)
+const deletingProjectId = ref(null)
 const genPrompt = ref('')
 const genKey = ref(0)
 const projectRefreshKey = ref(0)
@@ -72,6 +84,7 @@ const loadProjects = async () => {
 onMounted(async () => {
   try {
     const d = await authApi.getCurrentDetail()
+    userId.value = d?.id ?? null
     nickName.value = d?.nickName || d?.email || ''
     avatar.value = d?.avatar || getLocalAvatar()
   } catch {
@@ -79,6 +92,33 @@ onMounted(async () => {
   }
   loadProjects()
 })
+
+const onDeleteProject = async (projectId) => {
+  if (!projectId || deletingProjectId.value) return
+  if (!window.confirm(t('workspace.deleteProjectConfirm'))) return
+  deletingProjectId.value = projectId
+  try {
+    await feedApi.deleteProject(projectId)
+    myProjects.value = myProjects.value.filter((p) => p.id !== projectId)
+    if (activeProjectId.value === projectId) {
+      activeProjectId.value = null
+      view.value = 'new'
+    }
+    ElMessage.success(t('workspace.deleteProjectSuccess'))
+  } catch (e) {
+    ElMessage.error(e?.message || t('common.actionFailed'))
+  } finally {
+    deletingProjectId.value = null
+  }
+}
+
+const onExploreProjectDeleted = (projectId) => {
+  myProjects.value = myProjects.value.filter((p) => p.id !== projectId)
+  if (activeProjectId.value === projectId) {
+    activeProjectId.value = null
+    view.value = 'explore'
+  }
+}
 
 /** 从探索/历史回到生成页，保留进行中的任务与已生成 PPT */
 const returnToGenerator = () => {

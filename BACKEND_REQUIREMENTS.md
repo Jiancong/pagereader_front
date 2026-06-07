@@ -96,6 +96,31 @@ Header: Authorization: <JWT>
 
 `ProjectVo` 至少含：`id`、`name`（或 `title`）、`updateTime`，可选 `thumbnailUrl`/`description`。
 
+### 2.0 【新增】删除我的项目
+
+侧边栏「我的历史」与探索流中**本人分享**的作品需支持删除。前端已对接，**后端需提供**：
+
+```
+DELETE /api2/project/{id}
+Header: Authorization: <JWT>
+```
+
+| 项 | 要求 |
+|----|------|
+| 权限 | 仅项目 owner 可删；非 owner 返回 `403` |
+| 不存在 | `404` |
+| 副作用 | 软删或硬删均可；需从 `GET /project/user/list` 消失；若已 `share-to-community`，需从 `POST /www/model/feed/stream` 探索流移除；关联对话历史、留言一并处理 |
+| 响应 | `R<null>` 或 `R<{ deleted: true }>`，`code === 0` 即成功 |
+
+探索流删除按钮仅对 `sourceType === "USER_PROJECT"` 且当前用户为作者时展示。Feed 项建议补充：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `ownerUserId` | number | USER_PROJECT 的作者用户 ID |
+| `isOwner` | boolean | 登录用户请求 feed 时，是否为该条 owner（二选一或同时返回） |
+
+未返回 `ownerUserId` / `isOwner` 时，探索页**不显示**删除按钮（无法区分官方 manifest 与他人作品）。
+
 ### 2.1 【核心】上传资料并开始分析 → 自动创建/更新 Project（Chat）
 
 **产品预期**：用户在工作区「上传资料 → 分析并生成」后，左侧「我的历史」应立刻出现一条以**书名/文件名**命名的会话；点击可回看对话与生成结果。
@@ -229,7 +254,8 @@ SSE 事件（前端按 `event:` 名分发）：
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/www/model/feed/stream` | `{page,pageSize,sort}` → `{page,total,pageSize,data:[FeedItem]}`；匿名可访问；item 需含 `id/projectId/name/imageUrl/imageUrls/authorNickname/viewCount/favoriteCount` |
+| POST | `/www/model/feed/stream` | `{page,pageSize,sort,includeUserProjects?}` → `{page,total,pageSize,data:[FeedItem]}`；匿名可访问；item 需含 `id/sourceType/projectId/name/imageUrl/imageUrls/authorNickname/viewCount/favoriteCount`；USER_PROJECT 另需 `ownerUserId` 或 `isOwner`（见 §2.0） |
+| DELETE | `/project/{id}` | 删除本人项目（见 §2.0） |
 | GET | `/project/{id}` | 项目详情 `ProjectVo` |
 | GET | `/project/{id}/conversation/history` | `[{id,role,content,imageUrls,...}]`，图片放 `imageUrls`，前端用于预览 |
 

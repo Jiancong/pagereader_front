@@ -10,4 +10,5 @@ export {
   shareToCommunity,
   listComments,
   postComment,
+  deleteProject,
 } from "./feed"

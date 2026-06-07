@@ -1,7 +1,7 @@
 // 读书 / 探索 Feed 模块
 // @author hc @date 2026-06-03
 
-import { get, postJson } from "./client"
+import { del, get, postJson } from "./client"
 import type {
   FeedStreamRequest,
   FeedStreamPageDto,
@@ -84,6 +84,11 @@ export async function getMyProjects(
   size = 30,
 ): Promise<Page<ProjectVo>> {
   return get<Page<ProjectVo>>(`/project/user/list`, { query: { page, size } })
+}
+
+// 删除项目（需登录且为 owner）；已分享项目同时从探索流移除
+export async function deleteProject(id: string): Promise<void> {
+  await del<unknown>(`/project/${encodeURIComponent(id)}`)
 }
 
 // 分享到社区（需登录且为 owner）

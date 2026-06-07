@@ -8,31 +8,47 @@
     <div v-if="error" class="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{{ error }}</div>
 
     <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-      <button
+      <div
         v-for="item in items"
         :key="item.id"
-        class="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-lg"
-        @click="$emit('open', item)"
+        class="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-lg"
       >
-        <div class="aspect-[3/4] w-full overflow-hidden bg-secondary/40">
-          <img
-            v-if="cover(item)"
-            :src="cover(item)"
-            :alt="item.name || ''"
-            loading="lazy"
-            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-          <div v-else class="flex h-full w-full items-center justify-center text-xs text-muted-foreground">{{ t('workspace.noCover') }}</div>
-        </div>
-        <div class="flex flex-1 flex-col p-3">
-          <p class="line-clamp-2 text-sm font-medium text-foreground">{{ item.name || item.nameEn || t('workspace.unnamed') }}</p>
-          <div class="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-            <span v-if="item.authorNickname" class="truncate">{{ item.authorNickname }}</span>
-            <span class="ml-auto flex items-center gap-1"><Eye class="h-3 w-3" />{{ item.viewCount ?? 0 }}</span>
-            <span class="flex items-center gap-1"><Heart class="h-3 w-3" />{{ item.favoriteCount ?? 0 }}</span>
+        <button
+          type="button"
+          class="flex flex-1 flex-col text-left"
+          @click="$emit('open', item)"
+        >
+          <div class="aspect-[3/4] w-full overflow-hidden bg-secondary/40">
+            <img
+              v-if="cover(item)"
+              :src="cover(item)"
+              :alt="item.name || ''"
+              loading="lazy"
+              class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+            <div v-else class="flex h-full w-full items-center justify-center text-xs text-muted-foreground">{{ t('workspace.noCover') }}</div>
           </div>
-        </div>
-      </button>
+          <div class="flex flex-1 flex-col p-3">
+            <p class="line-clamp-2 text-sm font-medium text-foreground">{{ item.name || item.nameEn || t('workspace.unnamed') }}</p>
+            <div class="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+              <span v-if="item.authorNickname" class="truncate">{{ item.authorNickname }}</span>
+              <span class="ml-auto flex items-center gap-1"><Eye class="h-3 w-3" />{{ item.viewCount ?? 0 }}</span>
+              <span class="flex items-center gap-1"><Heart class="h-3 w-3" />{{ item.favoriteCount ?? 0 }}</span>
+            </div>
+          </div>
+        </button>
+        <button
+          v-if="canDelete(item)"
+          type="button"
+          :title="t('workspace.deleteProject')"
+          class="absolute right-2 top-2 rounded-lg bg-background/90 p-1.5 text-muted-foreground opacity-0 shadow-sm backdrop-blur transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+          :disabled="deletingId === deleteKey(item)"
+          @click.stop="onDelete(item)"
+        >
+          <Loader2 v-if="deletingId === deleteKey(item)" class="h-4 w-4 animate-spin" />
+          <Trash2 v-else class="h-4 w-4" />
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-8 text-muted-foreground">
@@ -53,10 +69,16 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Loader2, Eye, Heart } from 'lucide-vue-next'
+import { ElMessage } from 'element-plus'
+import { Loader2, Eye, Heart, Trash2 } from 'lucide-vue-next'
 import { feedApi } from '../../api'
+import { canDeleteFeedItem, feedItemDeleteProjectId } from '@/utils/projectDelete'
 
-defineEmits(['open'])
+const props = defineProps({
+  userId: { type: [String, Number], default: null },
+})
+
+const emit = defineEmits(['open', 'deleted'])
 
 const { t } = useI18n()
 
@@ -66,9 +88,30 @@ const page = ref(1)
 const total = ref(0)
 const loading = ref(false)
 const error = ref(null)
+const deletingId = ref(null)
 
 const hasMore = computed(() => items.value.length < total.value)
 const cover = (item) => item.imageUrl || item.imageUrls?.[0] || ''
+const canDelete = (item) => canDeleteFeedItem(item, props.userId)
+const deleteKey = (item) => feedItemDeleteProjectId(item) || item.id
+
+const onDelete = async (item) => {
+  const projectId = feedItemDeleteProjectId(item)
+  if (!projectId || !canDelete(item)) return
+  if (!window.confirm(t('workspace.deleteProjectConfirm'))) return
+  deletingId.value = projectId
+  try {
+    await feedApi.deleteProject(projectId)
+    items.value = items.value.filter((i) => deleteKey(i) !== projectId)
+    total.value = Math.max(0, total.value - 1)
+    ElMessage.success(t('workspace.deleteProjectSuccess'))
+    emit('deleted', projectId)
+  } catch (e) {
+    ElMessage.error(e?.message || t('common.actionFailed'))
+  } finally {
+    deletingId.value = null
+  }
+}
 
 const load = async (p) => {
   loading.value = true

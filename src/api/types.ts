@@ -93,6 +93,10 @@ export interface FeedStreamItemDto {
   id: string
   sourceType?: string
   projectId?: string
+  /** USER_PROJECT 时标识作者，供前端判断是否可删除 */
+  ownerUserId?: number | string
+  /** 登录用户对当前 feed 项是否为 owner（后端可选返回） */
+  isOwner?: boolean
   name?: string
   nameEn?: string
   imageUrl?: string

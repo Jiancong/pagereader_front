@@ -23,29 +23,46 @@
           <Loader2 class="h-4 w-4 animate-spin" /> {{ t('workspace.loading') }}
         </div>
         <p v-else-if="!myProjects.length" class="px-2 py-2 text-xs text-muted-foreground/70">{{ t('workspace.noHistory') }}</p>
-        <button
+        <div
           v-for="p in myProjects"
           v-else
           :key="p.id"
-          :title="p.name || p.title || p.id"
           :class="[
-            'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors',
-            activeProjectId === p.id
-              ? 'bg-secondary text-foreground'
-              : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+            'group flex w-full items-center gap-1 rounded-lg pr-1 transition-colors',
+            activeProjectId === p.id ? 'bg-secondary' : 'hover:bg-secondary/60',
           ]"
-          @click="$emit('open-project', p.id)"
         >
-          <img
-            v-if="p.thumbnailUrl"
-            :src="p.thumbnailUrl"
-            alt=""
-            class="h-8 w-8 flex-shrink-0 rounded object-cover"
-            loading="lazy"
-          />
-          <FileText v-else class="h-4 w-4 flex-shrink-0" />
-          <span class="truncate">{{ p.name || p.title || t('workspace.unnamedProject') }}</span>
-        </button>
+          <button
+            :title="p.name || p.title || p.id"
+            :class="[
+              'flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors',
+              activeProjectId === p.id
+                ? 'text-foreground'
+                : 'text-muted-foreground group-hover:text-foreground',
+            ]"
+            @click="$emit('open-project', p.id)"
+          >
+            <img
+              v-if="p.thumbnailUrl"
+              :src="p.thumbnailUrl"
+              alt=""
+              class="h-8 w-8 flex-shrink-0 rounded object-cover"
+              loading="lazy"
+            />
+            <FileText v-else class="h-4 w-4 flex-shrink-0" />
+            <span class="truncate">{{ p.name || p.title || t('workspace.unnamedProject') }}</span>
+          </button>
+          <button
+            type="button"
+            :title="t('workspace.deleteProject')"
+            class="flex-shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+            :disabled="deletingProjectId === p.id"
+            @click.stop="$emit('delete-project', p.id)"
+          >
+            <Loader2 v-if="deletingProjectId === p.id" class="h-4 w-4 animate-spin" />
+            <Trash2 v-else class="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
 
@@ -82,7 +99,7 @@
 </template>
 
 <script setup>
-import { Presentation, Plus, Compass, LogOut, FileText, Loader2, User } from 'lucide-vue-next'
+import { Presentation, Plus, Compass, LogOut, FileText, Loader2, User, Trash2 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import LocaleSwitcher from '../LocaleSwitcher.vue'
 import WorkspaceCreditsBar from './WorkspaceCreditsBar.vue'
@@ -94,8 +111,9 @@ defineProps({
   avatar: { type: String, default: '' },
   myProjects: { type: Array, default: () => [] },
   loadingProjects: { type: Boolean, default: false },
+  deletingProjectId: { type: String, default: null },
 })
-defineEmits(['new', 'explore', 'open-project', 'logout'])
+defineEmits(['new', 'explore', 'open-project', 'delete-project', 'logout'])
 
 const { t } = useI18n()
 
