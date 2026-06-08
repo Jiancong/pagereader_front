@@ -3,7 +3,7 @@
 
 import { createRouter, createWebHistory } from "vue-router";
 import { isLoggedIn } from "./api";
-import { pushGtmPageView } from "./composables/useGtmDataLayer";
+import { pushGtmPageView, gtmPageTypeFromRoute } from "./composables/useGtmDataLayer";
 import { applyDocumentI18n, normalizeLocale } from "./composables/useAppLocale";
 import { i18n } from "./i18n";
 
@@ -100,5 +100,6 @@ router.afterEach((to) => {
     page_path: to.fullPath,
     page_location: typeof window !== "undefined" ? window.location.href : to.fullPath,
     page_title: typeof document !== "undefined" ? document.title : String(to.name ?? ""),
+    page_type: gtmPageTypeFromRoute(to.name, to.fullPath),
   });
 });

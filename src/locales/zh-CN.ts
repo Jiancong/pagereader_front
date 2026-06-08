@@ -59,8 +59,9 @@ export default {
     featureDocDesc: "AI 深度理解文档内容，自动提取关键信息和核心观点",
     featureQuickTitle: "一键快速生成",
     featureQuickDesc: "只需输入主题描述，秒级生成结构完整的演示文稿",
-    featureTemplateTitle: "精美模板设计",
-    featureTemplateDesc: "多种专业模板可选，自动应用最佳排版和配色方案",
+    featureTopicSearchTitle: "主题纵向搜索",
+    featureTopicSearchDesc:
+      "在幻灯片上选中任意词句，AI 围绕该主题向下延展搜索与解读，逐层深入概念与背景，像读书一样边读边查、不打断节奏",
     featureI18nTitle: "多语言支持",
     featureI18nDesc: "支持中英文等多种语言，智能适配不同场景需求",
     tabQuick: "一句话生成",

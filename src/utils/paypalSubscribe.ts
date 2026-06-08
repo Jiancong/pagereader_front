@@ -39,7 +39,7 @@ export async function renderPaypalSubscribeButton(
   container: HTMLElement,
   planId: string,
   userId: string | number,
-  onDone?: () => void,
+  callbacks?: { onDone?: () => void; onCheckoutStart?: () => void },
 ): Promise<void> {
   await loadPaypalSdk()
   const w = window as Window & {
@@ -50,8 +50,10 @@ export async function renderPaypalSubscribeButton(
   container.innerHTML = ""
   w.paypal.Buttons({
     style: { shape: "rect", color: "gold", layout: "vertical", label: "subscribe" },
-    createSubscription: (_data: unknown, actions: { subscription: { create: (p: { plan_id: string }) => unknown } }) =>
-      actions.subscription.create({ plan_id: planId }),
+    createSubscription: (_data: unknown, actions: { subscription: { create: (p: { plan_id: string }) => unknown } }) => {
+      callbacks?.onCheckoutStart?.()
+      return actions.subscription.create({ plan_id: planId })
+    },
     onApprove: async (data: { subscriptionID?: string; orderID?: string }) => {
       if (!data.subscriptionID) return
       await subscribeApi.createUserSubscription({
@@ -60,7 +62,7 @@ export async function renderPaypalSubscribeButton(
         subscriptionId: data.subscriptionID,
         orderId: data.orderID,
       })
-      onDone?.()
+      callbacks?.onDone?.()
     },
   }).render(container)
 }

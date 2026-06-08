@@ -8304,6 +8304,7 @@ import {
   type RelatedSearchSessionEntry,
 } from "@/utils/pptChatHistoryDisplay";
 import { uploadedDocumentsFromPptData } from "@/utils/pptDocumentRag";
+import { gtmRelatedSearch } from "@/composables/useGtmDataLayer";
 import { resolveContextSelectionText } from "@/utils/pptContextSelection";
 import { prepareHtml2CanvasClone } from "@/utils/pptExportHtml2Canvas";
 import type { PptPageReference } from "@/utils/pptInlineMarkdown";
@@ -8704,6 +8705,9 @@ function recordRelatedSearchSession(term: string) {
     relatedSearchSessionEntries.value[idx] = entry;
   } else {
     relatedSearchSessionEntries.value.push(entry);
+  }
+  if (content && props.projectId) {
+    gtmRelatedSearch(String(props.projectId), q.length);
   }
   emit("related-search-recorded", [...relatedSearchSessionEntries.value]);
 }

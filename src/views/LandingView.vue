@@ -4,7 +4,7 @@
       :logged="logged"
       :nick-name="nickName"
       :avatar="avatar"
-      @open-login="openLogin"
+      @open-login="(mode) => openLogin(mode, 'header')"
       @enter="goWorkspace"
     />
     <main class="pt-16">
@@ -18,6 +18,7 @@
     <AuthDialog
       :open="dialogOpen"
       :default-mode="dialogMode"
+      :auth-source="authSource"
       @close="dialogOpen = false"
       @success="onLoginSuccess"
     />
@@ -43,6 +44,7 @@ const avatar = ref(getLocalAvatar())
 const userId = ref(null)
 const dialogOpen = ref(false)
 const dialogMode = ref('login')
+const authSource = ref('header')
 
 const refresh = async () => {
   logged.value = isLoggedIn()
@@ -67,8 +69,9 @@ const refresh = async () => {
 
 onMounted(refresh)
 
-const openLogin = (mode) => {
+const openLogin = (mode, source = 'header') => {
   dialogMode.value = mode
+  authSource.value = source
   dialogOpen.value = true
 }
 
@@ -78,13 +81,19 @@ const onLoginSuccess = () => {
   router.push('/workspace')
 }
 
-const onStart = () => {
-  if (isLoggedIn()) goWorkspace()
-  else openLogin('signup')
+const onStart = (payload) => {
+  if (isLoggedIn()) {
+    goWorkspace()
+    return
+  }
+  openLogin('signup', payload?.mode === 'upload' ? 'generator_upload' : 'generator_prompt')
 }
 
-const onPricingPlan = () => {
-  if (isLoggedIn()) goWorkspace()
-  else openLogin('signup')
+const onPricingPlan = (planType) => {
+  if (isLoggedIn()) {
+    goWorkspace()
+    return
+  }
+  openLogin('signup', `pricing_${String(planType || 'unknown').toLowerCase()}`)
 }
 </script>

@@ -13,6 +13,7 @@
     <AuthDialog
       :open="dialogOpen"
       :default-mode="dialogMode"
+      auth-source="pricing"
       @close="dialogOpen = false"
       @success="onLoginSuccess"
     />
@@ -63,7 +64,7 @@ const openLogin = (mode) => {
 
 const goWorkspace = () => router.push('/workspace')
 
-const onSelectPlan = () => {
+const onSelectPlan = (planType) => {
   if (isLoggedIn()) goWorkspace()
   else openLogin('signup')
 }

@@ -59,8 +59,9 @@ export default {
     featureDocDesc: "AI understands your documents and extracts key points automatically",
     featureQuickTitle: "One-click generation",
     featureQuickDesc: "Describe your topic and get a complete deck in seconds",
-    featureTemplateTitle: "Beautiful templates",
-    featureTemplateDesc: "Professional layouts and palettes applied automatically",
+    featureTopicSearchTitle: "Topic drill-down search",
+    featureTopicSearchDesc:
+      "Highlight any term on a slide and explore that topic in depth—definitions, context, and follow-ups layered on your deck, like reading with vertical search.",
     featureI18nTitle: "Multilingual",
     featureI18nDesc: "Chinese, English, and more—adapted to your audience",
     tabQuick: "Quick prompt",

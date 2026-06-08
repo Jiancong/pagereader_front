@@ -24,13 +24,18 @@
 
       <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
         <button
+          type="button"
           class="flex items-center gap-2 rounded-xl bg-primary px-8 py-4 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30"
           @click="scrollToGenerator"
         >
           <Zap class="h-5 w-5" />
           {{ t('landing.heroCta') }}
         </button>
-        <button class="flex items-center gap-2 rounded-xl border border-border bg-card/50 px-8 py-4 text-base font-medium text-foreground transition-colors hover:bg-card">
+        <button
+          type="button"
+          class="flex items-center gap-2 rounded-xl border border-border bg-card/50 px-8 py-4 text-base font-medium text-foreground transition-colors hover:bg-card"
+          @click="watchDemo"
+        >
           <Play class="h-5 w-5" />
           {{ t('landing.heroDemo') }}
         </button>
@@ -42,10 +47,19 @@
 <script setup>
 import { Sparkles, Zap, Play } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { gtmCtaClick, gtmDemoClick, LANDING_WATCH_DEMO_EVENT } from '@/composables/useGtmDataLayer'
 
 const { t } = useI18n()
 
 const scrollToGenerator = () => {
+  gtmCtaClick('hero_get_started')
+  document.getElementById('generator')?.scrollIntoView({ behavior: 'smooth' })
+}
+
+const watchDemo = () => {
+  gtmDemoClick('hero')
+  gtmCtaClick('hero_demo')
+  window.dispatchEvent(new CustomEvent(LANDING_WATCH_DEMO_EVENT))
   document.getElementById('generator')?.scrollIntoView({ behavior: 'smooth' })
 }
 </script>

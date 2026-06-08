@@ -6,7 +6,7 @@
           <button
             v-for="tab in tabs"
             :key="tab.id"
-            @click="activeTab = tab.id"
+            @click="selectTab(tab.id)"
             :class="[
               'flex flex-1 items-center justify-center gap-2 px-6 py-4 text-sm font-medium transition-colors',
               activeTab === tab.id
@@ -55,7 +55,7 @@
                   :key="example.id"
                   type="button"
                   :title="example.prompt"
-                  @click="prompt = example.prompt"
+                  @click="selectQuickExample(example)"
                   class="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
                 >
                   {{ example.label }}
@@ -117,7 +117,7 @@
                   :key="example.id"
                   type="button"
                   :title="example.prompt"
-                  @click="uploadPrompt = example.prompt"
+                  @click="selectUploadExample(example)"
                   class="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
                 >
                   {{ example.label }}
@@ -174,9 +174,17 @@
 </template>
 
 <script setup>
-import { ref, computed, markRaw } from 'vue'
+import { ref, computed, markRaw, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Sparkles, Upload, FileText, FileSearch, Download, Loader2, X, MessageSquare, FileUp } from 'lucide-vue-next'
+import {
+  gtmGenerateIntent,
+  gtmGeneratorTabSelect,
+  gtmQuickExampleClick,
+  gtmUploadExampleClick,
+  gtmFileSelected,
+  LANDING_WATCH_DEMO_EVENT,
+} from '@/composables/useGtmDataLayer'
 
 const { t } = useI18n()
 const emit = defineEmits(['start'])
@@ -249,21 +257,38 @@ const applyDefaultUploadPrompt = () => {
   }
 }
 
+const selectTab = (tabId) => {
+  if (activeTab.value !== tabId) {
+    activeTab.value = tabId
+    gtmGeneratorTabSelect(tabId)
+  }
+}
+
+const selectQuickExample = (example) => {
+  prompt.value = example.prompt
+  gtmQuickExampleClick(example.id)
+}
+
+const selectUploadExample = (example) => {
+  uploadPrompt.value = example.prompt
+  gtmUploadExampleClick(example.id)
+}
+
+const trackSelectedFile = (file) => {
+  selectedFile.value = file
+  applyDefaultUploadPrompt()
+  gtmFileSelected(file)
+}
+
 const handleDrop = (e) => {
   isDragging.value = false
   const files = e.dataTransfer.files
-  if (files.length > 0) {
-    selectedFile.value = files[0]
-    applyDefaultUploadPrompt()
-  }
+  if (files.length > 0) trackSelectedFile(files[0])
 }
 
 const handleFileSelect = (e) => {
   const files = e.target.files
-  if (files.length > 0) {
-    selectedFile.value = files[0]
-    applyDefaultUploadPrompt()
-  }
+  if (files.length > 0) trackSelectedFile(files[0])
 }
 
 const clearSelectedFile = () => {
@@ -271,8 +296,25 @@ const clearSelectedFile = () => {
   uploadPrompt.value = ''
 }
 
-const generatePPT = () => emit('start', { mode: 'prompt', prompt: prompt.value })
-const analyzeDocument = () =>
+const generatePPT = () => {
+  gtmGenerateIntent('prompt', Boolean(prompt.value.trim()))
+  emit('start', { mode: 'prompt', prompt: prompt.value })
+}
+const analyzeDocument = () => {
+  gtmGenerateIntent('upload', Boolean(uploadPrompt.value.trim()))
   emit('start', { mode: 'upload', prompt: uploadPrompt.value.trim() })
+}
 const downloadPPT = () => emit('start', { mode: 'prompt', prompt: prompt.value })
+
+function onLandingWatchDemo() {
+  selectTab('upload')
+}
+
+onMounted(() => {
+  window.addEventListener(LANDING_WATCH_DEMO_EVENT, onLandingWatchDemo)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener(LANDING_WATCH_DEMO_EVENT, onLandingWatchDemo)
+})
 </script>

@@ -104,6 +104,7 @@ import { authApi, projectApi, isLoggedIn, getLocalAvatar } from '@/api'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
 import { looksLikeDeckJson } from '@/utils/projectCommunity'
 import { buildPptChatHistoryDisplay } from '@/utils/pptChatHistoryDisplay'
+import { gtmForkProject } from '@/composables/useGtmDataLayer'
 
 const route = useRoute()
 const router = useRouter()
@@ -238,6 +239,7 @@ const onFork = async () => {
       extraConversations: buildExtraConversations(),
     })
     const newId = String(created?.id || '').trim()
+    gtmForkProject(id, newId || undefined)
     ElMessage.success(t('community.forkSuccess'))
     router.push(newId ? { name: 'workspace', query: { project: newId } } : { name: 'workspace' })
   } catch (e) {

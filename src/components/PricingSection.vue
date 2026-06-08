@@ -201,6 +201,7 @@ import { isPaypalConfigured, renderPaypalSubscribeButton } from '@/utils/paypalS
 import { notifyCreditsRefresh } from '@/composables/useCreditsRefresh'
 import WechatPayModal from '@/components/billing/WechatPayModal.vue'
 import WechatPayButton from '@/components/billing/WechatPayButton.vue'
+import { gtmPricingPlanClick, gtmBeginCheckout, gtmPurchase } from '@/composables/useGtmDataLayer'
 
 const props = defineProps({
   userId: { type: [String, Number], default: null },
@@ -419,7 +420,10 @@ async function mountPaypalButtons() {
     const el = document.getElementById(paypalContainerId(plan.planType))
     if (!planId || !el) continue
     try {
-      await renderPaypalSubscribeButton(el, planId, props.userId, () => showSubscribeSuccess())
+      await renderPaypalSubscribeButton(el, planId, props.userId, {
+        onCheckoutStart: () => gtmBeginCheckout(plan.planType, 'paypal'),
+        onDone: () => showSubscribeSuccess(plan.planType, 'paypal', plan),
+      })
     } catch (e) {
       console.warn('PayPal button', plan.planType, e)
     }
@@ -440,6 +444,7 @@ onMounted(async () => {
 watch(() => props.userId, () => mountPaypalButtons())
 
 function onSelectPlan(planType) {
+  gtmPricingPlanClick(String(planType || 'unknown'))
   emit('select-plan', planType)
 }
 
@@ -448,12 +453,19 @@ function openWechat(plan) {
     onSelectPlan(plan.planType)
     return
   }
+  gtmBeginCheckout(plan.planType, 'wechat')
   wechatPlanType.value = plan.planType
   wechatPlanName.value = plan.displayName || plan.planType
   wechatOpen.value = true
 }
 
-async function showSubscribeSuccess() {
+async function showSubscribeSuccess(planType, paymentMethod, plan) {
+  const value = Number(plan?.monthly?.recurringMonth)
+  gtmPurchase(
+    String(planType || wechatPlanType.value || 'unknown'),
+    paymentMethod,
+    Number.isFinite(value) && value > 0 ? value : undefined,
+  )
   subscribeSuccess.value = t('pricing.subscribeSuccess')
   await notifyCreditsRefresh()
   emit('subscribed')
@@ -462,6 +474,6 @@ async function showSubscribeSuccess() {
 }
 
 function onWechatSuccess() {
-  showSubscribeSuccess()
+  showSubscribeSuccess(wechatPlanType.value, 'wechat')
 }
 </script>

@@ -105,6 +105,7 @@ import AppFooter from '@/components/AppFooter.vue'
 import AuthDialog from '@/components/AuthDialog.vue'
 import ProjectCommentBoard from '@/components/community/ProjectCommentBoard.vue'
 import { authApi, projectApi, isLoggedIn, getLocalAvatar } from '@/api'
+import { gtmOpenReader } from '@/composables/useGtmDataLayer'
 
 const route = useRoute()
 const router = useRouter()
@@ -168,6 +169,7 @@ watch(projectId, (id) => load(id))
 
 const openReader = () => {
   if (!projectId.value) return
+  gtmOpenReader(projectId.value)
   router.push({ name: 'project-reader', params: { projectId: projectId.value } })
 }
 

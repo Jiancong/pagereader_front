@@ -24,7 +24,14 @@
 <script setup>
 import { useI18n } from 'vue-i18n'
 import { useAppLocale } from '@/composables/useAppLocale'
+import { gtmLocaleChange } from '@/composables/useGtmDataLayer'
 
 const { t } = useI18n()
-const { locale, setLocale, options } = useAppLocale()
+const { locale, setLocale: applyLocale, options } = useAppLocale()
+
+function setLocale(code) {
+  if (locale.value === code) return
+  applyLocale(code)
+  gtmLocaleChange(code)
+}
 </script>

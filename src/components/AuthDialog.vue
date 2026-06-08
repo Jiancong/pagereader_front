@@ -97,10 +97,15 @@ import { useI18n } from "vue-i18n"
 import { X, Loader2, Mail, Lock, User } from "lucide-vue-next"
 import { authApi, ApiError, setLocalAvatar } from "../api"
 import { loadGsi, parseProfileFromCredential } from "../utils/google"
+import { gtmAuthModalOpen, gtmLogin, gtmSignUp } from "@/composables/useGtmDataLayer"
 
 const { t } = useI18n()
 
-const props = defineProps<{ open: boolean; defaultMode?: "login" | "signup" }>()
+const props = defineProps<{
+  open: boolean
+  defaultMode?: "login" | "signup"
+  authSource?: string
+}>()
 const emit = defineEmits<{ (e: "close"): void; (e: "success"): void }>()
 
 const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || ""
@@ -119,6 +124,7 @@ watch(
     if (v) {
       mode.value = props.defaultMode || "login"
       error.value = null
+      gtmAuthModalOpen(mode.value, props.authSource || "unknown")
       if (googleClientId) nextTick(renderGoogle)
     }
   },
@@ -142,6 +148,7 @@ function renderGoogle() {
             const profile = parseProfileFromCredential(resp.credential)
             await authApi.googleLogin({ googleEmail: profile.email })
             setLocalAvatar(profile.picture || "")
+            gtmLogin("google", props.authSource)
             emit("success")
             emit("close")
           } catch (e: any) {
@@ -175,12 +182,14 @@ async function handleSubmit() {
   try {
     if (mode.value === "login") {
       await authApi.passwordLogin({ username: email.value.trim(), password: password.value })
+      gtmLogin("email", props.authSource)
     } else {
       await authApi.signUpAndLogin({
         email: email.value.trim(),
         password: password.value,
         nickName: nickName.value.trim() || undefined,
       })
+      gtmSignUp("email", props.authSource)
     }
     emit("success")
     emit("close")

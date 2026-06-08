@@ -25,7 +25,7 @@
 
 <script setup>
 import { computed, markRaw } from 'vue'
-import { Brain, Zap, Palette, Globe } from 'lucide-vue-next'
+import { Brain, Zap, TextSearch, Globe } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -33,7 +33,7 @@ const { t } = useI18n()
 const features = computed(() => [
   { icon: markRaw(Brain), title: t('landing.featureDocTitle'), description: t('landing.featureDocDesc') },
   { icon: markRaw(Zap), title: t('landing.featureQuickTitle'), description: t('landing.featureQuickDesc') },
-  { icon: markRaw(Palette), title: t('landing.featureTemplateTitle'), description: t('landing.featureTemplateDesc') },
+  { icon: markRaw(TextSearch), title: t('landing.featureTopicSearchTitle'), description: t('landing.featureTopicSearchDesc') },
   { icon: markRaw(Globe), title: t('landing.featureI18nTitle'), description: t('landing.featureI18nDesc') },
 ])
 </script>

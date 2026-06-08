@@ -211,6 +211,13 @@ import { resolvePptDataFromStreamComplete } from "@/utils/pptCompletePayload"
 import { notifyCreditsRefresh } from "@/composables/useCreditsRefresh"
 import type { UploadedDocument } from "@/utils/pptDocumentRag"
 import { formatBytes } from "@/utils/userAssets"
+import {
+  gtmGenerateStart,
+  gtmGenerateComplete,
+  gtmGenerateFail,
+  gtmAssetAttach,
+  gtmFileExt,
+} from "@/composables/useGtmDataLayer"
 
 const emit = defineEmits<{
   "project-started": [projectId: string]
@@ -327,12 +334,14 @@ const appendLog = (task: GeneratorTask, line: string) => task.logs.push(line)
 
 const refreshCreditsBar = () => notifyCreditsRefresh().catch(() => {})
 
-const applyStreamError = (task: GeneratorTask, msg: string) => {
+const applyStreamError = (task: GeneratorTask, msg: string, mode: "prompt" | "upload") => {
   if (isCreditsInsufficientMessage(msg)) {
     task.showCreditsCta = true
     task.errorMsg = t("workspace.creditsInsufficient")
+    gtmGenerateFail(mode, "credits")
   } else {
     task.errorMsg = msg
+    gtmGenerateFail(mode, "other")
   }
 }
 
@@ -387,6 +396,7 @@ function attachCloudDocument(payload: { doc: UploadedDocument; size?: number }) 
   uploadPrompt.value = t("workspace.docGeneratePrompt", {
     name: docBaseName(payload.doc.name || "document"),
   })
+  gtmAssetAttach(gtmFileExt(payload.doc.name || ""))
 }
 
 const resolveUserId = async (): Promise<string | null> => {
@@ -417,6 +427,7 @@ const runStream = async (
   message: string,
   documents?: any[],
   projectName?: string,
+  mode: "prompt" | "upload" = "prompt",
 ) => {
   const userId = await resolveUserId()
   if (!userId) {
@@ -461,19 +472,22 @@ const runStream = async (
           if (resolved) {
             task.pptData = resolved.pptData
             if (resolved.projectId) task.projectId = resolved.projectId
+            gtmGenerateComplete(mode, task.queue, task.projectId)
             emit("project-complete", task.projectId)
           } else {
             task.errorMsg = t("workspace.completeNoPptData")
+            gtmGenerateFail(mode, "other")
           }
         } catch {
           task.errorMsg = t("workspace.loadPptFailed")
+          gtmGenerateFail(mode, "network")
         } finally {
           refreshCreditsBar()
         }
       },
       onError: (msg: string) => {
         stopTaskTimer(task)
-        applyStreamError(task, msg)
+        applyStreamError(task, msg, mode)
         refreshCreditsBar()
       },
     },
@@ -498,14 +512,16 @@ const startTask = (task: GeneratorTask) => {
   ensureTimerTick()
 }
 
-const handleGenerateError = (task: GeneratorTask, e: unknown) => {
+const handleGenerateError = (task: GeneratorTask, e: unknown, mode: "prompt" | "upload" = "prompt") => {
   if (isCreditsInsufficient(e)) {
     task.showCreditsCta = true
     task.errorMsg = t("workspace.creditsInsufficient")
+    gtmGenerateFail(mode, "credits")
     refreshCreditsBar()
     return
   }
   task.errorMsg = e instanceof ApiError ? e.message : (e as Error)?.message || t("workspace.generateFailed")
+  gtmGenerateFail(mode, "other")
 }
 
 const onPromptSubmit = async () => {
@@ -514,12 +530,14 @@ const onPromptSubmit = async () => {
   if (!(await ensureCreditsForTask(promptTask))) {
     stopTaskTimer(promptTask)
     promptTask.isGenerating = false
+    gtmGenerateFail("prompt", "credits")
     return
   }
+  gtmGenerateStart("prompt", promptTask.queue)
   try {
-    await runStream(promptTask, input.value.trim())
+    await runStream(promptTask, input.value.trim(), undefined, undefined, "prompt")
   } catch (e: unknown) {
-    handleGenerateError(promptTask, e)
+    handleGenerateError(promptTask, e, "prompt")
   } finally {
     stopTaskTimer(promptTask)
     promptTask.isGenerating = false
@@ -535,8 +553,11 @@ const onAnalyze = async () => {
   if (!(await ensureCreditsForTask(ragTask))) {
     stopTaskTimer(ragTask)
     ragTask.isGenerating = false
+    gtmGenerateFail("upload", "credits")
     return
   }
+  const docSource = cloudDocument.value ? "cloud" : "local"
+  gtmGenerateStart("upload", ragTask.queue, docSource)
   try {
     let doc: UploadedDocument
     if (cloudDocument.value) {
@@ -549,9 +570,9 @@ const onAnalyze = async () => {
     } else {
       return
     }
-    await runStream(ragTask, message, [doc], docBaseName(doc.name || ""))
+    await runStream(ragTask, message, [doc], docBaseName(doc.name || ""), "upload")
   } catch (e: unknown) {
-    handleGenerateError(ragTask, e)
+    handleGenerateError(ragTask, e, "upload")
   } finally {
     stopTaskTimer(ragTask)
     ragTask.isGenerating = false
