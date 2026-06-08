@@ -30,29 +30,18 @@
           </div>
           <button
             type="button"
-            class="flex flex-shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="forking"
-            @click="onFork"
+            class="flex flex-shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            @click="openReader"
           >
-            <Loader2 v-if="forking" class="h-4 w-4 animate-spin" />
-            <GitFork v-else class="h-4 w-4" />
-            {{ forking ? t('community.forking') : t('community.forkToWorkspace') }}
+            <BookOpen class="h-4 w-4" /> {{ t('community.openToRead') }}
           </button>
         </div>
 
-        <div v-if="pptData" class="mt-6">
-          <p class="mb-2 text-xs text-muted-foreground">{{ t('community.interactiveHint') }}</p>
-          <PptViewer
-            :ppt-data="pptData"
-            :project-id="projectId"
-            :chat-history="displayChatHistory"
-            @update:ppt-data="(d) => (pptData = d)"
-            @related-search-recorded="(e) => (sessionEntries = e)"
-          />
-        </div>
-        <div
-          v-else-if="project.thumbnailUrl"
-          class="mt-6 overflow-hidden rounded-xl border border-border"
+        <button
+          v-if="project.thumbnailUrl"
+          type="button"
+          class="group relative mt-6 block w-full overflow-hidden rounded-xl border border-border"
+          @click="openReader"
         >
           <img
             :src="project.thumbnailUrl"
@@ -60,13 +49,12 @@
             class="w-full object-cover"
             loading="lazy"
           />
-        </div>
-        <p
-          v-else-if="loadingDeck"
-          class="mt-6 flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground"
-        >
-          <Loader2 class="h-5 w-5 animate-spin" /> {{ t('workspace.loadingPpt') }}
-        </p>
+          <span class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity group-hover:bg-black/30 group-hover:opacity-100">
+            <span class="inline-flex items-center gap-2 rounded-lg bg-background/90 px-4 py-2 text-sm font-semibold text-foreground shadow">
+              <BookOpen class="h-4 w-4" /> {{ t('community.openToRead') }}
+            </span>
+          </span>
+        </button>
 
         <section
           v-if="project.sourceBookTitle || project.sourceBookAuthor"
@@ -111,17 +99,12 @@ defineOptions({ name: 'ProjectCommunityView' })
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
-import { ArrowLeft, Loader2, GitFork } from 'lucide-vue-next'
+import { ArrowLeft, Loader2, BookOpen } from 'lucide-vue-next'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import AuthDialog from '@/components/AuthDialog.vue'
 import ProjectCommentBoard from '@/components/community/ProjectCommentBoard.vue'
-import PptViewer from '@/components/editor/chat/PptViewer.vue'
 import { authApi, projectApi, isLoggedIn, getLocalAvatar } from '@/api'
-import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
-import { looksLikeDeckJson } from '@/utils/projectCommunity'
-import { buildPptChatHistoryDisplay } from '@/utils/pptChatHistoryDisplay'
 
 const route = useRoute()
 const router = useRouter()
@@ -130,61 +113,13 @@ const { t } = useI18n()
 const projectId = computed(() => String(route.params.projectId || ''))
 const project = ref(null)
 const comments = ref([])
-const history = ref([])
-const pptData = ref(null)
 const loading = ref(false)
 const loadingComments = ref(false)
-const loadingDeck = ref(false)
 const error = ref(null)
 const logged = ref(false)
 const nickName = ref('')
 const avatar = ref(getLocalAvatar())
 const dialogOpen = ref(false)
-const forking = ref(false)
-const sessionEntries = ref([])
-const pendingForkAfterLogin = ref(false)
-
-const displayChatHistory = computed(() =>
-  buildPptChatHistoryDisplay(history.value, pptData.value, {
-    deckReady: (title, slides) =>
-      slides > 0
-        ? t('workspace.chatHistoryPanel.deckReady', { title, slides })
-        : t('workspace.chatHistoryPanel.deckReadyNoSlides', { title }),
-    relatedAsk: (term) => t('workspace.chatHistoryPanel.relatedAsk', { term }),
-    noAnswer: t('workspace.chatHistoryPanel.noAnswer'),
-  }),
-)
-
-function collectDeckUrls(proj, hist) {
-  const urls = []
-  if (proj?.configFilePath) urls.push(proj.configFilePath)
-  const assistantRows = [...hist].reverse().filter((h) => h.role === 'assistant')
-  for (const row of assistantRows) {
-    for (const url of row.imageUrls ?? []) {
-      if (looksLikeDeckJson(url)) urls.push(url)
-    }
-  }
-  return [...new Set(urls)]
-}
-
-async function loadPptDeck(id, proj, hist) {
-  const urls = collectDeckUrls(proj, hist)
-  if (!urls.length) return
-  loadingDeck.value = true
-  try {
-    for (const ppt_data_url of urls) {
-      const resolved = await resolvePptDataFromStreamComplete({ projectId: id, ppt_data_url })
-      if (resolved?.pptData) {
-        pptData.value = resolved.pptData
-        return
-      }
-    }
-  } catch {
-    /* 无 deck 时降级为缩略图 */
-  } finally {
-    loadingDeck.value = false
-  }
-}
 
 const refreshAuth = async () => {
   logged.value = isLoggedIn()
@@ -205,74 +140,22 @@ const load = async (id) => {
   if (!id) return
   loading.value = true
   loadingComments.value = true
-  loadingDeck.value = false
   error.value = null
   project.value = null
   comments.value = []
-  history.value = []
-  pptData.value = null
-  sessionEntries.value = []
   try {
-    const [proj, list, hist] = await Promise.all([
+    const [proj, list] = await Promise.all([
       projectApi.getProject(id),
       projectApi.listComments(id).catch(() => []),
-      projectApi.getProjectConversationHistory(id).catch(() => []),
     ])
     project.value = proj
     comments.value = list
-    history.value = hist
     projectApi.incrementProjectView(id).catch(() => {})
-    await loadPptDeck(id, proj, hist)
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')
   } finally {
     loading.value = false
     loadingComments.value = false
-  }
-}
-
-function buildExtraConversations() {
-  const out = []
-  for (const entry of sessionEntries.value) {
-    const term = String(entry?.term || '').trim()
-    const content = String(entry?.content || '').trim()
-    if (!term || !content) continue
-    out.push({
-      role: 'user',
-      content: t('workspace.chatHistoryPanel.relatedAsk', { term }),
-      intent: 'ppt_related_search',
-      term,
-    })
-    out.push({ role: 'assistant', content, intent: 'ppt_related_search', term })
-  }
-  return out
-}
-
-const onFork = async () => {
-  if (forking.value) return
-  if (!logged.value) {
-    pendingForkAfterLogin.value = true
-    dialogOpen.value = true
-    return
-  }
-  const id = projectId.value
-  if (!id) return
-  forking.value = true
-  try {
-    const created = await projectApi.forkProject(id, {
-      extraConversations: buildExtraConversations(),
-    })
-    const newId = String(created?.id || '').trim()
-    ElMessage.success(t('community.forkSuccess'))
-    if (newId) {
-      router.push({ name: 'workspace', query: { project: newId } })
-    } else {
-      router.push({ name: 'workspace' })
-    }
-  } catch (e) {
-    ElMessage.error(e?.message || t('common.actionFailed'))
-  } finally {
-    forking.value = false
   }
 }
 
@@ -283,6 +166,11 @@ onMounted(() => {
 
 watch(projectId, (id) => load(id))
 
+const openReader = () => {
+  if (!projectId.value) return
+  router.push({ name: 'project-reader', params: { projectId: projectId.value } })
+}
+
 const goBack = () => {
   if (window.history.length > 1) router.back()
   else router.push(logged.value ? '/workspace' : '/')
@@ -290,12 +178,8 @@ const goBack = () => {
 
 const goWorkspace = () => router.push('/workspace')
 const openLogin = () => { dialogOpen.value = true }
-const onLoginSuccess = async () => {
+const onLoginSuccess = () => {
   dialogOpen.value = false
-  await refreshAuth()
-  if (pendingForkAfterLogin.value) {
-    pendingForkAfterLogin.value = false
-    if (logged.value) onFork()
-  }
+  refreshAuth()
 }
 </script>

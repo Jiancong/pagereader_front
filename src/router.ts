@@ -25,6 +25,11 @@ const routes = [
     component: () => import("./views/ProjectCommunityView.vue"),
   },
   {
+    path: "/explore/project/:projectId/read",
+    name: "project-reader",
+    component: () => import("./views/ProjectReaderView.vue"),
+  },
+  {
     path: "/debug-ppt",
     name: "debug-ppt",
     component: () => import("./views/DebugPptView.vue"),
