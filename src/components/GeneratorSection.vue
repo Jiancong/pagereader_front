@@ -2,6 +2,33 @@
   <section id="generator" class="py-20">
     <div class="mx-auto max-w-4xl px-6">
       <div class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-black/20">
+        <div v-if="showDemoVideo" class="p-6">
+          <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-foreground">{{ t('landing.heroDemo') }}</h3>
+            <button
+              type="button"
+              class="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              :aria-label="t('landing.demoVideoClose')"
+              @click="closeDemoVideo"
+            >
+              <X class="h-4 w-4" />
+            </button>
+          </div>
+          <div class="relative w-full overflow-hidden rounded-xl bg-black">
+            <div class="relative w-full pt-[54.14%]">
+              <iframe
+                src="https://player.vimeo.com/video/1199420193?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1"
+                class="absolute inset-0 h-full w-full"
+                frameborder="0"
+                allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                referrerpolicy="strict-origin-when-cross-origin"
+                title="page2.top demo video"
+              />
+            </div>
+          </div>
+        </div>
+
+        <template v-else>
         <div class="flex border-b border-border">
           <button
             v-for="tab in tabs"
@@ -168,6 +195,7 @@
             </div>
           </div>
         </div>
+        </template>
       </div>
     </div>
   </section>
@@ -197,6 +225,7 @@ const isDownloading = ref(false)
 const isDragging = ref(false)
 const selectedFile = ref(null)
 const slides = ref([])
+const showDemoVideo = ref(false)
 
 const tabs = computed(() => [
   { id: 'quick', label: t('landing.tabQuick'), icon: markRaw(MessageSquare) },
@@ -306,8 +335,12 @@ const analyzeDocument = () => {
 }
 const downloadPPT = () => emit('start', { mode: 'prompt', prompt: prompt.value })
 
+const closeDemoVideo = () => {
+  showDemoVideo.value = false
+}
+
 function onLandingWatchDemo() {
-  selectTab('upload')
+  showDemoVideo.value = true
 }
 
 onMounted(() => {

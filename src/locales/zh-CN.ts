@@ -53,6 +53,7 @@ export default {
       "上传图书、论文、资料，AI 自动提取核心内容并生成结构化演示文稿。或者只需输入一句话，即刻获得精美 PPT。",
     heroCta: "立即开始",
     heroDemo: "观看演示",
+    demoVideoClose: "关闭演示",
     featuresTitle: "强大的功能特性",
     featuresSubtitle: "AI 驱动的智能分析，让演示文稿创建变得简单高效",
     featureDocTitle: "智能文档分析",

@@ -53,6 +53,7 @@ export default {
       "Upload books, papers, or notes and let AI structure them into a deck—or describe your topic in one sentence and get polished slides in seconds.",
     heroCta: "Get started",
     heroDemo: "Watch demo",
+    demoVideoClose: "Close demo",
     featuresTitle: "Powerful features",
     featuresSubtitle: "AI-driven analysis makes creating presentations simple and fast",
     featureDocTitle: "Smart document analysis",
