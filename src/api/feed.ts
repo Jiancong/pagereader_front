@@ -102,6 +102,14 @@ export async function shareToCommunity(
   )
 }
 
+// Fork 社区/本人项目到自己的 workspace（克隆 PPT + 历史，默认私有）；需登录
+export async function forkProject(
+  id: string,
+  body: { name?: string; extraConversations?: unknown[] } = {},
+): Promise<ProjectVo> {
+  return postJson<ProjectVo>(`/project/${encodeURIComponent(id)}/fork`, body)
+}
+
 // 留言列表（树形结构）
 export async function listComments(id: string): Promise<ProjectCommentVo[]> {
   return get<ProjectCommentVo[]>(`/project/${encodeURIComponent(id)}/comments`)

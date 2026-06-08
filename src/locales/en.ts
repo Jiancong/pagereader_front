@@ -361,6 +361,10 @@ export default {
   community: {
     bookSource: "Book source",
     bookAuthor: "Author: {name}",
+    interactiveHint: "Select text on a slide and right-click to ask the AI. Your questions appear in the chat panel.",
+    forkToWorkspace: "Fork to my workspace",
+    forking: "Forking…",
+    forkSuccess: "Forked to your workspace (private)",
     commentBoard: "Comments",
     commentPlaceholder: "Share your thoughts…",
     postComment: "Post comment",

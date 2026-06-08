@@ -8594,6 +8594,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "update:pptData", data: PptData): void;
+  (e: "related-search-recorded", entries: RelatedSearchSessionEntry[]): void;
 }>();
 
 const chatHistoryRailCollapsed = ref(false);
@@ -8704,6 +8705,7 @@ function recordRelatedSearchSession(term: string) {
   } else {
     relatedSearchSessionEntries.value.push(entry);
   }
+  emit("related-search-recorded", [...relatedSearchSessionEntries.value]);
 }
 
 async function onPptRelatedSearch() {

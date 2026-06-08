@@ -8,6 +8,7 @@ export {
   incrementProjectView,
   getMyProjects,
   shareToCommunity,
+  forkProject,
   listComments,
   postComment,
   deleteProject,

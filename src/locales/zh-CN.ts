@@ -351,6 +351,10 @@ export default {
   community: {
     bookSource: "书籍来源",
     bookAuthor: "作者：{name}",
+    interactiveHint: "在幻灯片上选中文字并右键即可向 AI 追问，提问会显示在右侧对话栏。",
+    forkToWorkspace: "Fork 到我的工作区",
+    forking: "Fork 中…",
+    forkSuccess: "已 Fork 到你的工作区（私有）",
     commentBoard: "留言板",
     commentPlaceholder: "写下你的想法…",
     postComment: "发表留言",

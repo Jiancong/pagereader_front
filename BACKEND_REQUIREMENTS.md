@@ -724,6 +724,111 @@ Header: Authorization: <JWT>
 4. 体验包 `recurringMonthHkd: 68` → `totalFee: 6800` → 显示 **HK$68.00**。
 5. 支付成功后 `GET /subscribe/my/status` 积分增加。
 
+## 8. 【新增】社区作品「打开互动」+「Fork 到我的工作区」
+
+社区作品页 `/explore/project/{id}`（匿名/任意登录用户可访问）将从「只读详情页」升级为「可互动 + 可 Fork」：
+
+1. **读者打开**：直接渲染作者分享的 PPT（与 owner 预览一致），可右键划词追问；追问结果加入右侧对话栏。
+2. **读者 Fork**：在当前 PPT 分析 + 历史的基础上，**复制一份**到自己的 workspace，默认私有（仅自己可见），可后续再选择分享到社区。
+
+### 8.1 读者在社区作品上的划词追问（互动，**不污染原作者项目**）
+
+- 复用现有 `POST /api2/agent/chat-stream`（§6.1，`intent=ppt_related_search`），`projectId` 传**被浏览的作品 id**（仅用于 RAG 上下文 / `uploaded_documents` 关联）。
+- **关键约束**：当**调用者不是该 project 的 owner** 时，后端**禁止**把这次追问写入原项目的 `conversation/history` 或 `ProjectRelatedSearch`（否则读者的提问会出现在作者的作品里）。即：
+  - owner 调用 → 正常落库（§6）。
+  - 非 owner 调用 → **临时响应**，只回流 SSE，不持久化。
+- 读者必须**已登录**（追问需 `userId`）；未登录点击追问，前端提示登录。
+- 读者的这些临时追问仅存在于前端会话内（已实现：右侧栏 session 合并）。如读者随后 Fork，可由前端把这些 Q&A 一并传入 Fork 接口落库（见 8.2 请求体 `extraConversations`）。
+
+**确认项**：
+
+| 接口 | 要求 |
+|------|------|
+| `GET /project/{id}` | 已分享作品对**非 owner / 匿名**可读（返回 `configFilePath`、`sourceBookTitle/Author`、`thumbnailUrl` 等） |
+| `GET /project/{id}/conversation/history` | 同上对非 owner 可读（读者据此恢复作者已有对话/分析） |
+| `POST /agent/chat-stream`（非 owner，`intent=ppt_related_search`） | 正常返回 SSE，但**不落库**到原项目 |
+
+### 8.2 【新增接口】Fork 项目（克隆 PPT + 历史到自己的 workspace）
+
+```
+POST /api2/project/{id}/fork
+```
+
+- **鉴权**：必须登录。
+- **来源校验**：`{id}` 必须是「已分享到社区的公开项目」或「调用者本人项目」；否则 403。
+- **行为**：以 `{id}` 为模板，新建一个 **owner = 当前用户** 的项目，复制：
+  - 基础信息：`name`（建议加后缀，如 `… (Copy)` 或保留原名）、`description`、`sourceBookTitle`、`sourceBookAuthor`、`categoryId`、`tags`
+  - **PPT 产物**：`configFilePath`（deck JSON 的 OSS 地址，可直接复用同一 OSS 对象或复制一份）、`thumbnailUrl`
+  - **对话历史**：把源项目 `conversation/history` 复制为新项目的历史（保持顺序 / `sequenceNumber`）
+  - 可选：源项目的 `ProjectRelatedSearch`（§6）一并复制到新项目
+  - **上传文档引用**：源项目 RAG 用的 `uploaded_documents`（如有）一并关联到新项目，保证 Fork 后追问的 RAG 上下文可用
+- **可见性默认私有**：`isPrivate = 1`、`isRecommended = 0`、`sharedToCommunity = false`（仅自己可见，直到用户主动 `POST /project/{newId}/share-to-community`）。
+- **血缘（可选但推荐）**：记录 `forkedFromProjectId = {id}`，用于统计/溯源。
+
+#### 请求体（均可选）
+
+```json
+{
+  "name": "The Great Alone (My copy)",
+  "extraConversations": [
+    {
+      "role": "user",
+      "content": "Please explain what \"Mama's plan details\" means …",
+      "intent": "ppt_related_search",
+      "term": "Mama's plan details"
+    },
+    {
+      "role": "assistant",
+      "content": "**Answer:** …(markdown)…",
+      "intent": "ppt_related_search",
+      "term": "Mama's plan details"
+    }
+  ]
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `name` | 可选，覆盖默认拷贝标题；不传则后端用 `源名 (Copy)` |
+| `extraConversations` | 可选，读者在社区页**未落库**的划词追问 Q&A；后端追加到新项目历史尾部（让 Fork 后保留读者本次互动）。每项至少含 `role` + `content` |
+
+#### 响应
+
+返回新项目 `ProjectVo`（至少含 `id`，建议含 `name/isPrivate/configFilePath/thumbnailUrl`）：
+
+```json
+{
+  "code": 0,
+  "data": {
+    "id": "9b1c…新项目id",
+    "name": "The Great Alone (My copy)",
+    "isPrivate": 1,
+    "isRecommended": 0,
+    "sharedToCommunity": false,
+    "configFilePath": "https://…/projects/…/ppt_data.json",
+    "thumbnailUrl": "https://…/…_cover.png",
+    "sourceBookTitle": "The Great Alone",
+    "sourceBookAuthor": "Kristin Hannah",
+    "forkedFromProjectId": "源项目id"
+  }
+}
+```
+
+#### 前端使用方式（已实现）
+
+| 步骤 | 前端行为 |
+|------|----------|
+| 社区页点击 **Fork** | 未登录 → 弹登录；已登录 → `POST /project/{id}/fork`（带本次会话内的 `extraConversations`） |
+| Fork 成功 | 跳转 `/workspace?project={newId}`，工作区直接打开新项目（owner 视角，可继续追问 / 分享） |
+
+#### 验收
+
+1. 读者在社区作品页可看到 PPT 并能右键划词追问（已登录），结果显示在右侧栏；**作者项目历史不受影响**。
+2. 读者点击 Fork → 在「我的项目」出现一个**私有**副本，PPT 与历史完整保留。
+3. 打开该副本：`GET /project/{newId}` 返回 owner = 读者、`isPrivate=1`；右键追问可正常落库到副本。
+4. 副本可独立 `share-to-community`，不影响源项目。
+5. 删除副本不影响源项目（反之亦然）。
+
 ---
 
 ## 最需先做

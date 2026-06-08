@@ -46,7 +46,7 @@
 defineOptions({ name: 'WorkspaceView' })
 
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar.vue'
@@ -56,6 +56,7 @@ import ProjectPreview from '../components/workspace/ProjectPreview.vue'
 import { authApi, feedApi, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 
+const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const view = ref('new')
@@ -91,7 +92,14 @@ onMounted(async () => {
   } catch {
     /* ignore */
   }
-  loadProjects()
+  await loadProjects()
+
+  // 从社区 Fork 后跳转：/workspace?project=<newId> 直接打开该项目
+  const target = String(route.query.project || '').trim()
+  if (target) {
+    openProject(target)
+    router.replace({ name: 'workspace' })
+  }
 })
 
 const onDeleteProject = async (projectId) => {
