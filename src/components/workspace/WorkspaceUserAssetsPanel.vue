@@ -67,12 +67,12 @@
             <Trash2 v-else class="h-3.5 w-3.5" />
           </button>
 
-          <a
-            v-if="asset.url"
-            :href="asset.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="block"
+          <button
+            v-if="asset.url && isDocumentAsset(asset)"
+            type="button"
+            :title="t('workspace.assets.attachAsDoc')"
+            class="block w-full text-left"
+            @click="onSelectDocument(asset)"
           >
             <div class="relative aspect-square overflow-hidden bg-secondary/40">
               <img
@@ -90,6 +90,30 @@
                 <FileText class="h-8 w-8" />
                 <span class="px-2 text-center text-[10px] uppercase tracking-wide">PDF</span>
               </div>
+              <div v-else class="flex h-full w-full items-center justify-center text-muted-foreground">
+                <File class="h-8 w-8" />
+              </div>
+              <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity group-hover:bg-black/20 group-hover:opacity-100">
+                <Paperclip class="h-5 w-5 text-white" />
+              </div>
+            </div>
+          </button>
+          <a
+            v-else-if="asset.url"
+            :href="asset.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="block"
+          >
+            <div class="relative aspect-square overflow-hidden bg-secondary/40">
+              <img
+                v-if="previewUrlFor(asset)"
+                :src="previewUrlFor(asset)"
+                :alt="asset.name"
+                loading="lazy"
+                class="h-full w-full object-cover"
+                @error="onPreviewError(asset)"
+              />
               <div v-else class="flex h-full w-full items-center justify-center text-muted-foreground">
                 <File class="h-8 w-8" />
               </div>
@@ -130,18 +154,21 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Loader2, Trash2, FileText, File, ExternalLink } from 'lucide-vue-next'
+import { Loader2, Trash2, FileText, File, ExternalLink, Paperclip } from 'lucide-vue-next'
 import { fileApi } from '@/api'
 import {
   formatBytes,
   isPdfAsset,
   resolveAssetPreviewCandidates,
 } from '@/utils/userAssets'
+import { isPptDocumentAsset, uploadedDocumentFromUserAsset } from '@/utils/pptDocumentRag'
 
 const props = defineProps({
   userId: { type: [String, Number], default: null },
   projectId: { type: String, default: '' },
 })
+
+const emit = defineEmits(['select-document'])
 
 const { t } = useI18n()
 
@@ -187,6 +214,20 @@ function onPreviewError(asset) {
     ...previewIndexByKey.value,
     [key]: next < candidates.length ? next : -1,
   }
+}
+
+function isDocumentAsset(asset) {
+  return isPptDocumentAsset(asset?.name || '', asset?.url || '', asset?.contentType || '')
+}
+
+function onSelectDocument(asset) {
+  const doc = uploadedDocumentFromUserAsset(asset)
+  if (!doc) {
+    ElMessage.warning(t('workspace.assets.notAttachable'))
+    return
+  }
+  emit('select-document', { doc, size: asset.size })
+  ElMessage.success(t('workspace.assets.attachedSuccess'))
 }
 
 const quotaPercent = computed(() => {

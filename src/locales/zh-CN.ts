@@ -71,14 +71,119 @@ export default {
     generating: "生成中...",
     generatePpt: "生成 PPT",
     quickStart: "快速开始：",
-    exampleBusiness: "商业计划书",
-    exampleReport: "项目汇报",
-    exampleProduct: "产品介绍",
-    exampleYearEnd: "年终总结",
-    exampleTech: "技术分享",
+    examples: {
+      math6: {
+        label: "六年级数学",
+        prompt:
+          "请帮我梳理小学六年级数学（人教版）全册核心知识点，按「数与代数、图形与几何、统计与概率、综合应用」分单元做成 PPT，每单元列出公式、典型例题与易错点，约 20 页，适合考前复习",
+      },
+      aiHealthcare: {
+        label: "AI 医疗商业计划",
+        prompt:
+          "人工智能在医疗领域的商业计划书，请做 25 页 PPT，内容详实专业，需包含市场规模、临床应用场景、竞争格局、合规风险与三年财务预测",
+      },
+      santiBook: {
+        label: "《三体》读书分享",
+        prompt:
+          "请根据刘慈欣《三体》第一部，做 15 页读书分享 PPT：故事梗概、主要人物、核心科幻设定（三体文明/智子/黑暗森林）、阅读启发，语言简洁、有观点",
+      },
+      newtonLaws: {
+        label: "牛顿定律复习课",
+        prompt:
+          "帮我做高中物理《牛顿运动定律》单元复习课 PPT，约 18 页：三大定律表述与适用条件、受力分析步骤、v-t 图解读、5 道高考真题精讲，面向高三学生",
+      },
+      xiaomiSu7: {
+        label: "小米 SU7 介绍",
+        prompt:
+          "小米 SU7 产品介绍 PPT，20 页，内容详实专业：产品定位、核心参数、设计亮点、智能座舱、安全性能、与竞品价格对比",
+      },
+      starbucksReport: {
+        label: "星巴克项目汇报",
+        prompt:
+          "星巴克新咖啡上市项目汇报，20 页 PPT，内容详实专业：项目背景、目标、进度里程碑、预算执行、阶段成果与下一步计划",
+      },
+      yearEnd: {
+        label: "年终总结",
+        prompt:
+          "星巴克新咖啡项目团队年终总结 PPT，约 15 页：KPI 完成情况、亮点与不足、经验复盘、明年重点方向",
+      },
+      iphone17: {
+        label: "iPhone 17 技术分享",
+        prompt:
+          "iPhone 17 内部技术分享 PPT，30 页，内容详实专业：芯片、影像、续航、iOS 新特性、供应链要点，附 Q&A 附录页",
+      },
+      pmInterview: {
+        label: "产品经理面试案例",
+        prompt:
+          "12 页产品经理面试案例复盘 PPT：背景是「用 AB 测试把某 App 次日留存从 32% 提到 41%」，包含目标、假设、实验设计、数据结果、反思与 STAR 讲述结构",
+      },
+      carbonResearch: {
+        label: "碳中和行业研报",
+        prompt:
+          "20 页研报风格 PPT：「双碳政策对光伏与储能行业的影响」，含政策时间线、产业链地图、龙头公司对比、风险提示与投资建议框架",
+      },
+      onboarding: {
+        label: "新员工入职培训",
+        prompt:
+          "10 页新员工入职培训 PPT：公司发展历程、组织架构、行为准则、信息安全与考勤制度、常用工具清单，语气正式但友好",
+      },
+    },
     dropHere: "拖放文件到这里",
     uploadFormats: "支持 PDF、Word、TXT、Markdown 格式",
     selectFile: "选择文件",
+    uploadPromptLabel: "你希望 AI 从文档中提取什么？",
+    uploadPromptHint: "先上传文档，再说明想要的 PPT 形式，可按需修改下方文案。",
+    uploadPromptDefault:
+      "提取文档核心观点，做 12 页读书分享 PPT，重点讲结构脉络、核心论点与金句摘录。",
+    uploadPromptPlaceholder: "例如：帮我分析这本《红楼梦》，重点关注人物关系，做成 25 页 PPT…",
+    uploadQuickStart: "上传文档场景：",
+    uploadExamples: {
+      hongloumeng: {
+        label: "《红楼梦》人物关系",
+        prompt:
+          "帮我分析这本《红楼梦》，重点关注人物关系与家族脉络，梳理主要人物小传、人物关系图谱与关键情节线，形成一份 25 页的 PPT",
+      },
+      researchPaper: {
+        label: "学术论文组会",
+        prompt:
+          "请精读这篇论文，提炼研究问题、方法、实验设计、核心结果、局限性与创新点，做成 15 页组会汇报 PPT",
+      },
+      contractReview: {
+        label: "合同条款审阅",
+        prompt:
+          "帮我审阅这份合同，提取签约主体、关键条款、双方义务、付款节点、终止条件与风险点，输出 12 页法务摘要 PPT",
+      },
+      industryReport: {
+        label: "行业研报解读",
+        prompt:
+          "基于这份行业研报，提炼市场规模、增长驱动、竞争格局、趋势判断与投资机会，做成 20 页投资分析 PPT",
+      },
+      prdReview: {
+        label: "产品 PRD 评审",
+        prompt:
+          "请分析这份 PRD，整理用户痛点、核心功能、优先级路线图、用户故事与待确认问题，生成 18 页产品评审 PPT",
+      },
+      textbookChapter: {
+        label: "教材章节讲义",
+        prompt:
+          "请根据这份教材章节，梳理知识框架、重点定义与公式、例题讲解与课后习题解析，做成 20 页课堂讲义 PPT",
+      },
+      meetingNotes: {
+        label: "会议纪要整理",
+        prompt:
+          "帮我整理这份会议纪要，按议题归纳讨论要点、已做决策、待办事项、责任人与截止时间，输出 10 页团队同步 PPT",
+      },
+      annualReport: {
+        label: "年报财务解读",
+        prompt:
+          "请分析这份公司年报，提炼营收结构、利润变化、现金流亮点、分部业绩与管理层展望，做成 16 页财务解读 PPT",
+      },
+      techWhitepaper: {
+        label: "技术白皮书",
+        prompt:
+          "请解读这份技术白皮书，概括问题背景、系统架构、核心算法、性能指标与落地场景，生成 22 页技术分享 PPT",
+      },
+    },
     analyzing: "分析中...",
     analyzeAndGenerate: "分析并生成 PPT",
     outlineTitle: "生成的大纲",
@@ -318,6 +423,7 @@ export default {
     uploadingDoc: "正在上传文档...",
     uploadDoneAnalyzing: "文档上传完成，开始分析生成...",
     docGeneratePrompt: "请根据上传的文档《{name}》生成一份专业的演示文稿",
+    fromCloudLibrary: "来自云资源库",
     loadingPpt: "正在加载演示文稿...",
     completeNoPptData: "生成完成，但未识别到 PPT 数据",
     loadPptFailed: "演示文稿加载失败，请检查网络或稍后重试",
@@ -346,6 +452,9 @@ export default {
       totalFiles: "共 {count} 个文件",
       totalSize: "总大小 {size}",
       totalSummary: "共 {count} 个文件 · 总计 {size}",
+      attachAsDoc: "添加到上传文档",
+      attachedSuccess: "已添加到上传文档",
+      notAttachable: "此文件无法作为文档附件",
     },
   },
   community: {

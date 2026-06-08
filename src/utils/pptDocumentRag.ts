@@ -73,6 +73,34 @@ export function isAllowedPptDocumentFile(file: File): boolean {
   );
 }
 
+export function isPptDocumentAsset(name: string, url = "", contentType = ""): boolean {
+  const probe = `${name} ${url}`.toLowerCase();
+  if (PPT_DOC_EXT_RE.test(probe)) return true;
+  const ct = String(contentType || "").toLowerCase();
+  return (
+    ct.includes("pdf") ||
+    ct.includes("msword") ||
+    ct.includes("wordprocessingml") ||
+    ct.startsWith("text/")
+  );
+}
+
+/** 云资源库条目 → chat_stream uploaded_documents 单条（已上传 OSS，无需再传） */
+export function uploadedDocumentFromUserAsset(asset: {
+  name: string;
+  url: string;
+  contentType?: string;
+}): UploadedDocument | null {
+  const url = String(asset.url || "").trim();
+  if (!isHttpShareUrl(url)) return null;
+  if (!isPptDocumentAsset(asset.name, url, asset.contentType)) return null;
+  return {
+    url,
+    name: asset.name,
+    type: inferPptDocumentType(asset.name, asset.contentType),
+  };
+}
+
 export function validatePptDocumentFile(file: File): string | null {
   if (!isAllowedPptDocumentFile(file)) {
     return "unsupported";

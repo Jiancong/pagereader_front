@@ -14,11 +14,13 @@
       @open-project="openProject"
       @delete-project="onDeleteProject"
       @logout="handleLogout"
+      @select-document="onSelectDocumentFromAssets"
     />
 
     <main class="min-w-0 flex-1 overflow-y-auto p-6 sm:p-8">
       <!-- v-show：切换探索/历史时保持生成状态与 SSE 连接 -->
       <WorkspaceGenerator
+        ref="generatorRef"
         v-show="view === 'new'"
         :key="genKey"
         :initial-prompt="genPrompt"
@@ -70,6 +72,7 @@ const deletingProjectId = ref(null)
 const genPrompt = ref('')
 const genKey = ref(0)
 const projectRefreshKey = ref(0)
+const generatorRef = ref(null)
 
 const loadProjects = async () => {
   loadingProjects.value = true
@@ -133,6 +136,11 @@ const onExploreProjectDeleted = (projectId) => {
 const returnToGenerator = () => {
   activeProjectId.value = null
   view.value = 'new'
+}
+
+const onSelectDocumentFromAssets = (payload) => {
+  returnToGenerator()
+  generatorRef.value?.attachCloudDocument?.(payload)
 }
 
 /** 新建空白任务（fork 等），重置生成器 */

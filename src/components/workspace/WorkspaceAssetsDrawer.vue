@@ -33,6 +33,7 @@
           <WorkspaceUserAssetsPanel
             ref="panelRef"
             :user-id="userId"
+            @select-document="onSelectDocument"
           />
         </div>
       </aside>
@@ -52,10 +53,15 @@ const props = defineProps({
   sidebarCollapsed: { type: Boolean, default: false },
 })
 
-defineEmits(['close'])
+const emit = defineEmits(['close', 'select-document'])
 
 const { t } = useI18n()
 const panelRef = ref(null)
+
+function onSelectDocument(payload) {
+  emit('select-document', payload)
+  emit('close')
+}
 
 watch(
   () => props.open,

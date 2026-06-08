@@ -52,11 +52,13 @@
               <div class="flex flex-wrap gap-2">
                 <button
                   v-for="example in quickExamples"
-                  :key="example"
-                  @click="prompt = example"
+                  :key="example.id"
+                  type="button"
+                  :title="example.prompt"
+                  @click="prompt = example.prompt"
                   class="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
                 >
-                  {{ example }}
+                  {{ example.label }}
                 </button>
               </div>
             </div>
@@ -91,17 +93,44 @@
                 <p class="truncate text-sm font-medium text-foreground">{{ selectedFile.name }}</p>
                 <p class="text-xs text-muted-foreground">{{ formatFileSize(selectedFile.size) }}</p>
               </div>
-              <button class="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" @click="selectedFile = null">
+              <button type="button" class="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" @click="clearSelectedFile">
                 <X class="h-4 w-4" />
               </button>
             </div>
 
+            <div>
+              <label class="mb-2 block text-sm font-medium text-foreground">{{ t('landing.uploadPromptLabel') }}</label>
+              <p class="mb-2 text-xs text-muted-foreground">{{ t('landing.uploadPromptHint') }}</p>
+              <textarea
+                v-model="uploadPrompt"
+                rows="4"
+                class="w-full resize-y rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                :placeholder="t('landing.uploadPromptPlaceholder')"
+              />
+            </div>
+
+            <div>
+              <p class="mb-3 text-sm text-muted-foreground">{{ t('landing.uploadQuickStart') }}</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="example in uploadExamples"
+                  :key="example.id"
+                  type="button"
+                  :title="example.prompt"
+                  @click="uploadPrompt = example.prompt"
+                  class="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                >
+                  {{ example.label }}
+                </button>
+              </div>
+            </div>
+
             <button
               @click="analyzeDocument"
-              :disabled="isLoading || !selectedFile"
+              :disabled="isLoading || !selectedFile || !uploadPrompt.trim()"
               :class="[
                 'flex w-full items-center justify-center gap-2 rounded-xl py-4 text-base font-medium transition-all',
-                isLoading || !selectedFile
+                isLoading || !selectedFile || !uploadPrompt.trim()
                   ? 'cursor-not-allowed bg-muted text-muted-foreground'
                   : 'bg-primary text-primary-foreground hover:bg-primary/90'
               ]"
@@ -154,6 +183,7 @@ const emit = defineEmits(['start'])
 
 const activeTab = ref('quick')
 const prompt = ref('')
+const uploadPrompt = ref('')
 const isLoading = ref(false)
 const isDownloading = ref(false)
 const isDragging = ref(false)
@@ -165,13 +195,47 @@ const tabs = computed(() => [
   { id: 'upload', label: t('landing.tabUpload'), icon: markRaw(FileUp) },
 ])
 
-const quickExamples = computed(() => [
-  t('landing.exampleBusiness'),
-  t('landing.exampleReport'),
-  t('landing.exampleProduct'),
-  t('landing.exampleYearEnd'),
-  t('landing.exampleTech'),
-])
+const QUICK_EXAMPLE_IDS = [
+  'math6',
+  'aiHealthcare',
+  'santiBook',
+  'newtonLaws',
+  'xiaomiSu7',
+  'starbucksReport',
+  'yearEnd',
+  'iphone17',
+  'pmInterview',
+  'carbonResearch',
+  'onboarding',
+]
+
+const quickExamples = computed(() =>
+  QUICK_EXAMPLE_IDS.map((id) => ({
+    id,
+    label: t(`landing.examples.${id}.label`),
+    prompt: t(`landing.examples.${id}.prompt`),
+  })),
+)
+
+const UPLOAD_EXAMPLE_IDS = [
+  'hongloumeng',
+  'researchPaper',
+  'contractReview',
+  'industryReport',
+  'prdReview',
+  'textbookChapter',
+  'meetingNotes',
+  'annualReport',
+  'techWhitepaper',
+]
+
+const uploadExamples = computed(() =>
+  UPLOAD_EXAMPLE_IDS.map((id) => ({
+    id,
+    label: t(`landing.uploadExamples.${id}.label`),
+    prompt: t(`landing.uploadExamples.${id}.prompt`),
+  })),
+)
 
 const formatFileSize = (bytes) => {
   if (bytes < 1024) return bytes + ' B'
@@ -179,18 +243,36 @@ const formatFileSize = (bytes) => {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
+const applyDefaultUploadPrompt = () => {
+  if (!uploadPrompt.value.trim()) {
+    uploadPrompt.value = t('landing.uploadPromptDefault')
+  }
+}
+
 const handleDrop = (e) => {
   isDragging.value = false
   const files = e.dataTransfer.files
-  if (files.length > 0) selectedFile.value = files[0]
+  if (files.length > 0) {
+    selectedFile.value = files[0]
+    applyDefaultUploadPrompt()
+  }
 }
 
 const handleFileSelect = (e) => {
   const files = e.target.files
-  if (files.length > 0) selectedFile.value = files[0]
+  if (files.length > 0) {
+    selectedFile.value = files[0]
+    applyDefaultUploadPrompt()
+  }
+}
+
+const clearSelectedFile = () => {
+  selectedFile.value = null
+  uploadPrompt.value = ''
 }
 
 const generatePPT = () => emit('start', { mode: 'prompt', prompt: prompt.value })
-const analyzeDocument = () => emit('start', { mode: 'upload' })
+const analyzeDocument = () =>
+  emit('start', { mode: 'upload', prompt: uploadPrompt.value.trim() })
 const downloadPPT = () => emit('start', { mode: 'prompt', prompt: prompt.value })
 </script>

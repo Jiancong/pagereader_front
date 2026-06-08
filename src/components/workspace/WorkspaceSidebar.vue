@@ -193,6 +193,7 @@
       :user-id="userId"
       :sidebar-collapsed="collapsed"
       @close="assetsOpen = false"
+      @select-document="onSelectDocument"
     />
   </aside>
 </template>
@@ -229,7 +230,7 @@ defineProps({
   loadingProjects: { type: Boolean, default: false },
   deletingProjectId: { type: String, default: null },
 })
-defineEmits(['new', 'explore', 'open-project', 'delete-project', 'logout'])
+const emit = defineEmits(['new', 'explore', 'open-project', 'delete-project', 'logout', 'select-document'])
 
 const assetsOpen = ref(false)
 const collapsed = ref(false)
@@ -250,6 +251,10 @@ const navBtnClass = (active) => [
   collapsed.value ? 'justify-center p-2.5' : 'gap-2 px-3 py-2.5',
   active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
 ]
+
+function onSelectDocument(payload) {
+  emit('select-document', payload)
+}
 
 onMounted(() => {
   try {

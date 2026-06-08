@@ -94,13 +94,14 @@
             @click="fileInput?.click()"
           >
             <input ref="fileInput" type="file" accept=".pdf,.doc,.docx,.txt,.md" class="hidden" @change="onFileChange" />
-            <div v-if="uploadedFile" class="flex items-center justify-center gap-3">
+            <div v-if="hasAttachedDoc" class="flex items-center justify-center gap-3">
               <FileText class="h-10 w-10 text-primary" />
               <div class="text-left">
-                <p class="font-medium text-foreground">{{ uploadedFile.name }}</p>
-                <p class="text-sm text-muted-foreground">{{ (uploadedFile.size / 1024 / 1024).toFixed(2) }} MB</p>
+                <p class="font-medium text-foreground">{{ attachedDocName }}</p>
+                <p v-if="attachedDocSizeLabel" class="text-sm text-muted-foreground">{{ attachedDocSizeLabel }}</p>
+                <p v-if="cloudDocument" class="text-xs text-muted-foreground">{{ t('workspace.fromCloudLibrary') }}</p>
               </div>
-              <button type="button" class="ml-4 rounded-lg p-1 hover:bg-secondary" @click.stop="clearUploadedFile">
+              <button type="button" class="ml-4 rounded-lg p-1 hover:bg-secondary" @click.stop="clearAttachedDoc">
                 <X class="h-5 w-5 text-muted-foreground" />
               </button>
             </div>
@@ -110,7 +111,7 @@
               <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.uploadFormatsShort') }}</p>
             </template>
           </div>
-          <div v-if="uploadedFile" class="mt-6">
+          <div v-if="hasAttachedDoc" class="mt-6">
             <label class="mb-2 block text-sm font-medium text-foreground">{{ t('workspace.uploadPromptLabel') }}</label>
             <p class="mb-2 text-xs text-muted-foreground">{{ t('workspace.uploadPromptHint') }}</p>
             <textarea
@@ -121,7 +122,7 @@
             />
           </div>
           <button
-            :disabled="!uploadedFile || !uploadPrompt.trim() || ragTask.isGenerating"
+            :disabled="!hasAttachedDoc || !uploadPrompt.trim() || ragTask.isGenerating"
             class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             @click="onAnalyze"
           >
@@ -208,6 +209,8 @@ import {
 import type { PptQueue } from "@/api/types"
 import { resolvePptDataFromStreamComplete } from "@/utils/pptCompletePayload"
 import { notifyCreditsRefresh } from "@/composables/useCreditsRefresh"
+import type { UploadedDocument } from "@/utils/pptDocumentRag"
+import { formatBytes } from "@/utils/userAssets"
 
 const emit = defineEmits<{
   "project-started": [projectId: string]
@@ -253,8 +256,20 @@ const ragTask = reactive<GeneratorTask>(createTask("SLOW"))
 const activeTab = ref<"prompt" | "upload">("prompt")
 const input = ref(props.initialPrompt || "")
 const uploadedFile = ref<File | null>(null)
+const cloudDocument = ref<UploadedDocument | null>(null)
+const cloudDocumentSize = ref<number | undefined>(undefined)
 const uploadPrompt = ref("")
 const fileInput = ref<HTMLInputElement | null>(null)
+
+const hasAttachedDoc = computed(() => Boolean(uploadedFile.value || cloudDocument.value))
+const attachedDocName = computed(
+  () => uploadedFile.value?.name || cloudDocument.value?.name || "",
+)
+const attachedDocSizeLabel = computed(() => {
+  if (uploadedFile.value) return `${(uploadedFile.value.size / 1024 / 1024).toFixed(2)} MB`
+  if (cloudDocumentSize.value != null) return formatBytes(cloudDocumentSize.value)
+  return ""
+})
 
 const activeTask = computed(() => (activeTab.value === "prompt" ? promptTask : ragTask))
 const activeLastLogs = computed(() => activeTask.value.logs.slice(-3))
@@ -347,15 +362,31 @@ function docBaseName(filename: string): string {
 const onFileChange = (e: Event) => {
   const f = (e.target as HTMLInputElement).files?.[0]
   if (f) {
+    cloudDocument.value = null
+    cloudDocumentSize.value = undefined
     uploadedFile.value = f
     uploadPrompt.value = t("workspace.uploadPromptDefault")
   }
 }
 
-const clearUploadedFile = () => {
+const clearAttachedDoc = () => {
   uploadedFile.value = null
+  cloudDocument.value = null
+  cloudDocumentSize.value = undefined
   uploadPrompt.value = ""
   if (fileInput.value) fileInput.value.value = ""
+}
+
+function attachCloudDocument(payload: { doc: UploadedDocument; size?: number }) {
+  if (!payload?.doc?.url) return
+  uploadedFile.value = null
+  if (fileInput.value) fileInput.value.value = ""
+  cloudDocument.value = payload.doc
+  cloudDocumentSize.value = payload.size
+  activeTab.value = "upload"
+  uploadPrompt.value = t("workspace.docGeneratePrompt", {
+    name: docBaseName(payload.doc.name || "document"),
+  })
 }
 
 const resolveUserId = async (): Promise<string | null> => {
@@ -497,7 +528,7 @@ const onPromptSubmit = async () => {
 }
 
 const onAnalyze = async () => {
-  if (!uploadedFile.value || ragTask.isGenerating) return
+  if (!hasAttachedDoc.value || ragTask.isGenerating) return
   const message = uploadPrompt.value.trim()
   if (!message) return
   startTask(ragTask)
@@ -507,10 +538,18 @@ const onAnalyze = async () => {
     return
   }
   try {
-    appendLog(ragTask, t("workspace.uploadingDoc"))
-    const doc = await fileApi.uploadDocument(uploadedFile.value)
-    appendLog(ragTask, t("workspace.uploadDoneAnalyzing"))
-    await runStream(ragTask, message, [doc], docBaseName(doc.name))
+    let doc: UploadedDocument
+    if (cloudDocument.value) {
+      doc = cloudDocument.value
+      appendLog(ragTask, t("workspace.uploadDoneAnalyzing"))
+    } else if (uploadedFile.value) {
+      appendLog(ragTask, t("workspace.uploadingDoc"))
+      doc = await fileApi.uploadDocument(uploadedFile.value)
+      appendLog(ragTask, t("workspace.uploadDoneAnalyzing"))
+    } else {
+      return
+    }
+    await runStream(ragTask, message, [doc], docBaseName(doc.name || ""))
   } catch (e: unknown) {
     handleGenerateError(ragTask, e)
   } finally {
@@ -528,6 +567,8 @@ const resetActiveTask = () => {
   activeTask.value.pptData = null
   activeTask.value.projectId = ""
 }
+
+defineExpose({ attachCloudDocument })
 </script>
 
 <style scoped>

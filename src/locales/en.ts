@@ -71,14 +71,119 @@ export default {
     generating: "Generating…",
     generatePpt: "Generate deck",
     quickStart: "Quick start:",
-    exampleBusiness: "Business plan",
-    exampleReport: "Project report",
-    exampleProduct: "Product intro",
-    exampleYearEnd: "Year-end review",
-    exampleTech: "Tech talk",
+    examples: {
+      math6: {
+        label: "Grade 6 math",
+        prompt:
+          "Summarize core topics from a 6th-grade math textbook (number & algebra, geometry, statistics, applied problems). Organize by unit with formulas, worked examples, and common mistakes—about 20 slides for exam review.",
+      },
+      aiHealthcare: {
+        label: "AI in healthcare",
+        prompt:
+          "Business plan for AI in healthcare—give me a 25-page deck, detailed and professional, covering market size, clinical use cases, competitive landscape, regulatory risks, and a 3-year financial outlook.",
+      },
+      santiBook: {
+        label: "Three-Body Problem",
+        prompt:
+          "Create a 15-slide book-share deck for Liu Cixin's The Three-Body Problem (Book 1): plot summary, main characters, key sci-fi ideas (Trisolarans, sophons, dark forest), and personal takeaways—concise and opinionated.",
+      },
+      newtonLaws: {
+        label: "Newton's laws",
+        prompt:
+          "Build an 18-slide high-school physics review deck on Newton's laws of motion: law statements and limits, free-body diagrams, v–t graph reading, and 5 exam-style worked problems—for Grade 12 review class.",
+      },
+      xiaomiSu7: {
+        label: "Xiaomi SU7",
+        prompt:
+          "Product introduction deck for the Xiaomi SU7—20 pages, detailed and professional: positioning, specs, design highlights, smart cockpit, safety, pricing vs. competitors.",
+      },
+      starbucksReport: {
+        label: "Starbucks project",
+        prompt:
+          "Project report on Starbucks' new coffee launch—20-page deck, detailed and professional: background, goals, timeline, budget, results, and next steps.",
+      },
+      yearEnd: {
+        label: "Year-end review",
+        prompt:
+          "Year-end review deck for our Starbucks new-coffee launch team—cover KPIs vs. targets, wins, misses, lessons learned, and priorities for next year, about 15 slides.",
+      },
+      iphone17: {
+        label: "iPhone 17 tech talk",
+        prompt:
+          "Internal tech talk on iPhone 17—30-page deck, detailed and professional: chip, camera, battery, iOS highlights, supply chain, and Q&A appendix.",
+      },
+      pmInterview: {
+        label: "PM interview case",
+        prompt:
+          "12-slide PM interview case study: how we used A/B tests to raise Day-1 retention from 32% to 41%—include background, hypothesis, experiment design, results, learnings, and STAR storytelling flow.",
+      },
+      carbonResearch: {
+        label: "Carbon-neutral research",
+        prompt:
+          "20-slide research-style deck on how dual-carbon policies affect solar and energy storage—policy timeline, industry chain map, leading company comparison, risk factors, and investment thesis framework.",
+      },
+      onboarding: {
+        label: "New-hire onboarding",
+        prompt:
+          "10-slide new-hire onboarding deck: company milestones, org chart, code of conduct, IT security and attendance policies, and essential tools—professional but welcoming tone.",
+      },
+    },
     dropHere: "Drop files here",
     uploadFormats: "PDF, Word, TXT, Markdown",
     selectFile: "Choose file",
+    uploadPromptLabel: "What should AI extract from your file?",
+    uploadPromptHint: "Upload a document, then describe the deck you want—you can edit the text below.",
+    uploadPromptDefault:
+      "Extract the document's core ideas into a 12-slide reading share deck—focus on structure, key arguments, and memorable quotes.",
+    uploadPromptPlaceholder: "e.g. Analyze this book—focus on character relationships, 25 slides…",
+    uploadQuickStart: "Document scenarios:",
+    uploadExamples: {
+      hongloumeng: {
+        label: "Dream of the Red Chamber",
+        prompt:
+          "Analyze this Dream of the Red Chamber upload—focus on character relationships and family/clan ties, with a relationship map and key plot threads. Produce a 25-slide deck.",
+      },
+      researchPaper: {
+        label: "Research paper",
+        prompt:
+          "Read this paper and extract the research question, methods, experiments, results, limitations, and contributions into a 15-slide lab-meeting deck.",
+      },
+      contractReview: {
+        label: "Contract review",
+        prompt:
+          "Review this contract—summarize parties, key clauses, obligations, payment milestones, termination terms, and risk flags in a 12-slide legal briefing deck.",
+      },
+      industryReport: {
+        label: "Industry report",
+        prompt:
+          "From this industry report, pull market size, growth drivers, competitive landscape, trend outlook, and investment angles into a 20-slide analyst deck.",
+      },
+      prdReview: {
+        label: "Product PRD",
+        prompt:
+          "Analyze this PRD—organize user pain points, core features, priority roadmap, user stories, and open questions into an 18-slide product review deck.",
+      },
+      textbookChapter: {
+        label: "Textbook chapter",
+        prompt:
+          "Turn this textbook chapter into a 20-slide lecture deck: knowledge framework, key definitions and formulas, worked examples, and end-of-chapter exercises explained.",
+      },
+      meetingNotes: {
+        label: "Meeting notes",
+        prompt:
+          "Summarize these meeting notes into a 10-slide team sync deck: topics discussed, decisions made, action items, owners, and deadlines.",
+      },
+      annualReport: {
+        label: "Annual report",
+        prompt:
+          "Analyze this annual report—revenue mix, profit trends, cash flow highlights, segment performance, and management outlook in a 16-slide finance briefing deck.",
+      },
+      techWhitepaper: {
+        label: "Tech white paper",
+        prompt:
+          "Digest this technical white paper into a 22-slide engineering talk: problem statement, architecture, core algorithms, benchmarks, and real-world use cases.",
+      },
+    },
     analyzing: "Analyzing…",
     analyzeAndGenerate: "Analyze & generate",
     outlineTitle: "Generated outline",
@@ -328,6 +433,7 @@ export default {
     uploadingDoc: "Uploading document…",
     uploadDoneAnalyzing: "Upload complete—starting generation…",
     docGeneratePrompt: 'Please create a professional presentation from the uploaded document "{name}"',
+    fromCloudLibrary: "From cloud library",
     loadingPpt: "Loading presentation…",
     completeNoPptData: "Done, but no presentation data was found",
     loadPptFailed: "Could not load the deck. Check your network and try again.",
@@ -356,6 +462,9 @@ export default {
       totalFiles: "{count} files",
       totalSize: "Total size {size}",
       totalSummary: "{count} files · {size} total",
+      attachAsDoc: "Add to upload documents",
+      attachedSuccess: "Added to upload documents",
+      notAttachable: "This file cannot be attached as a document",
     },
   },
   community: {
