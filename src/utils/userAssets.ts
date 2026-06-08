@@ -55,23 +55,19 @@ export function buildAssetThumbUrl(url: string): string {
   return `${url}${sep}x-oss-process=image/resize,m_lfit,w_480,h_480/quality,q_20`
 }
 
-function isAliyunOssUrl(url: string): boolean {
-  return /aliyuncs\.com/i.test(url)
-}
-
 function splitUrlPathQuery(url: string): { originPath: string; query: string } {
   const idx = url.indexOf("?")
   if (idx < 0) return { originPath: url, query: "" }
   return { originPath: url.slice(0, idx), query: url.slice(idx) }
 }
 
-/** 按项目约定从 PDF 地址推断封面图（如 1025043812_xxx.pdf → 1025043812_cover.png） */
+/** 按命名约定推断封面路径（无 query；私有 bucket 仍须后端返回已签名的 thumbnailUrl） */
 export function inferPdfCoverUrls(pdfUrl: string): string[] {
   const raw = String(pdfUrl || "").trim()
   if (!raw) return []
 
   try {
-    const { originPath, query } = splitUrlPathQuery(raw)
+    const { originPath } = splitUrlPathQuery(raw)
     const match = originPath.match(/^(https?:\/\/[^/]+)(\/.*)$/i)
     if (!match) return []
 
@@ -84,32 +80,19 @@ export function inferPdfCoverUrls(pdfUrl: string): string[] {
 
     const tsMatch = filename.match(/^(\d+)_/i)
     if (tsMatch) {
-      candidates.push(`${origin}${dir}${tsMatch[1]}_cover.png${query}`)
-      candidates.push(`${origin}${dir}${tsMatch[1]}_ppt-cover.png${query}`)
+      candidates.push(`${origin}${dir}${tsMatch[1]}_cover.png`)
+      candidates.push(`${origin}${dir}${tsMatch[1]}_ppt-cover.png`)
     }
 
     if (/\.pdf$/i.test(filename)) {
       const stem = filename.replace(/\.pdf$/i, "")
-      candidates.push(`${origin}${dir}${stem}_cover.png${query}`)
-      if (tsMatch) {
-        const rest = stem.replace(/^\d+_/, "")
-        if (rest) candidates.push(`${origin}${dir}${tsMatch[1]}_${rest}_cover.png${query}`)
-      }
+      candidates.push(`${origin}${dir}${stem}_cover.png`)
     }
 
     return [...new Set(candidates)]
   } catch {
     return []
   }
-}
-
-/** OSS 文档预览：将 PDF 第 1 页转为 PNG（需 bucket 开通 doc/preview） */
-export function buildOssDocPreviewUrl(fileUrl: string): string | null {
-  const url = String(fileUrl || "").trim()
-  if (!url || !isAliyunOssUrl(url)) return null
-  if (/x-oss-process=/i.test(url)) return null
-  const sep = url.includes("?") ? "&" : "?"
-  return `${url}${sep}x-oss-process=doc/preview,export_1,format_png`
 }
 
 export function normalizeUserAssetItem(raw: unknown): UserAssetItem | null {
@@ -151,8 +134,20 @@ function pushUnique(target: string[], value: string | null | undefined) {
 
 function pushImageCandidates(target: string[], ...candidates: string[]) {
   for (const c of candidates) {
-    if (c && looksLikeImagePreviewUrl(c)) pushUnique(target, buildAssetThumbUrl(c))
+    if (c && looksLikeImagePreviewUrl(c) && !isPdfAsset("", c, "")) {
+      pushUnique(target, buildAssetThumbUrl(c))
+    }
   }
+}
+
+/** 预览候选不得为 PDF 原文件（<img> 无法展示 PDF，须用 thumbnailUrl 封面 PNG） */
+function sanitizePreviewCandidates(candidates: string[]): string[] {
+  return candidates.filter((c) => {
+    const u = String(c || "").trim()
+    if (!u) return false
+    if (/\.pdf(\?|$)/i.test(u)) return false
+    return looksLikeImagePreviewUrl(u) || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(u)
+  })
 }
 
 /**
@@ -166,32 +161,34 @@ export function resolveAssetPreviewCandidates(asset: UserAssetItem): string[] {
 
   if (isPdfAsset(name, url, contentType)) {
     pushImageCandidates(results, thumb, preview)
-    for (const inferred of inferPdfCoverUrls(url)) {
-      pushUnique(results, buildAssetThumbUrl(inferred))
+    // 仅当 fileUrl 无签名时可尝试推断公开封面；私有 bucket 须后端返回 thumbnailUrl（方案 A）
+    if (!/[?&]Signature=/i.test(url)) {
+      for (const inferred of inferPdfCoverUrls(url)) {
+        pushUnique(results, buildAssetThumbUrl(inferred))
+      }
     }
-    pushUnique(results, buildOssDocPreviewUrl(url))
-    return results
+    return sanitizePreviewCandidates(results)
   }
 
   if (isVideoAsset(name, url, contentType)) {
     pushImageCandidates(results, preview, thumb)
-    return results
+    return sanitizePreviewCandidates(results)
   }
 
   if (isImageAsset(name, url, contentType)) {
     pushImageCandidates(results, preview, thumb)
     pushUnique(results, buildAssetThumbUrl(url))
-    return results
+    return sanitizePreviewCandidates(results)
   }
 
   pushImageCandidates(results, preview, thumb)
-  return results
+  return sanitizePreviewCandidates(results)
 }
 
 /**
- * 缩略图策略：
+ * 缩略图策略（PDF 方案 A：列表返回 thumbnailUrl 封面 PNG，<img> 禁止用 fileUrl）：
  * - 图片/视频：previewUrl → thumbnailUrl → fileUrl + OSS resize
- * - PDF：显式封面 → 按命名推断 _cover.png → OSS doc/preview 首页图
+ * - PDF：仅 previewUrl / thumbnailUrl（须为 .png 等图片）；无则占位
  */
 export function resolveAssetPreviewUrl(asset: UserAssetItem): string | null {
   const candidates = resolveAssetPreviewCandidates(asset)

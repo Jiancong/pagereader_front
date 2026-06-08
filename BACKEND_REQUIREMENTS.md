@@ -250,7 +250,7 @@ SSE 事件（前端按 `event:` 名分发）：
 
 - OSS bucket `aidesigns` 的跨域来源需包含 `https://page2.top`（阿里云控制台配置，非后端代码）。
 
-### 4.1 【新增/确认】用户资源列表缩略图（Assets 面板）
+### 4.1 【已定稿 · 方案 A】用户资源列表缩略图（Assets 面板）
 
 工作区侧边栏 **Assets** 调用：
 
@@ -259,9 +259,41 @@ SSE 事件（前端按 `event:` 名分发）：
 | GET | `/file/user/files` | 已上传文件（`user-upload/{userId}/...`） |
 | GET | `/file/user/private/assets` | 生成素材（`user-private/images\|videos/{userId}/...`） |
 
-**现状**：列表项仅有 `fileUrl` + 文件名 + `fileSize`，**无 `thumbnailUrl`**。PDF 等非图片类型前端只能显示 PDF/文件占位图标。
+**现状**：列表项仅有 `fileUrl` + 文件名 + `fileSize`，**无 `thumbnailUrl`**。PDF 等非图片类型前端只能显示 PDF 占位图标。
 
-**要求**：每个文件对象需返回可展示的缩略图 URL（与 aidesigns 编辑器资源库一致）。
+**已定方案 A（预生成封面 PNG）**：PDF 上传完成后，后端渲染第 1 页为 PNG 上传 OSS；列表接口为每个 PDF **单独返回已签名的 `thumbnailUrl`**（指向 `.png` 对象）。**不采用**在 `fileUrl` 后拼接 `x-oss-process=doc/preview`（私有 bucket 签名 URL 会 `SignatureDoesNotMatch`，已验证）。
+
+---
+
+#### 后端实现流程（方案 A）
+
+```
+1. POST /file/user/direct-upload/complete  （contentType = application/pdf）
+   ├─ 已有：PDF 写入 OSS（fileKey / fileUrl）
+   ├─ 新增：渲染 PDF 第 1 页 → PNG
+   ├─ 新增：上传封面到 OSS（与 PDF 同目录）
+   └─ 新增：可选落库 fileKey ↔ thumbnailKey
+
+2. GET /file/user/files / GET /file/user/private/assets
+   └─ 每条 PDF 返回 thumbnailUrl（对封面 PNG 单独 presign，勿复用 PDF 的 Signature）
+```
+
+**封面命名**（与 PPT 封面一致）：
+
+| PDF 对象 key / 文件名 | 封面 PNG |
+|----------------------|----------|
+| `1025043812_The_Great_Alone_-_Kristin_Hannah.pdf` | `1025043812_cover.png`（同目录） |
+| 备选 | `{timestamp}_ppt-cover.png` |
+
+**渲染实现**（任选其一）：
+
+- Python：`pymupdf` / `pdf2image` + 上传 OSS
+- Java：`Apache PDFBox` `PDFRenderer.renderImage(0)` + 上传 OSS
+- 异步：complete 先返回 `fileLink`，MQ/定时任务生成封面后更新 DB；列表接口读 DB 拼 `thumbnailUrl`
+
+**删除**：用户删 PDF 时，同步删除对应 `_cover.png`（若存在）。
+
+---
 
 #### 列表项字段（`files[]` / `items[]` 单条）
 
@@ -269,35 +301,39 @@ SSE 事件（前端按 `event:` 名分发）：
 |------|------|------|------|
 | `fileKey` | string | 是 | OSS 对象 key，删除时用 |
 | `originalName` / `fileName` | string | 是 | 原始文件名 |
-| `fileUrl` / `fileLink` | string | 是 | 可访问地址（可带签名） |
+| `fileUrl` / `fileLink` | string | 是 | PDF/文件可访问地址（presigned） |
 | `fileSize` | number | 推荐 | 字节 |
-| `contentType` | string | 推荐 | 如 `application/pdf`、`image/png` |
-| **`thumbnailUrl`** | string | **推荐** | **网格预览图**；无则非图片只能占位 |
+| `contentType` | string | 推荐 | 如 `application/pdf` |
+| **`thumbnailUrl`** | string | **PDF 必填** | **封面 PNG 的 presigned URL**（独立签名，非 fileUrl 拼接） |
+| `thumbnailKey` | string | 可选 | 封面 OSS key，便于删除/调试 |
 | `thumbUrl` / `coverUrl` | string | 可选 | 与 `thumbnailUrl` 同义 |
-| **`previewUrl`** | string | 可选 | 见下方「前端临时方案」 |
 
-#### 前端临时方案（后端未就绪时，已实现）
+**图片**：`thumbnailUrl` 可与 `fileUrl` 相同（前端会加 OSS `image/resize`）。  
+**视频**：`thumbnailUrl` 须为海报帧**图片** URL，不能是 `.mp4`。  
+**Word 等文档**：同 PDF，预生成首页 PNG + `thumbnailUrl`。
 
-在 `src/utils/userAssets.ts` → `resolveAssetPreviewUrl`：
+---
 
-| 类型 | 行为 |
-|------|------|
-| **图片** | 优先 `previewUrl` → `thumbnailUrl` → `fileUrl` + OSS `image/resize` |
-| **视频** | 优先 `previewUrl` → `thumbnailUrl`（须为图片地址，如海报帧） |
-| **PDF** | **仅**当 `previewUrl` / `thumbnailUrl` 指向 `*_cover.png`、`*_ppt-cover.png` 等**图片**时显示缩略图；否则继续 **PDF 占位图标** |
+#### 签名与 CORS（必读）
 
-即：后端若暂只返回 PDF 的 `fileUrl`，前端**不会**用 doc/preview 或 PDF 本身当缩略图；待 Python 产出 `_cover.png` 或 Java 列表接口带上封面 URL 后自动生效。
+1. **`thumbnailUrl` 必须对封面 PNG 对象单独 presign**，不能与 `fileUrl` 共用 Signature。
+2. **禁止**在已签名的 `fileUrl` 后追加 `x-oss-process=...`（会导致 `SignatureDoesNotMatch`）。
+3. OSS CORS 来源须包含 `https://page2.top`，允许 GET。
+4. `thumbnailUrl` 的 `Expires` ≥ `fileUrl`，或两者同时刷新。
 
-#### 缩略图生成规则
+Java SDK 示例（封面与 PDF 各签一次）：
 
-| 类型 | 后端行为 |
-|------|----------|
-| **图片** | `thumbnailUrl` = 原图 URL + OSS 处理参数，或预生成小图；前端也会自行追加 `x-oss-process=image/resize,m_lfit,w_480,h_480/quality,q_20` |
-| **PDF** | 上传完成或列表查询时提供**首页预览图** URL（PNG/JPEG）。可选方案：① 上传后服务端/异步任务渲染 PDF 第 1 页存 OSS；② 返回带 `x-oss-process=doc/preview,export_1,format_png` 的 URL（需 bucket 开通文档预览） |
-| **Word 等** | 同 PDF，首页或图标预览 URL |
-| **生成图** | `user-private/images` 下对象必须带 `thumbnailUrl`（可与 `fileUrl` 相同或缩小版） |
+```java
+// PDF
+URL fileUrl = ossClient.generatePresignedUrl(
+    new GeneratePresignedUrlRequest(bucket, pdfObjectKey).setExpiration(exp));
 
-参考命名（与现有 PPT 封面一致）：`{timestamp}_{basename}_cover.png` 或 `{timestamp}_ppt-cover.png`。
+// 封面 PNG — 独立 objectKey、独立签名
+URL thumbnailUrl = ossClient.generatePresignedUrl(
+    new GeneratePresignedUrlRequest(bucket, coverObjectKey).setExpiration(exp));
+```
+
+---
 
 #### 响应示例
 
@@ -309,10 +345,11 @@ SSE 事件（前端按 `event:` 名分发）：
       {
         "fileKey": "user-upload/4/20260607/1025043812_The_Great_Alone_-_Kristin_Hannah.pdf",
         "originalName": "The_Great_Alone_-_Kristin_Hannah.pdf",
-        "fileUrl": "https://page2top.oss-cn-hongkong.aliyuncs.com/user-upload/4/...pdf?...",
+        "fileUrl": "https://page2top.oss-cn-hongkong.aliyuncs.com/user-upload/4/20260607/1025043812_The_Great_Alone_-_Kristin_Hannah.pdf?Expires=...&Signature=...",
         "fileSize": 2211840,
         "contentType": "application/pdf",
-        "thumbnailUrl": "https://page2top.oss-cn-hongkong.aliyuncs.com/user-upload/4/.../1025043812_cover.png?..."
+        "thumbnailKey": "user-upload/4/20260607/1025043812_cover.png",
+        "thumbnailUrl": "https://page2top.oss-cn-hongkong.aliyuncs.com/user-upload/4/20260607/1025043812_cover.png?Expires=...&Signature=..."
       }
     ],
     "nextMarker": null,
@@ -321,12 +358,37 @@ SSE 事件（前端按 `event:` 名分发）：
 }
 ```
 
+#### 前端行为（`src/utils/userAssets.ts`）
+
+| 用途 | URL 字段 |
+|------|----------|
+| **`<img>` 网格预览** | `thumbnailUrl` / `previewUrl`（须为 `.png` 等图片） |
+| **点击打开 / 下载** | `fileUrl`（PDF 原文件） |
+
+| 类型 | `<img>` 行为 |
+|------|-------------|
+| **图片** | `previewUrl` → `thumbnailUrl` → `fileUrl` + OSS resize |
+| **视频** | `previewUrl` → `thumbnailUrl`（须为图片） |
+| **PDF** | **仅** `previewUrl` / `thumbnailUrl`；**禁止**把 `fileUrl`（`.pdf`）放进 `<img>` |
+
+PDF **不再**尝试 doc/preview 或复用 PDF 签名推断封面（私有 bucket 下均无效）。若后端误把 PDF 的 `fileUrl` 填入 `thumbnailUrl`，前端会过滤掉并显示占位图标。
+
+#### 怎么验证（后端 / 联调）
+
+1. 调 `GET /file/user/files?userId=4`，检查返回里每条 PDF 的 **完整 `thumbnailUrl`**（不是裸 path，须含 `Expires` / `Signature`）。
+2. 确认 `thumbnailUrl` 路径以 **`_cover.png`**（或其它 `.png`）结尾，**不是** `.pdf`。
+3. 用该完整 URL 执行 `curl -I`，`Content-Type` 应为 `image/png`（或 jpeg），不是 `application/pdf`。
+4. 浏览器直接打开 `thumbnailUrl` → 应看到封面图；打开 `fileUrl` → 下载/预览 PDF。
+5. 前端 Assets 网格：Network 里 `<img>` 请求的 URL 应为 **PNG 的 `thumbnailUrl`**；若请求头 `Sec-Fetch-Dest: image` 且 URL 仍是 `.pdf`，说明列表未返回有效 `thumbnailUrl` 或后端把 PDF 地址填错了字段。
+
+`fileUrl` 仅用于 `<a href>` 打开 PDF，**不要**用于 `<img>` 预览。
+
 #### 验收
 
-1. 上传 PDF 后刷新 Assets → 网格显示**首页缩略图**，非 PDF 字样占位。
-2. 上传 PNG → 显示图片预览。
-3. 生成类图片素材 → `private/assets` 列表同样含 `thumbnailUrl`。
-4. `thumbnailUrl` 须浏览器可加载（CORS / 签名有效期与 `fileUrl` 一致或更长）。
+1. 上传 PDF → complete 后 OSS 同目录存在 `{timestamp}_cover.png`。
+2. `GET /file/user/files` 每条 PDF 含 **`thumbnailUrl`**，浏览器直接打开可看到首页图。
+3. 前端 Assets 网格显示缩略图，非 PDF 字样占位。
+4. 删除 PDF 后封面 PNG 一并删除（或列表不再返回该 thumbnail）。
 
 ## 5. Explore / 项目预览（已存在，确认即可）
 
