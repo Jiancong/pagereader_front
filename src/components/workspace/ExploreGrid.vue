@@ -33,7 +33,23 @@
             <div class="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
               <span v-if="item.authorNickname" class="truncate">{{ item.authorNickname }}</span>
               <span class="ml-auto flex items-center gap-1"><Eye class="h-3 w-3" />{{ item.viewCount ?? 0 }}</span>
-              <span class="flex items-center gap-1"><Heart class="h-3 w-3" />{{ item.favoriteCount ?? 0 }}</span>
+              <button
+                type="button"
+                class="flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors hover:text-foreground disabled:opacity-50"
+                :class="item.likedByMe ? 'text-primary' : ''"
+                :disabled="favoritingId === item.id"
+                :aria-label="item.likedByMe ? t('workspace.unfavorite') : t('workspace.favorite')"
+                :aria-pressed="Boolean(item.likedByMe)"
+                @click.stop="toggleFavorite(item)"
+              >
+                <Loader2 v-if="favoritingId === item.id" class="h-3 w-3 animate-spin" />
+                <Heart
+                  v-else
+                  class="h-3 w-3"
+                  :class="item.likedByMe ? 'fill-current' : ''"
+                />
+                {{ item.favoriteCount ?? 0 }}
+              </button>
             </div>
           </div>
         </button>
@@ -89,6 +105,7 @@ const total = ref(0)
 const loading = ref(false)
 const error = ref(null)
 const deletingId = ref(null)
+const favoritingId = ref(null)
 
 const hasMore = computed(() => items.value.length < total.value)
 const cover = (item) => item.imageUrl || item.imageUrls?.[0] || ''
@@ -110,6 +127,21 @@ const onDelete = async (item) => {
     ElMessage.error(e?.message || t('common.actionFailed'))
   } finally {
     deletingId.value = null
+  }
+}
+
+const toggleFavorite = async (item) => {
+  if (!item?.id || favoritingId.value) return
+  const action = item.likedByMe ? 'unclick' : 'click'
+  favoritingId.value = item.id
+  try {
+    const res = await feedApi.favoriteFeedItem(item.id, action)
+    item.favoriteCount = res.favoriteCount
+    item.likedByMe = res.likedByMe
+  } catch (e) {
+    ElMessage.error(e?.message || t('common.actionFailed'))
+  } finally {
+    favoritingId.value = null
   }
 }
 

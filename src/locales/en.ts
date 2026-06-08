@@ -382,6 +382,8 @@ export default {
     unnamed: "Untitled",
     loadMore: "Load more",
     noWorks: "No decks yet",
+    favorite: "Like",
+    unfavorite: "Unlike",
     back: "Back",
     fork: "Fork & generate",
     slideAlt: "Slide {n}",

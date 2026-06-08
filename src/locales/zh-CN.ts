@@ -373,6 +373,8 @@ export default {
     unnamed: "未命名",
     loadMore: "加载更多",
     noWorks: "暂无作品",
+    favorite: "点赞",
+    unfavorite: "取消点赞",
     back: "返回",
     fork: "基于它再生成",
     slideAlt: "第 {n} 页",
