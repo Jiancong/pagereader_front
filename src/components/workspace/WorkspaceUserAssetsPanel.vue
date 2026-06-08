@@ -76,11 +76,12 @@
           >
             <div class="relative aspect-square overflow-hidden bg-secondary/40">
               <img
-                v-if="resolveAssetPreviewUrl(asset)"
-                :src="resolveAssetPreviewUrl(asset)"
+                v-if="previewUrlFor(asset)"
+                :src="previewUrlFor(asset)"
                 :alt="asset.name"
                 loading="lazy"
                 class="h-full w-full object-cover"
+                @error="onPreviewError(asset)"
               />
               <div
                 v-else-if="isPdfAsset(asset.name, asset.url, asset.contentType)"
@@ -133,9 +134,8 @@ import { Loader2, Trash2, FileText, File, ExternalLink } from 'lucide-vue-next'
 import { fileApi } from '@/api'
 import {
   formatBytes,
-  isImageAsset,
   isPdfAsset,
-  resolveAssetPreviewUrl,
+  resolveAssetPreviewCandidates,
 } from '@/utils/userAssets'
 
 const props = defineProps({
@@ -161,6 +161,33 @@ const listError = ref('')
 const quota = ref(null)
 const stats = ref(null)
 const deletingKey = ref(null)
+/** fileKey → 当前尝试的预览 URL 下标；-1 表示全部失败 */
+const previewIndexByKey = ref({})
+
+function previewCandidatesFor(asset) {
+  return resolveAssetPreviewCandidates(asset)
+}
+
+function previewUrlFor(asset) {
+  const key = asset?.fileKey
+  if (!key) return null
+  const idx = previewIndexByKey.value[key] ?? 0
+  if (idx < 0) return null
+  const candidates = previewCandidatesFor(asset)
+  return candidates[idx] ?? null
+}
+
+function onPreviewError(asset) {
+  const key = asset?.fileKey
+  if (!key) return
+  const candidates = previewCandidatesFor(asset)
+  const current = previewIndexByKey.value[key] ?? 0
+  const next = current + 1
+  previewIndexByKey.value = {
+    ...previewIndexByKey.value,
+    [key]: next < candidates.length ? next : -1,
+  }
+}
 
 const quotaPercent = computed(() => {
   const q = quota.value
@@ -257,6 +284,7 @@ async function reloadList() {
   nextMarker.value = null
   try {
     const page = await fetchPage(undefined)
+    previewIndexByKey.value = {}
     items.value = page.items
     nextMarker.value = page.nextMarker
     hasMore.value = page.hasMore
