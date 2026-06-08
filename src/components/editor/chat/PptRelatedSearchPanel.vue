@@ -554,6 +554,8 @@ async function onNestedRelatedSearch() {
 
     projectId: props.searchContext.projectId,
 
+    slideIndex: props.searchContext.slideIndex,
+
     uploadedDocuments: props.searchContext.uploadedDocuments,
 
     buildMessage: props.searchContext.buildMessage,

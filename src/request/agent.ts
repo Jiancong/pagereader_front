@@ -158,6 +158,8 @@ export interface AgentChatRequestDto {
   /** PPT 文档 RAG：OSS 公网可读的 PDF/DOCX/MD/TXT（与 images 可同时传） */
   uploadedDocuments?: UploadedDocument[];
   uploaded_documents?: UploadedDocument[];
+  /** 业务意图，如 ppt_related_search（区分主生成与知识点追问） */
+  intent?: string;
 }
 
 /**
@@ -640,16 +642,20 @@ export const sendAgentChatWithJson = async (
       userId: requestDto.userId,
     };
     
-    // 优先使用 projectId，如果没有则使用 sessionId（向后兼容）
     if (requestDto.projectId) {
       requestBody.projectId = requestDto.projectId;
-    } else if (requestDto.sessionId) {
+    }
+    if (requestDto.sessionId) {
       requestBody.sessionId = requestDto.sessionId;
     }
     applyEditorProjectToAgentBody(requestBody);
 
     if (useImagesArray) {
       requestBody.images = imagesArray;
+    }
+
+    if (requestDto.intent) {
+      requestBody.intent = requestDto.intent;
     }
     
     console.log('Agent API 请求体:', {
@@ -1225,16 +1231,20 @@ export const sendAgentChatWithStream = async (
       userId: requestDto.userId,
     };
     
-    // 优先使用 projectId，如果没有则使用 sessionId
     if (requestDto.projectId) {
       requestBody.projectId = requestDto.projectId;
-    } else if (requestDto.sessionId) {
+    }
+    if (requestDto.sessionId) {
       requestBody.sessionId = requestDto.sessionId;
     }
     applyEditorProjectToAgentBody(requestBody);
 
     if (useImagesArray) {
       requestBody.images = imagesArray;
+    }
+
+    if (requestDto.intent) {
+      requestBody.intent = requestDto.intent;
     }
 
     // 添加可选参数

@@ -8637,6 +8637,7 @@ const {
 const pptRelatedSearchContext = computed((): PptRelatedSearchContext => ({
   pptTitle: props.pptData.title,
   projectId: props.projectId,
+  slideIndex: currentSlide.value,
   uploadedDocuments: uploadedDocumentsFromPptData(props.pptData),
   buildMessage: buildPptRelatedSearchMessage,
 }));
@@ -8723,6 +8724,7 @@ async function onPptRelatedSearch() {
     term,
     pptTitle: props.pptData.title,
     projectId: props.projectId,
+    slideIndex: currentSlide.value,
     uploadedDocuments: uploadedDocumentsFromPptData(props.pptData),
     buildMessage: buildPptRelatedSearchMessage,
   });

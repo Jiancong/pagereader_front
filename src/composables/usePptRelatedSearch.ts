@@ -3,6 +3,11 @@ import { authApi, isLoggedIn } from "@/api";
 import { sendAgentChatWithStream } from "@/request/agent";
 import type { UploadedDocument } from "@/utils/pptDocumentRag";
 
+/** 与后端 chat-stream §6.1 一致，区分主 PPT 生成与划词追问 */
+export const PPT_RELATED_SEARCH_INTENT = "ppt_related_search";
+
+export type PptRelatedSearchSource = "MANUAL_SELECTION" | "AUTO_KEYPOINT";
+
 export interface PptRelatedSearchImage {
   url: string;
   thumbnail?: string;
@@ -28,6 +33,7 @@ export interface PptRelatedSearchState {
 export interface PptRelatedSearchContext {
   pptTitle?: string;
   projectId?: string;
+  slideIndex?: number;
   uploadedDocuments?: UploadedDocument[];
   buildMessage: (term: string, pptTitle?: string) => string;
 }
@@ -36,6 +42,8 @@ export interface PptRelatedSearchOptions {
   term: string;
   pptTitle?: string;
   projectId?: string;
+  slideIndex?: number;
+  source?: PptRelatedSearchSource;
   uploadedDocuments?: UploadedDocument[];
   buildMessage: (term: string, pptTitle?: string) => string;
 }
@@ -184,6 +192,17 @@ export function usePptRelatedSearch() {
 
     const uploadedDocs = options.uploadedDocuments ?? [];
     const message = options.buildMessage(term, options.pptTitle);
+    const pptTitle = String(options.pptTitle || "").trim() || undefined;
+    const source: PptRelatedSearchSource = options.source ?? "MANUAL_SELECTION";
+    const extraBody: Record<string, unknown> = {
+      intent: PPT_RELATED_SEARCH_INTENT,
+      term,
+      source,
+    };
+    if (pptTitle) extraBody.pptTitle = pptTitle;
+    if (typeof options.slideIndex === "number" && !Number.isNaN(options.slideIndex)) {
+      extraBody.slideIndex = options.slideIndex;
+    }
 
     try {
       streamConnection = await sendAgentChatWithStream(
@@ -193,6 +212,8 @@ export function usePptRelatedSearch() {
           projectId: options.projectId || undefined,
           sessionId: `ppt-related-${Date.now()}`,
           isAgent: true,
+          intent: PPT_RELATED_SEARCH_INTENT,
+          extra_body: extraBody,
           uploaded_documents: uploadedDocs.length ? uploadedDocs : undefined,
         },
         async (eventData) => {
