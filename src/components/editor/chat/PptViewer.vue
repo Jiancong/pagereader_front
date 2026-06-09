@@ -403,6 +403,7 @@
             </div>
             <!-- 底部装饰线 -->
             <div class="ppt-cover-bottom-line"></div>
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
 
           <!-- section 章节过渡 -->
@@ -454,10 +455,8 @@
                 />
               </div>
             </div>
-            <!-- 底部小字 -->
-            <div class="ppt-section-footer">
-              {{ pptSource.subtitle || pptSource.title }}
-            </div>
+            <!-- 底部品牌标识 -->
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
 
           <!-- toc 目录页 -->
@@ -606,10 +605,8 @@
                 </div>
               </div>
             </div>
-            <!-- 底部报告标题 -->
-            <div class="ppt-toc-footer">
-              {{ pptSource.subtitle || pptSource.title }}
-            </div>
+            <!-- 底部品牌标识 -->
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
 
           <!-- references 参考资料页 -->
@@ -647,6 +644,7 @@
                 </div>
               </template>
             </div>
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
 
           <!-- content 标准内容页 -->
@@ -2670,6 +2668,7 @@
               @blur="onDataSourceLineBlur($event, currentSlide)"
               @ref-click="onPptTableRefClick($event, slide)"
             />
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
 
           <!-- two_column 双栏对比 -->
@@ -5142,6 +5141,7 @@
                 </template>
               </svg>
             </div>
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
 
           <!-- data 数据图表页 -->
@@ -8138,6 +8138,7 @@
               @blur="onDataSourceLineBlur($event, currentSlide)"
               @ref-click="onPptTableRefClick($event, slide)"
             />
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
 
           <!-- quote 引言页 -->
@@ -8162,6 +8163,7 @@
             >
               — {{ slide.quote_author || slide.author }}
             </div>
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
 
           <!-- end 结束页 -->
@@ -8184,6 +8186,7 @@
                 @blur="onCellBlur($event, `slides.${currentSlide}.subtitle`)"
               />
             </p>
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
 
           <!-- 兜底：未知 layout -->
@@ -8212,6 +8215,7 @@
                 />
               </li>
             </ul>
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
         </template>
       </div>
@@ -8495,6 +8499,8 @@ interface PptSlide {
   organization?: string;
   date?: string;
   speaker_notes?: string;
+  /** 页底品牌标识，如 page2.top */
+  brand_footer?: string;
   image_prompt?: string;
   /** AI 生图背景（仅 cover/section 及 chapter_image_page 线使用） */
   image_url?: string;
@@ -8574,6 +8580,8 @@ interface PptHtmlTemplateRecommendation {
 interface PptData {
   title: string;
   subtitle?: string;
+  /** 全 deck 默认页脚（单页 brand_footer 优先） */
+  brand_footer?: string;
   theme?: string;
   palette?: PptPalette;
   html_template_recommendation?: PptHtmlTemplateRecommendation;
@@ -11489,6 +11497,10 @@ const slideForExport = computed<PptSlide | null>(() => {
 
 const slide = computed(() => slideForExport.value);
 
+const currentBrandFooter = computed(() =>
+  resolveBrandFooter(slide.value, pptSource.value)
+);
+
 const slideSpeakerNotesText = computed(() => resolveSlideSpeakerNotes(slide.value));
 
 /** 浏览态：幻灯片正下方展示演讲备注（全屏演示时隐藏） */
@@ -13200,6 +13212,40 @@ function hexForPptx(color: string): string {
   return color.replace(/^#/, "").toUpperCase();
 }
 
+/** 页底品牌标识：单页 brand_footer → deck brand_footer → 旧版 subtitle/title */
+function resolveBrandFooter(
+  slide?: PptSlide | null,
+  deck?: Pick<PptData, "brand_footer" | "subtitle" | "title"> | null
+): string {
+  const fromSlide = String(slide?.brand_footer ?? "").trim();
+  if (fromSlide) return fromSlide;
+  const fromDeck = String(deck?.brand_footer ?? "").trim();
+  if (fromDeck) return fromDeck;
+  return String(deck?.subtitle || deck?.title || "").trim();
+}
+
+function addBrandFooterToPptSlide(
+  pptSlide: any,
+  slide: PptSlide,
+  deck: PptData,
+  bodyFont: string,
+  textColor: string
+) {
+  const footer = resolveBrandFooter(slide, deck);
+  if (!footer) return;
+  pptSlide.addText(footer, {
+    x: 0.5,
+    y: 6.82,
+    w: 12.3,
+    h: 0.32,
+    fontSize: 9,
+    fontFace: bodyFont,
+    color: hexForPptx(textColor),
+    transparency: 70,
+    align: "center",
+  });
+}
+
 /** PPTX 目录页兜底：与在线 getTocEntries 一致，避免重复编号与纯文本列表 */
 function addTocLayoutToPptSlide(
   pptSlide: any,
@@ -13207,7 +13253,6 @@ function addTocLayoutToPptSlide(
   pptx: { ShapeType: { rect: string; roundRect: string } },
   theme: { accent: string; bg: string; text: string },
   bodyFont: string,
-  deckFooter?: string,
   headingFont: string = bodyFont
 ) {
   const accentHex = hexForPptx(theme.accent);
@@ -13297,21 +13342,6 @@ function addTocLayoutToPptSlide(
       });
     }
   });
-
-  const footer = deckFooter?.trim();
-  if (footer) {
-    pptSlide.addText(footer, {
-      x: 0.5,
-      y: 6.82,
-      w: 12.3,
-      h: 0.32,
-      fontSize: 9,
-      fontFace: bodyFont,
-      color: textHex,
-      transparency: 70,
-      align: "center",
-    });
-  }
 }
 
 /** LAYOUT_WIDE 16:9 幻灯片尺寸（英寸） */
@@ -13433,6 +13463,7 @@ const PPT_EXPORT_HIDE_FOR_BG_CAPTURE = [
   ".ppt-section-divider",
   ".ppt-section-sub",
   ".ppt-section-footer",
+  ".ppt-brand-footer",
   ".ppt-slide-title",
   ".ppt-chart-subtitle",
   ".ppt-two-col-body",
@@ -13532,7 +13563,6 @@ function addSectionLayoutToPptSlide(
   pptx: { ShapeType: { rect: string } },
   theme: { accent: string; bg: string; text: string },
   bodyFont: string,
-  deckFooter?: string,
   headingFont: string = bodyFont
 ) {
   const accentHex = hexForPptx(theme.accent);
@@ -13637,20 +13667,6 @@ function addSectionLayoutToPptSlide(
       transparency: 40,
       align: "center",
       valign: "top",
-    });
-  }
-  const footer = deckFooter?.trim();
-  if (footer) {
-    pptSlide.addText(footer, {
-      x: 0.5,
-      y: 6.82,
-      w: 12.33,
-      h: 0.32,
-      fontSize: 9,
-      fontFace: bodyFont,
-      color: textHex,
-      transparency: 70,
-      align: "center",
     });
   }
 }
@@ -14853,7 +14869,6 @@ async function exportPPTX() {
             pptx,
             theme,
             bodyFont,
-            props.pptData.subtitle || props.pptData.title,
             headingFont
           );
           break;
@@ -15502,7 +15517,6 @@ async function exportPPTX() {
             pptx,
             theme,
             bodyFont,
-            props.pptData.subtitle || props.pptData.title,
             headingFont
           );
           break;
@@ -15556,6 +15570,7 @@ async function exportPPTX() {
               })) as any,
               { x: 0.8, y: startY, w: 10.5, h: 5.8 - startY, valign: "top" }
             );
+            addBrandFooterToPptSlide(slide, s, props.pptData, bodyFont, theme.text);
           };
 
           // 第一页用已创建的 pptSlide
@@ -15575,6 +15590,10 @@ async function exportPPTX() {
           }
           break;
         }
+      }
+
+      if (s.layout !== "references") {
+        addBrandFooterToPptSlide(pptSlide, s, props.pptData, bodyFont, theme.text);
       }
 
       if (useVisualRaster) {
@@ -16350,7 +16369,7 @@ defineExpose({
 /* 当 slide 使用了背景图时，确保普通流子元素位于蒙层之上。
    排除本身已 absolute 定位的元素（skyline / info / bottom-line / corner / footer 等） */
 .ppt-slide
-  > *:not(.ppt-slide-bg-overlay):not(.ppt-cover-skyline):not(.ppt-scenic-skyline):not(.ppt-cover-info):not(.ppt-cover-bottom-line):not(.ppt-section-corner):not(.ppt-section-footer) {
+  > *:not(.ppt-slide-bg-overlay):not(.ppt-cover-skyline):not(.ppt-scenic-skyline):not(.ppt-cover-info):not(.ppt-cover-bottom-line):not(.ppt-section-corner):not(.ppt-section-footer):not(.ppt-brand-footer) {
   position: relative;
   z-index: 1;
 }
@@ -17373,7 +17392,22 @@ defineExpose({
   }
 }
 
-/* 底部报告标题 */
+/* 页底品牌标识（brand_footer） */
+.ppt-brand-footer {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--ppt-fs-caption);
+  color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.3));
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* 底部报告标题（旧版，保留兼容） */
 .ppt-section-footer {
   position: absolute;
   bottom: 28px;
