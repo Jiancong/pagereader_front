@@ -279,14 +279,17 @@ export function stitchCanvasesVertically(
   return out
 }
 
-export const PPT_EXPORT_IMAGE_QUALITY = 0.82
-export const PPT_EXPORT_JPEG_QUALITY = 0.85
-/** 单页/长图输出最大宽度（超出则等比缩小） */
-export const PPT_EXPORT_MAX_WIDTH = 1920
-/** 浏览器 canvas 单边安全上限 */
-export const PPT_EXPORT_MAX_CANVAS_DIMENSION = 16384
-/** 长图最终输出最大高度（超出则整体等比缩小） */
-export const PPT_EXPORT_LONG_MAX_HEIGHT = 16384
+export const PPT_EXPORT_WEBP_QUALITY = 0.92
+/** 回退 JPEG 质量 */
+export const PPT_EXPORT_JPEG_QUALITY = 0.9
+/** 目标体积 ≈ 无损 PNG 的 1/4（仅调质量，不砍分辨率） */
+export const PPT_EXPORT_TARGET_SIZE_RATIO = 0.25
+/** @deprecated 兼容旧引用 */
+export const PPT_EXPORT_IMAGE_QUALITY = PPT_EXPORT_WEBP_QUALITY
+/** Chrome / Safari 常见 canvas 单边上限 */
+export const PPT_EXPORT_MAX_CANVAS_DIMENSION = 32767
+/** Chrome canvas 像素面积上限 */
+export const PPT_EXPORT_MAX_CANVAS_AREA = 268_435_456
 
 export type PptExportImageMime = "image/webp" | "image/jpeg"
 
@@ -315,17 +318,25 @@ function isExportBlobTooSmall(blob: Blob, canvas: HTMLCanvasElement): boolean {
   return blob.size < minBytes
 }
 
-/** 等比缩小至最大宽度（拼接长图前先缩小单页，避免超大 canvas） */
-export function scaleCanvasToMaxWidth(
-  canvas: HTMLCanvasElement,
-  maxWidth = PPT_EXPORT_MAX_WIDTH,
-): HTMLCanvasElement {
-  if (canvas.width <= 0 || canvas.height <= 0) return canvas
-  if (canvas.width <= maxWidth) return canvas
+/** 粗估 PNG 体积（避免每张 slide 真编码 PNG） */
+function estimatePngBytes(canvas: HTMLCanvasElement): number {
+  return Math.max(4096, Math.floor(canvas.width * canvas.height * 0.45))
+}
 
-  const scale = maxWidth / canvas.width
+function canvasFitsBrowserLimits(width: number, height: number): boolean {
+  return (
+    width > 0 &&
+    height > 0 &&
+    width <= PPT_EXPORT_MAX_CANVAS_DIMENSION &&
+    height <= PPT_EXPORT_MAX_CANVAS_DIMENSION &&
+    width * height <= PPT_EXPORT_MAX_CANVAS_AREA
+  )
+}
+
+function scaleCanvasByFactor(canvas: HTMLCanvasElement, scale: number): HTMLCanvasElement {
+  if (scale >= 1) return canvas
   const out = document.createElement("canvas")
-  out.width = maxWidth
+  out.width = Math.max(1, Math.round(canvas.width * scale))
   out.height = Math.max(1, Math.round(canvas.height * scale))
   const ctx = out.getContext("2d")
   if (!ctx) return canvas
@@ -333,6 +344,57 @@ export function scaleCanvasToMaxWidth(
   ctx.imageSmoothingQuality = "high"
   ctx.drawImage(canvas, 0, 0, out.width, out.height)
   return out
+}
+
+/** 仅在超出浏览器 canvas 硬限制时等比缩小，平时保持截图原始像素 */
+export function scaleCanvasToFitBrowserLimits(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  if (canvas.width <= 0 || canvas.height <= 0) return canvas
+  if (canvasFitsBrowserLimits(canvas.width, canvas.height)) return canvas
+
+  let scale = 1
+  if (canvas.width > PPT_EXPORT_MAX_CANVAS_DIMENSION) {
+    scale = Math.min(scale, PPT_EXPORT_MAX_CANVAS_DIMENSION / canvas.width)
+  }
+  if (canvas.height > PPT_EXPORT_MAX_CANVAS_DIMENSION) {
+    scale = Math.min(scale, PPT_EXPORT_MAX_CANVAS_DIMENSION / canvas.height)
+  }
+  const area = canvas.width * canvas.height
+  if (area > PPT_EXPORT_MAX_CANVAS_AREA) {
+    scale = Math.min(scale, Math.sqrt(PPT_EXPORT_MAX_CANVAS_AREA / area))
+  }
+  return scaleCanvasByFactor(canvas, scale)
+}
+
+/** @deprecated 使用 scaleCanvasToFitBrowserLimits */
+export function fitCanvasToExportLimits(
+  canvas: HTMLCanvasElement,
+  _options?: {
+    maxWidth?: number
+    maxHeight?: number
+    maxDimension?: number
+  },
+): HTMLCanvasElement {
+  return scaleCanvasToFitBrowserLimits(canvas)
+}
+
+/** WebP 质量阶梯：尽量接近 PNG 体积的 1/4，但不低于 0.78 以免糊 */
+async function encodeWebpNearTargetSize(
+  canvas: HTMLCanvasElement,
+): Promise<Blob | null> {
+  const targetBytes = Math.max(
+    8192,
+    Math.floor(estimatePngBytes(canvas) * PPT_EXPORT_TARGET_SIZE_RATIO),
+  )
+  const qualities = [0.94, 0.92, 0.9, 0.88, 0.86, 0.84, 0.82, 0.8, 0.78]
+  let best: Blob | null = null
+
+  for (const quality of qualities) {
+    const blob = await blobFromCanvas(canvas, "image/webp", quality)
+    if (!blob || isExportBlobTooSmall(blob, canvas)) continue
+    best = blob
+    if (blob.size <= targetBytes * 1.2) return blob
+  }
+  return best
 }
 
 /** 优先 WebP，不支持时回退 JPEG */
@@ -347,10 +409,10 @@ export async function resolvePptExportImageFormat(): Promise<{
   probe.height = 64
   const ctx = probe.getContext("2d")
   ctx?.fillRect(0, 0, 64, 64)
-  const webpBlob = await blobFromCanvas(probe, "image/webp", PPT_EXPORT_IMAGE_QUALITY)
+  const webpBlob = await blobFromCanvas(probe, "image/webp", PPT_EXPORT_WEBP_QUALITY)
   const webpOk = !!webpBlob && !isExportBlobTooSmall(webpBlob, probe)
   cachedExportFormat = webpOk
-    ? { mimeType: "image/webp", quality: PPT_EXPORT_IMAGE_QUALITY }
+    ? { mimeType: "image/webp", quality: PPT_EXPORT_WEBP_QUALITY }
     : { mimeType: "image/jpeg", quality: PPT_EXPORT_JPEG_QUALITY }
   return cachedExportFormat
 }
@@ -359,46 +421,14 @@ export function pptExportImageExtension(mimeType: PptExportImageMime): string {
   return mimeType === "image/webp" ? "webp" : "jpg"
 }
 
-export function fitCanvasToExportLimits(
-  canvas: HTMLCanvasElement,
-  options?: {
-    maxWidth?: number
-    maxHeight?: number
-    maxDimension?: number
-  },
-): HTMLCanvasElement {
-  if (canvas.width <= 0 || canvas.height <= 0) return canvas
-
-  const maxWidth = options?.maxWidth ?? PPT_EXPORT_MAX_WIDTH
-  const maxHeight = options?.maxHeight ?? PPT_EXPORT_LONG_MAX_HEIGHT
-  const maxDimension = options?.maxDimension ?? PPT_EXPORT_MAX_CANVAS_DIMENSION
-
-  let scale = 1
-  if (canvas.width > maxWidth) scale = Math.min(scale, maxWidth / canvas.width)
-  if (canvas.height > maxHeight) scale = Math.min(scale, maxHeight / canvas.height)
-  const longest = Math.max(canvas.width, canvas.height)
-  if (longest > maxDimension) scale = Math.min(scale, maxDimension / longest)
-  if (scale >= 1) return canvas
-
-  const out = document.createElement("canvas")
-  out.width = Math.max(1, Math.round(canvas.width * scale))
-  out.height = Math.max(1, Math.round(canvas.height * scale))
-  const ctx = out.getContext("2d")
-  if (!ctx) return canvas
-  ctx.imageSmoothingEnabled = true
-  ctx.imageSmoothingQuality = "high"
-  ctx.drawImage(canvas, 0, 0, out.width, out.height)
-  return out
-}
-
 async function encodeCanvasPreferWebp(
   canvas: HTMLCanvasElement,
   preferWebp: boolean,
 ): Promise<PptExportImageResult | null> {
   if (preferWebp) {
-    const webpBlob = await blobFromCanvas(canvas, "image/webp", PPT_EXPORT_IMAGE_QUALITY)
+    const webpBlob = await encodeWebpNearTargetSize(canvas)
     if (webpBlob && !isExportBlobTooSmall(webpBlob, canvas)) {
-      cachedExportFormat = { mimeType: "image/webp", quality: PPT_EXPORT_IMAGE_QUALITY }
+      cachedExportFormat = { mimeType: "image/webp", quality: PPT_EXPORT_WEBP_QUALITY }
       return { blob: webpBlob, mimeType: "image/webp" }
     }
   }
@@ -411,21 +441,15 @@ async function encodeCanvasPreferWebp(
   return null
 }
 
-/** 导出压缩：WebP 优先，异常小图或编码失败时 JPEG；超出尺寸则等比缩小 */
+/** 导出压缩：保持截图分辨率，WebP 质量压至约 PNG 1/4 体积 */
 export async function canvasToExportBlob(
   canvas: HTMLCanvasElement,
   options?: {
-    maxWidth?: number
-    maxHeight?: number
     quality?: number
     mimeType?: PptExportImageMime
-    forLongImage?: boolean
   },
 ): Promise<PptExportImageResult | null> {
-  const fitted = fitCanvasToExportLimits(canvas, {
-    maxWidth: options?.maxWidth,
-    maxHeight: options?.forLongImage ? PPT_EXPORT_LONG_MAX_HEIGHT : options?.maxHeight,
-  })
+  const fitted = scaleCanvasToFitBrowserLimits(canvas)
 
   if (options?.mimeType === "image/jpeg") {
     const quality = options.quality ?? PPT_EXPORT_JPEG_QUALITY
@@ -436,8 +460,9 @@ export async function canvasToExportBlob(
   }
 
   if (options?.mimeType === "image/webp") {
-    const quality = options.quality ?? PPT_EXPORT_IMAGE_QUALITY
-    const webpBlob = await blobFromCanvas(fitted, "image/webp", quality)
+    const webpBlob = options.quality
+      ? await blobFromCanvas(fitted, "image/webp", options.quality)
+      : await encodeWebpNearTargetSize(fitted)
     if (webpBlob && !isExportBlobTooSmall(webpBlob, fitted)) {
       return { blob: webpBlob, mimeType: "image/webp" }
     }
@@ -447,11 +472,29 @@ export async function canvasToExportBlob(
   return encodeCanvasPreferWebp(fitted, true)
 }
 
-/** 长图导出：先缩小单页再拼接，避免中间 canvas 过高导致 WebP 编码失败 */
+/** 长图导出：仅在拼接后超出浏览器限制时统一缩小，避免双重缩放发糊 */
 export function prepareSlideCanvasesForLongExport(
   canvases: HTMLCanvasElement[],
 ): HTMLCanvasElement[] {
-  return canvases.map((c) => scaleCanvasToMaxWidth(c, PPT_EXPORT_MAX_WIDTH))
+  if (!canvases.length) return canvases
+
+  const maxW = Math.max(...canvases.map((c) => c.width))
+  const totalH = canvases.reduce((sum, c) => sum + c.height, 0)
+  if (canvasFitsBrowserLimits(maxW, totalH)) return canvases
+
+  let scale = 1
+  if (maxW > PPT_EXPORT_MAX_CANVAS_DIMENSION) {
+    scale = Math.min(scale, PPT_EXPORT_MAX_CANVAS_DIMENSION / maxW)
+  }
+  if (totalH > PPT_EXPORT_MAX_CANVAS_DIMENSION) {
+    scale = Math.min(scale, PPT_EXPORT_MAX_CANVAS_DIMENSION / totalH)
+  }
+  if (maxW * totalH > PPT_EXPORT_MAX_CANVAS_AREA) {
+    scale = Math.min(scale, Math.sqrt(PPT_EXPORT_MAX_CANVAS_AREA / (maxW * totalH)))
+  }
+  if (scale >= 1) return canvases
+
+  return canvases.map((c) => scaleCanvasByFactor(c, scale))
 }
 
 /** html2canvas onclone：移除不兼容样式表并内联计算样式 */

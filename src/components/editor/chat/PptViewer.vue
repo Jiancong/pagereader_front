@@ -14123,7 +14123,7 @@ async function exportLongPNG() {
     exportMessage.value = t("agent.pptExportDownloading");
     const { saveAs } = await import("file-saver");
     const base = sanitizeExportBasename(props.pptData.title || "presentation");
-    const result = await canvasToExportBlob(stitched, { forLongImage: true });
+    const result = await canvasToExportBlob(stitched);
     if (!result) {
       ElMessage.error(t("agent.pptExportPngLongTooLarge"));
       return;
