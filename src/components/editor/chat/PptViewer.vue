@@ -14057,7 +14057,7 @@ async function captureAllSlidesToCanvases(
   return canvases;
 }
 
-// ── 导出图片包（ZIP，JPEG） ─────────────────────────────────────────────────
+// ── 导出图片包（ZIP，WebP/JPEG） ───────────────────────────────────────────
 async function exportPNGs() {
   exporting.value = true;
   exportMessage.value = t("agent.pptExporting");
@@ -14107,7 +14107,7 @@ async function exportPNGs() {
   }
 }
 
-// ── 导出长图（全部页面纵向拼接，JPEG） ─────────────────────────────────────
+// ── 导出长图（全部页面纵向拼接，WebP/JPEG） ─────────────────────────────────
 async function exportLongPNG() {
   exporting.value = true;
   exportMessage.value = t("agent.pptExporting");
