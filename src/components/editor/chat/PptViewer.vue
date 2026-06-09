@@ -14011,7 +14011,9 @@ async function captureAllSlidesToCanvases(
   const captureSlide = async () => {
     await nextTick();
     await new Promise((r) => requestAnimationFrame(r));
-    if (!slideWrapperRef.value) return;
+    if (!slideWrapperRef.value) {
+      throw new Error("Slide wrapper missing during export capture");
+    }
     const refList = slideWrapperRef.value.querySelector<HTMLElement>(".ppt-ref-list");
     let origOverflow = "";
     let origMaxHeight = "";
@@ -14025,6 +14027,9 @@ async function captureAllSlidesToCanvases(
     if (refList) {
       refList.style.overflow = origOverflow;
       refList.style.maxHeight = origMaxHeight;
+    }
+    if (!canvas || canvas.width <= 0 || canvas.height <= 0) {
+      throw new Error("Slide capture produced empty canvas");
     }
     canvases.push(canvas);
   };
@@ -14052,7 +14057,7 @@ async function captureAllSlidesToCanvases(
   return canvases;
 }
 
-// ── 导出图片包（ZIP，WebP/JPEG） ───────────────────────────────────────────
+// ── 导出图片包（ZIP，JPEG） ─────────────────────────────────────────────────
 async function exportPNGs() {
   exporting.value = true;
   exportMessage.value = t("agent.pptExporting");
@@ -14072,7 +14077,10 @@ async function exportPNGs() {
 
     for (let index = 0; index < canvases.length; index++) {
       const result = await canvasToExportBlob(canvases[index]);
-      if (!result) continue;
+      if (!result) {
+        ElMessage.error(t("agent.pptExportFailed"));
+        return;
+      }
       const ext = pptExportImageExtension(result.mimeType);
       zip.file(
         `${base}-slide-${String(index + 1).padStart(2, "0")}.${ext}`,
@@ -14080,7 +14088,7 @@ async function exportPNGs() {
       );
     }
 
-    if (!Object.keys(zip.files).length) {
+    if (Object.keys(zip.files).length !== canvases.length) {
       ElMessage.error(t("agent.pptExportFailed"));
       return;
     }
@@ -14099,7 +14107,7 @@ async function exportPNGs() {
   }
 }
 
-// ── 导出长图（全部页面纵向拼接，WebP/JPEG） ─────────────────────────────────
+// ── 导出长图（全部页面纵向拼接，JPEG） ─────────────────────────────────────
 async function exportLongPNG() {
   exporting.value = true;
   exportMessage.value = t("agent.pptExporting");

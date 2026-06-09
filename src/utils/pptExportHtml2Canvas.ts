@@ -279,19 +279,18 @@ export function stitchCanvasesVertically(
   return out
 }
 
-export const PPT_EXPORT_WEBP_QUALITY = 0.92
-/** 回退 JPEG 质量 */
-export const PPT_EXPORT_JPEG_QUALITY = 0.9
-/** 目标体积 ≈ 无损 PNG 的 1/4（仅调质量，不砍分辨率） */
-export const PPT_EXPORT_TARGET_SIZE_RATIO = 0.25
+/** 默认 JPEG 质量（未走体积阶梯时使用） */
+export const PPT_EXPORT_JPEG_QUALITY = 0.92
+/** 偏好的 JPEG 体积 ≈ 无损 PNG 的 1/2（仅用于选质量，不截断导出） */
+export const PPT_EXPORT_TARGET_SIZE_RATIO = 0.5
 /** @deprecated 兼容旧引用 */
-export const PPT_EXPORT_IMAGE_QUALITY = PPT_EXPORT_WEBP_QUALITY
+export const PPT_EXPORT_IMAGE_QUALITY = PPT_EXPORT_JPEG_QUALITY
 /** Chrome / Safari 常见 canvas 单边上限 */
 export const PPT_EXPORT_MAX_CANVAS_DIMENSION = 32767
 /** Chrome canvas 像素面积上限 */
 export const PPT_EXPORT_MAX_CANVAS_AREA = 268_435_456
 
-export type PptExportImageMime = "image/webp" | "image/jpeg"
+export type PptExportImageMime = "image/jpeg"
 
 export type PptExportImageResult = {
   blob: Blob
@@ -310,7 +309,7 @@ function blobFromCanvas(
   })
 }
 
-/** WebP 编码失败时常返回极小 blob；按像素面积估算最小合理体积 */
+/** 编码失败时常返回极小 blob；按像素面积估算最小合理体积 */
 function isExportBlobTooSmall(blob: Blob, canvas: HTMLCanvasElement): boolean {
   const pixels = canvas.width * canvas.height
   if (pixels <= 4096) return blob.size < 64
@@ -377,71 +376,54 @@ export function fitCanvasToExportLimits(
   return scaleCanvasToFitBrowserLimits(canvas)
 }
 
-/** WebP 质量阶梯：尽量接近 PNG 体积的 1/4，但不低于 0.78 以免糊 */
-async function encodeWebpNearTargetSize(
-  canvas: HTMLCanvasElement,
-): Promise<Blob | null> {
+/** JPEG 质量阶梯（从高到低完整遍历，最后才选体积） */
+const JPEG_EXPORT_QUALITY_LADDER = [
+  0.94, 0.92, 0.9, 0.88, 0.86, 0.84, 0.82, 0.8, 0.78, 0.75, 0.7, 0.65, 0.6, 0.5,
+] as const
+
+/**
+ * 对已截好的 canvas 编码 JPEG：先保证能出图，再在可行质量中选最接近目标体积的。
+ * 体积目标仅影响质量选择，不会提前中断截图/拼接流程。
+ */
+async function encodeJpegForExport(canvas: HTMLCanvasElement): Promise<Blob> {
   const targetBytes = Math.max(
     8192,
     Math.floor(estimatePngBytes(canvas) * PPT_EXPORT_TARGET_SIZE_RATIO),
   )
-  const qualities = [0.94, 0.92, 0.9, 0.88, 0.86, 0.84, 0.82, 0.8, 0.78]
-  let best: Blob | null = null
+  const valid: { quality: number; blob: Blob }[] = []
 
-  for (const quality of qualities) {
-    const blob = await blobFromCanvas(canvas, "image/webp", quality)
-    if (!blob || isExportBlobTooSmall(blob, canvas)) continue
-    best = blob
-    if (blob.size <= targetBytes * 1.2) return blob
+  for (const quality of JPEG_EXPORT_QUALITY_LADDER) {
+    const blob = await blobFromCanvas(canvas, "image/jpeg", quality)
+    if (blob && !isExportBlobTooSmall(blob, canvas)) {
+      valid.push({ quality, blob })
+    }
   }
-  return best
+
+  if (valid.length) {
+    const underTarget = valid.find((entry) => entry.blob.size <= targetBytes * 1.2)
+    return (underTarget ?? valid[0]).blob
+  }
+
+  const fallback = await blobFromCanvas(canvas, "image/jpeg", PPT_EXPORT_JPEG_QUALITY)
+  if (fallback) return fallback
+
+  throw new Error("JPEG export encoding failed")
 }
 
-/** 优先 WebP，不支持时回退 JPEG */
 export async function resolvePptExportImageFormat(): Promise<{
   mimeType: PptExportImageMime
   quality: number
 }> {
   if (cachedExportFormat) return cachedExportFormat
-
-  const probe = document.createElement("canvas")
-  probe.width = 64
-  probe.height = 64
-  const ctx = probe.getContext("2d")
-  ctx?.fillRect(0, 0, 64, 64)
-  const webpBlob = await blobFromCanvas(probe, "image/webp", PPT_EXPORT_WEBP_QUALITY)
-  const webpOk = !!webpBlob && !isExportBlobTooSmall(webpBlob, probe)
-  cachedExportFormat = webpOk
-    ? { mimeType: "image/webp", quality: PPT_EXPORT_WEBP_QUALITY }
-    : { mimeType: "image/jpeg", quality: PPT_EXPORT_JPEG_QUALITY }
+  cachedExportFormat = { mimeType: "image/jpeg", quality: PPT_EXPORT_JPEG_QUALITY }
   return cachedExportFormat
 }
 
-export function pptExportImageExtension(mimeType: PptExportImageMime): string {
-  return mimeType === "image/webp" ? "webp" : "jpg"
+export function pptExportImageExtension(_mimeType: PptExportImageMime): string {
+  return "jpg"
 }
 
-async function encodeCanvasPreferWebp(
-  canvas: HTMLCanvasElement,
-  preferWebp: boolean,
-): Promise<PptExportImageResult | null> {
-  if (preferWebp) {
-    const webpBlob = await encodeWebpNearTargetSize(canvas)
-    if (webpBlob && !isExportBlobTooSmall(webpBlob, canvas)) {
-      cachedExportFormat = { mimeType: "image/webp", quality: PPT_EXPORT_WEBP_QUALITY }
-      return { blob: webpBlob, mimeType: "image/webp" }
-    }
-  }
-
-  const jpegBlob = await blobFromCanvas(canvas, "image/jpeg", PPT_EXPORT_JPEG_QUALITY)
-  if (jpegBlob && !isExportBlobTooSmall(jpegBlob, canvas)) {
-    cachedExportFormat = { mimeType: "image/jpeg", quality: PPT_EXPORT_JPEG_QUALITY }
-    return { blob: jpegBlob, mimeType: "image/jpeg" }
-  }
-  return null
-}
-
-/** 导出压缩：保持截图分辨率，WebP 质量压至约 PNG 1/4 体积 */
+/** 导出压缩：保持截图分辨率；完整性优先，体积目标仅用于选 JPEG 质量 */
 export async function canvasToExportBlob(
   canvas: HTMLCanvasElement,
   options?: {
@@ -450,26 +432,21 @@ export async function canvasToExportBlob(
   },
 ): Promise<PptExportImageResult | null> {
   const fitted = scaleCanvasToFitBrowserLimits(canvas)
+  if (fitted.width <= 0 || fitted.height <= 0) return null
 
-  if (options?.mimeType === "image/jpeg") {
-    const quality = options.quality ?? PPT_EXPORT_JPEG_QUALITY
-    const blob = await blobFromCanvas(fitted, "image/jpeg", quality)
-    return blob && !isExportBlobTooSmall(blob, fitted)
-      ? { blob, mimeType: "image/jpeg" }
-      : null
+  let jpegBlob: Blob
+  if (options?.quality != null) {
+    const direct = await blobFromCanvas(fitted, "image/jpeg", options.quality)
+    jpegBlob =
+      direct && !isExportBlobTooSmall(direct, fitted)
+        ? direct
+        : await encodeJpegForExport(fitted)
+  } else {
+    jpegBlob = await encodeJpegForExport(fitted)
   }
 
-  if (options?.mimeType === "image/webp") {
-    const webpBlob = options.quality
-      ? await blobFromCanvas(fitted, "image/webp", options.quality)
-      : await encodeWebpNearTargetSize(fitted)
-    if (webpBlob && !isExportBlobTooSmall(webpBlob, fitted)) {
-      return { blob: webpBlob, mimeType: "image/webp" }
-    }
-    return encodeCanvasPreferWebp(fitted, false)
-  }
-
-  return encodeCanvasPreferWebp(fitted, true)
+  cachedExportFormat = { mimeType: "image/jpeg", quality: PPT_EXPORT_JPEG_QUALITY }
+  return { blob: jpegBlob, mimeType: "image/jpeg" }
 }
 
 /** 长图导出：仅在拼接后超出浏览器限制时统一缩小，避免双重缩放发糊 */
