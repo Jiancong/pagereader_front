@@ -8355,7 +8355,7 @@ import {
   pinPptExportTypography,
   pptExportImageExtension,
   prepareHtml2CanvasClone,
-  resolvePptExportImageFormat,
+  prepareSlideCanvasesForLongExport,
   stitchCanvasesVertically,
 } from "@/utils/pptExportHtml2Canvas";
 import type { PptPageReference } from "@/utils/pptInlineMarkdown";
@@ -14052,7 +14052,7 @@ async function captureAllSlidesToCanvases(
   return canvases;
 }
 
-// ── 导出 PNG（ZIP） ────────────────────────────────────────────────────────
+// ── 导出图片包（ZIP，WebP/JPEG） ───────────────────────────────────────────
 async function exportPNGs() {
   exporting.value = true;
   exportMessage.value = t("agent.pptExporting");
@@ -14069,12 +14069,11 @@ async function exportPNGs() {
     const { saveAs } = await import("file-saver");
     const zip = new JSZip();
     const base = sanitizeExportBasename(props.pptData.title || "presentation");
-    const { mimeType } = await resolvePptExportImageFormat();
-    const ext = pptExportImageExtension(mimeType);
 
     for (let index = 0; index < canvases.length; index++) {
-      const result = await canvasToExportBlob(canvases[index], { mimeType });
+      const result = await canvasToExportBlob(canvases[index]);
       if (!result) continue;
+      const ext = pptExportImageExtension(result.mimeType);
       zip.file(
         `${base}-slide-${String(index + 1).padStart(2, "0")}.${ext}`,
         await result.blob.arrayBuffer(),
@@ -14090,7 +14089,7 @@ async function exportPNGs() {
     exportMessage.value = t("agent.pptExportDownloading");
     saveAs(blob, `${base}-slides.zip`);
   } catch (err) {
-    console.error("PNG export failed:", err);
+    console.error("Slide image export failed:", err);
     ElMessage.error(t("agent.pptExportFailed"));
   } finally {
     fallbackStyle.remove();
@@ -14100,7 +14099,7 @@ async function exportPNGs() {
   }
 }
 
-// ── 导出 PNG 长图（全部页面纵向拼接） ───────────────────────────────────────
+// ── 导出长图（全部页面纵向拼接，WebP/JPEG） ─────────────────────────────────
 async function exportLongPNG() {
   exporting.value = true;
   exportMessage.value = t("agent.pptExporting");
@@ -14114,7 +14113,8 @@ async function exportLongPNG() {
 
     exportMessage.value = t("agent.pptExportPngStitching");
     const { bg } = resolveThemeColors();
-    const stitched = stitchCanvasesVertically(canvases, { background: bg });
+    const scaledCanvases = prepareSlideCanvasesForLongExport(canvases);
+    const stitched = stitchCanvasesVertically(scaledCanvases, { background: bg });
     if (!stitched) {
       ElMessage.error(t("agent.pptExportFailed"));
       return;
@@ -14123,16 +14123,15 @@ async function exportLongPNG() {
     exportMessage.value = t("agent.pptExportDownloading");
     const { saveAs } = await import("file-saver");
     const base = sanitizeExportBasename(props.pptData.title || "presentation");
-    const { mimeType } = await resolvePptExportImageFormat();
-    const ext = pptExportImageExtension(mimeType);
-    const result = await canvasToExportBlob(stitched, { mimeType });
+    const result = await canvasToExportBlob(stitched, { forLongImage: true });
     if (!result) {
       ElMessage.error(t("agent.pptExportPngLongTooLarge"));
       return;
     }
+    const ext = pptExportImageExtension(result.mimeType);
     saveAs(result.blob, `${base}-long.${ext}`);
   } catch (err) {
-    console.error("Long PNG export failed:", err);
+    console.error("Long scroll image export failed:", err);
     ElMessage.error(t("agent.pptExportFailed"));
   } finally {
     fallbackStyle.remove();
