@@ -27,11 +27,8 @@ const LAYOUT_PROPS = [
   "right",
   "bottom",
   "left",
-  "width",
   "height",
-  "min-width",
   "min-height",
-  "max-width",
   "max-height",
   "margin-top",
   "margin-right",
@@ -211,6 +208,40 @@ function inlineExportComputedStyles(source: Element, clone: Element): void {
   const len = Math.min(srcChildren.length, cloneChildren.length)
   for (let i = 0; i < len; i++) {
     inlineExportComputedStyles(srcChildren[i], cloneChildren[i])
+  }
+}
+
+/** 导出前锁定幻灯片 typography token，避免 html2canvas 克隆文档里 vw/cqi 重算导致字号变化 */
+const PPT_EXPORT_TYPOGRAPHY_VARS = [
+  "--ppt-fs-display",
+  "--ppt-fs-title",
+  "--ppt-fs-heading",
+  "--ppt-fs-body-lg",
+  "--ppt-fs-body",
+  "--ppt-fs-body-sm",
+  "--ppt-fs-caption",
+  "--ppt-fs-quote-mark",
+  "--ppt-pad-y",
+  "--ppt-pad-x",
+  "--ppt-gap-sm",
+  "--ppt-gap-md",
+  "--ppt-gap-lg",
+] as const
+
+export function pinPptExportTypography(wrapper: HTMLElement): () => void {
+  const cs = getComputedStyle(wrapper)
+  const saved = PPT_EXPORT_TYPOGRAPHY_VARS.map(
+    (v) => [v, wrapper.style.getPropertyValue(v)] as const,
+  )
+  for (const v of PPT_EXPORT_TYPOGRAPHY_VARS) {
+    const val = cs.getPropertyValue(v).trim()
+    if (val) wrapper.style.setProperty(v, val)
+  }
+  return () => {
+    for (const [v, prev] of saved) {
+      if (prev) wrapper.style.setProperty(v, prev)
+      else wrapper.style.removeProperty(v)
+    }
   }
 }
 

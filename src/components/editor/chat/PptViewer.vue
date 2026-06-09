@@ -2537,7 +2537,9 @@
                 class="ppt-topic-grid"
                 :class="{
                   'ppt-topic-grid--stack': resolveSlideBulletItems(slide).length <= 3,
+                  'ppt-topic-grid--fill': resolveSlideBulletItems(slide).length >= 2,
                 }"
+                :style="topicGridFillStyle(slide)"
               >
                 <div
                   v-for="(item, bi) in resolveSlideBulletItems(slide)"
@@ -8311,7 +8313,7 @@ import { uploadedDocumentsFromPptData } from "@/utils/pptDocumentRag";
 import { buildExploreProjectShareUrl } from "@/utils/feedOpen";
 import { gtmRelatedSearch } from "@/composables/useGtmDataLayer";
 import { resolveContextSelectionText } from "@/utils/pptContextSelection";
-import { prepareHtml2CanvasClone } from "@/utils/pptExportHtml2Canvas";
+import { pinPptExportTypography, prepareHtml2CanvasClone } from "@/utils/pptExportHtml2Canvas";
 import type { PptPageReference } from "@/utils/pptInlineMarkdown";
 import {
   buildPptxBulletTextRuns,
@@ -11217,6 +11219,15 @@ function resolveSlideBulletItems(slide: PptSlide | undefined): string[] {
   return getContentItems(resolveSlideBulletItemsRaw(slide));
 }
 
+/** 无图表 topic 卡网格：2+ 项时均分剩余高度，避免卡片缩在顶部留白 */
+function topicGridFillStyle(slide: PptSlide | undefined): Record<string, string> {
+  const count = resolveSlideBulletItems(slide).length;
+  if (count < 2) return {};
+  const cols = count <= 3 ? 1 : 2;
+  const rows = Math.ceil(count / cols);
+  return { gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` };
+}
+
 /**
  * 判断一条 content 是否为底部总结
  */
@@ -13755,11 +13766,26 @@ function injectPptExportStyles(bodyFontCss: string, headingFontCss?: string): HT
       top: 0.5em !important;
       margin-top: 0 !important;
     }
-    .ppt-slide-wrapper .ppt-md-inline {
+    /* 标题/封面保持 block 换行，避免 html2canvas 把长标题挤成异常断行 */
+    .ppt-slide-wrapper .ppt-cover-title .ppt-md-inline,
+    .ppt-slide-wrapper .ppt-slide-title .ppt-md-inline,
+    .ppt-slide-wrapper .ppt-section-title .ppt-md-inline,
+    .ppt-slide-wrapper .ppt-toc-title .ppt-md-inline,
+    .ppt-slide-wrapper .ppt-end-title .ppt-md-inline {
+      display: block !important;
+      white-space: normal !important;
+      overflow-wrap: break-word !important;
+      word-break: break-word !important;
+      line-height: inherit !important;
+    }
+    /* 要点列表内联 markdown：html2canvas 对 flex 排版不稳定 */
+    .ppt-slide-wrapper .ppt-bullet-item .ppt-md-inline,
+    .ppt-slide-wrapper .ppt-content-point-body .ppt-md-inline,
+    .ppt-slide-wrapper .ppt-content-summary-body .ppt-md-inline {
       line-height: inherit !important;
       display: inline !important;
       white-space: normal !important;
-      overflow-wrap: anywhere !important;
+      overflow-wrap: break-word !important;
       word-break: break-word !important;
     }
     .ppt-slide-wrapper .ppt-md-inline .ppt-table-ref {
@@ -13771,6 +13797,22 @@ function injectPptExportStyles(bodyFontCss: string, headingFontCss?: string): HT
     }
     .ppt-slide-wrapper .ppt-content-point-body {
       line-height: 1.6 !important;
+    }
+    .ppt-slide-wrapper .ppt-topic-grid--fill {
+      height: 100% !important;
+      min-height: 0 !important;
+      align-content: stretch !important;
+      align-items: stretch !important;
+      overflow-y: hidden !important;
+    }
+    .ppt-slide-wrapper .ppt-topic-grid--fill .ppt-topic-card {
+      height: 100% !important;
+      min-height: 0 !important;
+    }
+    .ppt-slide-wrapper .ppt-content-with-side-image {
+      align-items: stretch !important;
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
     }
   `;
   document.head.appendChild(style);
@@ -13784,28 +13826,33 @@ async function capturePptSlideToCanvas(
   const html2canvas = (await import("html2canvas")).default;
   const bodyCss = pptBodyFontCss.value;
   const headingCss = pptHeadingFontCss.value;
-  return html2canvas(target, {
-    backgroundColor,
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    onclone: (doc, clonedEl) => {
-      if (clonedEl instanceof HTMLElement) {
-        prepareHtml2CanvasClone(doc, target, clonedEl);
-      }
-      const root = doc.querySelector(".ppt-slide-wrapper") ?? clonedEl;
-      if (root instanceof HTMLElement) {
-        root.style.setProperty("font-family", bodyCss, "important");
-        root.style.setProperty("--ppt-font-body", bodyCss);
-        root.style.setProperty("--ppt-font-heading", headingCss);
-        root.style.setProperty("--ppt-font-family", bodyCss);
-      }
-      doc.querySelectorAll("svg text").forEach((node) => {
-        const el = node as SVGTextElement;
-        el.style.fontFamily = bodyCss;
-      });
-    },
-  });
+  const restoreTypography = pinPptExportTypography(target);
+  try {
+    return await html2canvas(target, {
+      backgroundColor,
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      onclone: (doc, clonedEl) => {
+        if (clonedEl instanceof HTMLElement) {
+          prepareHtml2CanvasClone(doc, target, clonedEl);
+        }
+        const root = doc.querySelector(".ppt-slide-wrapper") ?? clonedEl;
+        if (root instanceof HTMLElement) {
+          root.style.setProperty("font-family", bodyCss, "important");
+          root.style.setProperty("--ppt-font-body", bodyCss);
+          root.style.setProperty("--ppt-font-heading", headingCss);
+          root.style.setProperty("--ppt-font-family", bodyCss);
+        }
+        doc.querySelectorAll("svg text").forEach((node) => {
+          const el = node as SVGTextElement;
+          el.style.fontFamily = bodyCss;
+        });
+      },
+    });
+  } finally {
+    restoreTypography();
+  }
 }
 
 async function preparePptExportFonts(): Promise<{ bodyFont: string; headingFont: string }> {
@@ -16675,14 +16722,31 @@ defineExpose({
   align-content: start;
 }
 
+.ppt-topic-grid--fill {
+  align-content: stretch;
+  align-items: stretch;
+  overflow-y: hidden;
+
+  .ppt-topic-card {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .ppt-topic-card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
 .ppt-topic-card {
   border: var(--ppt-card-border-width, 1px) solid rgba(255, 255, 255, 0.1);
   border-radius: var(--ppt-radius-card, 10px);
-  padding: 16px 18px;
+  padding: clamp(12px, 2cqi, 22px) clamp(14px, 2.2cqi, 24px);
   background: var(--ppt-bg-secondary, rgba(255, 255, 255, 0.03));
   display: flex;
   flex-direction: column;
-  gap: var(--ppt-gap-sm);
+  gap: clamp(6px, 1cqi, 12px);
   min-height: 0;
   overflow: visible;
 }
@@ -16708,15 +16772,15 @@ defineExpose({
 }
 
 .ppt-topic-card-title {
-  font-size: var(--ppt-fs-body-lg);
+  font-size: clamp(14px, 2.2cqi, 22px);
   font-weight: 700;
   color: var(--ppt-text, #e8f0fe);
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .ppt-topic-card-body {
-  font-size: var(--ppt-fs-body);
-  line-height: 1.65;
+  font-size: clamp(13px, 1.85cqi, 18px);
+  line-height: 1.6;
   color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.88));
   opacity: 1;
   flex: 1;
@@ -17404,7 +17468,7 @@ defineExpose({
 .ppt-content-with-side-image {
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 16px;
   flex: 1;
   min-height: 0;
