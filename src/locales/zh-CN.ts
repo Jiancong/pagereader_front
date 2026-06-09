@@ -523,6 +523,7 @@ export default {
     pptExportGoogleSlidesHint: "请将导出的 PPTX 上传到 Google Slides",
     pptExporting: "正在导出...",
     pptExportCapturing: "正在渲染第 {current}/{total} 页...",
+    pptExportEncoding: "正在编码第 {current}/{total} 页...",
     pptExportPngPackaging: "正在打包图片...",
     pptExportPngStitching: "正在拼接长图...",
     pptExportPngLongTooLarge: "长图过大，无法生成，请改用幻灯片图片包",

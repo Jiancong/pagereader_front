@@ -300,6 +300,19 @@ export type PptExportImageResult = {
 }
 
 let cachedExportFormat: { mimeType: PptExportImageMime; quality: number } | null = null
+/** 当前导出批次内 WebP 已不可用，后续页直接 JPEG，避免重复失败 */
+let exportPreferJpeg = false
+
+export function resetPptExportSession(): void {
+  exportPreferJpeg = false
+  cachedExportFormat = null
+}
+
+/** 释放单页 canvas 占用的 GPU/内存 */
+export function disposeExportCanvas(canvas: HTMLCanvasElement): void {
+  canvas.width = 0
+  canvas.height = 0
+}
 
 function blobFromCanvas(
   canvas: HTMLCanvasElement,
@@ -395,30 +408,30 @@ async function encodeForExportWithMime(
     8192,
     Math.floor(estimatePngBytes(canvas) * PPT_EXPORT_TARGET_SIZE_RATIO),
   )
-  const valid: { quality: number; blob: Blob }[] = []
+  let bestFallback: Blob | null = null
 
   for (const quality of EXPORT_QUALITY_LADDER) {
     const blob = await blobFromCanvas(canvas, mimeType, quality)
-    if (blob && !isExportBlobTooSmall(blob, canvas)) {
-      valid.push({ quality, blob })
-    }
+    if (!blob || isExportBlobTooSmall(blob, canvas)) continue
+    bestFallback = blob
+    if (blob.size <= targetBytes * 1.2) return blob
   }
 
-  if (valid.length) {
-    const underTarget = valid.find((entry) => entry.blob.size <= targetBytes * 1.2)
-    return (underTarget ?? valid[0]).blob
-  }
+  if (bestFallback) return bestFallback
 
   const defaultQuality =
     mimeType === "image/webp" ? PPT_EXPORT_WEBP_QUALITY : PPT_EXPORT_JPEG_QUALITY
   return blobFromCanvas(canvas, mimeType, defaultQuality)
 }
 
-/** WebP 优先；编码不可用时回退 JPEG，均保证完整性 */
+/** WebP 优先；本批次 WebP 失败后后续页直接 JPEG，均保证完整性 */
 async function encodeImageForExport(canvas: HTMLCanvasElement): Promise<PptExportImageResult> {
-  const webpBlob = await encodeForExportWithMime(canvas, "image/webp")
-  if (webpBlob && !isExportBlobTooSmall(webpBlob, canvas)) {
-    return { blob: webpBlob, mimeType: "image/webp" }
+  if (!exportPreferJpeg) {
+    const webpBlob = await encodeForExportWithMime(canvas, "image/webp")
+    if (webpBlob && !isExportBlobTooSmall(webpBlob, canvas)) {
+      return { blob: webpBlob, mimeType: "image/webp" }
+    }
+    exportPreferJpeg = true
   }
 
   const jpegBlob = await encodeForExportWithMime(canvas, "image/jpeg")

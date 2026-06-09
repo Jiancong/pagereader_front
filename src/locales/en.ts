@@ -533,6 +533,7 @@ export default {
     pptExportGoogleSlidesHint: "Upload the exported PPTX to Google Slides",
     pptExporting: "Exporting…",
     pptExportCapturing: "Rendering slide {current}/{total}…",
+    pptExportEncoding: "Encoding slide {current}/{total}…",
     pptExportPngPackaging: "Packaging images…",
     pptExportPngStitching: "Stitching long image…",
     pptExportPngLongTooLarge: "Long image is too large; try slide images (ZIP) instead",

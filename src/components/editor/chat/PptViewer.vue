@@ -8352,10 +8352,12 @@ import { gtmRelatedSearch } from "@/composables/useGtmDataLayer";
 import { resolveContextSelectionText } from "@/utils/pptContextSelection";
 import {
   canvasToExportBlob,
+  disposeExportCanvas,
   pinPptExportTypography,
   pptExportImageExtension,
   prepareHtml2CanvasClone,
   prepareSlideCanvasesForLongExport,
+  resetPptExportSession,
   stitchCanvasesVertically,
 } from "@/utils/pptExportHtml2Canvas";
 import type { PptPageReference } from "@/utils/pptInlineMarkdown";
@@ -14000,13 +14002,36 @@ async function runShareAction(action: PptShareAction) {
   else if (action === "png-long") await exportLongPNG();
 }
 
+/** 导出时需截图的页数（references 分页按多张计） */
+function countExportCaptureUnits(): number {
+  let total = 0;
+  for (const s of props.pptData.slides) {
+    if (s.layout === "references" && (s.content?.length ?? 0) > REFS_PER_PAGE) {
+      total += Math.ceil(s.content!.length / REFS_PER_PAGE);
+    } else {
+      total += 1;
+    }
+  }
+  return total;
+}
+
+type CaptureSlidesOptions = {
+  onProgress?: (current: number, total: number) => void;
+  /** 逐页处理 canvas，不累积在内存中 */
+  onCanvas?: (canvas: HTMLCanvasElement, index: number) => Promise<void>;
+};
+
 /** 逐页截图（references 分页与 PDF/PNG 导出共用） */
 async function captureAllSlidesToCanvases(
-  onProgress?: (current: number, total: number) => void
+  options?: CaptureSlidesOptions | ((current: number, total: number) => void),
 ): Promise<HTMLCanvasElement[]> {
+  const opts: CaptureSlidesOptions =
+    typeof options === "function" ? { onProgress: options } : (options ?? {});
   const savedSlide = currentSlide.value;
   const canvases: HTMLCanvasElement[] = [];
   const slideCount = props.pptData.slides.length;
+  const captureTotal = countExportCaptureUnits();
+  let captureIndex = 0;
 
   const captureSlide = async () => {
     await nextTick();
@@ -14031,13 +14056,22 @@ async function captureAllSlidesToCanvases(
     if (!canvas || canvas.width <= 0 || canvas.height <= 0) {
       throw new Error("Slide capture produced empty canvas");
     }
-    canvases.push(canvas);
+
+    const index = captureIndex;
+    captureIndex += 1;
+    opts.onProgress?.(index + 1, captureTotal);
+
+    if (opts.onCanvas) {
+      await opts.onCanvas(canvas, index);
+      disposeExportCanvas(canvas);
+    } else {
+      canvases.push(canvas);
+    }
   };
 
   for (let i = 0; i < slideCount; i++) {
     currentSlide.value = i;
     const s = props.pptData.slides[i];
-    onProgress?.(i + 1, slideCount);
 
     if (s.layout === "references" && (s.content?.length ?? 0) > REFS_PER_PAGE) {
       const items = s.content!;
@@ -14061,34 +14095,41 @@ async function captureAllSlidesToCanvases(
 async function exportPNGs() {
   exporting.value = true;
   exportMessage.value = t("agent.pptExporting");
+  resetPptExportSession();
   await preparePptExportFonts();
   const fallbackStyle = injectPptExportStyles(pptBodyFontCss.value, pptHeadingFontCss.value);
   try {
-    const canvases = await captureAllSlidesToCanvases((current, total) => {
-      exportMessage.value = t("agent.pptExportCapturing", { current, total });
-    });
-    if (!canvases.length) return;
-
     exportMessage.value = t("agent.pptExportPngPackaging");
     const JSZip = (await import("jszip")).default;
     const { saveAs } = await import("file-saver");
     const zip = new JSZip();
     const base = sanitizeExportBasename(props.pptData.title || "presentation");
+    const captureTotal = countExportCaptureUnits();
+    let exportedCount = 0;
 
-    for (let index = 0; index < canvases.length; index++) {
-      const result = await canvasToExportBlob(canvases[index]);
-      if (!result) {
-        ElMessage.error(t("agent.pptExportFailed"));
-        return;
-      }
-      const ext = pptExportImageExtension(result.mimeType);
-      zip.file(
-        `${base}-slide-${String(index + 1).padStart(2, "0")}.${ext}`,
-        await result.blob.arrayBuffer(),
-      );
-    }
+    await captureAllSlidesToCanvases({
+      onProgress: (current, total) => {
+        exportMessage.value = t("agent.pptExportCapturing", { current, total });
+      },
+      onCanvas: async (canvas, index) => {
+        exportMessage.value = t("agent.pptExportEncoding", {
+          current: index + 1,
+          total: captureTotal,
+        });
+        const result = await canvasToExportBlob(canvas);
+        if (!result) {
+          throw new Error(`Slide ${index + 1} export encoding failed`);
+        }
+        const ext = pptExportImageExtension(result.mimeType);
+        zip.file(
+          `${base}-slide-${String(index + 1).padStart(2, "0")}.${ext}`,
+          await result.blob.arrayBuffer(),
+        );
+        exportedCount += 1;
+      },
+    });
 
-    if (Object.keys(zip.files).length !== canvases.length) {
+    if (exportedCount !== captureTotal) {
       ElMessage.error(t("agent.pptExportFailed"));
       return;
     }
@@ -14111,18 +14152,23 @@ async function exportPNGs() {
 async function exportLongPNG() {
   exporting.value = true;
   exportMessage.value = t("agent.pptExporting");
+  resetPptExportSession();
   await preparePptExportFonts();
   const fallbackStyle = injectPptExportStyles(pptBodyFontCss.value, pptHeadingFontCss.value);
   try {
-    const canvases = await captureAllSlidesToCanvases((current, total) => {
-      exportMessage.value = t("agent.pptExportCapturing", { current, total });
+    const canvases = await captureAllSlidesToCanvases({
+      onProgress: (current, total) => {
+        exportMessage.value = t("agent.pptExportCapturing", { current, total });
+      },
     });
     if (!canvases.length) return;
 
     exportMessage.value = t("agent.pptExportPngStitching");
     const { bg } = resolveThemeColors();
     const scaledCanvases = prepareSlideCanvasesForLongExport(canvases);
+    canvases.forEach(disposeExportCanvas);
     const stitched = stitchCanvasesVertically(scaledCanvases, { background: bg });
+    scaledCanvases.forEach(disposeExportCanvas);
     if (!stitched) {
       ElMessage.error(t("agent.pptExportFailed"));
       return;
@@ -14132,6 +14178,7 @@ async function exportLongPNG() {
     const { saveAs } = await import("file-saver");
     const base = sanitizeExportBasename(props.pptData.title || "presentation");
     const result = await canvasToExportBlob(stitched);
+    disposeExportCanvas(stitched);
     if (!result) {
       ElMessage.error(t("agent.pptExportPngLongTooLarge"));
       return;
@@ -14159,8 +14206,10 @@ async function exportPDF() {
     // @ts-expect-error UMD subpath has no bundled TS declaration in this project setup
     const { jsPDF } = await import("jspdf/dist/jspdf.umd.min.js");
 
-    const canvases = await captureAllSlidesToCanvases((current, total) => {
-      exportMessage.value = t("agent.pptExportCapturing", { current, total });
+    const canvases = await captureAllSlidesToCanvases({
+      onProgress: (current, total) => {
+        exportMessage.value = t("agent.pptExportCapturing", { current, total });
+      },
     });
 
     if (canvases.length === 0) return;
