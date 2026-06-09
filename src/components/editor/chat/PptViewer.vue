@@ -246,6 +246,43 @@
               class="ppt-share-item"
               role="menuitem"
               :disabled="exporting"
+              @click="runShareAction('png-long')"
+            >
+              <span
+                class="ppt-share-item-brand ppt-share-item-brand--png-long"
+                aria-hidden="true"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                >
+                  <rect x="7" y="3" width="10" height="18" rx="2" />
+                  <path d="M9 7h6M9 11h6M9 15h4" />
+                </svg>
+              </span>
+              <span class="ppt-share-item-label">{{
+                t("agent.pptShareExportPngLong")
+              }}</span>
+              <span class="ppt-share-item-action" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path
+                    d="M8.5 1.5A1.5 1.5 0 0 0 7 0H2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5a1.5 1.5 0 0 0-1.5-1.5H9.5V1.5zM8 1v5.5H14v8H2V1h6z"
+                  />
+                  <path
+                    d="M7.5 9.5a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5zm3-1a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 1 .5-.5zm-6 2a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2a.5.5 0 0 1 .5-.5z"
+                  />
+                </svg>
+              </span>
+            </button>
+            <button
+              type="button"
+              class="ppt-share-item"
+              role="menuitem"
+              :disabled="exporting"
               @click="runShareAction('linkedin')"
             >
               <span
@@ -8313,7 +8350,7 @@ import { uploadedDocumentsFromPptData } from "@/utils/pptDocumentRag";
 import { buildExploreProjectShareUrl } from "@/utils/feedOpen";
 import { gtmRelatedSearch } from "@/composables/useGtmDataLayer";
 import { resolveContextSelectionText } from "@/utils/pptContextSelection";
-import { pinPptExportTypography, prepareHtml2CanvasClone } from "@/utils/pptExportHtml2Canvas";
+import { pinPptExportTypography, prepareHtml2CanvasClone, stitchCanvasesVertically } from "@/utils/pptExportHtml2Canvas";
 import type { PptPageReference } from "@/utils/pptInlineMarkdown";
 import {
   buildPptxBulletTextRuns,
@@ -13937,7 +13974,7 @@ async function exportGoogleSlides() {
   ElMessage.info(t("agent.pptExportGoogleSlidesHint"));
 }
 
-type PptShareAction = "pdf" | "pptx" | "google-slides" | "png" | "linkedin";
+type PptShareAction = "pdf" | "pptx" | "google-slides" | "png" | "png-long" | "linkedin";
 
 async function runShareAction(action: PptShareAction) {
   if (exporting.value) return;
@@ -13953,6 +13990,7 @@ async function runShareAction(action: PptShareAction) {
   if (action === "pdf") await exportPDF();
   else if (action === "pptx") await exportPPTX();
   else if (action === "png") await exportPNGs();
+  else if (action === "png-long") await exportLongPNG();
 }
 
 /** 逐页截图（references 分页与 PDF/PNG 导出共用） */
@@ -14042,6 +14080,48 @@ async function exportPNGs() {
     saveAs(blob, `${base}-slides.zip`);
   } catch (err) {
     console.error("PNG export failed:", err);
+    ElMessage.error(t("agent.pptExportFailed"));
+  } finally {
+    fallbackStyle.remove();
+    overrideContent.value = null;
+    exporting.value = false;
+    exportMessage.value = "";
+  }
+}
+
+// ── 导出 PNG 长图（全部页面纵向拼接） ───────────────────────────────────────
+async function exportLongPNG() {
+  exporting.value = true;
+  exportMessage.value = t("agent.pptExporting");
+  await preparePptExportFonts();
+  const fallbackStyle = injectPptExportStyles(pptBodyFontCss.value, pptHeadingFontCss.value);
+  try {
+    const canvases = await captureAllSlidesToCanvases((current, total) => {
+      exportMessage.value = t("agent.pptExportCapturing", { current, total });
+    });
+    if (!canvases.length) return;
+
+    exportMessage.value = t("agent.pptExportPngStitching");
+    const { bg } = resolveThemeColors();
+    const stitched = stitchCanvasesVertically(canvases, { background: bg });
+    if (!stitched) {
+      ElMessage.error(t("agent.pptExportFailed"));
+      return;
+    }
+
+    exportMessage.value = t("agent.pptExportDownloading");
+    const { saveAs } = await import("file-saver");
+    const base = sanitizeExportBasename(props.pptData.title || "presentation");
+    const blob = await new Promise<Blob | null>((resolve) => {
+      stitched.toBlob((b) => resolve(b), "image/png");
+    });
+    if (!blob) {
+      ElMessage.error(t("agent.pptExportPngLongTooLarge"));
+      return;
+    }
+    saveAs(blob, `${base}-long.png`);
+  } catch (err) {
+    console.error("Long PNG export failed:", err);
     ElMessage.error(t("agent.pptExportFailed"));
   } finally {
     fallbackStyle.remove();
@@ -16203,6 +16283,11 @@ defineExpose({
 .ppt-share-item-brand--png {
   background: #f3e8ff;
   color: #9333ea;
+}
+
+.ppt-share-item-brand--png-long {
+  background: #ede9fe;
+  color: #7c3aed;
 }
 
 .ppt-share-item-brand--linkedin {

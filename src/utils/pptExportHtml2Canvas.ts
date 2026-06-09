@@ -245,6 +245,40 @@ export function pinPptExportTypography(wrapper: HTMLElement): () => void {
   }
 }
 
+/** 将多张 slide 截图纵向拼接为一张长图（居中放置，宽度取最大值） */
+export function stitchCanvasesVertically(
+  canvases: HTMLCanvasElement[],
+  options?: { gap?: number; background?: string },
+): HTMLCanvasElement | null {
+  if (!canvases.length) return null
+
+  const gap = Math.max(0, options?.gap ?? 0)
+  const background = options?.background ?? "#000000"
+  const width = Math.max(...canvases.map((c) => c.width))
+  const totalHeight =
+    canvases.reduce((sum, c) => sum + c.height, 0) + gap * Math.max(0, canvases.length - 1)
+
+  const out = document.createElement("canvas")
+  out.width = width
+  out.height = totalHeight
+  const ctx = out.getContext("2d")
+  if (!ctx) return null
+
+  ctx.fillStyle = background
+  ctx.fillRect(0, 0, width, totalHeight)
+
+  let y = 0
+  for (let i = 0; i < canvases.length; i++) {
+    const canvas = canvases[i]
+    const x = Math.floor((width - canvas.width) / 2)
+    ctx.drawImage(canvas, x, y)
+    y += canvas.height
+    if (i < canvases.length - 1) y += gap
+  }
+
+  return out
+}
+
 /** html2canvas onclone：移除不兼容样式表并内联计算样式 */
 export function prepareHtml2CanvasClone(
   clonedDoc: Document,
