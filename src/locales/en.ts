@@ -384,6 +384,7 @@ export default {
     noWorks: "No decks yet",
     favorite: "Like",
     unfavorite: "Unlike",
+    share: "Share link",
     back: "Back",
     fork: "Fork & generate",
     slideAlt: "Slide {n}",

@@ -375,6 +375,7 @@ export default {
     noWorks: "暂无作品",
     favorite: "点赞",
     unfavorite: "取消点赞",
+    share: "分享链接",
     back: "返回",
     fork: "基于它再生成",
     slideAlt: "第 {n} 页",

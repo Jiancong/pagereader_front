@@ -2,9 +2,7 @@
   <header class="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
     <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
       <div class="flex items-center gap-2">
-        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-          <Presentation class="h-5 w-5 text-primary-foreground" />
-        </div>
+        <AppBrandMark />
         <span class="text-xl font-bold text-foreground">{{ t('app.brand') }}</span>
       </div>
 
@@ -69,9 +67,9 @@
 </template>
 
 <script setup>
-import { Presentation } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
+import AppBrandMark from './AppBrandMark.vue'
 import LocaleSwitcher from './LocaleSwitcher.vue'
 
 defineProps({

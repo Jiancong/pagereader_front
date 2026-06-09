@@ -18,3 +18,19 @@ export function resolveFeedOpenTarget(item: FeedStreamItemDto): FeedOpenTarget |
   if (name) return { kind: "fork", prompt: name }
   return null
 }
+
+/** Feed 条目可分享的 projectId（用于 /explore/project/{id}） */
+export function feedItemShareProjectId(item: FeedStreamItemDto): string | null {
+  const target = resolveFeedOpenTarget(item)
+  if (target?.kind === "community" || target?.kind === "project") {
+    return target.projectId
+  }
+  return null
+}
+
+export function buildExploreProjectShareUrl(projectId: string): string {
+  const pid = String(projectId ?? "").trim()
+  const base = import.meta.env.BASE_URL || "/"
+  const path = `${base.replace(/\/?$/, "/")}explore/project/${encodeURIComponent(pid)}`
+  return new URL(path, window.location.origin).href
+}

@@ -3,9 +3,7 @@
     <div class="mx-auto max-w-6xl px-6">
       <div class="flex flex-col items-center justify-between gap-6 md:flex-row">
         <div class="flex items-center gap-2">
-          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Presentation class="h-4 w-4 text-primary-foreground" />
-          </div>
+          <AppBrandMark img-class="h-8 w-8" />
           <span class="text-lg font-bold text-foreground">{{ t('app.brand') }}</span>
         </div>
 
@@ -23,9 +21,9 @@
 </template>
 
 <script setup>
-import { Presentation } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
+import AppBrandMark from './AppBrandMark.vue'
 
 const { t } = useI18n()
 </script>

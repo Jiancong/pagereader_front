@@ -34,6 +34,15 @@
               <span v-if="item.authorNickname" class="truncate">{{ item.authorNickname }}</span>
               <span class="ml-auto flex items-center gap-1"><Eye class="h-3 w-3" />{{ item.viewCount ?? 0 }}</span>
               <button
+                v-if="shareProjectId(item)"
+                type="button"
+                class="flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors hover:text-foreground"
+                :aria-label="t('workspace.share')"
+                @click.stop="copyShareLink(item)"
+              >
+                <Share2 class="h-3 w-3" />
+              </button>
+              <button
                 type="button"
                 class="flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors hover:text-foreground disabled:opacity-50"
                 :class="item.likedByMe ? 'text-primary' : ''"
@@ -86,9 +95,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Loader2, Eye, Heart, Trash2 } from 'lucide-vue-next'
+import { Loader2, Eye, Heart, Trash2, Share2 } from 'lucide-vue-next'
 import { feedApi } from '../../api'
 import { canDeleteFeedItem, feedItemDeleteProjectId } from '@/utils/projectDelete'
+import { buildExploreProjectShareUrl, feedItemShareProjectId } from '@/utils/feedOpen'
 
 const props = defineProps({
   userId: { type: [String, Number], default: null },
@@ -111,6 +121,21 @@ const hasMore = computed(() => items.value.length < total.value)
 const cover = (item) => item.imageUrl || item.imageUrls?.[0] || ''
 const canDelete = (item) => canDeleteFeedItem(item, props.userId)
 const deleteKey = (item) => feedItemDeleteProjectId(item) || item.id
+const shareProjectId = (item) => feedItemShareProjectId(item)
+
+const copyShareLink = async (item) => {
+  const projectId = shareProjectId(item)
+  if (!projectId) {
+    ElMessage.warning(t('agent.pptShareNoProject'))
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(buildExploreProjectShareUrl(projectId))
+    ElMessage.success(t('agent.pptShareLinkCopied'))
+  } catch {
+    ElMessage.error(t('agent.pptShareCopyFailed'))
+  }
+}
 
 const onDelete = async (item) => {
   const projectId = feedItemDeleteProjectId(item)

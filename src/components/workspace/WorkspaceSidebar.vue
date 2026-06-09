@@ -11,9 +11,7 @@
         collapsed ? 'justify-center px-2' : 'gap-2 px-4',
       ]"
     >
-      <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary">
-        <Presentation class="h-5 w-5 text-primary-foreground" />
-      </div>
+      <AppBrandMark class="flex-shrink-0" />
       <span v-if="!collapsed" class="min-w-0 flex-1 truncate text-lg font-bold text-foreground">
         {{ t('app.brand') }}
       </span>
@@ -201,7 +199,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import {
-  Presentation,
   Plus,
   Compass,
   LogOut,
@@ -214,6 +211,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import AppBrandMark from '../AppBrandMark.vue'
 import LocaleSwitcher from '../LocaleSwitcher.vue'
 import WorkspaceCreditsBar from './WorkspaceCreditsBar.vue'
 import WorkspaceAssetsDrawer from './WorkspaceAssetsDrawer.vue'

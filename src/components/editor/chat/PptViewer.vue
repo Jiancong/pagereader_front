@@ -8308,6 +8308,7 @@ import {
   type RelatedSearchSessionEntry,
 } from "@/utils/pptChatHistoryDisplay";
 import { uploadedDocumentsFromPptData } from "@/utils/pptDocumentRag";
+import { buildExploreProjectShareUrl } from "@/utils/feedOpen";
 import { gtmRelatedSearch } from "@/composables/useGtmDataLayer";
 import { resolveContextSelectionText } from "@/utils/pptContextSelection";
 import { prepareHtml2CanvasClone } from "@/utils/pptExportHtml2Canvas";
@@ -8594,7 +8595,7 @@ interface PptData {
 const props = defineProps<{
   pptData: PptData;
   initialSlide?: number;
-  /** 项目 ID，用于生成 /share?projectId= 链接 */
+  /** 项目 ID，用于生成 /explore/project/{id} 分享链接 */
   projectId?: string;
   /** 右侧栏展示项（由 ProjectPreview 经 buildPptChatHistoryDisplay 整理） */
   chatHistory?: ChatHistoryDisplayItem[];
@@ -13794,11 +13795,9 @@ function sanitizeExportBasename(title: string): string {
 function buildShareUrl(): string | null {
   const pid = props.projectId?.trim();
   if (pid) {
-    const base = import.meta.env.BASE_URL || "/";
-    const path = `${base.replace(/\/?$/, "/")}share?projectId=${encodeURIComponent(pid)}`;
-    return new URL(path, window.location.origin).href;
+    return buildExploreProjectShareUrl(pid);
   }
-  if (/\/share\b/i.test(window.location.pathname)) {
+  if (/^\/explore\/project\/[^/?#]+/.test(window.location.pathname)) {
     return window.location.href.split("#")[0];
   }
   return null;
