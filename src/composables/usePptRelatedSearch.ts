@@ -164,9 +164,11 @@ export function usePptRelatedSearch() {
     state.value.loading = false;
   }
 
-  async function runRelatedSearch(options: PptRelatedSearchOptions) {
+  async function runRelatedSearch(
+    options: PptRelatedSearchOptions,
+  ): Promise<PptRelatedSearchState> {
     const term = String(options.term || "").trim();
-    if (!term) return;
+    if (!term) return state.value;
 
     closeStream();
     resetStreamFlags();
@@ -183,11 +185,25 @@ export function usePptRelatedSearch() {
       isSearchResponse: false,
     };
 
+    let settle: ((value: PptRelatedSearchState) => void) | null = null;
+    let settled = false;
+    const streamDone = new Promise<PptRelatedSearchState>((resolve) => {
+      settle = resolve;
+    });
+    const finish = () => {
+      if (settled || !settle) return;
+      settled = true;
+      const done = settle;
+      settle = null;
+      done({ ...state.value });
+    };
+
     const userId = await resolveUserId();
     if (!userId) {
       state.value.loading = false;
       state.value.error = "login_required";
-      return;
+      finish();
+      return streamDone;
     }
 
     const uploadedDocs = options.uploadedDocuments ?? [];
@@ -244,11 +260,8 @@ export function usePptRelatedSearch() {
           }
 
           if (ev === "knowledge_response") {
-            if (streamFinalized) {
-              applyKnowledgePayload(data);
-              return;
-            }
             applyKnowledgePayload(data);
+            finish();
             return;
           }
 
@@ -261,6 +274,7 @@ export function usePptRelatedSearch() {
               streamBuf = text;
               streamFinalized = true;
               state.value.loading = false;
+              finish();
             }
             return;
           }
@@ -276,6 +290,7 @@ export function usePptRelatedSearch() {
               }
             }
             state.value.loading = false;
+            finish();
             return;
           }
 
@@ -283,6 +298,7 @@ export function usePptRelatedSearch() {
             state.value.error =
               String(data.message || data.error || "error").trim() || "error";
             state.value.loading = false;
+            finish();
           }
         },
         () => {
@@ -294,12 +310,14 @@ export function usePptRelatedSearch() {
             state.value.error = "error";
           }
           state.value.loading = false;
+          finish();
         },
         () => {
           if (state.value.loading) {
             if (streamBuf) state.value.content = streamBuf;
             state.value.loading = false;
           }
+          finish();
         },
         180000
       );
@@ -307,7 +325,10 @@ export function usePptRelatedSearch() {
       console.error("[ppt related search]", err);
       state.value.error = "error";
       state.value.loading = false;
+      finish();
     }
+
+    return streamDone;
   }
 
   return {

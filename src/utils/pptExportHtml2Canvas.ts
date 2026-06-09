@@ -139,11 +139,47 @@ function sanitizeCssValue(value: string): string {
   )
 }
 
+/** 匹配含嵌套括号的 color-mix(...) / oklch(...) 等，避免整段删除 stylesheet */
+function replaceUnsupportedColorFunctions(css: string): string {
+  const NEEDLE = ["color-mix(", "oklch(", "lab(", "color("] as const
+  let out = css
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const needle of NEEDLE) {
+      const start = out.indexOf(needle)
+      if (start < 0) continue
+      let depth = 0
+      let end = start
+      for (let i = start; i < out.length; i++) {
+        const ch = out[i]
+        if (ch === "(") depth++
+        else if (ch === ")") {
+          depth--
+          if (depth === 0) {
+            end = i + 1
+            break
+          }
+        }
+      }
+      if (end <= start) continue
+      const match = out.slice(start, end)
+      const replacement = resolveExportColor(match)
+      out = out.slice(0, start) + replacement + out.slice(end)
+      changed = true
+      break
+    }
+  }
+  return out
+}
+
 function stripUnsupportedStylesheets(clonedDoc: Document): void {
   clonedDoc.querySelectorAll("style").forEach((node) => {
     if (node.id === "ppt-export-styles") return
     const css = node.textContent ?? ""
-    if (UNSUPPORTED_COLOR_RE.test(css)) node.remove()
+    if (UNSUPPORTED_COLOR_RE.test(css)) {
+      node.textContent = replaceUnsupportedColorFunctions(css)
+    }
   })
   clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((node) => node.remove())
 }

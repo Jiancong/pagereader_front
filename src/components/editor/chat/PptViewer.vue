@@ -13734,6 +13734,44 @@ function injectPptExportStyles(bodyFontCss: string, headingFontCss?: string): HT
     .ppt-slide-wrapper svg text {
       font-family: ${bodyFontCss} !important;
     }
+    /* html2canvas 对 flex+gap 多行文本排版不稳定，导出时改用 block 布局 */
+    .ppt-slide-wrapper .ppt-bullet-list {
+      display: block !important;
+      gap: 0 !important;
+    }
+    .ppt-slide-wrapper .ppt-bullet-item {
+      display: block !important;
+      position: relative !important;
+      padding-left: 18px !important;
+      margin-bottom: 10px !important;
+      line-height: 1.55 !important;
+    }
+    .ppt-slide-wrapper .ppt-bullet-item:last-child {
+      margin-bottom: 0 !important;
+    }
+    .ppt-slide-wrapper .ppt-bullet-dot {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0.5em !important;
+      margin-top: 0 !important;
+    }
+    .ppt-slide-wrapper .ppt-md-inline {
+      line-height: inherit !important;
+      display: inline !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+      word-break: break-word !important;
+    }
+    .ppt-slide-wrapper .ppt-md-inline .ppt-table-ref {
+      line-height: inherit !important;
+      vertical-align: baseline !important;
+    }
+    .ppt-slide-wrapper .ppt-content-point {
+      margin-bottom: 10px !important;
+    }
+    .ppt-slide-wrapper .ppt-content-point-body {
+      line-height: 1.6 !important;
+    }
   `;
   document.head.appendChild(style);
   return style;
