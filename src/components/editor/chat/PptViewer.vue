@@ -18715,6 +18715,101 @@ defineExpose({
     min-height: auto;
   }
 
+  /* 全屏 / 演示：stage 作为固定视口内的纵向滚动容器 */
+  .ppt-viewer:fullscreen,
+  .ppt-viewer:-webkit-full-screen,
+  .ppt-viewer.ppt-viewer--presentation {
+    touch-action: pan-y;
+  }
+
+  .ppt-viewer:fullscreen .ppt-stage,
+  .ppt-viewer:-webkit-full-screen .ppt-stage,
+  .ppt-viewer.ppt-viewer--presentation .ppt-stage {
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior-y: contain;
+    padding: 8px 10px 12px;
+  }
+
+  .ppt-viewer:fullscreen .ppt-slide-wrapper,
+  .ppt-viewer:-webkit-full-screen .ppt-slide-wrapper,
+  .ppt-viewer.ppt-viewer--presentation .ppt-slide-wrapper {
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    min-height: calc(100cqw * 9 / 16);
+    overflow: visible !important;
+  }
+
+  .ppt-viewer:fullscreen .ppt-slide,
+  .ppt-viewer:-webkit-full-screen .ppt-slide,
+  .ppt-viewer.ppt-viewer--presentation .ppt-slide {
+    height: auto !important;
+    min-height: calc(100cqw * 9 / 16) !important;
+    overflow: visible !important;
+  }
+
+  .ppt-viewer:fullscreen .ppt-slide.ppt-content,
+  .ppt-viewer:-webkit-full-screen .ppt-slide.ppt-content,
+  .ppt-viewer.ppt-viewer--presentation .ppt-slide.ppt-content {
+    min-height: calc(100cqw * 9 / 16) !important;
+  }
+
+  .ppt-viewer:fullscreen .ppt-content-split,
+  .ppt-viewer:-webkit-full-screen .ppt-content-split,
+  .ppt-viewer.ppt-viewer--presentation .ppt-content-split,
+  .ppt-viewer:fullscreen .ppt-content-items-split,
+  .ppt-viewer:-webkit-full-screen .ppt-content-items-split,
+  .ppt-viewer.ppt-viewer--presentation .ppt-content-items-split,
+  .ppt-viewer:fullscreen .ppt-hero-left-split,
+  .ppt-viewer:-webkit-full-screen .ppt-hero-left-split,
+  .ppt-viewer.ppt-viewer--presentation .ppt-hero-left-split,
+  .ppt-viewer:fullscreen .ppt-metric-content-split,
+  .ppt-viewer:-webkit-full-screen .ppt-metric-content-split,
+  .ppt-viewer.ppt-viewer--presentation .ppt-metric-content-split,
+  .ppt-viewer:fullscreen .ppt-data-split,
+  .ppt-viewer:-webkit-full-screen .ppt-data-split,
+  .ppt-viewer.ppt-viewer--presentation .ppt-data-split,
+  .ppt-viewer:fullscreen .ppt-col,
+  .ppt-viewer:-webkit-full-screen .ppt-col,
+  .ppt-viewer.ppt-viewer--presentation .ppt-col,
+  .ppt-viewer:fullscreen .ppt-content-left,
+  .ppt-viewer:-webkit-full-screen .ppt-content-left,
+  .ppt-viewer.ppt-viewer--presentation .ppt-content-left,
+  .ppt-viewer:fullscreen .ppt-right-items,
+  .ppt-viewer:-webkit-full-screen .ppt-right-items,
+  .ppt-viewer.ppt-viewer--presentation .ppt-right-items {
+    flex: 0 1 auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .ppt-viewer:fullscreen .ppt-topic-grid,
+  .ppt-viewer:-webkit-full-screen .ppt-topic-grid,
+  .ppt-viewer.ppt-viewer--presentation .ppt-topic-grid,
+  .ppt-viewer:fullscreen .ppt-topic-grid--fill,
+  .ppt-viewer:-webkit-full-screen .ppt-topic-grid--fill,
+  .ppt-viewer.ppt-viewer--presentation .ppt-topic-grid--fill {
+    overflow: visible !important;
+
+    .ppt-topic-card-body {
+      overflow: visible !important;
+    }
+  }
+
+  .ppt-viewer:fullscreen .ppt-chapter-image-page-body,
+  .ppt-viewer:-webkit-full-screen .ppt-chapter-image-page-body,
+  .ppt-viewer.ppt-viewer--presentation .ppt-chapter-image-page-body {
+    min-height: auto;
+  }
+
   .ppt-viewer {
     min-height: 0;
     flex: 1 1 auto;
