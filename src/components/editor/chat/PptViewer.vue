@@ -18661,6 +18661,58 @@ defineExpose({
     flex-direction: column;
     margin: 0;
     border-radius: 8px;
+    overflow: visible;
+  }
+
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) {
+    overflow: visible;
+    touch-action: pan-y;
+  }
+
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-stage {
+    flex: 0 1 auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-slide-wrapper {
+    aspect-ratio: auto;
+    height: auto;
+    min-height: calc(100cqw * 9 / 16);
+    overflow: visible;
+  }
+
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-slide {
+    height: auto;
+    min-height: calc(100cqw * 9 / 16);
+    justify-content: flex-start;
+    overflow: visible;
+  }
+
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-content-split,
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-content-items-split,
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-hero-left-split,
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-metric-content-split,
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-data-split,
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-col,
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-content-left {
+    flex: 0 1 auto;
+    min-height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-topic-grid,
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-topic-grid--fill {
+    overflow: visible;
+
+    .ppt-topic-card-body {
+      overflow: visible;
+    }
+  }
+
+  .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-chapter-image-page-body {
+    min-height: auto;
   }
 
   .ppt-viewer {
@@ -18737,7 +18789,6 @@ defineExpose({
   .ppt-metric-content-split,
   .ppt-data-split {
     flex-direction: column;
-    overflow-y: auto;
   }
 
   .ppt-content-left,
