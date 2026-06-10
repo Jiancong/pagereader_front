@@ -900,6 +900,8 @@
                   hasTableAndChart(slide) && !shouldShowContentBullets(slide),
                 'ppt-content-split--table-chart-with-bullets':
                   hasTableAndChart(slide) && shouldShowContentBullets(slide),
+                'ppt-content-chart-only':
+                  hasBodyPrimaryVisual(slide) && !shouldShowContentBullets(slide),
               }"
             >
               <!-- 左栏：文字要点 -->
@@ -4207,7 +4209,7 @@
               />
             </div>
             <!-- two_column 无 column_split 时图表显示在底部 -->
-            <div v-else-if="slide.chart && !resolveContentSplitIndex(slide.column_split, slide.content?.length ?? 0)" class="ppt-two-col-chart">
+            <div v-else-if="slide.chart && !resolveContentSplitIndex(slide.column_split, slide.content?.length ?? 0)" class="ppt-two-col-chart" :class="{ 'ppt-chart-contained': isVisualOnlySlide(slide) }">
               <div class="ppt-chart-title">{{ slide.chart.title }}</div>
               <PptChartSourceLine
                 :chart="slide.chart"
@@ -5415,6 +5417,10 @@
                   !shouldShowContentBullets(slide),
                 'ppt-content-split--table-chart-with-bullets':
                   hasTableAndChart(slide) && shouldShowContentBullets(slide),
+                'ppt-content-chart-only':
+                  hasBodyPrimaryVisual(slide) &&
+                  !shouldShowContentBullets(slide) &&
+                  !isMetricCardsChartSplitSlide(slide),
               }"
             >
               <!-- 左栏：KPI 卡或文字要点 -->
@@ -7005,6 +7011,7 @@
             <div
               v-else-if="slide.chart && !slide.table"
               class="ppt-chart-area ppt-chart-area-full"
+              :class="{ 'ppt-chart-contained': isVisualOnlySlide(slide) }"
             >
               <div class="ppt-chart-title">{{ slide.chart.title }}</div>
               <PptChartSourceLine
@@ -10842,6 +10849,25 @@ function shouldShowHeroMetricBanner(slide: PptSlide | undefined): boolean {
 function shouldShowContentBullets(slide: PptSlide | undefined): boolean {
   if (isHeroLeftSlide(slide)) return false;
   return resolveSlideBulletItems(slide).length > 0;
+}
+
+/** 幻灯片正文区是否有文字要点（不含标题 / 图表标题） */
+function slideHasTextBody(slide: PptSlide | undefined): boolean {
+  if (!slide) return false;
+  if (shouldShowContentBullets(slide)) return true;
+  if ((slide.left_content?.length ?? 0) > 0) return true;
+  if ((slide.right_content?.length ?? 0) > 0) return true;
+  if ((slide.right_items?.length ?? 0) > 0) return true;
+  if ((slide.content?.length ?? 0) > 0) return true;
+  if (hasDocumentFigurePage(slide) && documentFigureLeftItems(slide).length > 0) return true;
+  return false;
+}
+
+/** 无正文、仅图表/表格占主体的页面 */
+function isVisualOnlySlide(slide: PptSlide | undefined): boolean {
+  if (!slide) return false;
+  if (!slide.chart && !slide.table) return false;
+  return !slideHasTextBody(slide);
 }
 
 /** @deprecated 使用 shouldShowMetricCardsPrimaryGrid */
@@ -17888,6 +17914,26 @@ defineExpose({
     flex: 1;
     min-height: 200px;
   }
+
+  &.ppt-chart-contained {
+    flex: 0 1 auto;
+    align-self: center;
+    width: 100%;
+    max-width: 70%;
+    padding: clamp(10px, 4cqi, 24px) clamp(12px, 5cqi, 32px);
+    margin-inline: auto;
+
+    .ppt-chart-svg {
+      flex: 0 1 auto;
+      min-height: 120px;
+      max-height: min(46cqi, 42vh);
+    }
+
+    .ppt-timeline-chart {
+      flex: 0 1 auto;
+      max-height: min(46cqi, 42vh);
+    }
+  }
 }
 
 .ppt-table-area-full {
@@ -18377,6 +18423,57 @@ defineExpose({
 .ppt-two-col-chart {
   margin-top: 8px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  .ppt-chart-svg,
+  .ppt-grouped-bar-wrap,
+  .ppt-line-chart-wrap {
+    width: 100%;
+    max-width: 70%;
+    max-height: min(40cqi, 36vh);
+  }
+
+  &.ppt-chart-contained {
+    flex: 0 1 auto;
+    width: 100%;
+    max-width: 70%;
+    padding: clamp(10px, 4cqi, 24px) clamp(12px, 5cqi, 32px);
+    margin-inline: auto;
+
+    .ppt-chart-svg,
+    .ppt-grouped-bar-wrap,
+    .ppt-line-chart-wrap,
+    .ppt-timeline-chart,
+    .ppt-funnel-chart {
+      max-width: 100%;
+      max-height: min(46cqi, 42vh);
+    }
+  }
+}
+
+.ppt-content-split.ppt-content-chart-only {
+  justify-content: center;
+
+  .ppt-content-right {
+    flex: 0 1 auto !important;
+    width: 100%;
+    max-width: 70%;
+    margin-inline: auto;
+  }
+
+  .ppt-content-chart-wrap {
+    flex: 0 1 auto;
+    width: 100%;
+
+    .ppt-chart-svg,
+    .ppt-grouped-bar-wrap,
+    .ppt-line-chart-wrap {
+      flex: 0 1 auto;
+      max-height: min(46cqi, 42vh);
+    }
+  }
 }
 
 /* ── toc ── */
