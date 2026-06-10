@@ -1,8 +1,9 @@
 <template>
   <aside
     :class="[
-      'relative flex h-full flex-shrink-0 flex-col overflow-hidden border-r border-border bg-card transition-[width] duration-300 ease-in-out',
-      collapsed ? 'w-16' : 'w-64',
+      'fixed inset-y-0 left-0 z-50 flex h-full flex-col overflow-hidden border-r border-border bg-card transition-transform duration-300 ease-in-out md:static md:z-auto md:flex-shrink-0 md:translate-x-0 md:transition-[width]',
+      collapsed ? 'w-64 md:w-16' : 'w-64',
+      mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
     ]"
   >
     <div
@@ -20,10 +21,18 @@
         type="button"
         :title="t('workspace.sidebar.collapse')"
         :aria-label="t('workspace.sidebar.collapse')"
-        class="flex-shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        class="hidden flex-shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:block"
         @click="setCollapsed(true)"
       >
         <PanelLeftClose class="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        :aria-label="t('workspace.sidebar.collapse')"
+        class="flex-shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:hidden"
+        @click="$emit('close-mobile')"
+      >
+        <X class="h-4 w-4" />
       </button>
     </div>
 
@@ -209,6 +218,7 @@ import {
   Images,
   PanelLeftClose,
   PanelLeftOpen,
+  X,
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import AppBrandMark from '../AppBrandMark.vue'
@@ -227,8 +237,9 @@ defineProps({
   myProjects: { type: Array, default: () => [] },
   loadingProjects: { type: Boolean, default: false },
   deletingProjectId: { type: String, default: null },
+  mobileOpen: { type: Boolean, default: false },
 })
-const emit = defineEmits(['new', 'explore', 'open-project', 'delete-project', 'logout', 'select-document'])
+const emit = defineEmits(['new', 'explore', 'open-project', 'delete-project', 'logout', 'select-document', 'close-mobile'])
 
 const assetsOpen = ref(false)
 const collapsed = ref(false)

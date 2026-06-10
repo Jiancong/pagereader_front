@@ -54,14 +54,14 @@
                 <textarea
                   v-model="prompt"
                   rows="4"
-                  class="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  class="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 pb-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:pb-14"
                   :placeholder="t('landing.promptPlaceholder')"
                 />
                 <button
                   @click="generatePPT"
                   :disabled="isLoading || !prompt.trim()"
                   :class="[
-                    'absolute bottom-3 right-3 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all',
+                    'mt-2 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all sm:absolute sm:bottom-3 sm:right-3 sm:mt-0 sm:w-auto',
                     isLoading || !prompt.trim()
                       ? 'cursor-not-allowed bg-muted text-muted-foreground'
                       : 'bg-primary text-primary-foreground hover:bg-primary/90'
@@ -97,7 +97,7 @@
               @dragleave="isDragging = false"
               @drop.prevent="handleDrop"
               :class="[
-                'flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-colors',
+                'flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors sm:p-12',
                 isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground'
               ]"
             >

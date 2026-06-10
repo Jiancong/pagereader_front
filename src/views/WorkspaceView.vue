@@ -1,5 +1,11 @@
 <template>
   <div class="flex h-screen overflow-hidden bg-background">
+    <div
+      v-if="mobileSidebarOpen"
+      class="fixed inset-0 z-40 bg-black/50 md:hidden"
+      @click="mobileSidebarOpen = false"
+    />
+
     <WorkspaceSidebar
       :view="view"
       :user-id="userId"
@@ -9,15 +15,30 @@
       :my-projects="myProjects"
       :loading-projects="loadingProjects"
       :deleting-project-id="deletingProjectId"
-      @new="returnToGenerator"
-      @explore="view = 'explore'"
-      @open-project="openProject"
+      :mobile-open="mobileSidebarOpen"
+      @new="onSidebarNav(returnToGenerator)"
+      @explore="onSidebarNav(() => (view = 'explore'))"
+      @open-project="(id) => onSidebarNav(() => openProject(id))"
       @delete-project="onDeleteProject"
       @logout="handleLogout"
       @select-document="onSelectDocumentFromAssets"
+      @close-mobile="mobileSidebarOpen = false"
     />
 
-    <main class="min-w-0 flex-1 overflow-y-auto p-6 sm:p-8">
+    <div class="flex min-w-0 flex-1 flex-col">
+      <div class="flex h-14 flex-shrink-0 items-center gap-2 border-b border-border px-4 md:hidden">
+        <button
+          type="button"
+          class="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          :aria-label="t('workspace.sidebar.expand')"
+          @click="mobileSidebarOpen = true"
+        >
+          <Menu class="h-5 w-5" />
+        </button>
+        <span class="text-base font-bold text-foreground">{{ t('app.brand') }}</span>
+      </div>
+
+      <main class="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
       <!-- v-show：切换探索/历史时保持生成状态与 SSE 连接 -->
       <WorkspaceGenerator
         ref="generatorRef"
@@ -40,7 +61,8 @@
         @back="view = 'explore'"
         @fork="goNew"
       />
-    </main>
+      </main>
+    </div>
   </div>
 </template>
 
@@ -51,6 +73,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { Menu } from 'lucide-vue-next'
 import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar.vue'
 import WorkspaceGenerator from '../components/workspace/WorkspaceGenerator.vue'
 import ExploreGrid from '../components/ExploreGrid.vue'
@@ -62,6 +85,7 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const view = ref('new')
+const mobileSidebarOpen = ref(false)
 const activeProjectId = ref(null)
 const userId = ref(null)
 const nickName = ref('')
@@ -73,6 +97,12 @@ const genPrompt = ref('')
 const genKey = ref(0)
 const projectRefreshKey = ref(0)
 const generatorRef = ref(null)
+
+/** 移动端：点击侧栏导航项后执行动作并关闭抽屉 */
+const onSidebarNav = (action) => {
+  action()
+  mobileSidebarOpen.value = false
+}
 
 const loadProjects = async () => {
   loadingProjects.value = true

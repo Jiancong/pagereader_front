@@ -9,6 +9,7 @@ export default {
     explore: "探索",
     pricing: "定价",
     story: "我们的故事",
+    menu: "菜单",
     login: "登录",
     signupTrial: "免费试用",
     enterWorkspace: "进入工作区",

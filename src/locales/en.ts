@@ -9,6 +9,7 @@ export default {
     explore: "Explore",
     pricing: "Pricing",
     story: "Our story",
+    menu: "Menu",
     login: "Log in",
     signupTrial: "Try for free",
     enterWorkspace: "Open workspace",
