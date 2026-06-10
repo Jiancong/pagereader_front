@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-background">
+  <div class="min-h-screen overflow-x-hidden bg-background">
     <AppHeader
       :logged="logged"
       :nick-name="nickName"
@@ -7,7 +7,7 @@
       @open-login="openLogin"
       @enter="goWorkspace"
     />
-    <main class="px-6 py-10 pt-24 sm:px-8">
+    <main class="px-4 py-6 pt-[4.5rem] sm:px-6 sm:py-10 sm:pt-24">
       <ExploreGrid :user-id="userId" @open="openExploreItem" />
     </main>
     <AppFooter />

@@ -225,4 +225,26 @@ button.ppt-chat-rail-item {
   color: rgba(255, 255, 255, 0.88);
   line-height: 1.45;
 }
+
+@media (max-width: 767px) {
+  .ppt-chat-rail {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    align-self: stretch;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    max-height: min(40vh, 280px);
+  }
+
+  .ppt-chat-rail--collapsed {
+    flex: 0 0 2.5rem !important;
+    width: 100% !important;
+    max-height: 2.75rem;
+  }
+
+  .ppt-chat-rail-header {
+    min-height: 2.5rem;
+  }
+}
 </style>

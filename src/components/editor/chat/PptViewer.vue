@@ -8658,6 +8658,15 @@ const emit = defineEmits<{
 const chatHistoryRailCollapsed = ref(false);
 const relatedSearchSessionEntries = ref<RelatedSearchSessionEntry[]>([]);
 
+const MOBILE_LAYOUT_MAX = 767;
+
+function syncMobileChrome() {
+  if (typeof window === "undefined") return;
+  if (window.innerWidth <= MOBILE_LAYOUT_MAX && showChatHistoryRail.value) {
+    chatHistoryRailCollapsed.value = true;
+  }
+}
+
 const chatHistoryRailItems = computed(() => {
   const base = Array.isArray(props.chatHistory) ? props.chatHistory : [];
   return mergeRelatedSearchAnswersIntoDisplay(base, relatedSearchSessionEntries.value, {
@@ -8667,6 +8676,8 @@ const chatHistoryRailItems = computed(() => {
 });
 
 const showChatHistoryRail = computed(() => chatHistoryRailItems.value.length > 0);
+
+watch(showChatHistoryRail, () => syncMobileChrome());
 
 const { t, locale } = useI18n();
 const currentSlide = ref(props.initialSlide ?? 0);
@@ -8961,6 +8972,8 @@ onMounted(() => {
   document.addEventListener("pointerdown", onPptContextMenuPointerDown);
   window.addEventListener("keydown", onPptViewerKeydown);
   window.addEventListener("resize", updatePresentationScale);
+  window.addEventListener("resize", syncMobileChrome);
+  syncMobileChrome();
   nextTick(() => {
     viewerRef.value?.focus();
     observeSlideWrapperSize();
@@ -8981,6 +8994,7 @@ onBeforeUnmount(() => {
   closePptContextMenu();
   window.removeEventListener("keydown", onPptViewerKeydown);
   window.removeEventListener("resize", updatePresentationScale);
+  window.removeEventListener("resize", syncMobileChrome);
   slideWrapperResizeObserver?.disconnect();
   slideWrapperResizeObserver = null;
   if (isPresentationFullscreen.value) {
@@ -18640,5 +18654,122 @@ defineExpose({
   white-space: nowrap;
   max-width: 56px;
   opacity: 0.7;
+}
+
+/* ── Mobile layout (≤767px) ── */
+@media (max-width: 767px) {
+  .ppt-viewer-shell {
+    flex-direction: column;
+    margin: 0;
+    border-radius: 8px;
+  }
+
+  .ppt-viewer {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .ppt-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .ppt-nav {
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .ppt-nav-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .ppt-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .ppt-title-label {
+    display: none;
+  }
+
+  .ppt-share-trigger > span:not(.ppt-share-chevron) {
+    display: none;
+  }
+
+  .ppt-share-trigger {
+    padding: 6px 10px;
+  }
+
+  .ppt-fullscreen-btn > span {
+    display: none;
+  }
+
+  .ppt-fullscreen-btn,
+  .ppt-close-btn {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .ppt-share-menu {
+    min-width: min(280px, calc(100vw - 24px));
+    max-width: calc(100vw - 16px);
+    right: 0;
+    left: auto;
+  }
+
+  .ppt-slide-wrapper {
+    --ppt-pad-y: clamp(10px, 2.5vw, 22px);
+    --ppt-pad-x: clamp(12px, 3.5vw, 28px);
+    --ppt-gap-lg: clamp(8px, 2vw, 16px);
+    --ppt-gap-md: clamp(6px, 1.5vw, 12px);
+    --ppt-fs-display: clamp(18px, 5.5vw, 32px);
+    --ppt-fs-title: clamp(14px, 4vw, 22px);
+    --ppt-fs-heading: clamp(13px, 3.5vw, 20px);
+  }
+
+  .ppt-content-split,
+  .ppt-content-items-split,
+  .ppt-hero-left-split,
+  .ppt-metric-content-split,
+  .ppt-data-split {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .ppt-content-left,
+  .ppt-hero-left-split .ppt-hero-left-panel,
+  .ppt-metric-content-split .ppt-metric-cards-side {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: none;
+  }
+
+  .ppt-content-split--table-chart-dual .ppt-content-right {
+    grid-template-columns: 1fr;
+  }
+
+  .ppt-topic-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ppt-speaker-notes-pane {
+    max-height: min(120px, 22vh);
+    padding: 8px 12px 10px;
+    font-size: 11px;
+  }
+
+  .ppt-thumbs {
+    padding: 6px 8px;
+  }
+
+  .ppt-thumb {
+    min-width: 40px;
+    padding: 4px 6px;
+  }
 }
 </style>

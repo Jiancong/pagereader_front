@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-screen flex-col overflow-hidden bg-background">
+  <div class="flex h-[100dvh] flex-col overflow-hidden bg-background">
     <AppHeader
       :logged="logged"
       :nick-name="nickName"
@@ -8,11 +8,11 @@
       @enter="goWorkspace"
     />
 
-    <main class="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-20 sm:px-6">
+    <main class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-6 pt-[4.5rem] sm:px-6 sm:pb-10 sm:pt-20">
       <div class="mx-auto w-full max-w-[min(100%,96rem)]">
-        <div class="mb-4 flex items-center justify-between gap-4">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
-            class="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            class="inline-flex items-center gap-1 self-start text-sm text-muted-foreground transition-colors hover:text-foreground"
             @click="goBack"
           >
             <ArrowLeft class="h-4 w-4" /> {{ t('workspace.back') }}
@@ -20,13 +20,14 @@
           <button
             v-if="project"
             type="button"
-            class="flex flex-shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex w-full shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             :disabled="forking"
             @click="onFork"
           >
             <Loader2 v-if="forking" class="h-4 w-4 animate-spin" />
             <GitFork v-else class="h-4 w-4" />
-            {{ forking ? t('community.forking') : t('community.forkToWorkspace') }}
+            <span class="sm:hidden">{{ forking ? t('community.forking') : t('community.forkToWorkspaceShort') }}</span>
+            <span class="hidden sm:inline">{{ forking ? t('community.forking') : t('community.forkToWorkspace') }}</span>
           </button>
         </div>
 
@@ -37,10 +38,12 @@
 
         <template v-if="project">
           <div class="mb-4">
-            <h1 class="text-2xl font-bold text-foreground">
+            <h1 class="break-words text-xl font-bold text-foreground sm:text-2xl">
               {{ project.name || project.title || t('workspace.unnamedProject') }}
             </h1>
-            <p v-if="project.description" class="mt-1 text-sm text-muted-foreground">{{ project.description }}</p>
+            <p v-if="project.description" class="mt-1 break-words text-sm text-muted-foreground">
+              {{ project.description }}
+            </p>
           </div>
 
           <div v-if="pptData">

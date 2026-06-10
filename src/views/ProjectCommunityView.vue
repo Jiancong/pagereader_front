@@ -7,7 +7,7 @@
       @open-login="openLogin"
       @enter="goWorkspace"
     />
-    <main class="mx-auto max-w-3xl px-4 pb-16 pt-20 sm:px-6">
+    <main class="mx-auto max-w-3xl px-3 pb-16 pt-[4.5rem] sm:px-6 sm:pt-20">
       <button
         class="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
         @click="goBack"

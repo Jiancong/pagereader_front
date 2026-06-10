@@ -12,7 +12,9 @@ export default {
     menu: "Menu",
     login: "Log in",
     signupTrial: "Try for free",
+    signupTrialShort: "Sign up",
     enterWorkspace: "Open workspace",
+    enterWorkspaceShort: "Workspace",
   },
   story: {
     badge: "Our story",
@@ -488,6 +490,7 @@ export default {
     openToRead: "Open to read",
     interactiveHint: "Select text on a slide and right-click to ask the AI. Your questions appear in the chat panel.",
     forkToWorkspace: "Fork to my workspace",
+    forkToWorkspaceShort: "Fork",
     forking: "Forking…",
     forkSuccess: "Forked to your workspace (private)",
     commentBoard: "Comments",

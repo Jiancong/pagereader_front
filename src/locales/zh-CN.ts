@@ -12,7 +12,9 @@ export default {
     menu: "菜单",
     login: "登录",
     signupTrial: "免费试用",
+    signupTrialShort: "注册",
     enterWorkspace: "进入工作区",
+    enterWorkspaceShort: "工作区",
   },
   story: {
     badge: "我们的故事",
@@ -478,6 +480,7 @@ export default {
     openToRead: "打开阅读",
     interactiveHint: "在幻灯片上选中文字并右键即可向 AI 追问，提问会显示在右侧对话栏。",
     forkToWorkspace: "Fork 到我的工作区",
+    forkToWorkspaceShort: "Fork",
     forking: "Fork 中…",
     forkSuccess: "已 Fork 到你的工作区（私有）",
     commentBoard: "留言板",

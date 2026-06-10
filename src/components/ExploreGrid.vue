@@ -1,13 +1,13 @@
 <template>
   <div class="mx-auto max-w-6xl">
-    <div v-if="showHeader" class="mb-6">
-      <h2 class="text-2xl font-bold text-foreground">{{ t('workspace.exploreTitle') }}</h2>
+    <div v-if="showHeader" class="mb-4 sm:mb-6">
+      <h2 class="text-xl font-bold text-foreground sm:text-2xl">{{ t('workspace.exploreTitle') }}</h2>
       <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.exploreSubtitle') }}</p>
     </div>
 
     <div v-if="error" class="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{{ error }}</div>
 
-    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
       <div
         v-for="item in items"
         :key="item.id"
@@ -28,11 +28,11 @@
             />
             <div v-else class="flex h-full w-full items-center justify-center text-xs text-muted-foreground">{{ t('workspace.noCover') }}</div>
           </div>
-          <div class="flex flex-1 flex-col p-3">
-            <p class="line-clamp-2 text-sm font-medium text-foreground">{{ item.name || item.nameEn || t('workspace.unnamed') }}</p>
-            <div class="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-              <span v-if="item.authorNickname" class="truncate">{{ item.authorNickname }}</span>
-              <span class="ml-auto flex items-center gap-1"><Eye class="h-3 w-3" />{{ item.viewCount ?? 0 }}</span>
+          <div class="flex flex-1 flex-col p-2 sm:p-3">
+            <p class="line-clamp-2 text-xs font-medium text-foreground sm:text-sm">{{ item.name || item.nameEn || t('workspace.unnamed') }}</p>
+            <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:mt-2 sm:gap-x-3 sm:text-xs">
+              <span v-if="item.authorNickname" class="min-w-0 max-w-full truncate">{{ item.authorNickname }}</span>
+              <span class="flex items-center gap-1 sm:ml-auto"><Eye class="h-3 w-3" />{{ item.viewCount ?? 0 }}</span>
               <button
                 v-if="shareProjectId(item)"
                 type="button"
