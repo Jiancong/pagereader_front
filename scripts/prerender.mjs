@@ -4,8 +4,10 @@
 // 用法（需先 vite build）：
 //   SITE_API_BASE=https://api.example.com node scripts/prerender.mjs
 // 可选环境变量：
-//   PRERENDER_LIMIT  预渲染的图书页数量（默认 50）
-//   PRERENDER_PORT   本地静态服务端口（默认 4179）
+//   SKIP_PRERENDER=1     跳过预渲染（构建仍成功）
+//   PRERENDER_LIMIT      预渲染的图书页数量（默认 50）
+//   PRERENDER_PORT       本地静态服务端口（默认 4179）
+//   CHROME_PATH          使用系统已安装的 Chrome/Chromium 可执行文件
 //   SITEMAP_API_BASE / VITE_API_URL / NEXT_PUBLIC_API_BASE  图书列表 API 源
 
 import { createServer } from "node:http"
@@ -22,6 +24,8 @@ const DIST = resolve(ROOT, "dist")
 
 const PORT = Number(process.env.PRERENDER_PORT || 4179)
 const LIMIT = Number(process.env.PRERENDER_LIMIT || 50)
+const SKIP = /^(1|true|yes)$/i.test(String(process.env.SKIP_PRERENDER || ""))
+const CHROME_PATH = String(process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || "").trim()
 const API_BASE = (
   process.env.SITE_API_BASE ||
   process.env.SITEMAP_API_BASE ||
@@ -147,7 +151,31 @@ async function prerenderRoute(browser, baseUrl, routePath, { waitForJsonLd } = {
   }
 }
 
+function logPrerenderSkipped(reason, detail) {
+  console.warn(`[prerender] skipped: ${reason}`)
+  if (detail) console.warn(detail)
+  console.warn(
+    "[prerender] Build continues without static HTML. Options:\n" +
+      "  - Set SKIP_PRERENDER=1 to silence this step\n" +
+      "  - Linux: apt-get install -y libgbm1 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libasound2\n" +
+      "  - Or: npx puppeteer browsers install chrome\n" +
+      "  - See https://pptr.dev/troubleshooting",
+  )
+}
+
+function launchOptions() {
+  const args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+  const opts = { headless: "new", args }
+  if (CHROME_PATH) opts.executablePath = CHROME_PATH
+  return opts
+}
+
 async function main() {
+  if (SKIP) {
+    console.log("[prerender] SKIP_PRERENDER=1, skipping.")
+    return
+  }
+
   if (!(await fileExists(join(DIST, "index.html")))) {
     console.error("[prerender] dist/index.html missing. Run `vite build` first.")
     process.exitCode = 1
@@ -158,17 +186,21 @@ async function main() {
   try {
     puppeteer = (await import("puppeteer")).default
   } catch {
-    console.error("[prerender] puppeteer not installed. Run `npm i -D puppeteer`.")
-    process.exitCode = 1
+    logPrerenderSkipped("puppeteer not installed", "Run `npm i -D puppeteer` in the build environment.")
     return
   }
 
   const server = await startStaticServer()
   const baseUrl = `http://127.0.0.1:${PORT}`
-  const browser = await puppeteer.launch({
-    headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  })
+
+  let browser
+  try {
+    browser = await puppeteer.launch(launchOptions())
+  } catch (e) {
+    server.close()
+    logPrerenderSkipped("failed to launch Chrome", e?.message || String(e))
+    return
+  }
 
   try {
     await prerenderRoute(browser, baseUrl, "/")
@@ -184,6 +216,5 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error("[prerender] failed:", e)
-  process.exitCode = 1
+  logPrerenderSkipped("unexpected error", e?.message || String(e))
 })
