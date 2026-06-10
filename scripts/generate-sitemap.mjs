@@ -52,7 +52,10 @@ async function collectProjectIds() {
 
 async function main() {
   const ids = await collectProjectIds()
-  const entries = [urlEntry(`${SITE_ORIGIN}/`, { changefreq: "daily", priority: "1.0" })]
+  const entries = [
+    urlEntry(`${SITE_ORIGIN}/`, { changefreq: "daily", priority: "1.0" }),
+    urlEntry(`${SITE_ORIGIN}/explore`, { changefreq: "daily", priority: "0.9" }),
+  ]
   for (const id of ids) {
     entries.push(urlEntry(`${SITE_ORIGIN}/explore/project/${encodeURIComponent(id)}`))
   }

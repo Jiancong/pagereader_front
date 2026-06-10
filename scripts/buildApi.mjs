@@ -68,3 +68,93 @@ export async function collectFeedProjectIds({ maxPages = 20, pageSize = 100, max
   }
   return ids.slice(0, maxIds)
 }
+
+async function fetchApiJson(path) {
+  const url = buildApiUrl(path)
+  const res = await fetch(url, { headers: { Accept: "application/json" } })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${url}: ${text.slice(0, 120)}`)
+  let body
+  try {
+    body = JSON.parse(text)
+  } catch {
+    throw new Error(`Non-JSON from ${url}`)
+  }
+  if (body.code !== 0 && body.success !== true) {
+    throw new Error(body.message || body.msg || `API error ${body.code}`)
+  }
+  return body.data
+}
+
+export async function fetchProject(projectId) {
+  return fetchApiJson(`/project/${encodeURIComponent(projectId)}`)
+}
+
+export async function fetchProjectConversationHistory(projectId) {
+  const data = await fetchApiJson(`/project/${encodeURIComponent(projectId)}/conversation/history`)
+  return Array.isArray(data) ? data : []
+}
+
+function asRecord(v) {
+  return v && typeof v === "object" && !Array.isArray(v) ? v : null
+}
+
+function hasSlides(data) {
+  return Array.isArray(data?.slides) && data.slides.length > 0
+}
+
+function normalizeDeckFromArtifact(obj) {
+  if (hasSlides(obj)) return obj
+  const inner = asRecord(obj?.ppt_data) ?? asRecord(obj?.pptData)
+  if (inner && hasSlides(inner)) return inner
+  return null
+}
+
+function unwrapArtifactEnvelope(obj) {
+  const payload = asRecord(obj?.payload)
+  const isEnvelope =
+    payload != null &&
+    (obj.artifact_kind != null || obj.schema_version != null || obj.sha256 != null)
+  return isEnvelope ? payload : obj
+}
+
+async function fetchPptJson(url) {
+  const res = await fetch(url, { credentials: "omit" })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const json = await res.json()
+  const obj = asRecord(json)
+  if (!obj) return null
+  return normalizeDeckFromArtifact(unwrapArtifactEnvelope(obj))
+}
+
+function looksLikeDeckJson(url) {
+  return /\.json(\?|$)/i.test(String(url || "")) || /ppt_data|deck|artifact/i.test(String(url || ""))
+}
+
+function collectDeckUrls(project, history) {
+  const urls = []
+  if (project?.configFilePath) urls.push(project.configFilePath)
+  for (const row of [...(history || [])].reverse()) {
+    if (row?.role !== "assistant") continue
+    for (const url of row.imageUrls ?? []) {
+      if (looksLikeDeckJson(url)) urls.push(url)
+    }
+  }
+  return [...new Set(urls.filter(Boolean))]
+}
+
+/** 拉取项目 deck JSON（与前端 loadPptDeck 对齐） */
+export async function resolveProjectDeck(projectId) {
+  const project = await fetchProject(projectId)
+  const history = await fetchProjectConversationHistory(projectId).catch(() => [])
+  const urls = collectDeckUrls(project, history)
+  for (const ppt_data_url of urls) {
+    try {
+      const deck = await fetchPptJson(ppt_data_url)
+      if (deck) return { project, deck }
+    } catch {
+      /* try next url */
+    }
+  }
+  return { project, deck: null }
+}

@@ -35,6 +35,8 @@ export interface BookSeoContent {
   bookTitle: string
   author: string
   overview: string
+  /** deck 幻灯片页数，用于 SEO「total pages / slides」意图 */
+  totalSlides: number
   summaryPoints: string[]
   takeaways: string[]
   characters: BookSeoCharacter[]
@@ -124,10 +126,13 @@ export function extractBookSeoContent(
     }
   }
 
+  const totalSlides = Array.isArray(deck?.slides) ? deck.slides.length : 0
+
   return {
     bookTitle,
     author,
     overview,
+    totalSlides,
     summaryPoints: dedupe(summaryPoints).slice(0, 24),
     takeaways: dedupe(takeaways).slice(0, 12),
     characters: characters
@@ -150,14 +155,16 @@ export function buildBookSeoTitle(content: BookSeoContent, siteName = "Page2Top"
 export function buildBookSeoDescription(content: BookSeoContent): string {
   const title = content.bookTitle || "this book"
   const byline = content.author ? ` by ${content.author}` : ""
+  const pagesHint =
+    content.totalSlides > 0 ? `${content.totalSlides}-slide interactive deck. ` : ""
   const intents = content.characters.length
-    ? "summary, key takeaways, main characters, and analysis"
-    : "summary, key takeaways, and analysis"
+    ? "summary, review, key takeaways, main characters, and analysis"
+    : "summary, review, key takeaways, and analysis"
   let desc =
     content.overview ||
-    `Read a clear summary of ${title}${byline}: ${intents}. Explore the interactive deck and discussion on Page2Top.`
+    `${pagesHint}Read a clear summary of ${title}${byline}: ${intents}. Explore the interactive deck on Page2Top.`
   if (content.overview) {
-    desc = `${title}${byline} — ${intents}. ${content.overview}`
+    desc = `${title}${byline} — ${pagesHint}${intents}. ${content.overview}`
   }
   return desc.length > 160 ? `${desc.slice(0, 157).trimEnd()}…` : desc
 }
@@ -177,6 +184,7 @@ export function buildBookJsonLd(
     description: opts.description,
   }
   if (content.author) book.author = { "@type": "Person", name: content.author }
+  if (content.totalSlides > 0) book.numberOfPages = content.totalSlides
   if (opts.image) book.image = opts.image
   if (content.characters.length) {
     book.character = content.characters.map((c) => ({
@@ -210,6 +218,7 @@ export function buildBookJsonLd(
 }
 
 /** 板块/卡片用：把书名折叠成迎合检索意图的副标题 */
-export function bookCardTagline(bookTitle: string): string {
-  return `${bookTitle} — Summary, Review & Characters`
+export function bookCardTagline(bookTitle: string, totalSlides = 0): string {
+  const pages = totalSlides > 0 ? `${totalSlides} slides · ` : ""
+  return `${pages}${bookTitle} — Summary, Review & Characters`
 }

@@ -7,7 +7,10 @@
       @open-login="openLogin"
       @enter="goWorkspace"
     />
-    <main class="mx-auto max-w-3xl px-3 pb-16 pt-[4.5rem] sm:px-6 sm:pt-20">
+    <main
+      class="mx-auto max-w-3xl px-3 pb-16 pt-[4.5rem] sm:px-6 sm:pt-20"
+      :data-seo-ready="seoReady ? 'true' : undefined"
+    >
       <button
         class="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
         @click="goBack"
@@ -26,6 +29,9 @@
             <h1 class="break-words text-2xl font-bold text-foreground sm:text-3xl">{{ pageHeading }}</h1>
             <p v-if="seo.author" class="mt-1 text-sm text-muted-foreground">
               {{ t('community.bookAuthor', { name: seo.author }) }}
+            </p>
+            <p v-if="seo.totalSlides > 0" class="mt-1 text-xs text-muted-foreground">
+              {{ t('community.seo.deckPages', { count: seo.totalSlides }) }}
             </p>
             <p v-if="seo.overview" class="mt-3 text-base leading-relaxed text-muted-foreground">
               {{ seo.overview }}
@@ -67,7 +73,7 @@
         </p>
 
         <!-- Summary：承接 "{book} summary / book summary" -->
-        <section v-if="seo.summaryPoints.length" class="mt-10">
+        <section v-if="seo.summaryPoints.length" data-seo-section="summary" class="mt-10">
           <h2 class="text-xl font-bold text-foreground">
             {{ t('community.seo.summaryHeading', { title: seo.bookTitle }) }}
           </h2>
@@ -84,7 +90,7 @@
         </section>
 
         <!-- Key takeaways / analysis：承接 "analysis / key takeaways" -->
-        <section v-if="seo.takeaways.length" class="mt-10">
+        <section v-if="seo.takeaways.length" data-seo-section="takeaways" class="mt-10">
           <h2 class="text-xl font-bold text-foreground">
             {{ t('community.seo.takeawaysHeading', { title: seo.bookTitle }) }}
           </h2>
@@ -101,7 +107,7 @@
         </section>
 
         <!-- Characters：承接 "{book} characters" -->
-        <section v-if="seo.characters.length" class="mt-10">
+        <section v-if="seo.characters.length" data-seo-section="characters" class="mt-10">
           <h2 class="text-xl font-bold text-foreground">
             {{ t('community.seo.charactersHeading', { title: seo.bookTitle }) }}
           </h2>
@@ -242,7 +248,11 @@ const hasSeoBody = computed(
   () =>
     seo.value.summaryPoints.length > 0 ||
     seo.value.takeaways.length > 0 ||
-    seo.value.characters.length > 0,
+    seo.value.characters.length > 0 ||
+    Boolean(seo.value.overview),
+)
+const seoReady = computed(
+  () => Boolean(project.value) && (hasSeoBody.value || !loadingDeck.value),
 )
 const pageHeading = computed(() => {
   const title = seo.value.bookTitle || project.value?.name || t('workspace.unnamedProject')

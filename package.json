@@ -4,9 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/prerender.mjs && node scripts/generate-sitemap.mjs",
+    "build": "vite build && node scripts/prerender.mjs && node scripts/injectBookSeoPages.mjs && node scripts/generate-sitemap.mjs",
     "build:vite": "vite build",
     "prerender": "node scripts/prerender.mjs",
+    "inject:seo": "node scripts/injectBookSeoPages.mjs",
     "gen:sitemap": "node scripts/generate-sitemap.mjs",
     "start": "serve dist -s -l tcp://127.0.0.1:3000",
     "preview": "vite preview"

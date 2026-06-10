@@ -103,21 +103,30 @@ function outFileForRoute(routePath) {
   return join(DIST, routePath.replace(/^\//, ""), "index.html")
 }
 
-async function prerenderRoute(browser, baseUrl, routePath, { waitForJsonLd } = {}) {
+async function prerenderRoute(browser, baseUrl, routePath, { waitForSeo } = {}) {
   const page = await browser.newPage()
   try {
     await page.goto(`${baseUrl}${routePath}`, {
       waitUntil: "networkidle0",
-      timeout: 60000,
+      timeout: 90000,
     })
-    await page.waitForSelector("#app h1", { timeout: 15000 }).catch(() => {})
-    if (waitForJsonLd) {
+    await page.waitForSelector("#app h1", { timeout: 20000 }).catch(() => {})
+    if (waitForSeo) {
       await page
         .waitForFunction(
-          () => !!document.querySelector('script[type="application/ld+json"][data-seo-head]'),
-          { timeout: 10000 },
+          () =>
+            document.querySelector('[data-seo-ready="true"]') ||
+            document.querySelector('[data-seo-section="summary"]') ||
+            document.querySelector('script[type="application/ld+json"][data-seo-head]'),
+          { timeout: 45000 },
         )
         .catch(() => {})
+    }
+    if (routePath === "/") {
+      await page.waitForSelector("#ebooks ul li", { timeout: 20000 }).catch(() => {})
+    }
+    if (routePath === "/explore") {
+      await page.waitForSelector(".grid .rounded-xl", { timeout: 20000 }).catch(() => {})
     }
     const html = await page.content()
     const out = outFileForRoute(routePath)
@@ -184,11 +193,12 @@ async function main() {
 
   try {
     await prerenderRoute(browser, baseUrl, "/")
+    await prerenderRoute(browser, baseUrl, "/explore")
     const ids = await fetchTopProjectIds(LIMIT)
     for (const id of ids) {
-      await prerenderRoute(browser, baseUrl, `/explore/project/${id}`, { waitForJsonLd: true })
+      await prerenderRoute(browser, baseUrl, `/explore/project/${id}`, { waitForSeo: true })
     }
-    console.log(`[prerender] done: 1 home + ${ids.length} book pages`)
+    console.log(`[prerender] done: home + explore + ${ids.length} book pages`)
   } finally {
     await browser.close()
     server.close()

@@ -499,6 +499,7 @@ export default {
     seo: {
       heading: "《{title}》摘要与核心要点",
       headingWithCharacters: "《{title}》摘要、人物与书评",
+      deckPages: "共 {count} 页 · 摘要、书评与核心要点",
       summaryHeading: "《{title}》内容摘要",
       takeawaysHeading: "《{title}》核心要点与解析",
       charactersHeading: "《{title}》主要人物",

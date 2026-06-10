@@ -509,6 +509,7 @@ export default {
     seo: {
       heading: "{title} Summary & Key Takeaways",
       headingWithCharacters: "{title} Summary, Characters & Review",
+      deckPages: "{count} slides · summary, review & key takeaways",
       summaryHeading: "{title} Summary",
       takeawaysHeading: "{title}: Key Takeaways & Analysis",
       charactersHeading: "{title}: Main Characters",
