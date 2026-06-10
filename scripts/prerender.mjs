@@ -15,6 +15,7 @@ import { readFile, writeFile, mkdir, stat } from "node:fs/promises"
 import { dirname, resolve, join, extname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { loadBuildEnv } from "./loadBuildEnv.mjs"
+import { resolveApiBase, collectFeedProjectIds } from "./buildApi.mjs"
 
 loadBuildEnv()
 
@@ -26,13 +27,6 @@ const PORT = Number(process.env.PRERENDER_PORT || 4179)
 const LIMIT = Number(process.env.PRERENDER_LIMIT || 50)
 const SKIP = /^(1|true|yes)$/i.test(String(process.env.SKIP_PRERENDER || ""))
 const CHROME_PATH = String(process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || "").trim()
-const API_BASE = (
-  process.env.SITE_API_BASE ||
-  process.env.SITEMAP_API_BASE ||
-  process.env.VITE_API_URL ||
-  process.env.NEXT_PUBLIC_API_BASE ||
-  ""
-).replace(/\/$/, "")
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -87,35 +81,21 @@ function startStaticServer() {
 }
 
 async function fetchTopProjectIds(limit) {
-  if (!API_BASE) {
+  if (!resolveApiBase()) {
     console.warn("[prerender] No API base; only homepage will be prerendered.")
     return []
   }
-  const ids = []
-  const pageSize = Math.min(100, limit)
-  for (let page = 1; ids.length < limit; page++) {
-    let json
-    try {
-      const res = await fetch(`${API_BASE}/www/model/feed/stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page, pageSize, sort: 1 }),
-      })
-      if (!res.ok) break
-      json = await res.json()
-    } catch (e) {
-      console.warn("[prerender] feed fetch failed:", e?.message || e)
-      break
-    }
-    const data = json?.data?.data ?? json?.data ?? []
-    if (!Array.isArray(data) || !data.length) break
-    for (const item of data) {
-      const pid = String(item?.projectId ?? "").trim()
-      if (pid && !ids.includes(pid)) ids.push(pid)
-    }
-    if (data.length < pageSize) break
+  try {
+    const ids = await collectFeedProjectIds({
+      maxPages: Math.ceil(limit / 100) + 1,
+      pageSize: Math.min(100, limit),
+      maxIds: limit,
+    })
+    return ids
+  } catch (e) {
+    console.warn("[prerender] feed fetch failed:", e?.message || e)
+    return []
   }
-  return ids.slice(0, limit)
 }
 
 function outFileForRoute(routePath) {

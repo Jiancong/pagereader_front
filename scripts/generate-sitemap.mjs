@@ -10,6 +10,7 @@ import { writeFile, mkdir } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { loadBuildEnv } from "./loadBuildEnv.mjs"
+import { resolveApiBase, collectFeedProjectIds } from "./buildApi.mjs"
 
 loadBuildEnv()
 
@@ -17,12 +18,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, "..")
 
 const SITE_ORIGIN = (process.env.SITE_ORIGIN || "https://page2.top").replace(/\/$/, "")
-const API_BASE = (
-  process.env.SITEMAP_API_BASE ||
-  process.env.VITE_API_URL ||
-  process.env.NEXT_PUBLIC_API_BASE ||
-  ""
-).replace(/\/$/, "")
 const OUT = process.env.SITEMAP_OUT || resolve(ROOT, "dist", "sitemap.xml")
 const MAX_PAGES = Number(process.env.SITEMAP_MAX_PAGES || 20)
 const PAGE_SIZE = Number(process.env.SITEMAP_PAGE_SIZE || 100)
@@ -38,36 +33,21 @@ function urlEntry(loc, { changefreq = "weekly", priority = "0.7" } = {}) {
 }
 
 async function collectProjectIds() {
-  if (!API_BASE) {
+  if (!resolveApiBase()) {
     console.warn(
       "[sitemap] No API base (SITEMAP_API_BASE / VITE_API_URL). Writing homepage-only sitemap.",
     )
     return []
   }
-  const ids = new Set()
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    let json
-    try {
-      const res = await fetch(`${API_BASE}/www/model/feed/stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page, pageSize: PAGE_SIZE, sort: 1 }),
-      })
-      if (!res.ok) break
-      json = await res.json()
-    } catch (e) {
-      console.warn(`[sitemap] feed fetch failed at page ${page}:`, e?.message || e)
-      break
-    }
-    const data = json?.data?.data ?? json?.data ?? []
-    if (!Array.isArray(data) || !data.length) break
-    for (const item of data) {
-      const pid = String(item?.projectId ?? "").trim()
-      if (pid) ids.add(pid)
-    }
-    if (data.length < PAGE_SIZE) break
+  try {
+    return await collectFeedProjectIds({
+      maxPages: MAX_PAGES,
+      pageSize: PAGE_SIZE,
+    })
+  } catch (e) {
+    console.warn(`[sitemap] feed fetch failed:`, e?.message || e)
+    return []
   }
-  return [...ids]
 }
 
 async function main() {
