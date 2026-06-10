@@ -18519,11 +18519,11 @@ defineExpose({
   }
 
   .ppt-toc-title {
-    font-size: clamp(15px, 2.8cqi, 22px);
+    font-size: clamp(16px, 3cqi, 24px);
   }
 
   .ppt-toc-subtitle {
-    font-size: clamp(10px, 1.5cqi, 12px);
+    font-size: clamp(11px, 1.65cqi, 13px);
     margin-top: 2px;
   }
 }
@@ -18597,32 +18597,34 @@ defineExpose({
 
 .ppt-toc-grid--compact {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(5px, 0.9cqi, 8px);
+  gap: clamp(6px, 1cqi, 10px);
+  align-content: start;
+  grid-auto-rows: auto;
 
   .ppt-toc-card {
-    padding: clamp(6px, 1.1cqi, 10px) clamp(8px, 1.4cqi, 12px);
+    padding: clamp(8px, 1.4cqi, 12px) clamp(10px, 1.6cqi, 14px);
     gap: clamp(6px, 1cqi, 8px);
     align-items: center;
   }
 
   .ppt-toc-card-icon {
-    width: clamp(24px, 3.2cqi, 30px);
-    height: clamp(24px, 3.2cqi, 30px);
+    width: clamp(28px, 3.8cqi, 36px);
+    height: clamp(28px, 3.8cqi, 36px);
     margin-top: 0;
 
     svg {
-      width: clamp(14px, 2cqi, 18px);
-      height: clamp(14px, 2cqi, 18px);
+      width: clamp(16px, 2.2cqi, 20px);
+      height: clamp(16px, 2.2cqi, 20px);
     }
   }
 
   .ppt-toc-card-body {
-    gap: clamp(2px, 0.5cqi, 4px);
+    gap: clamp(3px, 0.6cqi, 6px);
   }
 
   .ppt-toc-card-title {
-    font-size: clamp(11px, 1.9cqi, 14px);
-    line-height: 1.25;
+    font-size: clamp(13px, 2.3cqi, 17px);
+    line-height: 1.3;
     font-weight: 700;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -18636,8 +18638,8 @@ defineExpose({
   }
 
   .ppt-toc-card-desc {
-    font-size: clamp(9px, 1.45cqi, 11px);
-    line-height: 1.3;
+    font-size: clamp(11px, 1.75cqi, 14px);
+    line-height: 1.35;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
