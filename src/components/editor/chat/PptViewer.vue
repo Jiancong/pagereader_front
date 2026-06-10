@@ -8657,15 +8657,9 @@ const emit = defineEmits<{
 
 const chatHistoryRailCollapsed = ref(false);
 const relatedSearchSessionEntries = ref<RelatedSearchSessionEntry[]>([]);
+const { t, locale } = useI18n();
 
 const MOBILE_LAYOUT_MAX = 767;
-
-function syncMobileChrome() {
-  if (typeof window === "undefined") return;
-  if (window.innerWidth <= MOBILE_LAYOUT_MAX && showChatHistoryRail.value) {
-    chatHistoryRailCollapsed.value = true;
-  }
-}
 
 const chatHistoryRailItems = computed(() => {
   const base = Array.isArray(props.chatHistory) ? props.chatHistory : [];
@@ -8677,9 +8671,14 @@ const chatHistoryRailItems = computed(() => {
 
 const showChatHistoryRail = computed(() => chatHistoryRailItems.value.length > 0);
 
-watch(showChatHistoryRail, () => syncMobileChrome());
+function syncMobileChrome() {
+  if (typeof window === "undefined") return;
+  if (window.innerWidth <= MOBILE_LAYOUT_MAX && showChatHistoryRail.value) {
+    chatHistoryRailCollapsed.value = true;
+  }
+}
 
-const { t, locale } = useI18n();
+watch(showChatHistoryRail, () => syncMobileChrome());
 const currentSlide = ref(props.initialSlide ?? 0);
 const viewerRef = ref<HTMLElement | null>(null);
 const slideWrapperRef = ref<HTMLElement | null>(null);
