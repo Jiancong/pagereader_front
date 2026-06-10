@@ -42,6 +42,7 @@ export function gtmPageTypeFromRoute(
   if (n === "landing") return "landing"
   if (n === "workspace") return "workspace"
   if (n === "pricing") return "pricing"
+  if (n === "explore") return "explore"
   if (n === "story") return "story"
   if (n === "project-reader") return "project_reader"
   if (n === "project-community") return "project_community"

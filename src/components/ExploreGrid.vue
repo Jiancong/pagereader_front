@@ -1,6 +1,6 @@
 <template>
   <div class="mx-auto max-w-6xl">
-    <div class="mb-6">
+    <div v-if="showHeader" class="mb-6">
       <h2 class="text-2xl font-bold text-foreground">{{ t('workspace.exploreTitle') }}</h2>
       <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.exploreSubtitle') }}</p>
     </div>
@@ -96,12 +96,13 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Loader2, Eye, Heart, Trash2, Share2 } from 'lucide-vue-next'
-import { feedApi } from '../../api'
+import { feedApi } from '@/api'
 import { canDeleteFeedItem, feedItemDeleteProjectId } from '@/utils/projectDelete'
 import { buildExploreProjectShareUrl, feedItemShareProjectId } from '@/utils/feedOpen'
 
 const props = defineProps({
   userId: { type: [String, Number], default: null },
+  showHeader: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['open', 'deleted'])

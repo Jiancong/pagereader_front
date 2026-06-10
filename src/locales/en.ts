@@ -6,6 +6,7 @@ export default {
   },
   nav: {
     features: "Features",
+    explore: "Explore",
     pricing: "Pricing",
     story: "Our story",
     login: "Log in",
@@ -70,6 +71,7 @@ export default {
       subtitle:
         "Explore AI-generated book summaries, key takeaways, character breakdowns, and reviews—then read them as interactive decks or create your own.",
       cardAlt: "{title} — book summary, review and characters",
+      viewAll: "Browse all books",
       cta: "Generate your own book summary",
     },
     tabQuick: "Quick prompt",

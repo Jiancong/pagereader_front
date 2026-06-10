@@ -14,6 +14,12 @@
           {{ t('nav.features') }}
         </RouterLink>
         <RouterLink
+          to="/explore"
+          class="text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {{ t('nav.explore') }}
+        </RouterLink>
+        <RouterLink
           to="/pricing"
           class="text-sm text-muted-foreground transition-colors hover:text-foreground"
         >

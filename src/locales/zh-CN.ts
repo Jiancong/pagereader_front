@@ -6,6 +6,7 @@ export default {
   },
   nav: {
     features: "功能特性",
+    explore: "探索",
     pricing: "定价",
     story: "我们的故事",
     login: "登录",
@@ -70,6 +71,7 @@ export default {
       subtitle:
         "浏览 AI 生成的图书摘要、核心要点、人物解析与书评——可作为可交互演示文稿阅读，也能一键生成你自己的版本。",
       cardAlt: "{title} —— 图书摘要、书评与人物",
+      viewAll: "浏览全部图书",
       cta: "生成我的图书摘要",
     },
     tabQuick: "一句话生成",

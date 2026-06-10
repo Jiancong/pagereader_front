@@ -53,7 +53,13 @@
         <Loader2 class="h-5 w-5 animate-spin" />
       </div>
 
-      <div class="mt-10 text-center">
+      <div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+        <RouterLink
+          to="/explore"
+          class="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary/50 px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/50"
+        >
+          {{ t('landing.ebooks.viewAll') }}
+        </RouterLink>
         <button
           type="button"
           class="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
