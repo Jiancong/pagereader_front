@@ -500,6 +500,7 @@
           <div
             v-else-if="slide.layout === 'toc'"
             class="ppt-slide ppt-toc"
+            :class="`ppt-toc--${tocDensityLevel(slide)}`"
           >
             <!-- 标题区域 -->
             <div class="ppt-toc-header">
@@ -519,7 +520,7 @@
               </div>
             </div>
             <!-- 卡片网格 -->
-            <div class="ppt-toc-grid">
+            <div class="ppt-toc-grid" :class="`ppt-toc-grid--${tocDensityLevel(slide)}`">
               <div
                 v-for="(entry, ti) in getTocEntries(slide)"
                 :key="'toc-' + ti"
@@ -10985,6 +10986,14 @@ function getTocEntries(slide: PptSlide | undefined): PptTocEntry[] {
   }));
 }
 
+/** 目录页密度：条目多时缩小字号与间距，保证一屏展示 */
+function tocDensityLevel(slide: PptSlide | undefined): "default" | "medium" | "compact" {
+  const n = getTocEntries(slide).length;
+  if (n >= 6) return "compact";
+  if (n >= 4) return "medium";
+  return "default";
+}
+
 /** 目录图标槽位（0–5），与模板内 SVG 分支对应 */
 function tocIconIndex(entry: PptTocEntry, ti: number): number {
   const icon = (entry.icon || "").toLowerCase();
@@ -18479,18 +18488,52 @@ defineExpose({
 /* ── toc ── */
 .ppt-toc {
   justify-content: flex-start;
-  padding: 32px 44px 20px;
+  padding: clamp(20px, 3cqi, 32px) clamp(28px, 4cqi, 44px) clamp(12px, 2cqi, 20px);
   overflow: hidden;
+}
+
+.ppt-toc--medium {
+  padding: clamp(16px, 2.4cqi, 26px) clamp(22px, 3.2cqi, 36px) clamp(10px, 1.6cqi, 16px);
+
+  .ppt-toc-header {
+    margin-bottom: clamp(8px, 1.4cqi, 14px);
+  }
+
+  .ppt-toc-title {
+    font-size: clamp(18px, 3.6cqi, 28px);
+  }
+
+  .ppt-toc-subtitle {
+    font-size: clamp(11px, 1.8cqi, 14px);
+    margin-top: 4px;
+  }
+}
+
+.ppt-toc--compact {
+  padding: clamp(12px, 2cqi, 20px) clamp(18px, 2.8cqi, 28px) clamp(8px, 1.2cqi, 12px);
+
+  .ppt-toc-header {
+    margin-bottom: clamp(6px, 1cqi, 10px);
+  }
+
+  .ppt-toc-title {
+    font-size: clamp(15px, 2.8cqi, 22px);
+  }
+
+  .ppt-toc-subtitle {
+    font-size: clamp(10px, 1.5cqi, 12px);
+    margin-top: 2px;
+  }
 }
 
 /* 标题区域 */
 .ppt-toc-header {
-  margin-bottom: 18px;
+  margin-bottom: clamp(10px, 1.8cqi, 18px);
   flex-shrink: 0;
 }
 
 .ppt-toc-title {
-  font-size: clamp(22px, 4.8cqi, 36px);
+  font-size: clamp(20px, 4cqi, 32px);
   font-weight: 800;
   margin: 0 0 2px;
   color: var(--ppt-accent, #4a90e2);
@@ -18500,7 +18543,7 @@ defineExpose({
 }
 
 .ppt-toc-subtitle {
-  font-size: clamp(13px, 2.2cqi, 16px);
+  font-size: clamp(12px, 2cqi, 15px);
   opacity: 0.55;
   margin: 6px 0 0 18px;
 }
@@ -18508,24 +18551,111 @@ defineExpose({
 /* 卡片网格：2 列自适应 */
 .ppt-toc-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: clamp(12px, 2.4cqi, 18px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(10px, 1.8cqi, 16px);
   flex: 1;
   min-height: 0;
-  align-content: start;
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.ppt-toc-grid--medium {
+  gap: clamp(8px, 1.4cqi, 12px);
+
+  .ppt-toc-card {
+    padding: clamp(10px, 1.8cqi, 14px) clamp(12px, 2cqi, 16px);
+    gap: clamp(8px, 1.4cqi, 10px);
+  }
+
+  .ppt-toc-card-icon {
+    width: clamp(32px, 4.5cqi, 40px);
+    height: clamp(32px, 4.5cqi, 40px);
+    margin-top: 2px;
+
+    svg {
+      width: clamp(18px, 2.6cqi, 22px);
+      height: clamp(18px, 2.6cqi, 22px);
+    }
+  }
+
+  .ppt-toc-card-body {
+    gap: clamp(4px, 0.8cqi, 8px);
+  }
+
+  .ppt-toc-card-title {
+    font-size: clamp(14px, 2.6cqi, 18px);
+    line-height: 1.3;
+  }
+
+  .ppt-toc-card-desc {
+    font-size: clamp(11px, 1.8cqi, 14px);
+    line-height: 1.35;
+  }
+}
+
+.ppt-toc-grid--compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(5px, 0.9cqi, 8px);
+
+  .ppt-toc-card {
+    padding: clamp(6px, 1.1cqi, 10px) clamp(8px, 1.4cqi, 12px);
+    gap: clamp(6px, 1cqi, 8px);
+    align-items: center;
+  }
+
+  .ppt-toc-card-icon {
+    width: clamp(24px, 3.2cqi, 30px);
+    height: clamp(24px, 3.2cqi, 30px);
+    margin-top: 0;
+
+    svg {
+      width: clamp(14px, 2cqi, 18px);
+      height: clamp(14px, 2cqi, 18px);
+    }
+  }
+
+  .ppt-toc-card-body {
+    gap: clamp(2px, 0.5cqi, 4px);
+  }
+
+  .ppt-toc-card-title {
+    font-size: clamp(11px, 1.9cqi, 14px);
+    line-height: 1.25;
+    font-weight: 700;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .ppt-toc-card-num {
+    margin-right: 6px;
+    font-size: 0.95em;
+  }
+
+  .ppt-toc-card-desc {
+    font-size: clamp(9px, 1.45cqi, 11px);
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }
 
 /* 单个卡片 */
 .ppt-toc-card {
   display: flex;
   align-items: flex-start;
-  gap: clamp(12px, 2cqi, 16px);
-  padding: clamp(14px, 2.8cqi, 22px) clamp(16px, 3cqi, 24px);
+  gap: clamp(10px, 1.8cqi, 14px);
+  padding: clamp(12px, 2.2cqi, 18px) clamp(14px, 2.4cqi, 20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   background: var(--ppt-bg-secondary, rgba(255, 255, 255, 0.03));
   transition: border-color 0.25s, background 0.25s;
   cursor: default;
+  min-height: 0;
+  overflow: hidden;
 
   &:hover {
     border-color: var(--ppt-accent, #4a90e2);
@@ -18536,17 +18666,17 @@ defineExpose({
 /* 图标容器 */
 .ppt-toc-card-icon {
   flex-shrink: 0;
-  width: clamp(44px, 6cqi, 52px);
-  height: clamp(44px, 6cqi, 52px);
+  width: clamp(36px, 5cqi, 44px);
+  height: clamp(36px, 5cqi, 44px);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--ppt-accent, #4a90e2);
-  margin-top: 4px;
+  margin-top: 2px;
 
   svg {
-    width: clamp(26px, 4cqi, 32px);
-    height: clamp(26px, 4cqi, 32px);
+    width: clamp(20px, 3cqi, 26px);
+    height: clamp(20px, 3cqi, 26px);
   }
 }
 
@@ -18554,13 +18684,13 @@ defineExpose({
 .ppt-toc-card-body {
   display: flex;
   flex-direction: column;
-  gap: clamp(8px, 1.6cqi, 12px);
+  gap: clamp(4px, 0.9cqi, 8px);
   min-width: 0;
   flex: 1;
 }
 
 .ppt-toc-card-title {
-  font-size: clamp(22px, 4.8cqi, 32px);
+  font-size: clamp(16px, 3.2cqi, 22px);
   font-weight: 800;
   color: var(--ppt-text, #e8f0fe);
   line-height: 1.35;
@@ -18571,13 +18701,13 @@ defineExpose({
   color: var(--ppt-accent, #4a90e2);
   font-weight: 800;
   font-size: 1.05em;
-  margin-right: 10px;
+  margin-right: 8px;
 }
 
 .ppt-toc-card-desc {
-  font-size: clamp(17px, 3.6cqi, 24px);
+  font-size: clamp(12px, 2.2cqi, 15px);
   color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.62));
-  line-height: 1.45;
+  line-height: 1.4;
   word-break: break-word;
 }
 
@@ -18997,6 +19127,10 @@ defineExpose({
 
   .ppt-topic-grid {
     grid-template-columns: 1fr;
+  }
+
+  .ppt-toc-grid--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .ppt-speaker-notes-pane {
