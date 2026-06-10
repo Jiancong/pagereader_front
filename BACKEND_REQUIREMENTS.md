@@ -831,6 +831,150 @@ POST /api2/project/{id}/fork
 
 ---
 
+## 9. 【新增】社区图书多语言元数据（书名与内容语言一致）
+
+### 9.0 背景 / 问题
+
+同一本书可能在社区存在 **中文 deck** 与 **英文 deck** 两个独立 project（不同 `projectId`）。当前常见现象：
+
+- PPT / `deck.subtitle`、正文 slides 为**中文**
+- 但 `sourceBookTitle`、`name` 仍为上传文件名或英文原名（如 `Poor Charlie's Almanack_ … ( PDFDrive )`）
+
+前端社区页 SEO 标题取自 `sourceBookTitle → name → deck.title`（见 `src/utils/bookSeo.ts`）。**元数据语言与 deck 内容语言不一致**会导致：
+
+- 页面 H1 / `<title>` / JSON-LD 显示英文书名，副标题与正文却是中文
+- 中文长尾 SEO（如「穷查理宝典 摘要」）无法命中
+- 探索流卡片标题与点进去后的体验割裂
+
+**结论**：书名、作者等元数据应在 **生成 / 分享时由后端写入**，并与 **deck 实际语言** 对齐；前端仅做展示兜底，不负责实时翻译书名。
+
+### 9.1 新增 / 规范字段
+
+在 **`ProjectVo`**（`GET /project/{id}`、`fork`、`share-to-community` 响应）及 **Feed 项**（`POST /www/model/feed/stream`）中统一如下字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `sourceBookTitle` | string | 推荐 | **与 deck 内容语言一致**的规范书名。中文 deck → 中文名（如 `穷查理宝典`）；英文 deck → 英文名。不得长期使用 PDF 文件名（见 §9.2 清洗规则） |
+| `sourceBookAuthor` | string | 可选 | 与 deck 语言一致的作者名展示（中文 deck 可用中文译名或原文，需统一策略） |
+| `contentLanguage` | string | **推荐** | deck 主内容语言，ISO 639-1：`zh` \| `en`（可扩展 `ja` 等）。由生成 pipeline 在 complete 时判定并落库 |
+| `sourceBookTitleZh` | string | 可选 | 同一本书的**中文规范书名**（用于跨语言关联、SEO hreflang；中文 deck 可与 `sourceBookTitle` 相同） |
+| `sourceBookTitleEn` | string | 可选 | 同一本书的**英文规范书名** |
+| `canonicalBookKey` | string | 可选 | 同一本书跨中/英 project 的稳定关联键（如 ISBN、Open Library ID、或后端生成的 `book-{uuid}`）。**不用于路由**，仅用于关联与 sitemap |
+| `relatedProjectIds` | string[] | 可选 | 同一 `canonicalBookKey` 下其他语言版本的 `projectId` 列表（不含自身），供前端语言切换 / SEO `alternate` |
+
+**Feed 项 `FeedStreamItemDto` 补充**（与 project 对齐）：
+
+| 字段 | 说明 |
+|------|------|
+| `name` | 探索流卡片标题，**应与 `contentLanguage` 一致**（中文 project 用中文 `sourceBookTitle`） |
+| `nameEn` | 可选，英文书名；**当 `contentLanguage=zh` 时作副标题或 hreflang，不应覆盖 `name` 的主展示** |
+| `contentLanguage` | 同 ProjectVo |
+| `sourceBookTitle` / `sourceBookAuthor` | 建议与 `GET /project/{id}` 一致返回，减少前端二次请求 |
+
+### 9.2 写入时机与规则
+
+#### A. PPT 生成完成（`chat-stream` → `complete`）
+
+| 步骤 | 要求 |
+|------|------|
+| 1. 判定语言 | 根据 user prompt、`uploaded_documents` 语言、或 deck 首屏/正文抽样，写入 `contentLanguage` |
+| 2. 规范书名 | 从文档内容 / LLM 抽取**规范书名**（非文件名），写入 `sourceBookTitle`；同时更新 `name`（与 §2.1 一致，但 **complete 后应以规范书名为准覆盖** 文件名-derived 的 `name`） |
+| 3. deck JSON | PPT `title`（封面）与 `sourceBookTitle` **语言一致**；`subtitle` 与 slides 语言一致 |
+| 4. 双语字段 | 若 pipeline 已知中英双名（如翻译书），可同时写 `sourceBookTitleZh` / `sourceBookTitleEn` |
+
+#### B. 文件名清洗（写入 `sourceBookTitle` / `name` 前）
+
+以下后缀 / 噪声须去除或替换为规范书名，**不得**原样落库为 SEO 标题：
+
+- `( PDFDrive )`、`_ PDFDrive`、`.pdf` / 扩展名
+- 下划线连接的长文件名（优先 LLM 抽取短书名）
+- 重复空格、全角半角混排 normalize
+
+**示例**：
+
+| 上传文件名 | contentLanguage | sourceBookTitle（期望） |
+|------------|-----------------|-------------------------|
+| `Poor Charlie's Almanack_ … ( PDFDrive ).pdf` | `en` | `Poor Charlie's Almanack` |
+| `穷查理宝典.pdf` | `zh` | `穷查理宝典` |
+| 同上英文 PDF，但 user prompt 要求中文 PPT | `zh` | `穷查理宝典`（非英文文件名） |
+
+#### C. 分享到社区（`POST /project/{id}/share-to-community`）
+
+- 分享前校验：`contentLanguage` 已设置；`sourceBookTitle` 与 deck 语言一致，否则 **400** 并提示修复（或分享时自动 re-extract 一次）
+- Feed 索引使用 §9.1 的 `name` + `contentLanguage`，保证探索流卡片与详情页一致
+
+#### D. Fork（`POST /project/{id}/fork`）
+
+- 复制 `sourceBookTitle`、`sourceBookAuthor`、`contentLanguage`、`sourceBookTitleZh/En`、`canonicalBookKey`
+- Fork 副本默认 `canonicalBookKey` 不变，`relatedProjectIds` 可选刷新
+
+### 9.3 接口响应示例
+
+**中文社区作品** `GET /api2/project/{id}`：
+
+```json
+{
+  "code": 0,
+  "data": {
+    "id": "c2e3ee39fec341309aa4acb5b95ee1ef",
+    "name": "穷查理宝典",
+    "sourceBookTitle": "穷查理宝典",
+    "sourceBookAuthor": "查理·芒格",
+    "contentLanguage": "zh",
+    "sourceBookTitleZh": "穷查理宝典",
+    "sourceBookTitleEn": "Poor Charlie's Almanack",
+    "canonicalBookKey": "book-charlie-munger-almanack",
+    "relatedProjectIds": ["a1b2c3d4…英文版projectId"],
+    "thumbnailUrl": "https://…",
+    "configFilePath": "https://…/ppt_data.json",
+    "sharedToCommunity": true
+  }
+}
+```
+
+**探索流** `POST /api2/www/model/feed/stream` 单条 item 片段：
+
+```json
+{
+  "id": "feed-item-uuid",
+  "sourceType": "USER_PROJECT",
+  "projectId": "c2e3ee39fec341309aa4acb5b95ee1ef",
+  "name": "穷查理宝典",
+  "nameEn": "Poor Charlie's Almanack",
+  "contentLanguage": "zh",
+  "sourceBookTitle": "穷查理宝典",
+  "imageUrl": "https://…",
+  "viewCount": 12
+}
+```
+
+### 9.4 前端消费约定（供后端知悉）
+
+| 场景 | 前端行为 |
+|------|----------|
+| 社区页 H1 / SEO title | 优先 `sourceBookTitle`（后端按语言写好后即可正确展示） |
+| 探索流卡片 | 优先 `name`，fallback `sourceBookTitle` |
+| 语言切换（可选） | 若返回 `relatedProjectIds` + `contentLanguage`，前端可展示「English version / 中文版」链接 |
+| 兜底 | 在后端未全量上线前，前端可检测 deck 正文语言并优先选用含 CJK 的 `deck.title`；**不依赖前端实时翻译** |
+
+### 9.5 验收
+
+1. 用户用**中文 prompt** 分析英文 PDF → complete 后 `contentLanguage=zh`，`sourceBookTitle` 为中文规范书名，`name` 同步更新，deck 封面 `title` 为中文。
+2. 同一用户再生成**英文版** → 新 project `contentLanguage=en`，`sourceBookTitle` 为英文规范名；可选共享 `canonicalBookKey`，`relatedProjectIds` 互相引用。
+3. `GET /project/{id}` 与 feed item 的 `name` / `sourceBookTitle` / `contentLanguage` **一致**；无 `( PDFDrive )` 等文件名噪声。
+4. 分享到社区后，探索流卡片标题与 `/explore/project/{id}` 页 H1 **一致且同语言**。
+5. Fork 副本保留上述元数据；匿名用户访问已分享 project 可读全部 SEO 相关字段。
+
+### 9.6 优先级建议
+
+| 优先级 | 项 |
+|--------|-----|
+| P0 | `contentLanguage` + complete 时写入与 deck 一致的 `sourceBookTitle`，并覆盖 `name`；文件名清洗 |
+| P1 | Feed 返回 `contentLanguage`、`sourceBookTitle`；`name` 与详情页对齐 |
+| P2 | `sourceBookTitleZh/En`、`canonicalBookKey`、`relatedProjectIds`（多语言互链与 SEO hreflang） |
+
+---
+
 ## 最需先做
 
 1. **chat-stream 收到请求时**：按 `projectId` upsert Project，标题取 `uploaded_documents[0].name`（去后缀），并写入首条 user 对话（见 **2.1**）

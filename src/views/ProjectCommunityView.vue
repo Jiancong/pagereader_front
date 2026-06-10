@@ -21,9 +21,9 @@
       <div v-if="error" class="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{{ error }}</div>
 
       <template v-if="project">
-        <div class="flex items-start justify-between gap-4">
-          <div class="min-w-0">
-            <h1 class="text-2xl font-bold text-foreground sm:text-3xl">{{ pageHeading }}</h1>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0 flex-1">
+            <h1 class="break-words text-2xl font-bold text-foreground sm:text-3xl">{{ pageHeading }}</h1>
             <p v-if="seo.author" class="mt-1 text-sm text-muted-foreground">
               {{ t('community.bookAuthor', { name: seo.author }) }}
             </p>
@@ -33,7 +33,7 @@
           </div>
           <button
             type="button"
-            class="flex flex-shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            class="flex w-full shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto"
             @click="openReader"
           >
             <BookOpen class="h-4 w-4" /> {{ t('community.openToRead') }}
