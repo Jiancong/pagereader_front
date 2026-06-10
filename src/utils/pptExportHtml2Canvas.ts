@@ -170,6 +170,41 @@ function replaceUnsupportedColorFunctions(css: string): string {
   return out
 }
 
+/** Google Fonts 样式表只含 @font-face，需保留以保证克隆文档排版字体与绘制字体一致 */
+const FONT_STYLESHEET_HOST_RE = /fonts\.googleapis\.com|fonts\.gstatic\.com/i
+
+function absolutizeCssUrls(cssText: string, baseHref: string | null): string {
+  if (!baseHref) return cssText
+  return cssText.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g, (match, _q, url) => {
+    if (/^(data:|blob:|https?:|\/\/)/i.test(url)) return match
+    try {
+      return `url("${new URL(url, baseHref).href}")`
+    } catch {
+      return match
+    }
+  })
+}
+
+/** 收集同源样式表中的 @font-face（构建产物 CSS 被移除后，克隆文档仍需字体定义） */
+function collectFontFaceCss(): string {
+  const parts: string[] = []
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRuleList | null = null
+    try {
+      rules = sheet.cssRules
+    } catch {
+      continue
+    }
+    if (!rules) continue
+    for (const rule of Array.from(rules)) {
+      if (rule.type === CSSRule.FONT_FACE_RULE) {
+        parts.push(absolutizeCssUrls(rule.cssText, sheet.href ?? document.baseURI))
+      }
+    }
+  }
+  return parts.join("\n")
+}
+
 function stripUnsupportedStylesheets(clonedDoc: Document): void {
   clonedDoc.querySelectorAll("style").forEach((node) => {
     if (node.id === "ppt-export-styles") return
@@ -178,7 +213,20 @@ function stripUnsupportedStylesheets(clonedDoc: Document): void {
       node.textContent = replaceUnsupportedColorFunctions(css)
     }
   })
-  clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((node) => node.remove())
+  clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((node) => {
+    const href = node.getAttribute("href") ?? ""
+    if (FONT_STYLESHEET_HOST_RE.test(href)) return
+    node.remove()
+  })
+
+  // 文字定位用克隆文档布局、绘制用主文档字体；克隆文档缺 @font-face 会导致字距错乱重叠
+  const fontFaceCss = collectFontFaceCss()
+  if (fontFaceCss) {
+    const style = clonedDoc.createElement("style")
+    style.setAttribute("data-ppt-export-font-faces", "")
+    style.textContent = fontFaceCss
+    ;(clonedDoc.head ?? clonedDoc.documentElement).appendChild(style)
+  }
 }
 
 function inlineExportComputedStyles(source: Element, clone: Element): void {
