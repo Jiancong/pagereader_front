@@ -12,6 +12,9 @@ import { createServer } from "node:http"
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises"
 import { dirname, resolve, join, extname } from "node:path"
 import { fileURLToPath } from "node:url"
+import { loadBuildEnv } from "./loadBuildEnv.mjs"
+
+loadBuildEnv()
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, "..")
