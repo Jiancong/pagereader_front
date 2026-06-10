@@ -14214,9 +14214,11 @@ async function exportLongPNG() {
     exportMessage.value = t("agent.pptExportPngStitching");
     const { bg } = resolveThemeColors();
     const scaledCanvases = prepareSlideCanvasesForLongExport(canvases);
-    canvases.forEach(disposeExportCanvas);
     const stitched = stitchCanvasesVertically(scaledCanvases, { background: bg });
     scaledCanvases.forEach(disposeExportCanvas);
+    if (scaledCanvases !== canvases) {
+      canvases.forEach(disposeExportCanvas);
+    }
     if (!stitched) {
       ElMessage.error(t("agent.pptExportFailed"));
       return;

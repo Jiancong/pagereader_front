@@ -270,6 +270,7 @@ export function stitchCanvasesVertically(
   let y = 0
   for (let i = 0; i < canvases.length; i++) {
     const canvas = canvases[i]
+    if (canvas.width <= 0 || canvas.height <= 0) continue
     const x = Math.floor((width - canvas.width) / 2)
     ctx.drawImage(canvas, x, y)
     y += canvas.height
