@@ -65,6 +65,13 @@ export default {
       "Highlight any term on a slide and explore that topic in depth—definitions, context, and follow-ups layered on your deck, like reading with vertical search.",
     featureI18nTitle: "Multilingual",
     featureI18nDesc: "Chinese, English, and more—adapted to your audience",
+    ebooks: {
+      title: "Book summaries from our community",
+      subtitle:
+        "Explore AI-generated book summaries, key takeaways, character breakdowns, and reviews—then read them as interactive decks or create your own.",
+      cardAlt: "{title} — book summary, review and characters",
+      cta: "Generate your own book summary",
+    },
     tabQuick: "Quick prompt",
     tabUpload: "Upload & analyze",
     promptLabel: "Describe your presentation",
@@ -493,6 +500,17 @@ export default {
     loginToComment: "Log in to comment",
     noComments: "No comments yet—be the first",
     userFallback: "User {id}",
+    seo: {
+      heading: "{title} Summary & Key Takeaways",
+      headingWithCharacters: "{title} Summary, Characters & Review",
+      summaryHeading: "{title} Summary",
+      takeawaysHeading: "{title}: Key Takeaways & Analysis",
+      charactersHeading: "{title}: Main Characters",
+      quotesHeading: "Notable Quotes from {title}",
+      ctaHeading: "Explore {title} as an interactive deck",
+      ctaBody: "Open the full interactive presentation, drill into any topic, or generate your own book summary in minutes.",
+      ctaCreate: "Generate your own",
+    },
   },
   legal: {
     backHome: "Back to home",

@@ -65,6 +65,13 @@ export default {
       "在幻灯片上选中任意词句，AI 围绕该主题向下延展搜索与解读，逐层深入概念与背景，像读书一样边读边查、不打断节奏",
     featureI18nTitle: "多语言支持",
     featureI18nDesc: "支持中英文等多种语言，智能适配不同场景需求",
+    ebooks: {
+      title: "来自社区的图书摘要",
+      subtitle:
+        "浏览 AI 生成的图书摘要、核心要点、人物解析与书评——可作为可交互演示文稿阅读，也能一键生成你自己的版本。",
+      cardAlt: "{title} —— 图书摘要、书评与人物",
+      cta: "生成我的图书摘要",
+    },
     tabQuick: "一句话生成",
     tabUpload: "上传资料分析",
     promptLabel: "描述你想要的 PPT 主题",
@@ -483,6 +490,17 @@ export default {
     loginToComment: "登录后可留言",
     noComments: "暂无留言，来抢沙发吧",
     userFallback: "用户{id}",
+    seo: {
+      heading: "《{title}》摘要与核心要点",
+      headingWithCharacters: "《{title}》摘要、人物与书评",
+      summaryHeading: "《{title}》内容摘要",
+      takeawaysHeading: "《{title}》核心要点与解析",
+      charactersHeading: "《{title}》主要人物",
+      quotesHeading: "《{title}》经典语录",
+      ctaHeading: "以可交互演示文稿探索《{title}》",
+      ctaBody: "打开完整的可交互演示，向下追问任意主题，或几分钟内生成你自己的图书摘要。",
+      ctaCreate: "生成我的版本",
+    },
   },
   legal: {
     backHome: "返回首页",

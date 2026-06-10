@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /workspace
+
+# 站点地图（建议由后端动态生成全量图书 URL；构建期可用 npm run gen:sitemap 生成快照）
+Sitemap: https://page2.top/sitemap.xml
