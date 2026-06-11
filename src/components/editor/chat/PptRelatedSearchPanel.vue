@@ -234,6 +234,8 @@
 
       @related-search="onNestedRelatedSearch"
 
+      @custom-search="onNestedCustomSearch"
+
       @close="closeContextMenu"
 
     />
@@ -530,11 +532,11 @@ function onContextMenuPointerDown(event: PointerEvent) {
 
 
 
-async function onNestedRelatedSearch() {
+async function runNestedRelatedSearch(term: string) {
 
-  const term = contextSelection.value.trim();
+  const q = term.trim();
 
-  if (!term) {
+  if (!q) {
 
     ElMessage.warning(t("agent.pptRelatedSearchSelectText"));
 
@@ -548,7 +550,7 @@ async function onNestedRelatedSearch() {
 
   await runChildRelatedSearch({
 
-    term,
+    term: q,
 
     pptTitle: props.searchContext.pptTitle,
 
@@ -561,6 +563,22 @@ async function onNestedRelatedSearch() {
     buildMessage: props.searchContext.buildMessage,
 
   });
+
+}
+
+
+
+async function onNestedRelatedSearch() {
+
+  await runNestedRelatedSearch(contextSelection.value);
+
+}
+
+
+
+async function onNestedCustomSearch(term: string) {
+
+  await runNestedRelatedSearch(term);
 
 }
 

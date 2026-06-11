@@ -599,6 +599,9 @@ export default {
     pptRelatedSearchEmpty: "No results",
     pptRelatedSearchFailed: "Search failed",
     pptRelatedSearchSelectText: "Select text first",
+    pptRelatedSearchInputPlaceholder: "Ask a question…",
+    pptRelatedSearchSubmit: "Search",
+    pptRelatedSearchEnterQuery: "Enter a question first",
     pptRelatedSearchPromptWithTitle:
       'In the deck "{title}", explain what "{term}" means, its context, and how it is used here.',
     pptRelatedSearchPromptGeneric: 'Explain what "{term}" means and its background.',

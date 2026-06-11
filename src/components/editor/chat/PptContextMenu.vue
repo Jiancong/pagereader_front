@@ -17,12 +17,38 @@
     <div v-if="selectionText" class="ppt-context-menu-selection">
       「{{ selectionPreview }}」
     </div>
+
+    <div class="ppt-context-menu-divider" />
+
+    <div class="ppt-context-menu-query">
+      <input
+        ref="queryInputRef"
+        v-model="queryText"
+        type="text"
+        class="ppt-context-menu-input"
+        :placeholder="t('agent.pptRelatedSearchInputPlaceholder')"
+        @keydown.enter.prevent="onCustomSearch"
+        @keydown.stop
+        @keyup.stop
+        @click.stop
+      />
+      <button
+        type="button"
+        class="ppt-context-menu-submit"
+        :aria-label="t('agent.pptRelatedSearchSubmit')"
+        :title="t('agent.pptRelatedSearchSubmit')"
+        @click="onCustomSearch"
+      >
+        <i class="bi bi-arrow-right"></i>
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { ElMessage } from "element-plus";
 
 const props = withDefaults(
   defineProps<{
@@ -37,10 +63,14 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: "related-search"): void;
+  (e: "custom-search", term: string): void;
   (e: "close"): void;
 }>();
 
 const { t } = useI18n();
+
+const queryInputRef = ref<HTMLInputElement | null>(null);
+const queryText = ref("");
 
 const selectionPreview = computed(() => {
   const text = props.selectionText.trim();
@@ -48,9 +78,31 @@ const selectionPreview = computed(() => {
   return `${text.slice(0, 24)}…`;
 });
 
+watch(
+  () => props.show,
+  (visible) => {
+    if (visible) {
+      queryText.value = props.selectionText.trim();
+      nextTick(() => queryInputRef.value?.focus());
+      return;
+    }
+    queryText.value = "";
+  }
+);
+
 function onRelatedSearch() {
   if (!props.selectionText.trim()) return;
   emit("related-search");
+  emit("close");
+}
+
+function onCustomSearch() {
+  const term = queryText.value.trim();
+  if (!term) {
+    ElMessage.warning(t("agent.pptRelatedSearchEnterQuery"));
+    return;
+  }
+  emit("custom-search", term);
   emit("close");
 }
 </script>
@@ -58,7 +110,8 @@ function onRelatedSearch() {
 <style scoped lang="scss">
 .ppt-context-menu {
   position: fixed;
-  min-width: 168px;
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - 16px));
   padding: 6px 0;
   background: #2d2d2d;
   border: 1px solid #4a4a4a;
@@ -101,5 +154,57 @@ function onRelatedSearch() {
   color: rgba(255, 255, 255, 0.55);
   line-height: 1.4;
   word-break: break-all;
+}
+
+.ppt-context-menu-divider {
+  height: 1px;
+  margin: 4px 10px 6px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ppt-context-menu-query {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.ppt-context-menu-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  background: #1f1f1f;
+  color: #e8e8e8;
+  font-size: 13px;
+  outline: none;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  &:focus {
+    border-color: #409eff;
+  }
+}
+
+.ppt-context-menu-submit {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  background: #409eff;
+  color: #fff;
+  cursor: pointer;
+
+  &:hover {
+    background: #66b1ff;
+  }
 }
 </style>

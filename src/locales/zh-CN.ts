@@ -589,6 +589,9 @@ export default {
     pptRelatedSearchEmpty: "暂无相关结果",
     pptRelatedSearchFailed: "搜索失败",
     pptRelatedSearchSelectText: "请先选中文本",
+    pptRelatedSearchInputPlaceholder: "输入问题搜索…",
+    pptRelatedSearchSubmit: "搜索",
+    pptRelatedSearchEnterQuery: "请先输入问题",
     pptRelatedSearchPromptWithTitle:
       "关于演示文稿《{title}》中的内容，请详细解释「{term}」的含义、背景和其在文中的具体指代。",
     pptRelatedSearchPromptGeneric: "请详细解释「{term}」的含义与背景。",

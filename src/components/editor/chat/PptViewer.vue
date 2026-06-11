@@ -8293,6 +8293,7 @@
       :y="pptContextMenuY"
       :selection-text="pptContextSelection"
       @related-search="onPptRelatedSearch"
+      @custom-search="onPptCustomSearch"
       @close="closePptContextMenu"
     />
     <PptRelatedSearchPanel
@@ -8788,22 +8789,30 @@ function recordRelatedSearchSession(term: string) {
   emit("related-search-recorded", [...relatedSearchSessionEntries.value]);
 }
 
-async function onPptRelatedSearch() {
-  const term = pptContextSelection.value.trim();
-  if (!term) {
+async function runPptRelatedSearch(term: string) {
+  const q = term.trim();
+  if (!q) {
     ElMessage.warning(t("agent.pptRelatedSearchSelectText"));
     return;
   }
   closePptContextMenu();
   await runRelatedSearch({
-    term,
+    term: q,
     pptTitle: props.pptData.title,
     projectId: props.projectId,
     slideIndex: currentSlide.value,
     uploadedDocuments: uploadedDocumentsFromPptData(props.pptData),
     buildMessage: buildPptRelatedSearchMessage,
   });
-  recordRelatedSearchSession(term);
+  recordRelatedSearchSession(q);
+}
+
+async function onPptRelatedSearch() {
+  await runPptRelatedSearch(pptContextSelection.value);
+}
+
+async function onPptCustomSearch(term: string) {
+  await runPptRelatedSearch(term);
 }
 
 function onRelatedSearchPanelClose() {
