@@ -115,7 +115,7 @@
             ]"
             @click="onSelectPlan(plan.planType)"
           >
-            {{ t('pricing.starterCta') }}
+            {{ plan.ctaKey ? t(plan.ctaKey) : t('pricing.starterCta') }}
           </button>
         </div>
       </div>
@@ -209,7 +209,7 @@ const props = defineProps({
 
 const emit = defineEmits(['select-plan', 'subscribed'])
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const plansLoading = ref(true)
 const plansError = ref(null)
@@ -356,6 +356,44 @@ const usageItems = computed(() => [
   },
 ])
 
+function planKind(plan) {
+  const key = String(plan.planType || '').toUpperCase()
+  if (key.includes('STARTER') || key.includes('BASIC')) return 'starter'
+  if (key.includes('PRO')) return 'pro'
+  return null
+}
+
+/** 付费套餐文案走 i18n；价格/积分仍来自 API */
+function localizePaidPlan(plan) {
+  const kind = planKind(plan)
+  if (!kind) return plan
+
+  const highlights =
+    kind === 'starter'
+      ? [
+          t('pricing.starterEquiv'),
+          t('pricing.starterDaily'),
+          t('pricing.starterF1'),
+          t('pricing.starterF2'),
+          t('pricing.starterF3'),
+        ]
+      : [
+          t('pricing.proEquiv'),
+          t('pricing.proDaily'),
+          t('pricing.proF1'),
+          t('pricing.proF2'),
+          t('pricing.proF3'),
+        ]
+
+  return {
+    ...plan,
+    displayName: t(`pricing.${kind}Name`),
+    tagline: t(`pricing.${kind}Badge`),
+    highlights,
+    ctaKey: `pricing.${kind}Cta`,
+  }
+}
+
 const freePlan = computed(() => ({
   planType: 'FREE',
   isFree: true,
@@ -366,7 +404,11 @@ const freePlan = computed(() => ({
   highlights: [t('pricing.freeF1'), t('pricing.freeF2'), t('pricing.freeF3')],
 }))
 
-const displayPlans = computed(() => [freePlan.value, ...apiPlans.value])
+const displayPlans = computed(() => {
+  // 切换语言时重新映射 API 套餐文案
+  void locale.value
+  return [freePlan.value, ...apiPlans.value.map((plan) => localizePaidPlan(plan))]
+})
 
 /** 各档云空间（MB）：FREE 100 / Starter 1000 / PRO 5000，按 planType 关键字匹配，价格兜底 */
 const STORAGE_MB_BY_PLAN = { FREE: 100, STARTER: 1000, PRO: 5000 }
