@@ -332,6 +332,8 @@ export function stitchCanvasesVertically(
 export const PPT_EXPORT_JPEG_QUALITY = 0.92
 /** 偏好的导出体积 ≈ 无损 PNG 的 1/2（仅用于选质量，不截断导出） */
 export const PPT_EXPORT_TARGET_SIZE_RATIO = 0.5
+/** 长图导出偏好的 JPEG 体积目标（相对 PNG 估算，仅影响质量选择） */
+export const PPT_EXPORT_LONG_TARGET_SIZE_RATIO = 0.7
 /** @deprecated 兼容旧引用 */
 export const PPT_EXPORT_IMAGE_QUALITY = PPT_EXPORT_JPEG_QUALITY
 /** Chrome / Safari 常见 canvas 单边上限 */
@@ -444,10 +446,13 @@ const EXPORT_QUALITY_LADDER = [
  * 对已截好的 canvas 编码 JPEG：先保证能出图，再在可行质量中选最接近目标体积的。
  * 体积目标仅影响质量选择，不会提前中断截图/拼接流程。
  */
-async function encodeJpegForExport(canvas: HTMLCanvasElement): Promise<Blob> {
+async function encodeJpegForExport(
+  canvas: HTMLCanvasElement,
+  targetSizeRatio = PPT_EXPORT_TARGET_SIZE_RATIO,
+): Promise<Blob> {
   const targetBytes = Math.max(
     8192,
-    Math.floor(estimatePngBytes(canvas) * PPT_EXPORT_TARGET_SIZE_RATIO),
+    Math.floor(estimatePngBytes(canvas) * targetSizeRatio),
   )
   let bestFallback: Blob | null = null
 
@@ -485,6 +490,8 @@ export async function canvasToExportBlob(
   options?: {
     quality?: number
     mimeType?: PptExportImageMime
+    /** 覆盖默认体积目标比例（如长图导出用 0.7） */
+    targetSizeRatio?: number
   },
 ): Promise<PptExportImageResult | null> {
   const fitted = scaleCanvasToFitBrowserLimits(canvas)
@@ -498,7 +505,7 @@ export async function canvasToExportBlob(
     }
   }
 
-  const jpegBlob = await encodeJpegForExport(fitted)
+  const jpegBlob = await encodeJpegForExport(fitted, options?.targetSizeRatio)
   cachedExportFormat = { mimeType: "image/jpeg", quality: PPT_EXPORT_JPEG_QUALITY }
   return { blob: jpegBlob, mimeType: "image/jpeg" }
 }

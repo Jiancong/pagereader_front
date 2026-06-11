@@ -8366,6 +8366,7 @@ import {
   pptExportImageExtension,
   prepareHtml2CanvasClone,
   prepareSlideCanvasesForLongExport,
+  PPT_EXPORT_LONG_TARGET_SIZE_RATIO,
   resetPptExportSession,
   stitchCanvasesVertically,
 } from "@/utils/pptExportHtml2Canvas";
@@ -14236,7 +14237,9 @@ async function exportLongPNG() {
     exportMessage.value = t("agent.pptExportDownloading");
     const { saveAs } = await import("file-saver");
     const base = sanitizeExportBasename(props.pptData.title || "presentation");
-    const result = await canvasToExportBlob(stitched);
+    const result = await canvasToExportBlob(stitched, {
+      targetSizeRatio: PPT_EXPORT_LONG_TARGET_SIZE_RATIO,
+    });
     disposeExportCanvas(stitched);
     if (!result) {
       ElMessage.error(t("agent.pptExportPngLongTooLarge"));
