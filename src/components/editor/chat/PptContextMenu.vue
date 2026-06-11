@@ -11,7 +11,22 @@
       :class="{ 'ppt-context-menu-item--disabled': !selectionText }"
       @click="onRelatedSearch"
     >
-      <i class="bi bi-search"></i>
+      <svg
+        class="ppt-context-menu-item-icon"
+        xmlns="http://www.w3.org/2000/svg"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="8" />
+        <path d="m21 21-4.3-4.3" />
+      </svg>
       <span>{{ t("agent.pptRelatedSearch") }}</span>
     </div>
     <div v-if="selectionText" class="ppt-context-menu-selection">
@@ -39,7 +54,23 @@
         :title="t('agent.pptRelatedSearchSubmit')"
         @click="onCustomSearch"
       >
-        <i class="bi bi-arrow-right"></i>
+        <svg
+          class="ppt-context-menu-submit-icon"
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+        <span>{{ t("agent.pptRelatedSearchSubmit") }}</span>
       </button>
     </div>
   </div>
@@ -128,8 +159,9 @@ function onCustomSearch() {
   color: #e8e8e8;
   cursor: pointer;
 
-  i {
+  .ppt-context-menu-item-icon {
     color: #409eff;
+    flex-shrink: 0;
   }
 
   &:hover {
@@ -192,19 +224,28 @@ function onCustomSearch() {
 
 .ppt-context-menu-submit {
   flex-shrink: 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  gap: 4px;
   height: 32px;
+  padding: 0 10px;
   border: none;
   border-radius: 4px;
   background: #409eff;
   color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
+  white-space: nowrap;
 
   &:hover {
     background: #66b1ff;
   }
+}
+
+.ppt-context-menu-submit-icon {
+  flex-shrink: 0;
 }
 </style>
