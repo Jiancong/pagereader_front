@@ -80,7 +80,8 @@ import { projectApi } from '../../api'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
 import {
   buildShareToCommunityBody,
-  canShareToCommunity,
+  collectDeckUrls,
+  hasShareableContent,
   isSharedToCommunity,
   looksLikeDeckJson,
 } from '@/utils/projectCommunity'
@@ -104,11 +105,10 @@ const sharing = ref(false)
 
 const sharedToCommunity = computed(() => isSharedToCommunity(project.value))
 
-/** deck 已就绪：本地已加载 pptData，或 project / 对话历史里能拿到 deck JSON 地址 */
+/** 内容已就绪：PPT deck 或书籍卡片预览图 */
 const canShare = computed(() => {
   if (pptData.value) return true
-  if (canShareToCommunity(project.value)) return true
-  return collectDeckUrls(project.value, history.value).length > 0
+  return hasShareableContent(project.value, history.value)
 })
 
 const shareButtonLabel = computed(() => {
@@ -140,18 +140,6 @@ const displayChatHistory = computed(() =>
     noAnswer: t('workspace.chatHistoryPanel.noAnswer'),
   }),
 )
-
-function collectDeckUrls(proj, hist) {
-  const urls = []
-  if (proj?.configFilePath) urls.push(proj.configFilePath)
-  const assistantRows = [...hist].reverse().filter((h) => h.role === 'assistant')
-  for (const row of assistantRows) {
-    for (const url of row.imageUrls ?? []) {
-      if (looksLikeDeckJson(url)) urls.push(url)
-    }
-  }
-  return [...new Set(urls)]
-}
 
 async function loadPptDeck(id, proj, hist) {
   const urls = collectDeckUrls(proj, hist)
@@ -202,7 +190,7 @@ watch(() => props.refreshKey, () => {
 async function onShareToCommunity() {
   if (!project.value?.id || sharedToCommunity.value) return
   if (!canShare.value) {
-    ElMessage.warning(t('workspace.shareWaitPpt'))
+    ElMessage.warning(t('workspace.shareWhenReady'))
     return
   }
   sharing.value = true

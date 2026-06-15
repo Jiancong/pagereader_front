@@ -1,23 +1,46 @@
 import type { ConversationHistoryVo, ProjectVo } from "@/api/types"
+import { extractMarkdownImageUrls } from "@/utils/bookCardStream"
 
 export function looksLikeDeckJson(url: string): boolean {
   const s = String(url || "").toLowerCase()
   return s.endsWith(".json") || s.includes("/projects/") || s.includes("ppt_data")
 }
 
-/** 从对话历史收集非 deck JSON 的预览图（assistant 优先，取最新） */
-export function collectPreviewImageUrls(
-  hist: ConversationHistoryVo[] | Array<{ role?: string; imageUrls?: string[] }>,
+type HistoryRow = ConversationHistoryVo | { role?: string; imageUrls?: string[]; content?: string }
+
+/** 从对话历史收集 deck JSON 地址（assistant 优先） */
+export function collectDeckUrls(
+  proj: ProjectVo | null | undefined,
+  hist: HistoryRow[],
 ): string[] {
+  const urls: string[] = []
+  if (proj?.configFilePath) urls.push(proj.configFilePath)
+  const assistantRows = [...hist].reverse().filter((h) => h.role === "assistant")
+  for (const row of assistantRows) {
+    for (const url of row.imageUrls ?? []) {
+      if (url && looksLikeDeckJson(url)) urls.push(url)
+    }
+  }
+  return [...new Set(urls)]
+}
+
+/** 从对话历史收集非 deck JSON 的预览图（assistant 优先，取最新） */
+export function collectPreviewImageUrls(hist: HistoryRow[]): string[] {
   const urls: string[] = []
   const assistantRows = [...hist].reverse().filter((h) => h.role === "assistant")
   for (const row of assistantRows) {
     for (const url of row.imageUrls ?? []) {
       if (url && !looksLikeDeckJson(url)) urls.push(url)
     }
+    for (const url of extractMarkdownImageUrls(String(row.content ?? ""))) {
+      if (url && !looksLikeDeckJson(url)) urls.push(url)
+    }
   }
   for (const row of hist) {
     for (const url of row.imageUrls ?? []) {
+      if (url && !looksLikeDeckJson(url) && !urls.includes(url)) urls.push(url)
+    }
+    for (const url of extractMarkdownImageUrls(String(row.content ?? ""))) {
       if (url && !looksLikeDeckJson(url) && !urls.includes(url)) urls.push(url)
     }
   }
@@ -53,9 +76,20 @@ export function isSharedToCommunity(proj: ProjectVo | null | undefined): boolean
   return false
 }
 
-/** PPT deck 已生成即可分享；封面由后端在分享时补全或从 deck 推导 */
+/** 项目已持久化 PPT deck JSON 地址 */
 export function canShareToCommunity(proj: ProjectVo | null | undefined): boolean {
   return !!proj?.configFilePath
+}
+
+/** PPT deck 或书籍卡片等预览图已就绪即可分享 */
+export function hasShareableContent(
+  proj: ProjectVo | null | undefined,
+  hist: HistoryRow[],
+): boolean {
+  if (canShareToCommunity(proj)) return true
+  if (String(proj?.thumbnailUrl ?? "").trim()) return true
+  if (collectDeckUrls(proj, hist).length > 0) return true
+  return collectPreviewImageUrls(hist).length > 0
 }
 
 export function formatCommentTime(iso: string): string {
