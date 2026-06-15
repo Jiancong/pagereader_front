@@ -1,9 +1,16 @@
 import type { ConversationHistoryVo, ProjectVo } from "@/api/types"
 import { extractMarkdownImageUrls } from "@/utils/bookCardStream"
+import { looksLikeImagePreviewUrl } from "@/utils/userAssets"
 
 export function looksLikeDeckJson(url: string): boolean {
   const s = String(url || "").toLowerCase()
   return s.endsWith(".json") || s.includes("/projects/") || s.includes("ppt_data")
+}
+
+/** 对话历史 / 缩略图里可用于 <img> 展示的地址（排除 deck JSON、PDF 等文档） */
+export function isDisplayablePreviewUrl(url: string): boolean {
+  const u = String(url || "").trim()
+  return !!u && !looksLikeDeckJson(u) && looksLikeImagePreviewUrl(u)
 }
 
 type HistoryRow = ConversationHistoryVo | { role?: string; imageUrls?: string[]; content?: string }
@@ -30,18 +37,18 @@ export function collectPreviewImageUrls(hist: HistoryRow[]): string[] {
   const assistantRows = [...hist].reverse().filter((h) => h.role === "assistant")
   for (const row of assistantRows) {
     for (const url of row.imageUrls ?? []) {
-      if (url && !looksLikeDeckJson(url)) urls.push(url)
+      if (isDisplayablePreviewUrl(url)) urls.push(url)
     }
     for (const url of extractMarkdownImageUrls(String(row.content ?? ""))) {
-      if (url && !looksLikeDeckJson(url)) urls.push(url)
+      if (isDisplayablePreviewUrl(url)) urls.push(url)
     }
   }
   for (const row of hist) {
     for (const url of row.imageUrls ?? []) {
-      if (url && !looksLikeDeckJson(url) && !urls.includes(url)) urls.push(url)
+      if (isDisplayablePreviewUrl(url) && !urls.includes(url)) urls.push(url)
     }
     for (const url of extractMarkdownImageUrls(String(row.content ?? ""))) {
-      if (url && !looksLikeDeckJson(url) && !urls.includes(url)) urls.push(url)
+      if (isDisplayablePreviewUrl(url) && !urls.includes(url)) urls.push(url)
     }
   }
   return [...new Set(urls)]
@@ -53,7 +60,7 @@ export function resolveThumbnailForShare(
   hist: ConversationHistoryVo[] | Array<{ role?: string; imageUrls?: string[] }>,
 ): string | undefined {
   const fromProject = String(proj?.thumbnailUrl ?? "").trim()
-  if (fromProject) return fromProject
+  if (fromProject && isDisplayablePreviewUrl(fromProject)) return fromProject
   return collectPreviewImageUrls(hist)[0]
 }
 
@@ -87,7 +94,7 @@ export function hasShareableContent(
   hist: HistoryRow[],
 ): boolean {
   if (canShareToCommunity(proj)) return true
-  if (String(proj?.thumbnailUrl ?? "").trim()) return true
+  if (isDisplayablePreviewUrl(String(proj?.thumbnailUrl ?? ""))) return true
   if (collectDeckUrls(proj, hist).length > 0) return true
   return collectPreviewImageUrls(hist).length > 0
 }

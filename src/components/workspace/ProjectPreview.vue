@@ -81,9 +81,10 @@ import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
 import {
   buildShareToCommunityBody,
   collectDeckUrls,
+  collectPreviewImageUrls,
   hasShareableContent,
+  isDisplayablePreviewUrl,
   isSharedToCommunity,
-  looksLikeDeckJson,
 } from '@/utils/projectCommunity'
 import { buildPptChatHistoryDisplay } from '@/utils/pptChatHistoryDisplay'
 
@@ -117,15 +118,13 @@ const shareButtonLabel = computed(() => {
   return t('workspace.shareToCommunity')
 })
 
-const previewImageUrls = computed(() =>
-  history.value.flatMap((h) => (h.imageUrls ?? []).filter((u) => !looksLikeDeckJson(u))),
-)
-
 const images = computed(() => {
-  if (project.value?.thumbnailUrl) {
-    return [project.value.thumbnailUrl, ...previewImageUrls.value]
+  const urls = collectPreviewImageUrls(history.value)
+  const thumb = String(project.value?.thumbnailUrl ?? '').trim()
+  if (thumb && isDisplayablePreviewUrl(thumb) && !urls.includes(thumb)) {
+    return [thumb, ...urls]
   }
-  return previewImageUrls.value
+  return urls
 })
 
 const firstUserMsg = computed(() => history.value.find((h) => h.role === 'user')?.content || '')
