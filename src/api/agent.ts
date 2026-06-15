@@ -55,7 +55,11 @@ function resolveEffectiveEvent(wire: string, payload: unknown): string {
   }
 
   const status = normalizeEventName(String(p.status ?? ""))
-  if (status === "complete" || status === "ppt_complete") return status
+  if (status === "complete" || status === "ppt_complete" || status === "design_complete") {
+    return status
+  }
+  const state = normalizeEventName(String(p.state ?? ""))
+  if (state === "book_card_complete") return "design_complete"
   if (status === "error") return "error"
   if (status === "in_progress" || p.phase != null) return "progress"
 
@@ -125,7 +129,7 @@ export async function chatStream(
     const event = resolveEffectiveEvent(parsed.event, data)
     cb.onEvent?.(event, data, parsed.data)
 
-    if (event === "complete" || event === "ppt_complete") {
+    if (event === "complete" || event === "ppt_complete" || event === "design_complete") {
       await cb.onComplete?.(data)
     } else if (event === "error") {
       const msg =

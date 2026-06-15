@@ -1,5 +1,5 @@
 <template>
-  <div :class="activeTask.pptData ? 'mx-auto w-full max-w-[min(100%,96rem)]' : 'mx-auto max-w-3xl'">
+  <div :class="(activeTask.pptData || activeTask.cardResult) ? 'mx-auto w-full max-w-[min(100%,96rem)]' : 'mx-auto max-w-3xl'">
     <!-- Tab 切换：两套任务状态独立，可并行生成 -->
     <div class="mb-8 flex items-center justify-center">
         <div class="inline-flex rounded-xl border border-border bg-secondary/30 p-1.5">
@@ -30,8 +30,15 @@
         </div>
     </div>
 
+    <!-- 已生成：卡片模式结果 -->
+    <WorkspaceCardResult
+      v-if="activeTask.cardResult"
+      :result="activeTask.cardResult"
+      @close="resetActiveTask"
+    />
+
     <!-- 已生成：展示当前标签对应任务的 PptViewer -->
-    <div v-if="activeTask.pptData" class="rounded-2xl border border-border bg-card">
+    <div v-else-if="activeTask.pptData" class="rounded-2xl border border-border bg-card">
       <PptViewer
         :ppt-data="activeTask.pptData"
         :project-id="activeTask.projectId"
@@ -195,6 +202,12 @@ import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X } from "lucide-vue-next"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
+import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
+import {
+  isBookCardStreamPayload,
+  parseBookCardStreamPayload,
+  type BookCardResult,
+} from "@/utils/bookCardStream"
 import {
   authApi,
   fileApi,
@@ -233,6 +246,7 @@ type GeneratorTask = {
   logs: string[]
   errorMsg: string | null
   pptData: any
+  cardResult: BookCardResult | null
   projectId: string
   queue: PptQueue
   showCreditsCta: boolean
@@ -247,6 +261,7 @@ function createTask(defaultQueue: PptQueue): GeneratorTask {
     logs: [],
     errorMsg: null,
     pptData: null,
+    cardResult: null,
     projectId: "",
     queue: defaultQueue,
     showCreditsCta: false,
@@ -336,6 +351,26 @@ const tabClass = (tab: "prompt" | "upload") => [
 ]
 
 const appendLog = (task: GeneratorTask, line: string) => task.logs.push(line)
+
+async function handleCardStreamComplete(
+  task: GeneratorTask,
+  data: unknown,
+  mode: "prompt" | "upload",
+) {
+  const parsed = parseBookCardStreamPayload(data)
+  if (!parsed) {
+    task.errorMsg = t("workspace.cardResultEmpty")
+    gtmGenerateFail(mode, "other")
+    return
+  }
+  stopTaskTimer(task)
+  task.cardResult = parsed
+  const doneLine = parsed.message || t("workspace.cardResultReady")
+  appendLog(task, doneLine)
+  gtmGenerateComplete(mode, task.queue, task.projectId)
+  emit("project-complete", task.projectId)
+  await refreshCreditsBar()
+}
 
 const refreshCreditsBar = () => notifyCreditsRefresh().catch(() => {})
 
@@ -465,9 +500,17 @@ const runStream = async (
         const line = toText(data)
         if (line) appendLog(task, line)
       },
+      onEvent: async (event, data) => {
+        if (event !== "design_complete" || task.cardResult || task.pptData) return
+        await handleCardStreamComplete(task, data, mode)
+      },
       onComplete: async (data: unknown) => {
-        if (task.pptData) return
+        if (task.pptData || task.cardResult) return
         const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+        if (isBookCardStreamPayload(o)) {
+          await handleCardStreamComplete(task, data, mode)
+          return
+        }
         const isPptCompletion =
           o.ppt_data_url != null ||
           o.remote_url != null ||
@@ -513,6 +556,7 @@ const startTask = (task: GeneratorTask) => {
   task.errorMsg = null
   task.showCreditsCta = false
   task.pptData = null
+  task.cardResult = null
   task.projectId = newProjectId()
   task.logs = []
   task.timerStartAt = Date.now()
@@ -596,6 +640,7 @@ onBeforeUnmount(() => {
 
 const resetActiveTask = () => {
   activeTask.value.pptData = null
+  activeTask.value.cardResult = null
   activeTask.value.projectId = ""
 }
 
