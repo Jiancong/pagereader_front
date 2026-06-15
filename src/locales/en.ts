@@ -428,11 +428,17 @@ export default {
     taskRunning: "Generation running in background",
     promptTitle: "Describe your deck",
     promptHint: "Topic, style, and content—AI will build a professional presentation",
+    promptTitleCard: "Describe a topic for card distillation",
+    promptHintCard:
+      "Enter a topic and focus—AI will distill the core ideas into easy-to-review theme cards",
     promptPlaceholder: "e.g. A 10-slide deck on the history of artificial intelligence…",
+    promptPlaceholderCard:
+      "e.g. Distill the history of AI into theme cards—key milestones, figures, and core ideas…",
     enableSearchLabel: "Enable web search",
     enableSearchHint: "When on, AI searches the web for up-to-date material; when off, it uses only your prompt (off by default)",
     generating: "Generating…",
     generateDeck: "Generate deck",
+    generateDeckCard: "Generate theme cards",
     uploadTitle: "Upload a document",
     uploadHint: "PDF, Word, TXT, etc.—AI extracts key content for your deck",
     uploadTitleCard: "Upload a book for card distillation",

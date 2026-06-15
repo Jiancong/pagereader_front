@@ -62,13 +62,13 @@
         <!-- 一句话 / 联网搜索 -->
         <div v-if="activeTab === 'prompt'" class="p-6 sm:p-8">
           <div class="mb-6">
-            <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.promptTitle') }}</h3>
-            <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.promptHint') }}</p>
+            <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('promptTitle')) }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('promptHint')) }}</p>
           </div>
           <form class="space-y-4" @submit.prevent="onPromptSubmit">
             <textarea
               v-model="input"
-              :placeholder="t('workspace.promptPlaceholder')"
+              :placeholder="t(workspaceCopyKey('promptPlaceholder'))"
               class="min-h-[140px] w-full resize-none rounded-xl border border-border bg-secondary/50 px-4 py-4 text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             <button
@@ -78,7 +78,7 @@
             >
               <Loader2 v-if="promptTask.isGenerating" class="h-5 w-5 animate-spin" />
               <Sparkles v-else class="h-5 w-5" />
-              {{ promptTask.isGenerating ? t('workspace.generating') : t('workspace.generateDeck') }}
+              {{ promptTask.isGenerating ? t('workspace.generating') : t(workspaceCopyKey('generateDeck')) }}
             </button>
           </form>
         </div>
@@ -86,8 +86,8 @@
         <!-- RAG 上传分析 -->
         <div v-else class="p-6 sm:p-8">
           <div class="mb-6">
-            <h3 class="text-lg font-semibold text-foreground">{{ t(uploadCopyKey('uploadTitle')) }}</h3>
-            <p class="mt-1 text-sm text-muted-foreground">{{ t(uploadCopyKey('uploadHint')) }}</p>
+            <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('uploadTitle')) }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('uploadHint')) }}</p>
           </div>
           <div
             class="cursor-pointer rounded-xl border-2 border-dashed border-border bg-secondary/30 p-8 text-center transition-colors hover:border-primary/50"
@@ -112,11 +112,11 @@
             </template>
           </div>
           <div v-if="hasAttachedDoc" class="mt-6">
-            <label class="mb-2 block text-sm font-medium text-foreground">{{ t(uploadCopyKey('uploadPromptLabel')) }}</label>
-            <p class="mb-2 text-xs text-muted-foreground">{{ t(uploadCopyKey('uploadPromptHint')) }}</p>
+            <label class="mb-2 block text-sm font-medium text-foreground">{{ t(workspaceCopyKey('uploadPromptLabel')) }}</label>
+            <p class="mb-2 text-xs text-muted-foreground">{{ t(workspaceCopyKey('uploadPromptHint')) }}</p>
             <textarea
               v-model="uploadPrompt"
-              :placeholder="t(uploadCopyKey('uploadPromptPlaceholder'))"
+              :placeholder="t(workspaceCopyKey('uploadPromptPlaceholder'))"
               :disabled="ragTask.isGenerating"
               class="min-h-[120px] w-full resize-y rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
             />
@@ -128,7 +128,7 @@
           >
             <Loader2 v-if="ragTask.isGenerating" class="h-5 w-5 animate-spin" />
             <Sparkles v-else class="h-5 w-5" />
-            {{ ragTask.isGenerating ? t('workspace.analyzingDoc') : t(uploadCopyKey('analyzeAndGenerate')) }}
+            {{ ragTask.isGenerating ? t('workspace.analyzingDoc') : t(workspaceCopyKey('analyzeAndGenerate')) }}
           </button>
         </div>
 
@@ -282,7 +282,7 @@ const activeTask = computed(() => (activeTab.value === "prompt" ? promptTask : r
 const isCardMode = computed(() => activeTask.value.queue === "FAST")
 const activeLastLogs = computed(() => activeTask.value.logs.slice(-3))
 
-function uploadCopyKey(suffix: string): string {
+function workspaceCopyKey(suffix: string): string {
   return isCardMode.value ? `workspace.${suffix}Card` : `workspace.${suffix}`
 }
 
