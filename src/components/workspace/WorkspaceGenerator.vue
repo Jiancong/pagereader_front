@@ -86,8 +86,8 @@
         <!-- RAG 上传分析 -->
         <div v-else class="p-6 sm:p-8">
           <div class="mb-6">
-            <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.uploadTitle') }}</h3>
-            <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.uploadHint') }}</p>
+            <h3 class="text-lg font-semibold text-foreground">{{ t(uploadCopyKey('uploadTitle')) }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t(uploadCopyKey('uploadHint')) }}</p>
           </div>
           <div
             class="cursor-pointer rounded-xl border-2 border-dashed border-border bg-secondary/30 p-8 text-center transition-colors hover:border-primary/50"
@@ -112,11 +112,11 @@
             </template>
           </div>
           <div v-if="hasAttachedDoc" class="mt-6">
-            <label class="mb-2 block text-sm font-medium text-foreground">{{ t('workspace.uploadPromptLabel') }}</label>
-            <p class="mb-2 text-xs text-muted-foreground">{{ t('workspace.uploadPromptHint') }}</p>
+            <label class="mb-2 block text-sm font-medium text-foreground">{{ t(uploadCopyKey('uploadPromptLabel')) }}</label>
+            <p class="mb-2 text-xs text-muted-foreground">{{ t(uploadCopyKey('uploadPromptHint')) }}</p>
             <textarea
               v-model="uploadPrompt"
-              :placeholder="t('workspace.uploadPromptPlaceholder')"
+              :placeholder="t(uploadCopyKey('uploadPromptPlaceholder'))"
               :disabled="ragTask.isGenerating"
               class="min-h-[120px] w-full resize-y rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
             />
@@ -128,7 +128,7 @@
           >
             <Loader2 v-if="ragTask.isGenerating" class="h-5 w-5 animate-spin" />
             <Sparkles v-else class="h-5 w-5" />
-            {{ ragTask.isGenerating ? t('workspace.analyzingDoc') : t('workspace.analyzeAndGenerate') }}
+            {{ ragTask.isGenerating ? t('workspace.analyzingDoc') : t(uploadCopyKey('analyzeAndGenerate')) }}
           </button>
         </div>
 
@@ -279,7 +279,12 @@ const attachedDocSizeLabel = computed(() => {
 })
 
 const activeTask = computed(() => (activeTab.value === "prompt" ? promptTask : ragTask))
+const isCardMode = computed(() => activeTask.value.queue === "FAST")
 const activeLastLogs = computed(() => activeTask.value.logs.slice(-3))
+
+function uploadCopyKey(suffix: string): string {
+  return isCardMode.value ? `workspace.${suffix}Card` : `workspace.${suffix}`
+}
 
 const timerNow = ref(Date.now())
 let timerTickId: ReturnType<typeof setInterval> | null = null
@@ -374,7 +379,9 @@ const onFileChange = (e: Event) => {
     cloudDocument.value = null
     cloudDocumentSize.value = undefined
     uploadedFile.value = f
-    uploadPrompt.value = t("workspace.uploadPromptDefault")
+    uploadPrompt.value = t(
+      ragTask.queue === "FAST" ? "workspace.uploadPromptDefaultCard" : "workspace.uploadPromptDefault",
+    )
   }
 }
 
@@ -393,9 +400,12 @@ function attachCloudDocument(payload: { doc: UploadedDocument; size?: number }) 
   cloudDocument.value = payload.doc
   cloudDocumentSize.value = payload.size
   activeTab.value = "upload"
-  uploadPrompt.value = t("workspace.docGeneratePrompt", {
-    name: docBaseName(payload.doc.name || "document"),
-  })
+  uploadPrompt.value = t(
+    ragTask.queue === "FAST" ? "workspace.docGeneratePromptCard" : "workspace.docGeneratePrompt",
+    {
+      name: docBaseName(payload.doc.name || "document"),
+    },
+  )
   gtmAssetAttach(gtmFileExt(payload.doc.name || ""))
 }
 
