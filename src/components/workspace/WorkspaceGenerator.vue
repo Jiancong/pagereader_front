@@ -3,11 +3,11 @@
     <!-- Tab 切换：两套任务状态独立，可并行生成 -->
     <div class="mb-8 flex items-center justify-center">
         <div class="inline-flex rounded-xl border border-border bg-secondary/30 p-1.5">
-          <button :class="tabClass('prompt')" @click="activeTab = 'prompt'">
-            <MessageSquare class="h-4 w-4" />
-            {{ t('workspace.tabQuick') }}
+          <button :class="tabClass('upload')" @click="activeTab = 'upload'">
+            <Upload class="h-4 w-4" />
+            {{ t('workspace.tabUpload') }}
             <span
-              v-if="promptTask.isGenerating && activeTab !== 'prompt'"
+              v-if="ragTask.isGenerating && activeTab !== 'upload'"
               class="relative ml-1 flex h-2 w-2"
               :title="t('workspace.taskRunning')"
             >
@@ -15,11 +15,11 @@
               <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
           </button>
-          <button :class="tabClass('upload')" @click="activeTab = 'upload'">
-            <Upload class="h-4 w-4" />
-            {{ t('workspace.tabUpload') }}
+          <button :class="tabClass('prompt')" @click="activeTab = 'prompt'">
+            <MessageSquare class="h-4 w-4" />
+            {{ t('workspace.tabQuick') }}
             <span
-              v-if="ragTask.isGenerating && activeTab !== 'upload'"
+              v-if="promptTask.isGenerating && activeTab !== 'prompt'"
               class="relative ml-1 flex h-2 w-2"
               :title="t('workspace.taskRunning')"
             >
@@ -66,32 +66,8 @@
       </div>
 
       <div class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        <!-- 一句话 / 联网搜索 -->
-        <div v-if="activeTab === 'prompt'" class="p-6 sm:p-8">
-          <div class="mb-6">
-            <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('promptTitle')) }}</h3>
-            <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('promptHint')) }}</p>
-          </div>
-          <form class="space-y-4" @submit.prevent="onPromptSubmit">
-            <textarea
-              v-model="input"
-              :placeholder="t(workspaceCopyKey('promptPlaceholder'))"
-              class="min-h-[140px] w-full resize-none rounded-xl border border-border bg-secondary/50 px-4 py-4 text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-            <button
-              type="submit"
-              :disabled="promptTask.isGenerating || !input.trim()"
-              class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Loader2 v-if="promptTask.isGenerating" class="h-5 w-5 animate-spin" />
-              <Sparkles v-else class="h-5 w-5" />
-              {{ promptTask.isGenerating ? t('workspace.generating') : t(workspaceCopyKey('generateDeck')) }}
-            </button>
-          </form>
-        </div>
-
         <!-- RAG 上传分析 -->
-        <div v-else class="p-6 sm:p-8">
+        <div v-if="activeTab === 'upload'" class="p-6 sm:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('uploadTitle')) }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('uploadHint')) }}</p>
@@ -137,6 +113,30 @@
             <Sparkles v-else class="h-5 w-5" />
             {{ ragTask.isGenerating ? t('workspace.analyzingDoc') : t(workspaceCopyKey('analyzeAndGenerate')) }}
           </button>
+        </div>
+
+        <!-- 一句话 / 联网搜索 -->
+        <div v-else class="p-6 sm:p-8">
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('promptTitle')) }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('promptHint')) }}</p>
+          </div>
+          <form class="space-y-4" @submit.prevent="onPromptSubmit">
+            <textarea
+              v-model="input"
+              :placeholder="t(workspaceCopyKey('promptPlaceholder'))"
+              class="min-h-[140px] w-full resize-none rounded-xl border border-border bg-secondary/50 px-4 py-4 text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <button
+              type="submit"
+              :disabled="promptTask.isGenerating || !input.trim()"
+              class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Loader2 v-if="promptTask.isGenerating" class="h-5 w-5 animate-spin" />
+              <Sparkles v-else class="h-5 w-5" />
+              {{ promptTask.isGenerating ? t('workspace.generating') : t(workspaceCopyKey('generateDeck')) }}
+            </button>
+          </form>
         </div>
 
         <!-- 错误（当前标签任务） -->
@@ -275,7 +275,7 @@ const promptTask = reactive<GeneratorTask>(createTask("FAST"))
 /** RAG 文档分析：独立任务 */
 const ragTask = reactive<GeneratorTask>(createTask("SLOW"))
 
-const activeTab = ref<"prompt" | "upload">("prompt")
+const activeTab = ref<"prompt" | "upload">("upload")
 const input = ref(props.initialPrompt || "")
 const uploadedFile = ref<File | null>(null)
 const cloudDocument = ref<UploadedDocument | null>(null)

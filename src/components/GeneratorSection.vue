@@ -47,51 +47,7 @@
         </div>
 
         <div class="p-6">
-          <div v-if="activeTab === 'quick'" class="space-y-6">
-            <div>
-              <label class="mb-2 block text-sm font-medium text-foreground">{{ t('landing.promptLabel') }}</label>
-              <div class="relative">
-                <textarea
-                  v-model="prompt"
-                  rows="4"
-                  class="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 pb-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:pb-14"
-                  :placeholder="t('landing.promptPlaceholder')"
-                />
-                <button
-                  @click="generatePPT"
-                  :disabled="isLoading || !prompt.trim()"
-                  :class="[
-                    'mt-2 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all sm:absolute sm:bottom-3 sm:right-3 sm:mt-0 sm:w-auto',
-                    isLoading || !prompt.trim()
-                      ? 'cursor-not-allowed bg-muted text-muted-foreground'
-                      : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  ]"
-                >
-                  <Loader2 v-if="isLoading" class="h-4 w-4 animate-spin" />
-                  <Sparkles v-else class="h-4 w-4" />
-                  {{ isLoading ? t('landing.generating') : t('landing.generatePpt') }}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <p class="mb-3 text-sm text-muted-foreground">{{ t('landing.quickStart') }}</p>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="example in quickExamples"
-                  :key="example.id"
-                  type="button"
-                  :title="example.prompt"
-                  @click="selectQuickExample(example)"
-                  class="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
-                >
-                  {{ example.label }}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div v-else class="space-y-6">
+          <div v-if="activeTab === 'upload'" class="space-y-6">
             <div
               @dragover.prevent="isDragging = true"
               @dragleave="isDragging = false"
@@ -168,6 +124,50 @@
             </button>
           </div>
 
+          <div v-else class="space-y-6">
+            <div>
+              <label class="mb-2 block text-sm font-medium text-foreground">{{ t('landing.promptLabel') }}</label>
+              <div class="relative">
+                <textarea
+                  v-model="prompt"
+                  rows="4"
+                  class="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 pb-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:pb-14"
+                  :placeholder="t('landing.promptPlaceholder')"
+                />
+                <button
+                  @click="generatePPT"
+                  :disabled="isLoading || !prompt.trim()"
+                  :class="[
+                    'mt-2 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all sm:absolute sm:bottom-3 sm:right-3 sm:mt-0 sm:w-auto',
+                    isLoading || !prompt.trim()
+                      ? 'cursor-not-allowed bg-muted text-muted-foreground'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  ]"
+                >
+                  <Loader2 v-if="isLoading" class="h-4 w-4 animate-spin" />
+                  <Sparkles v-else class="h-4 w-4" />
+                  {{ isLoading ? t('landing.generating') : t('landing.generatePpt') }}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <p class="mb-3 text-sm text-muted-foreground">{{ t('landing.quickStart') }}</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="example in quickExamples"
+                  :key="example.id"
+                  type="button"
+                  :title="example.prompt"
+                  @click="selectQuickExample(example)"
+                  class="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                >
+                  {{ example.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div v-if="slides.length > 0" class="mt-8 space-y-4">
             <div class="flex items-center justify-between">
               <h3 class="text-lg font-semibold text-foreground">{{ t('landing.outlineTitle') }}</h3>
@@ -217,7 +217,7 @@ import {
 const { t } = useI18n()
 const emit = defineEmits(['start'])
 
-const activeTab = ref('quick')
+const activeTab = ref('upload')
 const prompt = ref('')
 const uploadPrompt = ref('')
 const isLoading = ref(false)
@@ -228,8 +228,8 @@ const slides = ref([])
 const showDemoVideo = ref(false)
 
 const tabs = computed(() => [
-  { id: 'quick', label: t('landing.tabQuick'), icon: markRaw(MessageSquare) },
   { id: 'upload', label: t('landing.tabUpload'), icon: markRaw(FileUp) },
+  { id: 'quick', label: t('landing.tabQuick'), icon: markRaw(MessageSquare) },
 ])
 
 const QUICK_EXAMPLE_IDS = [
