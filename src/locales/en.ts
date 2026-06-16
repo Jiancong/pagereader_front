@@ -475,8 +475,8 @@ export default {
     completeNoPptData: "Done, but no presentation data was found",
     loadPptFailed: "Could not load the deck. Check your network and try again.",
     queueLabel: "Generation mode",
-    queueFast: "Card Mode",
-    queueSlow: "Document Mode",
+    queueCard: "Card Mode",
+    queueDocument: "Document Mode",
     queueHint:
       "Card mode distills core ideas into easy-to-review theme cards; Document mode generates a full, structured presentation.",
     creditsInsufficient: "Not enough credits to generate a deck",

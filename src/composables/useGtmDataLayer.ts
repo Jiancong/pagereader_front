@@ -5,6 +5,8 @@
  * Measurement ID G-0Y4KL2PZ5Y is configured inside GTM, not here.
  */
 
+import type { PptQueue } from "@/api/types"
+
 declare global {
   interface Window {
     dataLayer?: unknown[]
@@ -136,7 +138,7 @@ export const LANDING_WATCH_DEMO_EVENT = "landing:watch-demo"
 
 export function gtmGenerateStart(
   mode: "prompt" | "upload",
-  queue: "FAST" | "SLOW",
+  queue: PptQueue,
   source: "local" | "cloud" = "local",
 ): void {
   pushGtmEvent("generate_start", { mode, queue, source })
@@ -144,7 +146,7 @@ export function gtmGenerateStart(
 
 export function gtmGenerateComplete(
   mode: "prompt" | "upload",
-  queue: "FAST" | "SLOW",
+  queue: PptQueue,
   projectId: string,
 ): void {
   pushGtmEvent("generate_complete", { mode, queue, project_id: projectId })

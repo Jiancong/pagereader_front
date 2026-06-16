@@ -52,14 +52,14 @@
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
           <label class="flex cursor-pointer items-center gap-2 text-sm">
-            <input v-model="activeTask.queue" type="radio" value="FAST" class="accent-primary" />
-            <span>{{ t('workspace.queueFast') }}</span>
-            <span class="text-muted-foreground">({{ t('pricing.usageFastCredits') }})</span>
+            <input v-model="activeTask.queue" type="radio" value="CARD" class="accent-primary" />
+            <span>{{ t('workspace.queueCard') }}</span>
+            <span class="text-muted-foreground">({{ t('pricing.usageSlowCredits') }})</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2 text-sm">
-            <input v-model="activeTask.queue" type="radio" value="SLOW" class="accent-primary" />
-            <span>{{ t('workspace.queueSlow') }}</span>
-            <span class="text-muted-foreground">({{ t('pricing.usageSlowCredits') }})</span>
+            <input v-model="activeTask.queue" type="radio" value="DOCUMENT" class="accent-primary" />
+            <span>{{ t('workspace.queueDocument') }}</span>
+            <span class="text-muted-foreground">({{ t('pricing.usageFastCredits') }})</span>
           </label>
         </div>
         <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.queueHint') }}</p>
@@ -271,9 +271,9 @@ function createTask(defaultQueue: PptQueue): GeneratorTask {
 }
 
 /** 一句话 / 联网搜索：独立任务 */
-const promptTask = reactive<GeneratorTask>(createTask("FAST"))
+const promptTask = reactive<GeneratorTask>(createTask("CARD"))
 /** RAG 文档分析：独立任务 */
-const ragTask = reactive<GeneratorTask>(createTask("SLOW"))
+const ragTask = reactive<GeneratorTask>(createTask("DOCUMENT"))
 
 const activeTab = ref<"prompt" | "upload">("upload")
 const input = ref(props.initialPrompt || "")
@@ -294,7 +294,7 @@ const attachedDocSizeLabel = computed(() => {
 })
 
 const activeTask = computed(() => (activeTab.value === "prompt" ? promptTask : ragTask))
-const isCardMode = computed(() => activeTask.value.queue === "FAST")
+const isCardMode = computed(() => activeTask.value.queue === "CARD")
 const activeLastLogs = computed(() => activeTask.value.logs.slice(-3))
 
 function workspaceCopyKey(suffix: string): string {
@@ -438,7 +438,7 @@ function docBaseName(filename: string): string {
 function applyDefaultUploadPrompt() {
   if (!hasAttachedDoc.value) return
   uploadPrompt.value = t(
-    ragTask.queue === "FAST" ? "workspace.uploadPromptDefaultCard" : "workspace.uploadPromptDefault",
+    ragTask.queue === "CARD" ? "workspace.uploadPromptDefaultCard" : "workspace.uploadPromptDefault",
   )
 }
 

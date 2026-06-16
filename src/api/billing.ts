@@ -6,8 +6,8 @@ import { CREDITS_INSUFFICIENT, type PptQueue, type SubscribeMyStatus } from "./t
 
 /** 各队列单次生成扣费（与定价页一致） */
 export const QUEUE_CREDIT_COST: Record<PptQueue, number> = {
-  FAST: 60,
-  SLOW: 30,
+  CARD: 30,
+  DOCUMENT: 60,
 }
 
 function parseCredits(v: unknown): number {
@@ -32,12 +32,12 @@ export function getPackageCreditsRemaining(status: SubscribeMyStatus | null | un
   )
 }
 
-/** 慢速：每日免费 + 套餐；快速：仅套餐 */
+/** CARD：每日免费 + 套餐；DOCUMENT：仅套餐 */
 export function canAffordQueue(status: SubscribeMyStatus | null | undefined, queue: PptQueue): boolean {
   const cost = QUEUE_CREDIT_COST[queue]
   const daily = getDailyCreditsRemaining(status)
   const pkg = getPackageCreditsRemaining(status)
-  if (queue === "FAST") return pkg >= cost
+  if (queue === "DOCUMENT") return pkg >= cost
   return daily + pkg >= cost
 }
 
