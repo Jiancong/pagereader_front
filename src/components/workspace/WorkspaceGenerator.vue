@@ -197,7 +197,7 @@
 
 
 <script setup lang="ts">
-import { ref, computed, reactive, onBeforeUnmount } from "vue"
+import { ref, computed, reactive, watch, onBeforeUnmount } from "vue"
 import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X } from "lucide-vue-next"
@@ -434,15 +434,28 @@ function docBaseName(filename: string): string {
   return dot > 0 ? base.slice(0, dot) : base
 }
 
+/** 按当前 RAG 任务 queue，填充上传分析默认诉求（随 Card / Document 模式切换） */
+function applyDefaultUploadPrompt() {
+  if (!hasAttachedDoc.value) return
+  uploadPrompt.value = t(
+    ragTask.queue === "FAST" ? "workspace.uploadPromptDefaultCard" : "workspace.uploadPromptDefault",
+  )
+}
+
+watch(
+  () => ragTask.queue,
+  () => {
+    if (activeTab.value === "upload") applyDefaultUploadPrompt()
+  },
+)
+
 const onFileChange = (e: Event) => {
   const f = (e.target as HTMLInputElement).files?.[0]
   if (f) {
     cloudDocument.value = null
     cloudDocumentSize.value = undefined
     uploadedFile.value = f
-    uploadPrompt.value = t(
-      ragTask.queue === "FAST" ? "workspace.uploadPromptDefaultCard" : "workspace.uploadPromptDefault",
-    )
+    applyDefaultUploadPrompt()
   }
 }
 
@@ -461,12 +474,7 @@ function attachCloudDocument(payload: { doc: UploadedDocument; size?: number }) 
   cloudDocument.value = payload.doc
   cloudDocumentSize.value = payload.size
   activeTab.value = "upload"
-  uploadPrompt.value = t(
-    ragTask.queue === "FAST" ? "workspace.docGeneratePromptCard" : "workspace.docGeneratePrompt",
-    {
-      name: docBaseName(payload.doc.name || "document"),
-    },
-  )
+  applyDefaultUploadPrompt()
   gtmAssetAttach(gtmFileExt(payload.doc.name || ""))
 }
 
