@@ -220,7 +220,7 @@ import {
   canAffordQueue,
 } from "../../api"
 import type { PptQueue } from "@/api/types"
-import { resolvePptDataFromStreamComplete } from "@/utils/pptCompletePayload"
+import { resolvePptDataFromStreamComplete, isPptStreamPayload } from "@/utils/pptCompletePayload"
 import { notifyCreditsRefresh } from "@/composables/useCreditsRefresh"
 import type { UploadedDocument } from "@/utils/pptDocumentRag"
 import { formatBytes } from "@/utils/userAssets"
@@ -351,6 +351,32 @@ const tabClass = (tab: "prompt" | "upload") => [
 ]
 
 const appendLog = (task: GeneratorTask, line: string) => task.logs.push(line)
+
+async function handlePptStreamComplete(
+  task: GeneratorTask,
+  data: unknown,
+  mode: "prompt" | "upload",
+) {
+  stopTaskTimer(task)
+  appendLog(task, t("workspace.loadingPpt"))
+  try {
+    const resolved = await resolvePptDataFromStreamComplete(data)
+    if (resolved) {
+      task.pptData = resolved.pptData
+      if (resolved.projectId) task.projectId = resolved.projectId
+      gtmGenerateComplete(mode, task.queue, task.projectId)
+      emit("project-complete", task.projectId)
+    } else {
+      task.errorMsg = t("workspace.completeNoPptData")
+      gtmGenerateFail(mode, "other")
+    }
+  } catch {
+    task.errorMsg = t("workspace.loadPptFailed")
+    gtmGenerateFail(mode, "network")
+  } finally {
+    await refreshCreditsBar()
+  }
+}
 
 async function handleCardStreamComplete(
   task: GeneratorTask,
@@ -501,41 +527,24 @@ const runStream = async (
         if (line) appendLog(task, line)
       },
       onEvent: async (event, data) => {
-        if (event !== "design_complete" || task.cardResult || task.pptData) return
-        await handleCardStreamComplete(task, data, mode)
+        if (task.cardResult || task.pptData) return
+        if (event === "ppt_complete" || (event === "design_complete" && isPptStreamPayload(data))) {
+          await handlePptStreamComplete(task, data, mode)
+          return
+        }
+        if (event === "design_complete" && isBookCardStreamPayload(data)) {
+          await handleCardStreamComplete(task, data, mode)
+        }
       },
       onComplete: async (data: unknown) => {
         if (task.pptData || task.cardResult) return
         const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
-        if (isBookCardStreamPayload(o)) {
-          await handleCardStreamComplete(task, data, mode)
+        if (isPptStreamPayload(o)) {
+          await handlePptStreamComplete(task, data, mode)
           return
         }
-        const isPptCompletion =
-          o.ppt_data_url != null ||
-          o.remote_url != null ||
-          o.ppt_data != null ||
-          o.is_ppt_response === true ||
-          o.ppt_generation === true
-        if (!isPptCompletion) return
-        stopTaskTimer(task)
-        appendLog(task, t("workspace.loadingPpt"))
-        try {
-          const resolved = await resolvePptDataFromStreamComplete(data)
-          if (resolved) {
-            task.pptData = resolved.pptData
-            if (resolved.projectId) task.projectId = resolved.projectId
-            gtmGenerateComplete(mode, task.queue, task.projectId)
-            emit("project-complete", task.projectId)
-          } else {
-            task.errorMsg = t("workspace.completeNoPptData")
-            gtmGenerateFail(mode, "other")
-          }
-        } catch {
-          task.errorMsg = t("workspace.loadPptFailed")
-          gtmGenerateFail(mode, "network")
-        } finally {
-          refreshCreditsBar()
+        if (isBookCardStreamPayload(o)) {
+          await handleCardStreamComplete(task, data, mode)
         }
       },
       onError: (msg: string) => {

@@ -59,6 +59,7 @@ function resolveEffectiveEvent(wire: string, payload: unknown): string {
     return status
   }
   const state = normalizeEventName(String(p.state ?? ""))
+  if (state === "ppt_complete") return "ppt_complete"
   if (state === "book_card_complete") return "design_complete"
   if (status === "error") return "error"
   if (status === "in_progress" || p.phase != null) return "progress"

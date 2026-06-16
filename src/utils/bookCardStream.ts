@@ -1,3 +1,5 @@
+import { isPptStreamPayload } from "@/utils/pptCompletePayload"
+
 export type BookCardResult = {
   content: string
   imageUrls: string[]
@@ -23,10 +25,12 @@ export function stripMarkdownImages(markdown: string): string {
 
 export function isBookCardStreamPayload(data: unknown): boolean {
   if (!data || typeof data !== "object") return false
+  if (isPptStreamPayload(data)) return false
   const o = data as Record<string, unknown>
   const status = String(o.status ?? "").toLowerCase()
   const state = String(o.state ?? "").toLowerCase()
-  if (status === "design_complete" || state === "book_card_complete") return true
+  if (state === "book_card_complete") return true
+  if (status === "design_complete") return true
   const hasImages = Array.isArray(o.image_urls) && o.image_urls.length > 0
   const hasText =
     typeof o.response === "string" ||

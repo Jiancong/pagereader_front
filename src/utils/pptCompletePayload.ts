@@ -12,6 +12,18 @@ function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null
 }
 
+/** SSE complete / design_complete 载荷是否为 PPT 生成结果（非书籍卡片） */
+export function isPptStreamPayload(payload: unknown): boolean {
+  const root = asRecord(payload)
+  if (!root) return false
+  const state = String(root.state ?? "").toLowerCase()
+  const status = String(root.status ?? "").toLowerCase()
+  if (state === "ppt_complete" || status === "ppt_complete") return true
+  if (root.ppt_data_url != null || root.remote_url != null || root.ppt_data != null) return true
+  if (root.is_ppt_response === true || root.ppt_generation === true) return true
+  return false
+}
+
 function hasSlides(data: Record<string, unknown>): boolean {
   return Array.isArray(data.slides) && data.slides.length > 0
 }
