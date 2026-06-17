@@ -301,7 +301,7 @@ export interface ChatStreamReq {
   uploaded_documents?: UploadedDocument[]
   /** 显式项目标题；上传 PDF 时建议传去后缀书名 */
   projectName?: string
-  /** CARD 30 credits/run (daily free first); DOCUMENT 60 credits/run (package only) */
+  /** CARD 60 credits/run (package only); DOCUMENT 30 credits/run (daily free first) */
   queue?: PptQueue
   /** 一句话生成：是否启用联网搜索；上传文档时不传 */
   enable_search?: boolean

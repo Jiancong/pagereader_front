@@ -54,12 +54,12 @@
           <label class="flex cursor-pointer items-center gap-2 text-sm">
             <input v-model="activeTask.queue" type="radio" value="CARD" class="accent-primary" />
             <span>{{ t('workspace.queueCard') }}</span>
-            <span class="text-muted-foreground">({{ t('pricing.usageSlowCredits') }})</span>
+            <span class="text-muted-foreground">({{ t('pricing.usageFastCredits') }})</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2 text-sm">
             <input v-model="activeTask.queue" type="radio" value="DOCUMENT" class="accent-primary" />
             <span>{{ t('workspace.queueDocument') }}</span>
-            <span class="text-muted-foreground">({{ t('pricing.usageFastCredits') }})</span>
+            <span class="text-muted-foreground">({{ t('pricing.usageSlowCredits') }})</span>
           </label>
         </div>
         <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.queueHint') }}</p>
