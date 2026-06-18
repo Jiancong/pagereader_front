@@ -386,9 +386,232 @@
         @contextmenu.prevent="onPptSlideContextMenu"
       >
         <template v-if="slide">
+          <!-- modern-literary-minimal：现代文学极简渲染分支 -->
+          <div
+            v-if="shouldUseModernLiterarySlide(slide)"
+            class="ppt-slide ppt-modern-literary"
+            :class="`ppt-modern-literary--${slide.layout}`"
+          >
+            <template v-if="slide.layout === 'cover'">
+              <div class="ppt-modern-kicker">
+                {{ slide.author || slide.organization || t("agent.pptDefaultOrg") }}
+              </div>
+              <div class="ppt-modern-cover-grid">
+                <div class="ppt-modern-cover-main">
+                  <h1 class="ppt-modern-cover-title">
+                    <PptMarkdownInline
+                      :text="slide.title || ''"
+                      :editable="isEditing"
+                      @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                    />
+                  </h1>
+                  <div class="ppt-modern-accent-line"></div>
+                  <p v-if="pptSource.subtitle || slide.subtitle" class="ppt-modern-cover-subtitle">
+                    <PptMarkdownInline
+                      :text="slide.subtitle || pptSource.subtitle || ''"
+                      :editable="isEditing"
+                      @blur="onCellBlur($event, `slides.${currentSlide}.subtitle`)"
+                    />
+                  </p>
+                </div>
+              </div>
+              <div class="ppt-modern-cover-footer">
+                <span>{{ modernLiteraryTagline }}</span>
+                <span>{{
+                  slide.date ||
+                  new Date().toLocaleDateString(locale === "zh-cn" ? "zh-CN" : "en-US", {
+                    year: "numeric",
+                    month: "long",
+                  })
+                }}</span>
+              </div>
+            </template>
+
+            <template v-else-if="slide.layout === 'section'">
+              <div class="ppt-modern-section-rail"></div>
+              <div class="ppt-modern-section-block">
+                <div class="ppt-modern-section-label">
+                  {{
+                    t("agent.pptChapterLabel", {
+                      number:
+                        slide.chapter_number ||
+                        String(sectionChapterNum).padStart(2, "0"),
+                    })
+                  }}
+                </div>
+                <h2 class="ppt-modern-section-title">
+                  <PptMarkdownInline
+                    :text="slide.title || ''"
+                    :editable="isEditing"
+                    @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                  />
+                </h2>
+                <div class="ppt-modern-section-line"></div>
+                <PptMarkdownInline
+                  v-if="resolveSectionSubtitle(slide) || isEditing"
+                  class="ppt-modern-section-subtitle"
+                  :text="resolveSectionSubtitle(slide)"
+                  :editable="isEditing"
+                  @blur="onCellBlur($event, `slides.${currentSlide}.subtitle_en`)"
+                />
+              </div>
+            </template>
+
+            <template v-else-if="slide.layout === 'quote'">
+              <div class="ppt-modern-quote-card">
+                <div class="ppt-modern-quote-mark">“</div>
+                <PptMarkdownInline
+                  class="ppt-modern-quote-text"
+                  :text="modernLiteraryQuoteText(slide)"
+                  :page-references="slide.page_references"
+                  :editable="isEditing"
+                  @blur="onCellBlur($event, `slides.${currentSlide}.quote`)"
+                  @ref-click="onPptTableRefClick($event, slide)"
+                />
+                <div
+                  v-if="slide.quote_author || slide.author || isEditing"
+                  class="ppt-modern-quote-author"
+                  :contenteditable="isEditing"
+                  @blur="onCellBlur($event, `slides.${currentSlide}.quote_author`)"
+                >
+                  {{ slide.quote_author || slide.author }}
+                </div>
+              </div>
+              <PptMarkdownInline
+                v-if="slide.key_insight"
+                class="ppt-modern-insight"
+                :text="slide.key_insight"
+                :page-references="slide.page_references"
+                :editable="isEditing"
+                @blur="onCellBlur($event, `slides.${currentSlide}.key_insight`)"
+                @ref-click="onPptTableRefClick($event, slide)"
+              />
+            </template>
+
+            <template v-else-if="slide.layout === 'content'">
+              <div class="ppt-modern-content-header">
+                <h2 class="ppt-modern-slide-title">
+                  <PptMarkdownInline
+                    :text="slide.title || ''"
+                    :editable="isEditing"
+                    @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                  />
+                </h2>
+                <div class="ppt-modern-accent-line"></div>
+              </div>
+              <div class="ppt-modern-content-body">
+                <div v-if="modernLiteraryQuoteItems(slide).length" class="ppt-modern-content-quotes">
+                  <div
+                    v-for="(item, qi) in modernLiteraryQuoteItems(slide)"
+                    :key="'modern-quote-' + qi"
+                    class="ppt-modern-inline-quote"
+                  >
+                    <PptMarkdownInline
+                      :text="modernLiteraryCleanText(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </div>
+                </div>
+                <div class="ppt-modern-explain-grid">
+                  <div
+                    v-for="(item, bi) in modernLiteraryBodyItems(slide)"
+                    :key="'modern-body-' + bi"
+                    class="ppt-modern-explain-card"
+                  >
+                    <PptMarkdownInline
+                      class="ppt-modern-explain-title"
+                      :text="contentPointTitle(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                    <PptMarkdownInline
+                      v-if="hasContentPointBody(item)"
+                      class="ppt-modern-explain-body"
+                      :text="parseContentBody(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </div>
+                </div>
+              </div>
+              <PptMarkdownInline
+                v-if="slide.key_insight"
+                class="ppt-modern-insight ppt-modern-insight--footer"
+                :text="slide.key_insight"
+                :page-references="slide.page_references"
+                :editable="isEditing"
+                @blur="onCellBlur($event, `slides.${currentSlide}.key_insight`)"
+                @ref-click="onPptTableRefClick($event, slide)"
+              />
+            </template>
+
+            <template v-else-if="slide.layout === 'two_column'">
+              <div class="ppt-modern-content-header">
+                <h2 class="ppt-modern-slide-title">
+                  <PptMarkdownInline
+                    :text="slide.title || ''"
+                    :editable="isEditing"
+                    @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                  />
+                </h2>
+                <div class="ppt-modern-accent-line"></div>
+              </div>
+              <div class="ppt-modern-two-col-grid">
+                <section class="ppt-modern-compare-card ppt-modern-compare-card--light">
+                  <h3>
+                    <PptMarkdownInline
+                      :text="slide.left_title || t('agent.pptLeftColumn')"
+                      :editable="isEditing"
+                      @blur="onCellBlur($event, `slides.${currentSlide}.left_title`)"
+                    />
+                  </h3>
+                  <div class="ppt-modern-compare-list">
+                    <PptMarkdownInline
+                      v-for="(item, li) in slide.left_content || []"
+                      :key="'modern-left-' + li"
+                      class="ppt-modern-compare-item"
+                      :text="displayText(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </div>
+                </section>
+                <section class="ppt-modern-compare-card ppt-modern-compare-card--dark">
+                  <h3>
+                    <PptMarkdownInline
+                      :text="slide.right_title || t('agent.pptRightColumn')"
+                      :editable="isEditing"
+                      @blur="onCellBlur($event, `slides.${currentSlide}.right_title`)"
+                    />
+                  </h3>
+                  <div class="ppt-modern-compare-list">
+                    <PptMarkdownInline
+                      v-for="(item, ri) in modernLiteraryRightItems(slide)"
+                      :key="'modern-right-' + ri"
+                      class="ppt-modern-compare-item"
+                      :text="modernLiteraryCleanText(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </div>
+                </section>
+              </div>
+              <div v-if="modernLiteraryFooterQuote(slide)" class="ppt-modern-quote-strip">
+                <PptMarkdownInline
+                  :text="modernLiteraryFooterQuote(slide)"
+                  :page-references="slide.page_references"
+                  @ref-click="onPptTableRefClick($event, slide)"
+                />
+              </div>
+            </template>
+
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
+          </div>
+
           <!-- cover 封面 -->
           <div
-            v-if="slide.layout === 'cover'"
+            v-else-if="slide.layout === 'cover'"
             class="ppt-slide ppt-cover"
             :style="coverBackdropUrl ? { backgroundImage: `url(${coverBackdropUrl})` } : {}"
           >
@@ -9663,6 +9886,28 @@ const paletteStyle = computed(() => {
     vars[`--ppt-accent-${i + 1}`] = c;
   });
   ensureReadablePaletteVars(vars);
+  if (isModernLiteraryMinimal.value) {
+    const colors = modernLiteraryColors.value;
+    const fonts = modernLiteraryFonts.value;
+    Object.assign(vars, {
+      "--ppt-bg": colors.bg,
+      "--ppt-bg-secondary": colors.surface,
+      "--ppt-accent": colors.accent,
+      "--ppt-text": colors.text,
+      "--ppt-text-secondary": colors.muted,
+      "--ppt-modern-bg": colors.bg,
+      "--ppt-modern-surface": colors.surface,
+      "--ppt-modern-accent": colors.accent,
+      "--ppt-modern-text": colors.text,
+      "--ppt-modern-muted": colors.muted,
+      "--ppt-font-display": fonts.display,
+      "--ppt-font-heading": fonts.heading,
+      "--ppt-font-body": fonts.body,
+      "--ppt-font-family": fonts.body,
+      "--ppt-quote-font-family": fonts.heading,
+      fontFamily: fonts.body,
+    });
+  }
   return vars;
 });
 
@@ -11112,6 +11357,63 @@ function displayText(item: unknown): string {
   return coerceContentItemText(item);
 }
 
+function modernLiteraryCleanText(item: unknown): string {
+  return displayText(item)
+    .replace(/(^|\s)\((\/resource\/[^)]+|https?:\/\/[^)\s]+#page=[^)]+)\)/g, "$1")
+    .replace(/\bhttps?:\/\/\S+#page=\S+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function shouldUseModernLiterarySlide(slide: PptSlide | null | undefined): boolean {
+  if (!isModernLiteraryMinimal.value || !slide) return false;
+  return ["cover", "section", "quote", "content", "two_column"].includes(slide.layout);
+}
+
+function isModernLiteraryQuotedFragment(item: unknown): boolean {
+  const text = modernLiteraryCleanText(item);
+  if (!text || !/\[\d+\]/.test(text)) return false;
+  return (
+    /[“”"「」『』《》]/.test(text) ||
+    /(^|\s)(\.{3}|…)/.test(text) ||
+    text.includes("...")
+  );
+}
+
+function modernLiteraryQuoteText(slide: PptSlide): string {
+  return modernLiteraryCleanText(
+    slide.quote || slide.content?.[0] || slide.key_insight || slide.title || ""
+  );
+}
+
+function modernLiteraryQuoteItems(slide: PptSlide): string[] {
+  return (slide.content || []).filter(isModernLiteraryQuotedFragment).slice(0, 2);
+}
+
+function modernLiteraryBodyItems(slide: PptSlide): string[] {
+  const items = (slide.content || []).filter((item) => !isModernLiteraryQuotedFragment(item));
+  if (items.length) return items.slice(0, 3);
+  return (slide.content || []).slice(1, 4);
+}
+
+function modernLiteraryRightItems(slide: PptSlide): string[] {
+  if (slide.right_items?.length) {
+    return slide.right_items
+      .map((item) => {
+        const title = rightItemTitle(item);
+        const desc = rightItemDescription(item);
+        return modernLiteraryCleanText(title && desc ? `${title} — ${desc}` : title || desc);
+      })
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+  return (slide.right_content || []).map(modernLiteraryCleanText).filter(Boolean).slice(0, 3);
+}
+
+function modernLiteraryFooterQuote(slide: PptSlide): string {
+  return modernLiteraryQuoteItems(slide)[0] || "";
+}
+
 function rightItemTitle(ri: { title?: unknown }): string {
   return pickDisplayString(ri.title);
 }
@@ -11510,6 +11812,59 @@ const pptSource = computed<PptData>(() => {
   return normalizePptData(base);
 });
 
+const MODERN_LITERARY_TEMPLATE_ID = "modern-literary-minimal";
+const MODERN_LITERARY_DEFAULT_GOOGLE_FONTS = [
+  "https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap",
+  "https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700;900&display=swap",
+  "https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap",
+];
+
+const modernLiteraryTokens = computed(() => pptSource.value.palette?.theme_tokens ?? {});
+const modernLiteraryTemplateId = computed(
+  () =>
+    modernLiteraryTokens.value.template_id ||
+    pptSource.value.html_template_recommendation?.template_id ||
+    ""
+);
+const isModernLiteraryMinimal = computed(
+  () => modernLiteraryTemplateId.value === MODERN_LITERARY_TEMPLATE_ID
+);
+
+const modernLiteraryColors = computed(() => {
+  const palette = pptSource.value.palette || {};
+  return {
+    bg: palette.bg_color || "#fdfcf8",
+    surface: palette.bg_color_secondary || "#f4f2ed",
+    accent: palette.accent_color || "#c41e3a",
+    text: palette.text_color || "#1a1a1a",
+    muted: palette.text_secondary || "#888888",
+  };
+});
+
+const modernLiteraryFonts = computed(() => {
+  const typography = modernLiteraryTokens.value.typography || {};
+  return {
+    display: typography.font_display || "ZCOOL XiaoWei",
+    heading: typography.font_heading || "ZCOOL XiaoWei, Noto Serif SC, serif",
+    body: typography.font_body || "Noto Serif SC, serif",
+  };
+});
+
+const modernLiteraryTagline = computed(
+  () =>
+    modernLiteraryTokens.value.typography?.tagline ||
+    modernLiteraryTokens.value.tagline ||
+    pptSource.value.brand_footer ||
+    currentBrandFooter.value ||
+    ""
+);
+
+const modernLiteraryGoogleFontUrls = computed(() => {
+  const urls = pptSource.value.palette?.theme_tokens?.typography?.google_fonts_urls ?? [];
+  if (!isModernLiteraryMinimal.value) return urls;
+  return [...new Set([...urls, ...MODERN_LITERARY_DEFAULT_GOOGLE_FONTS])];
+});
+
 /** 章节联网配图索引（ppt_data.chapter_images + section slide 兜底） */
 const chapterImageIndex = computed(() => buildChapterImageIndex(pptSource.value));
 
@@ -11596,7 +11951,7 @@ watch(
 );
 
 watch(
-  () => pptSource.value.palette?.theme_tokens?.typography?.google_fonts_urls,
+  modernLiteraryGoogleFontUrls,
   (urls) => syncPptGoogleFontLinks(urls),
   { immediate: true }
 );
@@ -18896,6 +19251,332 @@ defineExpose({
   white-space: nowrap;
   max-width: 56px;
   opacity: 0.7;
+}
+
+.ppt-modern-literary {
+  --modern-bg: var(--ppt-modern-bg, #fdfcf8);
+  --modern-surface: var(--ppt-modern-surface, #f4f2ed);
+  --modern-accent: var(--ppt-modern-accent, #c41e3a);
+  --modern-text: var(--ppt-modern-text, #1a1a1a);
+  --modern-muted: var(--ppt-modern-muted, #888888);
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  padding: 58px 70px;
+  overflow: hidden;
+  color: var(--modern-text);
+  background: var(--modern-bg);
+  font-family: var(--ppt-font-body, "Noto Serif SC", serif);
+}
+
+.ppt-modern-literary .ppt-table-ref {
+  color: var(--modern-accent);
+  font-size: 0.62em;
+  opacity: 0.55;
+  text-decoration: none;
+  vertical-align: super;
+}
+
+.ppt-modern-literary::after {
+  content: "";
+  position: absolute;
+  right: 34px;
+  bottom: 28px;
+  width: 46%;
+  height: 120px;
+  border-bottom: 18px solid var(--modern-text);
+  opacity: 0.035;
+  pointer-events: none;
+}
+
+.ppt-modern-kicker,
+.ppt-modern-section-label {
+  color: var(--modern-accent);
+  font-family: var(--ppt-font-body, "Noto Serif SC", serif);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+
+.ppt-modern-cover-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 9fr) minmax(80px, 3fr);
+  align-items: center;
+  min-height: 100%;
+}
+
+.ppt-modern-cover-main {
+  max-width: 82%;
+}
+
+.ppt-modern-cover-title,
+.ppt-modern-section-title,
+.ppt-modern-slide-title {
+  margin: 0;
+  color: var(--modern-text);
+  font-family: var(--ppt-font-display, "ZCOOL XiaoWei", "Noto Serif SC", serif);
+  font-weight: 900;
+  letter-spacing: -0.065em;
+  line-height: 0.86;
+}
+
+.ppt-modern-cover-title {
+  max-width: 980px;
+  font-size: clamp(72px, 9.4cqi, 150px);
+}
+
+.ppt-modern-accent-line,
+.ppt-modern-section-line {
+  width: 118px;
+  height: 6px;
+  margin: 28px 0 22px;
+  background: var(--modern-accent);
+}
+
+.ppt-modern-cover-subtitle {
+  max-width: 680px;
+  margin: 0;
+  color: var(--modern-muted);
+  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-size: clamp(20px, 2.4cqi, 34px);
+  line-height: 1.35;
+}
+
+.ppt-modern-cover-footer {
+  position: absolute;
+  right: 70px;
+  bottom: 44px;
+  left: 70px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  color: var(--modern-muted);
+  font-family: "Lora", var(--ppt-font-body, serif);
+  font-size: 14px;
+  font-style: italic;
+}
+
+.ppt-modern-literary--section {
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 52px;
+  padding: 0;
+}
+
+.ppt-modern-section-rail {
+  background: var(--modern-text);
+}
+
+.ppt-modern-section-block {
+  align-self: center;
+  max-width: 860px;
+  padding-right: 80px;
+  padding-left: 42px;
+  border-left: 10px solid var(--modern-accent);
+}
+
+.ppt-modern-section-title {
+  margin-top: 20px;
+  font-size: clamp(60px, 7.6cqi, 122px);
+}
+
+.ppt-modern-section-subtitle {
+  display: block;
+  max-width: 620px;
+  color: var(--modern-muted);
+  font-size: clamp(18px, 1.8cqi, 28px);
+  line-height: 1.55;
+}
+
+.ppt-modern-literary--quote {
+  align-content: center;
+  padding: 72px 86px;
+}
+
+.ppt-modern-quote-card,
+.ppt-modern-inline-quote {
+  position: relative;
+  border-left: 12px solid var(--modern-accent);
+  background: var(--modern-surface);
+}
+
+.ppt-modern-quote-card {
+  min-height: 410px;
+  padding: 58px 72px 46px;
+}
+
+.ppt-modern-quote-mark {
+  position: absolute;
+  top: 10px;
+  left: 34px;
+  color: var(--modern-accent);
+  font-family: "Lora", var(--ppt-font-heading, serif);
+  font-size: 118px;
+  font-style: italic;
+  line-height: 0.8;
+  opacity: 0.18;
+}
+
+.ppt-modern-quote-text {
+  position: relative;
+  display: block;
+  max-width: 920px;
+  color: var(--modern-text);
+  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-size: clamp(34px, 4.2cqi, 70px);
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+}
+
+.ppt-modern-quote-author {
+  margin-top: 34px;
+  color: var(--modern-muted);
+  font-size: 16px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ppt-modern-insight {
+  display: block;
+  margin-top: 28px;
+  color: var(--modern-accent);
+  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-size: clamp(22px, 2.2cqi, 34px);
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.ppt-modern-content-header {
+  align-self: start;
+}
+
+.ppt-modern-slide-title {
+  max-width: 900px;
+  font-size: clamp(48px, 5.6cqi, 92px);
+}
+
+.ppt-modern-content-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 34px;
+  align-self: center;
+}
+
+.ppt-modern-content-quotes {
+  display: grid;
+  gap: 18px;
+}
+
+.ppt-modern-inline-quote {
+  padding: 28px 34px;
+  color: var(--modern-text);
+  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-size: clamp(22px, 2.1cqi, 34px);
+  font-style: italic;
+  font-weight: 800;
+  line-height: 1.28;
+}
+
+.ppt-modern-explain-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.ppt-modern-explain-card {
+  min-height: 142px;
+  padding: 22px 24px;
+  border-top: 6px solid var(--modern-accent);
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.ppt-modern-explain-title {
+  display: block;
+  color: var(--modern-text);
+  font-size: clamp(20px, 1.75cqi, 30px);
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.ppt-modern-explain-body {
+  display: block;
+  margin-top: 12px;
+  color: var(--modern-muted);
+  font-size: clamp(15px, 1.25cqi, 22px);
+  line-height: 1.5;
+}
+
+.ppt-modern-insight--footer {
+  position: absolute;
+  right: 70px;
+  bottom: 42px;
+  left: 70px;
+  max-width: 760px;
+}
+
+.ppt-modern-two-col-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-self: center;
+}
+
+.ppt-modern-compare-card {
+  min-height: 390px;
+  padding: 34px 38px;
+  border-left: 10px solid var(--modern-accent);
+}
+
+.ppt-modern-compare-card h3 {
+  margin: 0 0 28px;
+  font-family: var(--ppt-font-display, "ZCOOL XiaoWei", serif);
+  font-size: clamp(34px, 3.9cqi, 62px);
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+}
+
+.ppt-modern-compare-card--light {
+  color: var(--modern-text);
+  background: var(--modern-surface);
+}
+
+.ppt-modern-compare-card--dark {
+  color: var(--modern-bg);
+  background: var(--modern-text);
+}
+
+.ppt-modern-compare-card--dark .ppt-modern-compare-item,
+.ppt-modern-compare-card--dark .ppt-table-ref {
+  color: rgba(253, 252, 248, 0.82);
+}
+
+.ppt-modern-compare-list {
+  display: grid;
+  gap: 16px;
+}
+
+.ppt-modern-compare-item {
+  display: block;
+  color: inherit;
+  font-size: clamp(17px, 1.55cqi, 25px);
+  line-height: 1.38;
+}
+
+.ppt-modern-quote-strip {
+  position: absolute;
+  right: 70px;
+  bottom: 36px;
+  left: 70px;
+  padding: 16px 22px;
+  border-left: 8px solid var(--modern-accent);
+  color: var(--modern-muted);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 16px;
+  font-style: italic;
 }
 
 /* ── Mobile layout (≤767px) ── */

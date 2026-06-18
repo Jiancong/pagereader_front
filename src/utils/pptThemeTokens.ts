@@ -1,5 +1,6 @@
 /** 后端 palette.theme_tokens（HTML 模板方案 C） */
 export interface PptThemeTypography {
+  font_display?: string;
   font_body?: string;
   font_heading?: string;
   google_fonts_urls?: string[];
@@ -13,6 +14,7 @@ export interface PptThemeShape {
 }
 
 export interface PptThemeTokens {
+  template_id?: string;
   scheme?: string;
   typography?: PptThemeTypography;
   shape?: PptThemeShape;
