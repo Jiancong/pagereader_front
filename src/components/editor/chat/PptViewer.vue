@@ -494,16 +494,18 @@
                 class="ppt-modern-right-items-portrait"
               >
                 <section class="ppt-modern-portrait-hero">
-                  <div v-if="modernLiteraryPortraitKicker(slide)" class="ppt-modern-portrait-kicker">
-                    {{ modernLiteraryPortraitKicker(slide) }}
+                  <div class="ppt-modern-impact-block">
+                    <div v-if="modernLiteraryPortraitKicker(slide)" class="ppt-modern-portrait-kicker">
+                      {{ modernLiteraryPortraitKicker(slide) }}
+                    </div>
+                    <h2 class="ppt-modern-portrait-title">
+                      <PptMarkdownInline
+                        :text="modernLiteraryPortraitHeroTitle(slide)"
+                        :editable="isEditing"
+                        @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                      />
+                    </h2>
                   </div>
-                  <h2 class="ppt-modern-portrait-title">
-                    <PptMarkdownInline
-                      :text="modernLiteraryPortraitHeroTitle(slide)"
-                      :editable="isEditing"
-                      @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
-                    />
-                  </h2>
                   <PptMarkdownInline
                     v-if="modernLiteraryPortraitHeroBody(slide)"
                     class="ppt-modern-portrait-lead"
@@ -580,12 +582,12 @@
                 :class="`ppt-modern-double--${modernLiteraryDoubleVariant(slide)}`"
               >
                 <template v-if="modernLiteraryDoubleVariant(slide) === 'contrast'">
-                  <article
-                    v-for="(item, di) in modernLiteraryDoubleItems(slide)"
-                    :key="'modern-double-contrast-' + di"
-                    class="ppt-modern-double-card"
-                    :class="{ 'ppt-modern-double-card--dark': di === 1 }"
-                  >
+                    <article
+                      v-for="(item, di) in modernLiteraryDoubleItems(slide)"
+                      :key="'modern-double-contrast-' + di"
+                      class="ppt-modern-double-card"
+                      :class="{ 'ppt-modern-double-card--dark': di === 1, 'ppt-modern-double-card--light': di === 0 }"
+                    >
                     <h3>
                       <PptMarkdownInline
                         :text="contentPointTitle(item)"
@@ -659,7 +661,7 @@
                       v-for="(item, di) in modernLiteraryDoubleItems(slide)"
                       :key="'modern-double-stacked-' + di"
                       class="ppt-modern-double-stacked-card"
-                      :class="{ 'ppt-modern-double-stacked-card--soft': di === 1 }"
+                      :class="{ 'ppt-modern-double-stacked-card--impact': di === 0, 'ppt-modern-double-stacked-card--soft': di === 1 }"
                     >
                       <h3>
                         <PptMarkdownInline
@@ -736,16 +738,18 @@
               >
                 <template v-if="modernLiteraryTripleVariant(slide) === 'portrait'">
                   <section class="ppt-modern-triple-portrait-hero">
-                    <div class="ppt-modern-triple-kicker">
-                      {{ contentPointTitle(modernLiteraryTripleItems(slide)[0]) }}
+                    <div class="ppt-modern-impact-block">
+                      <div class="ppt-modern-triple-kicker">
+                        {{ contentPointTitle(modernLiteraryTripleItems(slide)[0]) }}
+                      </div>
+                      <h3>
+                        <PptMarkdownInline
+                          :text="contentPointTitle(modernLiteraryTripleItems(slide)[0])"
+                          :page-references="slide.page_references"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                      </h3>
                     </div>
-                    <h3>
-                      <PptMarkdownInline
-                        :text="contentPointTitle(modernLiteraryTripleItems(slide)[0])"
-                        :page-references="slide.page_references"
-                        @ref-click="onPptTableRefClick($event, slide)"
-                      />
-                    </h3>
                     <PptMarkdownInline
                       class="ppt-modern-triple-portrait-body"
                       :text="parseContentBody(modernLiteraryTripleItems(slide)[0])"
@@ -757,7 +761,7 @@
                     <div
                       v-for="(item, ti) in modernLiteraryTripleItems(slide).slice(1)"
                       :key="'modern-portrait-' + ti"
-                      class="ppt-modern-triple-bullet"
+                      class="ppt-modern-triple-bullet ppt-modern-triple-bullet--block"
                     >
                       <span></span>
                       <div>
@@ -849,6 +853,10 @@
                     v-for="(item, mi) in modernLiteraryMultiItems(slide)"
                     :key="'modern-multi-' + mi"
                     class="ppt-modern-multi-card"
+                    :class="{
+                      'ppt-modern-multi-card--impact': mi === 0,
+                      'ppt-modern-multi-card--dark': mi === 1,
+                    }"
                   >
                     <h3>
                       <PptMarkdownInline
@@ -20021,7 +20029,8 @@ defineExpose({
 
 .ppt-modern-cover-title {
   max-width: 980px;
-  font-size: clamp(48px, 7.1cqi, 104px);
+  font-size: clamp(34px, 4.8cqi, 58px);
+  line-height: 1.08;
   overflow-wrap: break-word;
   text-wrap: balance;
 }
@@ -20090,7 +20099,10 @@ defineExpose({
 
 .ppt-modern-section-title {
   margin-top: 20px;
-  font-size: clamp(60px, 7.6cqi, 122px);
+  font-size: clamp(36px, 5cqi, 64px);
+  line-height: 1.08;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 .ppt-modern-section-subtitle {
@@ -20329,14 +20341,35 @@ defineExpose({
 .ppt-modern-explain-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: clamp(14px, 1.8cqi, 22px);
 }
 
 .ppt-modern-explain-card {
-  min-height: 142px;
-  padding: 22px 24px;
-  border-top: 6px solid var(--modern-accent);
-  background: rgba(255, 255, 255, 0.52);
+  min-height: clamp(120px, 14cqi, 180px);
+  padding: clamp(18px, 2cqi, 26px) clamp(20px, 2.2cqi, 28px);
+  border: none;
+  border-left: 8px solid var(--modern-accent);
+  border-radius: 0;
+  background: var(--modern-bg);
+  box-shadow: inset 0 0 0 1px rgba(26, 26, 26, 0.08);
+}
+
+.ppt-modern-explain-card:nth-child(2),
+.ppt-modern-explain-card:nth-child(3) {
+  color: var(--modern-bg);
+  background: var(--modern-text);
+  border-left-color: var(--modern-accent);
+  box-shadow: none;
+}
+
+.ppt-modern-explain-card:nth-child(2) .ppt-modern-explain-title,
+.ppt-modern-explain-card:nth-child(3) .ppt-modern-explain-title {
+  color: var(--modern-bg);
+}
+
+.ppt-modern-explain-card:nth-child(2) .ppt-modern-explain-body,
+.ppt-modern-explain-card:nth-child(3) .ppt-modern-explain-body {
+  color: rgba(253, 252, 248, 0.82);
 }
 
 .ppt-modern-explain-title {
@@ -20356,23 +20389,55 @@ defineExpose({
 }
 
 .ppt-modern-double {
-  align-self: center;
+  align-self: stretch;
+  width: 100%;
+}
+
+/* ── 大色块冲击层：accent / dark / surface 对比 ── */
+.ppt-modern-impact-block {
+  display: grid;
+  gap: 10px;
+  margin-bottom: clamp(16px, 2cqi, 24px);
+  padding: clamp(22px, 2.8cqi, 36px) clamp(24px, 3cqi, 40px);
+  background: var(--modern-accent);
+  color: var(--modern-bg);
+}
+
+.ppt-modern-impact-block .ppt-modern-portrait-kicker,
+.ppt-modern-impact-block .ppt-modern-triple-kicker {
+  margin-bottom: 0;
+  color: rgba(253, 252, 248, 0.82);
+}
+
+.ppt-modern-impact-block .ppt-modern-portrait-title,
+.ppt-modern-impact-block h3 {
+  margin: 0;
+  color: var(--modern-bg);
 }
 
 .ppt-modern-double--contrast {
   position: relative;
   display: grid;
-  min-height: 405px;
+  min-height: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 44px;
+  gap: clamp(20px, 2.8cqi, 36px);
+  align-items: stretch;
 }
 
 .ppt-modern-double-card {
-  padding: 42px 46px;
-  border: 1px solid rgba(26, 26, 26, 0.09);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 18px 36px rgba(26, 26, 26, 0.08);
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(220px, 28cqi, 320px);
+  padding: clamp(28px, 3.2cqi, 42px) clamp(30px, 3.4cqi, 46px);
+  border: none;
+  border-radius: 0;
+  background: var(--modern-surface);
+  box-shadow: none;
+}
+
+.ppt-modern-double-card--light {
+  background: var(--modern-bg);
+  box-shadow: inset 0 0 0 1px rgba(26, 26, 26, 0.08);
 }
 
 .ppt-modern-double-card--dark {
@@ -20405,77 +20470,122 @@ defineExpose({
 }
 
 .ppt-modern-double-quote-strip {
-  position: absolute;
-  right: 0;
-  bottom: -78px;
-  left: 0;
-  padding: 18px 28px;
-  border: 1px solid rgba(26, 26, 26, 0.08);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.78);
+  grid-column: 1 / -1;
+  margin-top: clamp(8px, 1cqi, 14px);
+  padding: clamp(16px, 1.8cqi, 24px) clamp(22px, 2.4cqi, 32px);
+  border-left: 8px solid var(--modern-accent);
+  border-radius: 0;
+  background: var(--modern-surface);
   color: var(--modern-text);
-  font-size: clamp(18px, 1.65cqi, 27px);
+  font-size: clamp(15px, 1.35cqi, 22px);
   font-style: italic;
-  font-weight: 900;
-  line-height: 1.28;
-  text-align: center;
+  font-weight: 800;
+  line-height: 1.38;
+  text-align: left;
 }
 
 .ppt-modern-double--split {
   display: grid;
-  min-height: 520px;
-  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  min-height: 0;
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  gap: clamp(28px, 3.6cqi, 48px);
+  align-items: stretch;
 }
 
 .ppt-modern-double-split-hero {
-  display: grid;
-  align-content: center;
-  padding: 54px 52px;
-  border-right: 10px solid var(--modern-accent);
-  color: var(--modern-bg);
-  background: var(--modern-text);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+  padding: clamp(12px, 1.4cqi, 20px) clamp(16px, 2cqi, 28px) clamp(12px, 1.4cqi, 20px) 0;
+  border-right: none;
+  color: var(--modern-text);
+  background: transparent;
+}
+
+.ppt-modern-double-split-hero::after {
+  content: "";
+  display: block;
+  width: clamp(72px, 9cqi, 120px);
+  height: 4px;
+  margin: clamp(16px, 2cqi, 22px) 0;
+  background: var(--modern-accent);
 }
 
 .ppt-modern-double-kicker {
-  margin-bottom: 18px;
-  color: var(--modern-accent);
-  font-size: 16px;
+  margin-bottom: 12px;
+  color: var(--modern-muted);
+  font-size: clamp(13px, 1.1cqi, 16px);
   font-weight: 900;
   letter-spacing: 0.14em;
 }
 
 .ppt-modern-double-split-hero h3,
 .ppt-modern-double-aside h3 {
-  margin: 0 0 24px;
+  margin: 0 0 18px;
+  color: var(--modern-text);
   font-family: var(--ppt-font-display, "Playfair Display", serif);
-  font-size: clamp(50px, 5.2cqi, 92px);
+  font-size: clamp(34px, 4.2cqi, 64px);
   font-weight: 900;
-  letter-spacing: -0.05em;
-  line-height: 0.98;
+  letter-spacing: -0.04em;
+  line-height: 1.04;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 .ppt-modern-double-split-body,
 .ppt-modern-double-aside-body {
   display: block;
-  color: rgba(253, 252, 248, 0.72);
-  font-size: clamp(16px, 1.45cqi, 24px);
+  color: var(--modern-muted);
+  font-size: clamp(15px, 1.35cqi, 22px);
   line-height: 1.55;
 }
 
 .ppt-modern-double-split-side {
   display: grid;
   align-content: center;
-  gap: 34px;
-  padding-left: 76px;
+  gap: clamp(18px, 2.2cqi, 28px);
+  min-height: 0;
+  padding-left: 0;
+}
+
+.ppt-modern-double-split-side .ppt-modern-double-side-card {
+  min-height: clamp(160px, 18cqi, 240px);
+  padding: clamp(24px, 2.8cqi, 36px);
+  border: none;
+  border-left: 8px solid var(--modern-bg);
+  border-radius: 0;
+  color: var(--modern-bg);
+  background: var(--modern-text);
+  box-shadow: none;
+}
+
+.ppt-modern-double-split-side .ppt-modern-double-side-title {
+  color: var(--modern-bg);
+}
+
+.ppt-modern-double-split-side .ppt-modern-double-side-body {
+  color: rgba(253, 252, 248, 0.82);
+}
+
+.ppt-modern-double-split-side .ppt-modern-double-side-insight {
+  padding: clamp(20px, 2.2cqi, 28px) clamp(22px, 2.4cqi, 32px);
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  border-radius: 0;
+  background: var(--modern-bg);
+  color: var(--modern-text);
+  font-size: clamp(14px, 1.2cqi, 19px);
+  font-style: italic;
+  line-height: 1.45;
 }
 
 .ppt-modern-double-side-card,
 .ppt-modern-double-stacked-card {
-  padding: 32px 38px;
-  border: 1px solid rgba(196, 30, 58, 0.12);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 14px 30px rgba(196, 30, 58, 0.08);
+  padding: clamp(24px, 2.8cqi, 34px) clamp(26px, 3cqi, 38px);
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  border-radius: 0;
+  background: var(--modern-bg);
+  box-shadow: none;
 }
 
 .ppt-modern-double-side-title,
@@ -20507,38 +20617,57 @@ defineExpose({
 
 .ppt-modern-double--stacked {
   display: grid;
-  min-height: 420px;
+  min-height: 0;
   grid-template-rows: 1fr auto;
-  gap: 28px;
+  gap: clamp(18px, 2.2cqi, 28px);
 }
 
 .ppt-modern-double-stacked-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
+  gap: clamp(18px, 2.2cqi, 26px);
   align-content: center;
-  max-width: 660px;
-  margin-left: auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.ppt-modern-double-stacked-card--impact {
+  color: var(--modern-bg);
+  background: var(--modern-text);
+  border: none;
+  border-left: 8px solid var(--modern-accent);
+}
+
+.ppt-modern-double-stacked-card--impact h3,
+.ppt-modern-double-stacked-card--impact .ppt-modern-double-stacked-body {
+  color: rgba(253, 252, 248, 0.88);
+}
+
+.ppt-modern-double-stacked-card--impact h3 {
+  color: var(--modern-bg);
 }
 
 .ppt-modern-double-stacked-card--soft {
-  background: var(--modern-surface);
-  box-shadow: none;
+  background: var(--modern-bg);
+  box-shadow: inset 0 0 0 1px rgba(26, 26, 26, 0.1);
 }
 
 .ppt-modern-double-stacked-footer {
   display: block;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 18px 28px;
-  border-radius: 16px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: clamp(16px, 1.8cqi, 24px) clamp(22px, 2.4cqi, 32px);
+  border-left: 8px solid var(--modern-accent);
+  border-radius: 0;
   color: var(--modern-text);
-  background: rgba(255, 255, 255, 0.72);
-  font-size: clamp(17px, 1.55cqi, 25px);
+  background: var(--modern-surface);
+  font-size: clamp(15px, 1.35cqi, 22px);
   font-style: italic;
-  font-weight: 900;
-  line-height: 1.35;
-  text-align: center;
+  font-weight: 800;
+  line-height: 1.38;
+  text-align: left;
 }
 
 .ppt-modern-double--numbered {
@@ -20649,6 +20778,11 @@ defineExpose({
   text-wrap: balance;
 }
 
+.ppt-modern-triple-portrait-hero .ppt-modern-impact-block h3 {
+  margin: 0;
+  color: var(--modern-bg);
+}
+
 .ppt-modern-triple-portrait-body {
   display: block;
   max-width: 560px;
@@ -20659,7 +20793,11 @@ defineExpose({
 
 .ppt-modern-triple-portrait-list {
   display: grid;
-  gap: clamp(18px, 2.2cqi, 26px);
+  gap: clamp(14px, 1.8cqi, 22px);
+  align-content: start;
+  padding: clamp(12px, 1.4cqi, 18px);
+  background: color-mix(in srgb, var(--modern-surface) 72%, var(--modern-bg) 28%);
+  box-shadow: inset 0 0 0 1px rgba(26, 26, 26, 0.06);
   min-height: 0;
 }
 
@@ -20668,6 +20806,22 @@ defineExpose({
   grid-template-columns: 16px minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+}
+
+.ppt-modern-triple-bullet--block {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: clamp(18px, 2cqi, 28px) clamp(20px, 2.2cqi, 30px);
+  background: var(--modern-bg);
+  box-shadow: inset 0 0 0 1px rgba(26, 26, 26, 0.08);
+}
+
+.ppt-modern-triple-bullet--block > span {
+  display: none;
+}
+
+.ppt-modern-triple-bullet--block .ppt-modern-triple-bullet-title {
+  color: var(--modern-text);
 }
 
 .ppt-modern-triple-bullet > span {
@@ -20698,11 +20852,13 @@ defineExpose({
   display: block;
   grid-column: 1 / -1;
   margin-top: clamp(8px, 1cqi, 14px);
-  padding: clamp(14px, 1.6cqi, 20px) clamp(18px, 2cqi, 26px);
-  border-radius: 16px;
-  color: var(--modern-bg);
-  background: var(--modern-accent);
-  font-size: clamp(13px, 1.15cqi, 18px);
+  padding: clamp(16px, 1.8cqi, 24px) clamp(22px, 2.4cqi, 32px);
+  border-left: 8px solid var(--modern-accent);
+  border-radius: 0;
+  color: var(--modern-text);
+  background: var(--modern-surface);
+  font-size: clamp(14px, 1.2cqi, 19px);
+  font-style: italic;
   font-weight: 800;
   line-height: 1.38;
   overflow-wrap: break-word;
@@ -20763,34 +20919,49 @@ defineExpose({
   justify-content: space-between;
   gap: 18px;
   min-height: 0;
+  padding: clamp(12px, 1.4cqi, 18px);
+  background: color-mix(in srgb, var(--modern-surface) 72%, var(--modern-bg) 28%);
+  box-shadow: inset 0 0 0 1px rgba(26, 26, 26, 0.06);
 }
 
 .ppt-modern-portrait-list {
   display: grid;
-  gap: clamp(18px, 2.2cqi, 28px);
+  gap: clamp(14px, 1.8cqi, 22px);
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
 
 .ppt-modern-portrait-list--dense {
-  gap: clamp(12px, 1.5cqi, 20px);
+  gap: clamp(10px, 1.2cqi, 16px);
 }
 
 .ppt-modern-portrait-item {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: clamp(16px, 1.8cqi, 24px) clamp(18px, 2cqi, 26px);
+  background: var(--modern-bg);
+  box-shadow: inset 0 0 0 1px rgba(26, 26, 26, 0.08);
+}
+
+.ppt-modern-portrait-item:nth-child(2) {
+  color: var(--modern-bg);
+  background: var(--modern-text);
+  border-left: 8px solid var(--modern-accent);
+}
+
+.ppt-modern-portrait-item:nth-child(2) .ppt-modern-portrait-item-title,
+.ppt-modern-portrait-item:nth-child(2) .ppt-modern-portrait-item-title--accent {
+  color: var(--modern-bg);
+}
+
+.ppt-modern-portrait-item:nth-child(2) .ppt-modern-portrait-item-body {
+  color: rgba(253, 252, 248, 0.82);
 }
 
 .ppt-modern-portrait-bullet {
-  width: 10px;
-  height: 10px;
-  margin-top: 9px;
-  border-radius: 999px;
-  background: var(--modern-accent);
-  flex-shrink: 0;
+  display: none;
 }
 
 .ppt-modern-portrait-item-title {
@@ -20820,11 +20991,13 @@ defineExpose({
   display: block;
   flex: 0 0 auto;
   margin-top: auto;
-  padding: clamp(14px, 1.6cqi, 20px) clamp(18px, 2cqi, 26px);
-  border-radius: 16px;
-  color: var(--modern-bg);
-  background: var(--modern-accent);
-  font-size: clamp(13px, 1.15cqi, 18px);
+  padding: clamp(16px, 1.8cqi, 24px) clamp(22px, 2.4cqi, 32px);
+  border-left: 8px solid var(--modern-accent);
+  border-radius: 0;
+  color: var(--modern-text);
+  background: var(--modern-surface);
+  font-size: clamp(14px, 1.2cqi, 19px);
+  font-style: italic;
   font-weight: 800;
   line-height: 1.38;
   overflow-wrap: break-word;
@@ -20899,35 +21072,40 @@ defineExpose({
 
 .ppt-modern-triple--cards {
   display: grid;
-  min-height: 420px;
+  min-height: 0;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  gap: clamp(16px, 2cqi, 24px);
   align-items: stretch;
 }
 
 .ppt-modern-triple-card {
   display: grid;
   align-content: start;
-  min-height: 390px;
-  padding: 30px 34px;
-  border: 1px solid rgba(26, 26, 26, 0.1);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 14px 30px rgba(26, 26, 26, 0.08);
+  min-height: clamp(200px, 24cqi, 320px);
+  padding: clamp(24px, 2.8cqi, 38px) clamp(26px, 3cqi, 40px);
+  border: none;
+  border-radius: 0;
+  background: var(--modern-surface);
+  box-shadow: none;
 }
 
 .ppt-modern-triple-card--dark {
   color: var(--modern-bg);
   background: var(--modern-text);
+  border-left: 8px solid var(--modern-accent);
 }
 
 .ppt-modern-triple-card h3 {
   margin: 0 0 18px;
   color: var(--modern-accent);
   font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
-  font-size: clamp(24px, 2.3cqi, 38px);
+  font-size: clamp(22px, 2cqi, 34px);
   font-weight: 900;
   line-height: 1.18;
+}
+
+.ppt-modern-triple-card--dark h3 {
+  color: var(--modern-bg);
 }
 
 .ppt-modern-triple-card-body {
@@ -20968,12 +21146,49 @@ defineExpose({
 }
 
 .ppt-modern-multi-card {
-  min-height: 116px;
-  padding: 20px 26px 20px 34px;
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(120px, 14cqi, 180px);
+  padding: clamp(18px, 2cqi, 26px) clamp(20px, 2.2cqi, 28px) clamp(18px, 2cqi, 26px) clamp(26px, 2.8cqi, 34px);
+  border: none;
   border-left: 8px solid var(--modern-accent);
-  border-radius: 24px;
-  background: color-mix(in srgb, var(--modern-surface) 84%, #ffffff 16%);
-  box-shadow: 0 10px 22px rgba(26, 26, 26, 0.08);
+  border-radius: 0;
+  background: var(--modern-bg);
+  box-shadow: inset 0 0 0 1px rgba(26, 26, 26, 0.08);
+}
+
+.ppt-modern-multi-card--impact {
+  border-left-color: var(--modern-bg);
+  color: var(--modern-bg);
+  background: var(--modern-accent);
+  box-shadow: none;
+}
+
+.ppt-modern-multi-card--impact h3 {
+  color: var(--modern-bg);
+}
+
+.ppt-modern-multi-card--impact .ppt-modern-multi-body {
+  color: rgba(253, 252, 248, 0.88);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.ppt-modern-multi-card--dark {
+  border-left-color: var(--modern-accent);
+  color: var(--modern-bg);
+  background: var(--modern-text);
+  box-shadow: none;
+}
+
+.ppt-modern-multi-card--dark h3 {
+  color: var(--modern-bg);
+}
+
+.ppt-modern-multi-card--dark .ppt-modern-multi-body {
+  color: rgba(253, 252, 248, 0.82);
+  font-style: normal;
+  font-weight: 500;
 }
 
 .ppt-modern-literary--content .ppt-modern-multi-card {
