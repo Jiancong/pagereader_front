@@ -1,7 +1,7 @@
 {
   "source": "manual-curation",
-  "updated": "2026-03-25T00:00:00.000Z",
-  "count": 9,
+  "updated": "2026-06-19T00:00:00.000Z",
+  "count": 12,
   "fonts": [
     {
       "label": "思源黑体 SC",
@@ -49,12 +49,39 @@
       "license": "SIL Open Font License 1.1"
     },
     {
+      "label": "霞鹜文楷 TC",
+      "value": "LXGW WenKai TC",
+      "category": "chinese",
+      "preview": "霞鹜文楷",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@300;400;700&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
       "label": "霞鹜文楷 Mono TC",
       "value": "LXGW WenKai Mono TC",
       "category": "chinese",
       "preview": "霞鹜文楷",
       "sourceType": "css",
       "cssUrl": "https://fonts.googleapis.com/css2?family=LXGW+WenKai+Mono+TC:wght@300;400;700&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "label": "Zen Kaku Gothic New",
+      "value": "Zen Kaku Gothic New",
+      "category": "chinese",
+      "preview": "现代黑体",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "label": "Zen Maru Gothic",
+      "value": "Zen Maru Gothic",
+      "category": "chinese",
+      "preview": "现代圆体",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap",
       "license": "SIL Open Font License 1.1"
     },
     {
