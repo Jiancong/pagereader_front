@@ -489,6 +489,81 @@
             </template>
 
             <template v-else-if="slide.layout === 'content'">
+              <div
+                v-if="isModernLiteraryRightItemsContent(slide)"
+                class="ppt-modern-right-items-portrait"
+              >
+                <section class="ppt-modern-portrait-hero">
+                  <div v-if="modernLiteraryPortraitKicker(slide)" class="ppt-modern-portrait-kicker">
+                    {{ modernLiteraryPortraitKicker(slide) }}
+                  </div>
+                  <h2 class="ppt-modern-portrait-title">
+                    <PptMarkdownInline
+                      :text="modernLiteraryPortraitHeroTitle(slide)"
+                      :editable="isEditing"
+                      @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                    />
+                  </h2>
+                  <PptMarkdownInline
+                    v-if="modernLiteraryPortraitHeroBody(slide)"
+                    class="ppt-modern-portrait-lead"
+                    :text="modernLiteraryPortraitHeroBody(slide)"
+                    :page-references="slide.page_references"
+                    :editable="isEditing"
+                    @blur="onCellBlur($event, `slides.${currentSlide}.speaker_notes`)"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
+                </section>
+                <section class="ppt-modern-portrait-side">
+                  <div
+                    class="ppt-modern-portrait-list"
+                    :class="{ 'ppt-modern-portrait-list--dense': (slide.right_items?.length ?? 0) >= 4 }"
+                  >
+                    <article
+                      v-for="(ri, idx) in slide.right_items"
+                      :key="'modern-right-item-' + idx"
+                      class="ppt-modern-portrait-item"
+                    >
+                      <span
+                        class="ppt-modern-portrait-bullet"
+                        :style="{ background: (ri.accent_color || '').trim() || undefined }"
+                      ></span>
+                      <div>
+                        <PptMarkdownInline
+                          class="ppt-modern-portrait-item-title"
+                          :class="{ 'ppt-modern-portrait-item-title--accent': modernLiteraryRightItemTitleAccentClass(ri, idx) }"
+                          :style="modernLiteraryRightItemTitleAccentStyle(ri, idx)"
+                          :text="rightItemTitle(ri)"
+                          :page-references="slide.page_references"
+                          :editable="isEditing"
+                          @blur="onCellBlur($event, `slides.${currentSlide}.right_items.${idx}.title`)"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                        <PptMarkdownInline
+                          v-if="rightItemDescription(ri) || isEditing"
+                          class="ppt-modern-portrait-item-body"
+                          :text="rightItemDescription(ri)"
+                          :page-references="slide.page_references"
+                          :editable="isEditing"
+                          @blur="onCellBlur($event, `slides.${currentSlide}.right_items.${idx}.description`)"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                      </div>
+                    </article>
+                  </div>
+                  <PptMarkdownInline
+                    v-if="slide.key_insight"
+                    class="ppt-modern-portrait-insight"
+                    :text="slide.key_insight"
+                    :page-references="slide.page_references"
+                    :editable="isEditing"
+                    @blur="onCellBlur($event, `slides.${currentSlide}.key_insight`)"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
+                </section>
+              </div>
+
+              <template v-else>
               <div class="ppt-modern-content-header">
                 <h2 class="ppt-modern-slide-title">
                   <PptMarkdownInline
@@ -700,14 +775,16 @@
                         />
                       </div>
                     </div>
-                    <PptMarkdownInline
-                      v-if="slide.key_insight"
-                      class="ppt-modern-triple-insight"
-                      :text="slide.key_insight"
-                      :page-references="slide.page_references"
-                      @ref-click="onPptTableRefClick($event, slide)"
-                    />
                   </section>
+                  <PptMarkdownInline
+                    v-if="slide.key_insight"
+                    class="ppt-modern-triple-insight"
+                    :text="slide.key_insight"
+                    :page-references="slide.page_references"
+                    :editable="isEditing"
+                    @blur="onCellBlur($event, `slides.${currentSlide}.key_insight`)"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
                 </template>
 
                 <template v-else-if="modernLiteraryTripleVariant(slide) === 'orbit'">
@@ -744,7 +821,7 @@
                     v-for="(item, ti) in modernLiteraryTripleItems(slide)"
                     :key="'modern-card-' + ti"
                     class="ppt-modern-triple-card"
-                    :class="{ 'ppt-modern-triple-card--dark': ti === 2 }"
+                    :class="{ 'ppt-modern-triple-card--dark': ti === 1 }"
                   >
                     <h3>
                       <PptMarkdownInline
@@ -826,8 +903,9 @@
                   </div>
                 </div>
               </div>
+              </template>
               <PptMarkdownInline
-                v-if="slide.key_insight"
+                v-if="slide.key_insight && !modernLiteraryInlineKeyInsight(slide)"
                 class="ppt-modern-insight ppt-modern-insight--footer"
                 :text="slide.key_insight"
                 :page-references="slide.page_references"
@@ -850,7 +928,7 @@
               </div>
               <div class="ppt-modern-two-col-grid">
                 <section class="ppt-modern-compare-card ppt-modern-compare-card--light">
-                  <h3>
+                  <h3 v-if="!modernLiteraryCompareTitleDuplicatesSlide(slide.left_title, slide.title)">
                     <PptMarkdownInline
                       :text="slide.left_title || t('agent.pptLeftColumn')"
                       :editable="isEditing"
@@ -9070,6 +9148,8 @@ interface PptSlide {
     title?: string;
     description?: string;
     accent_color?: string;
+    highlight?: boolean;
+    emphasis?: boolean;
   }>;
   /** 后端在 section 页提供的章节编号，如 "01"、"03" */
   chapter_number?: string;
@@ -11714,6 +11794,62 @@ function isModernLiteraryMultiContent(slide: PptSlide): boolean {
   return slide.layout === "content" && modernLiteraryMultiItems(slide).length > 3;
 }
 
+type ModernLiteraryRightItem = NonNullable<PptSlide["right_items"]>[number];
+
+function isModernLiteraryRightItemsContent(slide: PptSlide): boolean {
+  return (
+    slide.layout === "content" &&
+    (slide.right_items?.length ?? 0) > 0 &&
+    modernLiteraryPlainItems(slide).length === 0
+  );
+}
+
+function modernLiterarySplitTitle(title: string): { kicker: string; hero: string } {
+  const trimmed = (title ?? "").trim();
+  for (const sep of [" — ", " – ", " - ", ": "]) {
+    const idx = trimmed.indexOf(sep);
+    if (idx > 0) {
+      return {
+        kicker: trimmed.slice(0, idx).trim(),
+        hero: trimmed.slice(idx + sep.length).trim(),
+      };
+    }
+  }
+  return { kicker: "", hero: trimmed };
+}
+
+function modernLiteraryPortraitKicker(slide: PptSlide): string {
+  const { kicker } = modernLiterarySplitTitle(slide.title || "");
+  return kicker || (slide.subtitle || "").trim();
+}
+
+function modernLiteraryPortraitHeroTitle(slide: PptSlide): string {
+  const { hero, kicker } = modernLiterarySplitTitle(slide.title || "");
+  return hero || kicker || slide.title || "";
+}
+
+function modernLiteraryPortraitHeroBody(slide: PptSlide): string {
+  return (slide.speaker_notes || slide.subtitle || "").trim();
+}
+
+function modernLiteraryRightItemTitleAccentClass(
+  ri: ModernLiteraryRightItem,
+  idx: number,
+): boolean {
+  if (ri.highlight === true || ri.emphasis === true) return true;
+  return idx === 1;
+}
+
+function modernLiteraryRightItemTitleAccentStyle(
+  ri: ModernLiteraryRightItem,
+  idx: number,
+): Record<string, string> | undefined {
+  if (!modernLiteraryRightItemTitleAccentClass(ri, idx)) return undefined;
+  const accent = (ri.accent_color || "").trim();
+  if (accent) return { color: accent };
+  return { color: "var(--modern-accent)" };
+}
+
 function modernLiteraryDoubleItems(slide: PptSlide): string[] {
   const items = modernLiteraryPlainItems(slide);
   return items.length === 2 ? items : [];
@@ -11745,8 +11881,29 @@ function isModernLiteraryTripleContent(slide: PptSlide): boolean {
   return slide.layout === "content" && modernLiteraryTripleItems(slide).length === 3;
 }
 
+function modernLiteraryInlineKeyInsight(slide: PptSlide): boolean {
+  if (isModernLiteraryRightItemsContent(slide)) return true;
+  if (isModernLiteraryDoubleContent(slide)) return true;
+  if (isModernLiteraryTripleContent(slide)) {
+    return modernLiteraryTripleVariant(slide) !== "cards";
+  }
+  return false;
+}
+
+function modernLiteraryTriplePrefersCards(slide: PptSlide): boolean {
+  const items = modernLiteraryTripleItems(slide);
+  if (!items.length) return false;
+  const bodyLengths = items.map((item) => parseContentBody(item).replace(/\s+/g, "").length);
+  const maxLen = Math.max(...bodyLengths);
+  const avgLen = bodyLengths.reduce((sum, len) => sum + len, 0) / bodyLengths.length;
+  // Orbit/circle 仅适合竞品那种「标题 + 一句短引文」；长段落对比用卡片
+  return maxLen > 56 || avgLen > 40;
+}
+
 function modernLiteraryTripleVariant(slide: PptSlide): "portrait" | "orbit" | "cards" {
   const hinted = slideEmphasisLayout(slide);
+  const prefersCards = modernLiteraryTriplePrefersCards(slide);
+  if (prefersCards) return "cards";
   if (hinted.includes("orbit") || hinted.includes("circle")) return "orbit";
   if (hinted.includes("card")) return "cards";
   if (hinted.includes("portrait") || hinted.includes("split")) return "portrait";
@@ -11771,6 +11928,15 @@ function modernLiteraryRightItems(slide: PptSlide): string[] {
 
 function modernLiteraryFooterQuote(slide: PptSlide): string {
   return modernLiteraryQuoteItems(slide)[0] || "";
+}
+
+function modernLiteraryCompareTitleDuplicatesSlide(
+  columnTitle?: string,
+  slideTitle?: string,
+): boolean {
+  const col = (columnTitle ?? "").trim();
+  const title = (slideTitle ?? "").trim();
+  return Boolean(col && title && col === title);
 }
 
 function rightItemTitle(ri: { title?: unknown }): string {
@@ -20028,7 +20194,8 @@ defineExpose({
 .ppt-modern-literary--content .ppt-modern-multi,
 .ppt-modern-literary--content .ppt-modern-double,
 .ppt-modern-literary--content .ppt-modern-triple,
-.ppt-modern-literary--content .ppt-modern-content-body {
+.ppt-modern-literary--content .ppt-modern-content-body,
+.ppt-modern-literary--content .ppt-modern-right-items-portrait {
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -20046,6 +20213,87 @@ defineExpose({
 }
 
 .ppt-modern-literary--content .ppt-brand-footer {
+  bottom: 10px;
+  font-size: 11px;
+  opacity: 0.42;
+}
+
+.ppt-modern-literary--two_column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 48px;
+  overflow: hidden;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-content-header {
+  flex: 0 0 auto;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-slide-title {
+  max-width: 100%;
+  color: var(--modern-accent);
+  font-size: clamp(28px, 3.2cqi, 48px);
+  line-height: 1.1;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-accent-line {
+  width: 88px;
+  margin: 12px 0 8px;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-two-col-grid {
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: 100%;
+  min-height: 0;
+  gap: 18px;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-compare-card {
+  display: flex;
+  min-height: 0;
+  max-height: 100%;
+  padding: 22px 24px;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-compare-card h3 {
+  flex: 0 0 auto;
+  margin-bottom: 14px;
+  font-size: clamp(18px, 1.65cqi, 28px);
+  line-height: 1.15;
+  overflow-wrap: break-word;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-compare-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-compare-item {
+  font-size: clamp(12px, 1.05cqi, 16px);
+  line-height: 1.42;
+  overflow-wrap: break-word;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-document-figure {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  padding: 8px;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-document-figure-img {
+  max-height: min(240px, 100%);
+}
+
+.ppt-modern-literary--two_column .ppt-brand-footer {
   bottom: 10px;
   font-size: 11px;
   opacity: 0.42;
@@ -20366,15 +20614,19 @@ defineExpose({
 .ppt-modern-triple--portrait {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr);
-  min-height: 430px;
-  gap: 54px;
-  align-items: center;
+  gap: clamp(28px, 3.6cqi, 48px);
+  align-items: start;
+  align-self: stretch;
+  width: 100%;
+  min-height: 0;
 }
 
 .ppt-modern-triple-portrait-hero {
-  display: grid;
-  align-content: center;
-  min-height: 390px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+  padding-right: 8px;
 }
 
 .ppt-modern-triple-kicker {
@@ -20386,13 +20638,15 @@ defineExpose({
 }
 
 .ppt-modern-triple-portrait-hero h3 {
-  margin: 0 0 24px;
+  margin: 0 0 18px;
   color: var(--modern-text);
   font-family: var(--ppt-font-display, "Playfair Display", serif);
-  font-size: clamp(58px, 6.7cqi, 112px);
+  font-size: clamp(34px, 4.2cqi, 64px);
   font-weight: 900;
-  letter-spacing: -0.055em;
-  line-height: 0.95;
+  letter-spacing: -0.04em;
+  line-height: 1.04;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 .ppt-modern-triple-portrait-body {
@@ -20405,7 +20659,8 @@ defineExpose({
 
 .ppt-modern-triple-portrait-list {
   display: grid;
-  gap: 26px;
+  gap: clamp(18px, 2.2cqi, 26px);
+  min-height: 0;
 }
 
 .ppt-modern-triple-bullet {
@@ -20441,14 +20696,138 @@ defineExpose({
 
 .ppt-modern-triple-insight {
   display: block;
-  margin-top: 10px;
-  padding: 18px 24px;
-  border-radius: 18px;
+  grid-column: 1 / -1;
+  margin-top: clamp(8px, 1cqi, 14px);
+  padding: clamp(14px, 1.6cqi, 20px) clamp(18px, 2cqi, 26px);
+  border-radius: 16px;
   color: var(--modern-bg);
   background: var(--modern-accent);
-  font-size: clamp(14px, 1.2cqi, 19px);
+  font-size: clamp(13px, 1.15cqi, 18px);
   font-weight: 800;
-  line-height: 1.35;
+  line-height: 1.38;
+  overflow-wrap: break-word;
+}
+
+/* ── right_items portrait（content 空 + right_items 分栏） ── */
+.ppt-modern-right-items-portrait {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: clamp(28px, 4cqi, 54px);
+  align-items: stretch;
+  align-self: stretch;
+  width: 100%;
+  min-height: 0;
+}
+
+.ppt-modern-portrait-hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+  padding-right: 8px;
+}
+
+.ppt-modern-portrait-kicker {
+  margin-bottom: 14px;
+  color: var(--modern-accent);
+  font-size: clamp(13px, 1.1cqi, 16px);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1.3;
+}
+
+.ppt-modern-portrait-title {
+  margin: 0 0 20px;
+  color: var(--modern-text);
+  font-family: var(--ppt-font-display, "ZCOOL XiaoWei", "Playfair Display", serif);
+  font-size: clamp(36px, 4.8cqi, 72px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+.ppt-modern-portrait-lead {
+  display: block;
+  max-width: 520px;
+  color: var(--modern-muted);
+  font-size: clamp(14px, 1.35cqi, 20px);
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+
+.ppt-modern-portrait-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 0;
+}
+
+.ppt-modern-portrait-list {
+  display: grid;
+  gap: clamp(18px, 2.2cqi, 28px);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ppt-modern-portrait-list--dense {
+  gap: clamp(12px, 1.5cqi, 20px);
+}
+
+.ppt-modern-portrait-item {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.ppt-modern-portrait-bullet {
+  width: 10px;
+  height: 10px;
+  margin-top: 9px;
+  border-radius: 999px;
+  background: var(--modern-accent);
+  flex-shrink: 0;
+}
+
+.ppt-modern-portrait-item-title {
+  display: block;
+  color: var(--modern-text);
+  font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
+  font-size: clamp(18px, 1.75cqi, 28px);
+  font-weight: 900;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+.ppt-modern-portrait-item-title--accent {
+  color: var(--modern-accent);
+}
+
+.ppt-modern-portrait-item-body {
+  display: block;
+  margin-top: 5px;
+  color: var(--modern-muted);
+  font-size: clamp(13px, 1.15cqi, 18px);
+  line-height: 1.42;
+  overflow-wrap: break-word;
+}
+
+.ppt-modern-portrait-insight {
+  display: block;
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding: clamp(14px, 1.6cqi, 20px) clamp(18px, 2cqi, 26px);
+  border-radius: 16px;
+  color: var(--modern-bg);
+  background: var(--modern-accent);
+  font-size: clamp(13px, 1.15cqi, 18px);
+  font-weight: 800;
+  line-height: 1.38;
+  overflow-wrap: break-word;
 }
 
 .ppt-modern-triple--orbit {
@@ -20646,12 +21025,16 @@ defineExpose({
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
   align-self: center;
+  width: 100%;
+  min-width: 0;
 }
 
 .ppt-modern-compare-card {
   min-height: 390px;
+  min-width: 0;
   padding: 34px 38px;
   border-left: 10px solid var(--modern-accent);
+  box-sizing: border-box;
 }
 
 .ppt-modern-compare-card h3 {
