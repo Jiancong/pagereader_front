@@ -8867,6 +8867,7 @@ import {
   loadFont,
   parseFontFamilyCssStack,
 } from "@/composables/useFontLoader";
+import { findRuntimeCustomFontEntry } from "@/utils/runtimeCustomFontRegistry";
 import PptMarkdownInline from "@/components/editor/chat/PptMarkdownInline.vue";
 import PptChapterImages from "@/components/editor/chat/PptChapterImages.vue";
 import PptTableBlock from "@/components/editor/chat/PptTableBlock.vue";
@@ -12171,9 +12172,10 @@ const pptSource = computed<PptData>(() => {
 });
 
 const MODERN_LITERARY_TEMPLATE_ID = "modern-literary-minimal";
+/** modern-literary-minimal 中文回退：走 custom-chinese-fonts 目录，不再硬编码 Noto Serif SC */
+const MODERN_LITERARY_ZH_DISPLAY = "ZCOOL XiaoWei";
+const MODERN_LITERARY_ZH_BODY = "LXGW WenKai TC";
 const MODERN_LITERARY_DEFAULT_GOOGLE_FONTS = [
-  "https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap",
-  "https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700;900&display=swap",
   "https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap",
   "https://fonts.googleapis.com/css2?family=Oxanium:wght@200;400;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap",
 ];
@@ -12202,13 +12204,15 @@ const modernLiteraryColors = computed(() => {
 
 const modernLiteraryFonts = computed(() => {
   const typography = modernLiteraryTokens.value.typography || {};
-  const display = typography.font_display || '"Playfair Display"';
+  const display = typography.font_display || MODERN_LITERARY_ZH_DISPLAY;
   const heading = typography.font_heading || display;
-  const body = typography.font_body || '"Noto Serif SC"';
+  const body = typography.font_body || MODERN_LITERARY_ZH_BODY;
+  const zhDisplay = MODERN_LITERARY_ZH_DISPLAY;
+  const zhBody = MODERN_LITERARY_ZH_BODY;
   return {
-    display: `${display}, "Playfair Display", "Noto Serif SC", serif`,
-    heading: `${heading}, "Playfair Display", "Noto Serif SC", serif`,
-    body: `${body}, "Noto Serif SC", "Oxanium", serif`,
+    display: `${display}, "Playfair Display", "${zhDisplay}", serif`,
+    heading: `${heading}, "Playfair Display", "${zhDisplay}", serif`,
+    body: `${body}, "${zhBody}", "${zhDisplay}", "Oxanium", serif`,
   };
 });
 
@@ -12310,7 +12314,25 @@ const pptDeckFontCss = computed(() => buildFontFamilyCss(pptDeckFontFamily.value
 watch(
   pptDeckFontFamily,
   (family) => {
+    if (isModernLiteraryMinimal.value) return;
     void loadFont(family);
+  },
+  { immediate: true }
+);
+
+watch(
+  () => (isModernLiteraryMinimal.value ? modernLiteraryFonts.value : null),
+  (fonts) => {
+    if (!fonts) return;
+    const families = new Set<string>();
+    for (const stack of [fonts.display, fonts.heading, fonts.body]) {
+      for (const family of parseFontFamilyCssStack(stack)) {
+        families.add(family);
+      }
+    }
+    for (const family of families) {
+      void loadFont(family);
+    }
   },
   { immediate: true }
 );
@@ -12318,6 +12340,138 @@ watch(
 watch(
   modernLiteraryGoogleFontUrls,
   (urls) => syncPptGoogleFontLinks(urls),
+  { immediate: true }
+);
+
+function parseComputedFontFamily(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((family) => family.trim().replace(/^['"]|['"]$/g, ""))
+    .filter(Boolean);
+}
+
+function probeRenderedFontFamily(family: string, sample: string): boolean {
+  if (typeof document === "undefined" || !document.fonts) return false;
+  return document.fonts.check(`16px "${family}"`, sample);
+}
+
+function resolveRenderedFontFamily(stack: string[], samples: string[]): string {
+  for (const sample of samples) {
+    for (const family of stack) {
+      if (probeRenderedFontFamily(family, sample)) {
+        return family;
+      }
+    }
+  }
+  return stack[0] || "unknown";
+}
+
+function describeFontCatalogSource(family: string): string {
+  const entry = findRuntimeCustomFontEntry(family);
+  if (!entry) return "google-or-system";
+  if (entry.sourceType === "css" && entry.cssUrl) return `custom-chinese-fonts.cssUrl`;
+  if (entry.sourceType === "file" && entry.files?.length) return `custom-chinese-fonts.file`;
+  return `custom-chinese-fonts.${entry.sourceType}`;
+}
+
+function logModernLiteraryFontUsage() {
+  if (!isModernLiteraryMinimal.value) return;
+
+  const wrapper = slideWrapperRef.value;
+  const fonts = modernLiteraryFonts.value;
+  const typography = modernLiteraryTokens.value.typography ?? {};
+  const targets: Array<{
+    role: string;
+    selector: string;
+    configuredStack: string;
+    cjkSample: string;
+    latinSample: string;
+  }> = [
+    {
+      role: "cover-title",
+      selector: ".ppt-modern-cover-title",
+      configuredStack: fonts.display,
+      cjkSample: "杀死",
+      latinSample: "Mockingbird",
+    },
+    {
+      role: "cover-subtitle",
+      selector: ".ppt-modern-cover-subtitle",
+      configuredStack: fonts.heading,
+      cjkSample: "成长",
+      latinSample: "Scout",
+    },
+    {
+      role: "slide-title",
+      selector: ".ppt-modern-slide-title, .ppt-modern-section-title",
+      configuredStack: fonts.display,
+      cjkSample: "标题",
+      latinSample: "Title",
+    },
+    {
+      role: "body",
+      selector:
+        ".ppt-modern-multi-body, .ppt-modern-explain-body, .ppt-modern-cover-footer, .ppt-modern-double-card-body",
+      configuredStack: fonts.body,
+      cjkSample: "正文",
+      latinSample: "body",
+    },
+  ];
+
+  const rendered: Record<string, unknown> = {};
+  for (const target of targets) {
+    const el = wrapper?.querySelector(target.selector) as HTMLElement | null;
+    if (!el) continue;
+    const computedFontFamily = getComputedStyle(el).fontFamily;
+    const computedStack = parseComputedFontFamily(computedFontFamily);
+    const activeCjk = resolveRenderedFontFamily(computedStack, [target.cjkSample]);
+    const activeLatin = resolveRenderedFontFamily(computedStack, [target.latinSample]);
+    rendered[target.role] = {
+      selector: target.selector,
+      configuredStack: target.configuredStack,
+      computedFontFamily,
+      activeForCjk: activeCjk,
+      activeForLatin: activeLatin,
+      activeForCjkSource: describeFontCatalogSource(activeCjk),
+      activeForLatinSource: describeFontCatalogSource(activeLatin),
+    };
+  }
+
+  console.info("[PptViewer][Fonts] modern-literary-minimal", {
+    slideIndex: currentSlide.value,
+    layout: slide.value?.layout,
+    typographyTokens: typography,
+    cssVars: {
+      "--ppt-font-display": paletteStyle.value["--ppt-font-display"],
+      "--ppt-font-heading": paletteStyle.value["--ppt-font-heading"],
+      "--ppt-font-body": paletteStyle.value["--ppt-font-body"],
+    },
+    configuredStacks: fonts,
+    rendered,
+  });
+}
+
+watch(
+  () =>
+    [
+      isModernLiteraryMinimal.value,
+      currentSlide.value,
+      slide.value?.layout,
+      modernLiteraryFonts.value.display,
+      modernLiteraryFonts.value.heading,
+      modernLiteraryFonts.value.body,
+    ] as const,
+  () => {
+    void nextTick(async () => {
+      if (typeof document !== "undefined" && document.fonts?.ready) {
+        await Promise.race([
+          document.fonts.ready,
+          new Promise<void>((resolve) => setTimeout(resolve, 1200)),
+        ]);
+      }
+      logModernLiteraryFontUsage();
+    });
+  },
   { immediate: true }
 );
 
@@ -19518,7 +19672,7 @@ defineExpose({
 .ppt-quote-text {
   display: block;
   font-size: var(--ppt-fs-heading);
-  font-family: var(--ppt-quote-font-family, "Noto Serif SC", "Songti SC", serif);
+  font-family: var(--ppt-quote-font-family, "ZCOOL XiaoWei", "Playfair Display", serif);
   font-style: italic;
   font-weight: 600;
   line-height: 1.5;
@@ -19632,7 +19786,7 @@ defineExpose({
   overflow: hidden;
   color: var(--modern-text);
   background: var(--modern-bg);
-  font-family: var(--ppt-font-body, "Noto Serif SC", serif);
+  font-family: var(--ppt-font-body, "LXGW WenKai TC", "ZCOOL XiaoWei", serif);
 }
 
 .ppt-modern-literary .ppt-table-ref {
@@ -19658,7 +19812,7 @@ defineExpose({
 .ppt-modern-kicker,
 .ppt-modern-section-label {
   color: var(--modern-accent);
-  font-family: var(--ppt-font-body, "Noto Serif SC", serif);
+  font-family: var(--ppt-font-body, "LXGW WenKai TC", "ZCOOL XiaoWei", serif);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.34em;
@@ -19682,10 +19836,21 @@ defineExpose({
 .ppt-modern-slide-title {
   margin: 0;
   color: var(--modern-text);
-  font-family: var(--ppt-font-display, "ZCOOL XiaoWei", "Noto Serif SC", serif);
+  font-family: var(--ppt-font-display, "ZCOOL XiaoWei", "Playfair Display", serif);
   font-weight: 900;
   letter-spacing: -0.035em;
   line-height: 1.02;
+}
+
+.ppt-modern-cover-title .ppt-md-inline,
+.ppt-modern-slide-title .ppt-md-inline,
+.ppt-modern-section-title .ppt-md-inline {
+  display: block;
+  font-family: inherit;
+  color: inherit;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .ppt-modern-cover-title {
@@ -19707,7 +19872,7 @@ defineExpose({
   max-width: 680px;
   margin: 0;
   color: var(--modern-muted);
-  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
   font-size: clamp(20px, 2.4cqi, 34px);
   line-height: 1.35;
 }
@@ -19717,10 +19882,10 @@ defineExpose({
   right: 70px;
   bottom: 42px;
   left: 70px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   color: var(--modern-muted);
   font-family: "Lora", var(--ppt-font-body, serif);
   font-size: 13px;
@@ -19729,14 +19894,13 @@ defineExpose({
 }
 
 .ppt-modern-cover-footer-text {
-  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .ppt-modern-cover-footer-date {
-  grid-column: 2;
   white-space: nowrap;
 }
 
@@ -19805,7 +19969,7 @@ defineExpose({
   display: block;
   max-width: 920px;
   color: var(--modern-text);
-  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
   font-size: clamp(34px, 4.2cqi, 70px);
   font-style: italic;
   font-weight: 900;
@@ -19825,7 +19989,7 @@ defineExpose({
   display: block;
   margin-top: 28px;
   color: var(--modern-accent);
-  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
   font-size: clamp(22px, 2.2cqi, 34px);
   font-weight: 900;
   line-height: 1.25;
@@ -19833,6 +19997,58 @@ defineExpose({
 
 .ppt-modern-content-header {
   align-self: start;
+}
+
+.ppt-modern-literary--content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 52px;
+  overflow: hidden;
+}
+
+.ppt-modern-literary--content .ppt-modern-content-header {
+  flex: 0 0 auto;
+}
+
+.ppt-modern-literary--content .ppt-modern-slide-title {
+  max-width: 100%;
+  color: var(--modern-accent);
+  font-size: clamp(34px, 4.4cqi, 68px);
+  line-height: 1.08;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+.ppt-modern-literary--content .ppt-modern-accent-line {
+  width: 96px;
+  margin: 14px 0 10px;
+}
+
+.ppt-modern-literary--content .ppt-modern-multi,
+.ppt-modern-literary--content .ppt-modern-double,
+.ppt-modern-literary--content .ppt-modern-triple,
+.ppt-modern-literary--content .ppt-modern-content-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ppt-modern-literary--content .ppt-modern-insight--footer {
+  position: static;
+  flex: 0 0 auto;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(26, 26, 26, 0.08);
+  max-width: 100%;
+  font-size: clamp(14px, 1.22cqi, 20px);
+  font-weight: 800;
+  line-height: 1.38;
+}
+
+.ppt-modern-literary--content .ppt-brand-footer {
+  bottom: 10px;
+  font-size: 11px;
+  opacity: 0.42;
 }
 
 .ppt-modern-slide-title {
@@ -19855,7 +20071,7 @@ defineExpose({
 .ppt-modern-inline-quote {
   padding: 28px 34px;
   color: var(--modern-text);
-  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
   font-size: clamp(22px, 2.1cqi, 34px);
   font-style: italic;
   font-weight: 800;
@@ -20019,7 +20235,7 @@ defineExpose({
   display: block;
   margin: 0 0 14px;
   color: var(--modern-accent);
-  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
   font-size: clamp(24px, 2.2cqi, 38px);
   font-weight: 900;
   line-height: 1.18;
@@ -20329,7 +20545,7 @@ defineExpose({
 .ppt-modern-triple-card h3 {
   margin: 0 0 18px;
   color: var(--modern-accent);
-  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
   font-size: clamp(24px, 2.3cqi, 38px);
   font-weight: 900;
   line-height: 1.18;
@@ -20348,6 +20564,14 @@ defineExpose({
 
 .ppt-modern-multi {
   align-self: center;
+  width: 100%;
+}
+
+.ppt-modern-literary--content .ppt-modern-multi {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .ppt-modern-multi-grid {
@@ -20356,6 +20580,12 @@ defineExpose({
   margin: 0 auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 30px 42px;
+}
+
+.ppt-modern-literary--content .ppt-modern-multi-grid {
+  max-width: none;
+  width: 100%;
+  gap: 18px 28px;
 }
 
 .ppt-modern-multi-card {
@@ -20367,22 +20597,40 @@ defineExpose({
   box-shadow: 0 10px 22px rgba(26, 26, 26, 0.08);
 }
 
+.ppt-modern-literary--content .ppt-modern-multi-card {
+  min-height: 0;
+  padding: 14px 18px 14px 26px;
+  border-radius: 20px;
+}
+
 .ppt-modern-multi-card h3 {
   margin: 0 0 8px;
   color: var(--modern-text);
-  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
   font-size: clamp(20px, 1.85cqi, 30px);
   font-weight: 900;
   line-height: 1.15;
 }
 
+.ppt-modern-literary--content .ppt-modern-multi-card h3 {
+  margin-bottom: 6px;
+  font-size: clamp(16px, 1.45cqi, 22px);
+}
+
 .ppt-modern-multi-body {
   display: block;
   color: var(--modern-muted);
+  font-family: var(--ppt-font-body, "LXGW WenKai TC", "ZCOOL XiaoWei", serif);
   font-size: clamp(13px, 1.18cqi, 19px);
   font-style: italic;
   font-weight: 700;
   line-height: 1.42;
+}
+
+.ppt-modern-literary--content .ppt-modern-multi-body {
+  font-size: clamp(11px, 0.98cqi, 15px);
+  font-weight: 500;
+  line-height: 1.36;
 }
 
 .ppt-modern-insight--footer {
