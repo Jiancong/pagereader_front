@@ -7,6 +7,7 @@ import { router } from './router'
 import { i18n } from './i18n'
 import { applyDocumentI18n, getSavedLocale } from './composables/useAppLocale'
 import { initGtm } from './utils/gtmBootstrap'
+import '../font-styles-export/styles/index.css'
 import './style.css'
 
 applyDocumentI18n(getSavedLocale())

@@ -1,0 +1,21 @@
+/**
+ * 登录弹窗头部品牌字体色
+ * 来源：LoginButton.vue
+ */
+
+.login-promo-title--default {
+  font-family: "Oxanium", sans-serif;
+  color: #14ecff;
+}
+
+.login-promo-title--ximeng {
+  font-family: "Oxanium", sans-serif;
+  color: #ddc7ac;
+}
+
+.login-promo-cta--default,
+.login-promo-cta--ximeng {
+  font-family: "Oxanium", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}

@@ -1,0 +1,206 @@
+/* 移除阻塞渲染的 Google Fonts import，改用 preload 方式
+ * 字体会在 nuxt.config.ts 中异步加载
+ */
+
+/* Amsterdam font family — CDN hosted woff (cdnfonts.com) */
+@font-face {
+  font-family: 'The Amsterdam';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/45985/The Amsterdam.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'New Amsterdam';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/16462/NewAmsterdam.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'New Amsterdam';
+  font-style: italic;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/16462/NewAmsterdam-Italic.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Amsterdam Script';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/100245/amsterdamscript.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Amsterdam';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/17992/Amsterdam.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Amsterdam Graffiti';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/10107/amsterdam.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Amsterdam Handwriting';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/84930/AmsterdamhandwritingRegular-6Y1Vo.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Soul Amsterdams Reguler';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/80673/Soul Amsterdams Reguler.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Amsterdam Kindom - Personal use';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/89077/AmsterdamKindomPersonalUse-nRmJO.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Tour To Amsterdam';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/103678/Tour-To-Amsterdam-BF64f5e8fe6ef40.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Amsterdam Bridge';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/77242/AmsterdamBridge.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Amsterdam Signature';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/96782/AmsterdamSignature-owazB.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Amsterdam CITY';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/74400/Amsterdam CITY.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Amsterdam Bright';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/84603/AmsterdamBright-DOPmD.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'South Amsterdam';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/84173/South Amsterdam.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'North Amsterdam';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/85307/NorthAmsterdam-vmVRL.woff') format('woff');
+  font-display: swap;
+}
+/* Vivaldi — cdnfonts.com/css/vivaldi（CDN 声明为 Italic 400；补 normal 以便未开斜体时仍能用该文件渲染） */
+@font-face {
+  font-family: 'Vivaldi';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/14715/VIVALDII.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vivaldi';
+  font-style: italic;
+  font-weight: 400;
+  src: url('https://fonts.cdnfonts.com/s/14715/VIVALDII.woff') format('woff');
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 14px;
+  font-family: 'Oxanium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+// Marketing main title: align with `secondary.mainTitle` (Oxanium 700 + blue–cyan gradient)
+.app-title-gradient {
+  font-family: "Oxanium", sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  background: linear-gradient(90deg, #0176ff 0%, rgba(1, 231, 255, 0.79) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.overflow-overlay {
+  overflow: overlay;
+}
+
+.flex-center {
+  @apply flex justify-center items-center;
+}
+
+//下划线
+.border-line {
+  @apply relative;
+  &::after {
+    content: "";
+    @apply absolute left-[0] bottom-[0] w-full h-[1px] bg-white;
+    transform: scaleY(0.5);
+  }
+}
+
+.border-right {
+  @apply relative;
+  &::after {
+    @apply absolute bg-white/[0.3] w-[1px] h-[22px] right-[0];
+    content: "";
+    top: 50%;
+    transform: translateY(-50%);
+  }
+}
+
+::-webkit-inner-spin-button,
+::-webkit-outer-spin-button {
+  display: none;
+}
+
+.svg-icon {
+  transform: translateX(-180px);
+  filter: drop-shadow(rgba($color: #ffffff, $alpha: 0.5) 180px 0);
+}
+
+.icon-info {
+  @apply cursor-pointer overflow-hidden;
+
+  img {
+    @apply w-[14px];
+    transform: translateX(-80px);
+    filter: drop-shadow(rgba($color: #ffffff, $alpha: 0.5) 80px 0);
+  }
+}
+

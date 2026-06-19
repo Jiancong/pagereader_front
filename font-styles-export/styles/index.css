@@ -1,0 +1,10 @@
+/**
+ * 一键引入（按顺序）
+ * 1. 在 HTML head 加入 01-google-fonts-head.html 中的 link
+ * 2. import 本文件或按序 @import 下列模块
+ */
+@import "./02-global-typography.css";
+@import "./03-ximeng-brand-tokens.css";
+@import "./04-ximeng-typography.css";
+@import "./05-navigation-typography.css";
+@import "./06-login-promo-typography.css";

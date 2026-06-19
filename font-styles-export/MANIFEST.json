@@ -1,0 +1,27 @@
+{
+  "package": "font-styles-export",
+  "description": "Fonts and typography extracted from midjourney-ui-vue3",
+  "brandFonts": {
+    "ui": {
+      "family": "Oxanium",
+      "weights": [200, 400, 700],
+      "cdn": "https://fonts.googleapis.com/css2?family=Oxanium:wght@200;400;700&display=swap"
+    },
+    "ximengDisplay": {
+      "family": "Playfair Display",
+      "weights": [400, 500, 600, 700],
+      "styles": ["normal", "italic"],
+      "cdn": "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap"
+    }
+  },
+  "sourceFiles": [
+    "src/assets/styles/base.scss",
+    "nuxt.config.ts (app.head.link fonts section)",
+    "src/components/home/revamp/XmHomeHero.vue",
+    "src/components/home/revamp/XmPageShell.vue",
+    "src/components/layout/NavItems.vue",
+    "src/components/layout/NavBar.vue",
+    "src/components/layout/LoginButton.vue",
+    "src/composables/useFontLoader.ts"
+  ]
+}

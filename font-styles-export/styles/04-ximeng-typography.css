@@ -1,0 +1,59 @@
+/**
+ * ximeng 落地页排版尺度（Hero / 落地页 / Showcase 共用）
+ * 与 tailwind 无关，纯 CSS 可移植
+ */
+
+/* Hero H1 */
+.xm-hero__title,
+.xm-lp__title,
+.xm-sc__title {
+  font-family: "Playfair Display", ui-serif, Georgia, serif;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+/* Section H2 */
+.xm-flow-sec__title,
+.xm-teaser__title,
+.xm-feat__heading {
+  font-family: "Playfair Display", ui-serif, Georgia, serif;
+  font-size: clamp(1.6rem, 3.4vw, 2.5rem);
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Kicker / 小标签全大写 */
+.xm-hero__kicker,
+.xm-lp__kicker {
+  font-family: "Oxanium", sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #ddc7ac;
+}
+
+/* 副标题 */
+.xm-hero__subtitle,
+.xm-lp__sub,
+.xm-sc__sub,
+.xm-flow-sec__sub,
+.xm-teaser__sub {
+  font-family: "Oxanium", sans-serif;
+  font-size: clamp(1rem, 1.6vw, 1.18rem);
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* CTA 按钮文案 */
+.xm-btn,
+.xm-lp__cta,
+.xm-nav-cta,
+.xm-cross__cta {
+  font-family: "Oxanium", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+}

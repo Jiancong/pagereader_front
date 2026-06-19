@@ -416,8 +416,8 @@
                 </div>
               </div>
               <div class="ppt-modern-cover-footer">
-                <span>{{ modernLiteraryTagline }}</span>
-                <span>{{
+                <span v-if="modernLiteraryCoverTagline" class="ppt-modern-cover-footer-text">{{ modernLiteraryCoverTagline }}</span>
+                <span class="ppt-modern-cover-footer-date">{{
                   slide.date ||
                   new Date().toLocaleDateString(locale === "zh-cn" ? "zh-CN" : "en-US", {
                     year: "numeric",
@@ -499,7 +499,298 @@
                 </h2>
                 <div class="ppt-modern-accent-line"></div>
               </div>
-              <div class="ppt-modern-content-body">
+              <div
+                v-if="isModernLiteraryDoubleContent(slide)"
+                class="ppt-modern-double"
+                :class="`ppt-modern-double--${modernLiteraryDoubleVariant(slide)}`"
+              >
+                <template v-if="modernLiteraryDoubleVariant(slide) === 'contrast'">
+                  <article
+                    v-for="(item, di) in modernLiteraryDoubleItems(slide)"
+                    :key="'modern-double-contrast-' + di"
+                    class="ppt-modern-double-card"
+                    :class="{ 'ppt-modern-double-card--dark': di === 1 }"
+                  >
+                    <h3>
+                      <PptMarkdownInline
+                        :text="contentPointTitle(item)"
+                        :page-references="slide.page_references"
+                        @ref-click="onPptTableRefClick($event, slide)"
+                      />
+                    </h3>
+                    <PptMarkdownInline
+                      class="ppt-modern-double-card-body"
+                      :text="parseContentBody(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </article>
+                  <PptMarkdownInline
+                    v-if="slide.key_insight"
+                    class="ppt-modern-double-quote-strip"
+                    :text="slide.key_insight"
+                    :page-references="slide.page_references"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
+                </template>
+
+                <template v-else-if="modernLiteraryDoubleVariant(slide) === 'split'">
+                  <section class="ppt-modern-double-split-hero">
+                    <div class="ppt-modern-double-kicker">
+                      {{ contentPointTitle(modernLiteraryDoubleItems(slide)[0]) }}
+                    </div>
+                    <h3>
+                      <PptMarkdownInline
+                        :text="contentPointTitle(modernLiteraryDoubleItems(slide)[0])"
+                        :page-references="slide.page_references"
+                        @ref-click="onPptTableRefClick($event, slide)"
+                      />
+                    </h3>
+                    <PptMarkdownInline
+                      class="ppt-modern-double-split-body"
+                      :text="parseContentBody(modernLiteraryDoubleItems(slide)[0])"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </section>
+                  <section class="ppt-modern-double-split-side">
+                    <div class="ppt-modern-double-side-card">
+                      <PptMarkdownInline
+                        class="ppt-modern-double-side-title"
+                        :text="contentPointTitle(modernLiteraryDoubleItems(slide)[1])"
+                        :page-references="slide.page_references"
+                        @ref-click="onPptTableRefClick($event, slide)"
+                      />
+                      <PptMarkdownInline
+                        class="ppt-modern-double-side-body"
+                        :text="parseContentBody(modernLiteraryDoubleItems(slide)[1])"
+                        :page-references="slide.page_references"
+                        @ref-click="onPptTableRefClick($event, slide)"
+                      />
+                    </div>
+                    <PptMarkdownInline
+                      v-if="slide.key_insight"
+                      class="ppt-modern-double-side-insight"
+                      :text="slide.key_insight"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </section>
+                </template>
+
+                <template v-else-if="modernLiteraryDoubleVariant(slide) === 'stacked'">
+                  <div class="ppt-modern-double-stacked-list">
+                    <article
+                      v-for="(item, di) in modernLiteraryDoubleItems(slide)"
+                      :key="'modern-double-stacked-' + di"
+                      class="ppt-modern-double-stacked-card"
+                      :class="{ 'ppt-modern-double-stacked-card--soft': di === 1 }"
+                    >
+                      <h3>
+                        <PptMarkdownInline
+                          :text="contentPointTitle(item)"
+                          :page-references="slide.page_references"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                      </h3>
+                      <PptMarkdownInline
+                        class="ppt-modern-double-stacked-body"
+                        :text="parseContentBody(item)"
+                        :page-references="slide.page_references"
+                        @ref-click="onPptTableRefClick($event, slide)"
+                      />
+                    </article>
+                  </div>
+                  <PptMarkdownInline
+                    v-if="slide.key_insight"
+                    class="ppt-modern-double-stacked-footer"
+                    :text="slide.key_insight"
+                    :page-references="slide.page_references"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
+                </template>
+
+                <template v-else>
+                  <aside class="ppt-modern-double-aside">
+                    <div class="ppt-modern-double-kicker">
+                      {{ contentPointTitle(modernLiteraryDoubleItems(slide)[0]) }}
+                    </div>
+                    <h3>
+                      <PptMarkdownInline
+                        :text="contentPointTitle(modernLiteraryDoubleItems(slide)[0])"
+                        :page-references="slide.page_references"
+                        @ref-click="onPptTableRefClick($event, slide)"
+                      />
+                    </h3>
+                    <PptMarkdownInline
+                      class="ppt-modern-double-aside-body"
+                      :text="parseContentBody(modernLiteraryDoubleItems(slide)[0])"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </aside>
+                  <section class="ppt-modern-double-numbered">
+                    <div class="ppt-modern-double-number">01</div>
+                    <PptMarkdownInline
+                      class="ppt-modern-double-number-title"
+                      :text="contentPointTitle(modernLiteraryDoubleItems(slide)[1])"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                    <PptMarkdownInline
+                      class="ppt-modern-double-number-body"
+                      :text="parseContentBody(modernLiteraryDoubleItems(slide)[1])"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                    <PptMarkdownInline
+                      v-if="slide.key_insight"
+                      class="ppt-modern-double-number-quote"
+                      :text="slide.key_insight"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </section>
+                </template>
+              </div>
+
+              <div
+                v-else-if="isModernLiteraryTripleContent(slide)"
+                class="ppt-modern-triple"
+                :class="`ppt-modern-triple--${modernLiteraryTripleVariant(slide)}`"
+              >
+                <template v-if="modernLiteraryTripleVariant(slide) === 'portrait'">
+                  <section class="ppt-modern-triple-portrait-hero">
+                    <div class="ppt-modern-triple-kicker">
+                      {{ contentPointTitle(modernLiteraryTripleItems(slide)[0]) }}
+                    </div>
+                    <h3>
+                      <PptMarkdownInline
+                        :text="contentPointTitle(modernLiteraryTripleItems(slide)[0])"
+                        :page-references="slide.page_references"
+                        @ref-click="onPptTableRefClick($event, slide)"
+                      />
+                    </h3>
+                    <PptMarkdownInline
+                      class="ppt-modern-triple-portrait-body"
+                      :text="parseContentBody(modernLiteraryTripleItems(slide)[0])"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </section>
+                  <section class="ppt-modern-triple-portrait-list">
+                    <div
+                      v-for="(item, ti) in modernLiteraryTripleItems(slide).slice(1)"
+                      :key="'modern-portrait-' + ti"
+                      class="ppt-modern-triple-bullet"
+                    >
+                      <span></span>
+                      <div>
+                        <PptMarkdownInline
+                          class="ppt-modern-triple-bullet-title"
+                          :text="contentPointTitle(item)"
+                          :page-references="slide.page_references"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                        <PptMarkdownInline
+                          class="ppt-modern-triple-bullet-body"
+                          :text="parseContentBody(item)"
+                          :page-references="slide.page_references"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                      </div>
+                    </div>
+                    <PptMarkdownInline
+                      v-if="slide.key_insight"
+                      class="ppt-modern-triple-insight"
+                      :text="slide.key_insight"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </section>
+                </template>
+
+                <template v-else-if="modernLiteraryTripleVariant(slide) === 'orbit'">
+                  <div
+                    v-for="(item, ti) in modernLiteraryTripleItems(slide)"
+                    :key="'modern-orbit-' + ti"
+                    class="ppt-modern-orbit-node"
+                    :class="{ 'ppt-modern-orbit-node--dark': ti === 1 }"
+                  >
+                    <PptMarkdownInline
+                      class="ppt-modern-orbit-kicker"
+                      :text="contentPointTitle(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                    <PptMarkdownInline
+                      class="ppt-modern-orbit-title"
+                      :text="parseContentBody(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </div>
+                  <PptMarkdownInline
+                    v-if="slide.key_insight"
+                    class="ppt-modern-orbit-insight"
+                    :text="slide.key_insight"
+                    :page-references="slide.page_references"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
+                </template>
+
+                <template v-else>
+                  <article
+                    v-for="(item, ti) in modernLiteraryTripleItems(slide)"
+                    :key="'modern-card-' + ti"
+                    class="ppt-modern-triple-card"
+                    :class="{ 'ppt-modern-triple-card--dark': ti === 2 }"
+                  >
+                    <h3>
+                      <PptMarkdownInline
+                        :text="contentPointTitle(item)"
+                        :page-references="slide.page_references"
+                        @ref-click="onPptTableRefClick($event, slide)"
+                      />
+                    </h3>
+                    <PptMarkdownInline
+                      class="ppt-modern-triple-card-body"
+                      :text="parseContentBody(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </article>
+                </template>
+              </div>
+
+              <div
+                v-else-if="isModernLiteraryMultiContent(slide)"
+                class="ppt-modern-multi"
+              >
+                <div class="ppt-modern-multi-grid">
+                  <article
+                    v-for="(item, mi) in modernLiteraryMultiItems(slide)"
+                    :key="'modern-multi-' + mi"
+                    class="ppt-modern-multi-card"
+                  >
+                    <h3>
+                      <PptMarkdownInline
+                        :text="contentPointTitle(item)"
+                        :page-references="slide.page_references"
+                        @ref-click="onPptTableRefClick($event, slide)"
+                      />
+                    </h3>
+                    <PptMarkdownInline
+                      class="ppt-modern-multi-body"
+                      :text="parseContentBody(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </article>
+                </div>
+              </div>
+
+              <div v-else class="ppt-modern-content-body">
                 <div v-if="modernLiteraryQuoteItems(slide).length" class="ppt-modern-content-quotes">
                   <div
                     v-for="(item, qi) in modernLiteraryQuoteItems(slide)"
@@ -585,7 +876,20 @@
                       @blur="onCellBlur($event, `slides.${currentSlide}.right_title`)"
                     />
                   </h3>
-                  <div class="ppt-modern-compare-list">
+                  <figure v-if="documentFigure?.url" class="ppt-modern-document-figure">
+                    <img
+                      :src="documentFigure.url"
+                      class="ppt-modern-document-figure-img"
+                      :style="documentFigureImgStyle(documentFigure)"
+                      :alt="documentFigure.caption || documentFigure.page_label || slide.title || ''"
+                      loading="lazy"
+                      crossorigin="anonymous"
+                    />
+                    <figcaption v-if="documentFigure.caption || documentFigure.page_label">
+                      {{ documentFigure.caption || documentFigure.page_label }}
+                    </figcaption>
+                  </figure>
+                  <div v-else class="ppt-modern-compare-list">
                     <PptMarkdownInline
                       v-for="(item, ri) in modernLiteraryRightItems(slide)"
                       :key="'modern-right-' + ri"
@@ -606,7 +910,7 @@
               </div>
             </template>
 
-            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
+            <div v-if="currentBrandFooter && slide.layout !== 'cover'" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
           </div>
 
           <!-- cover 封面 -->
@@ -11392,8 +11696,62 @@ function modernLiteraryQuoteItems(slide: PptSlide): string[] {
 
 function modernLiteraryBodyItems(slide: PptSlide): string[] {
   const items = (slide.content || []).filter((item) => !isModernLiteraryQuotedFragment(item));
-  if (items.length) return items.slice(0, 3);
+  if (items.length) return items.slice(0, 4);
   return (slide.content || []).slice(1, 4);
+}
+
+function modernLiteraryPlainItems(slide: PptSlide): string[] {
+  return (slide.content || []).filter((item) => !isModernLiteraryQuotedFragment(item));
+}
+
+function modernLiteraryMultiItems(slide: PptSlide): string[] {
+  const items = modernLiteraryPlainItems(slide);
+  return items.length > 3 ? items.slice(0, 4) : [];
+}
+
+function isModernLiteraryMultiContent(slide: PptSlide): boolean {
+  return slide.layout === "content" && modernLiteraryMultiItems(slide).length > 3;
+}
+
+function modernLiteraryDoubleItems(slide: PptSlide): string[] {
+  const items = modernLiteraryPlainItems(slide);
+  return items.length === 2 ? items : [];
+}
+
+function isModernLiteraryDoubleContent(slide: PptSlide): boolean {
+  return slide.layout === "content" && modernLiteraryDoubleItems(slide).length === 2;
+}
+
+function modernLiteraryDoubleVariant(
+  slide: PptSlide,
+): "contrast" | "split" | "stacked" | "numbered" {
+  const hinted = slideEmphasisLayout(slide);
+  if (hinted.includes("split") || hinted.includes("hero")) return "split";
+  if (hinted.includes("stack") || hinted.includes("quote")) return "stacked";
+  if (hinted.includes("number") || hinted.includes("list")) return "numbered";
+  if (hinted.includes("contrast") || hinted.includes("compare")) return "contrast";
+  const variants = ["contrast", "split", "stacked", "numbered"] as const;
+  const n = Number(slide.index || currentSlide.value + 1);
+  return variants[Math.abs(n - 1) % variants.length];
+}
+
+function modernLiteraryTripleItems(slide: PptSlide): string[] {
+  const items = modernLiteraryPlainItems(slide);
+  return items.length === 3 ? items : [];
+}
+
+function isModernLiteraryTripleContent(slide: PptSlide): boolean {
+  return slide.layout === "content" && modernLiteraryTripleItems(slide).length === 3;
+}
+
+function modernLiteraryTripleVariant(slide: PptSlide): "portrait" | "orbit" | "cards" {
+  const hinted = slideEmphasisLayout(slide);
+  if (hinted.includes("orbit") || hinted.includes("circle")) return "orbit";
+  if (hinted.includes("card")) return "cards";
+  if (hinted.includes("portrait") || hinted.includes("split")) return "portrait";
+  const variants = ["portrait", "orbit", "cards"] as const;
+  const n = Number(slide.index || currentSlide.value + 1);
+  return variants[Math.abs(n - 1) % variants.length];
 }
 
 function modernLiteraryRightItems(slide: PptSlide): string[] {
@@ -11817,6 +12175,7 @@ const MODERN_LITERARY_DEFAULT_GOOGLE_FONTS = [
   "https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap",
   "https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700;900&display=swap",
   "https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap",
+  "https://fonts.googleapis.com/css2?family=Oxanium:wght@200;400;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap",
 ];
 
 const modernLiteraryTokens = computed(() => pptSource.value.palette?.theme_tokens ?? {});
@@ -11843,21 +12202,27 @@ const modernLiteraryColors = computed(() => {
 
 const modernLiteraryFonts = computed(() => {
   const typography = modernLiteraryTokens.value.typography || {};
+  const display = typography.font_display || '"Playfair Display"';
+  const heading = typography.font_heading || display;
+  const body = typography.font_body || '"Noto Serif SC"';
   return {
-    display: typography.font_display || "ZCOOL XiaoWei",
-    heading: typography.font_heading || "ZCOOL XiaoWei, Noto Serif SC, serif",
-    body: typography.font_body || "Noto Serif SC, serif",
+    display: `${display}, "Playfair Display", "Noto Serif SC", serif`,
+    heading: `${heading}, "Playfair Display", "Noto Serif SC", serif`,
+    body: `${body}, "Noto Serif SC", "Oxanium", serif`,
   };
 });
 
-const modernLiteraryTagline = computed(
-  () =>
-    modernLiteraryTokens.value.typography?.tagline ||
-    modernLiteraryTokens.value.tagline ||
+const modernLiteraryCoverTagline = computed(() => {
+  const s = slide.value;
+  const raw =
+    s?.brand_footer ||
     pptSource.value.brand_footer ||
     currentBrandFooter.value ||
-    ""
-);
+    "";
+  const text = String(raw).trim();
+  if (!text || text.length > 64) return "";
+  return text;
+});
 
 const modernLiteraryGoogleFontUrls = computed(() => {
   const urls = pptSource.value.palette?.theme_tokens?.typography?.google_fonts_urls ?? [];
@@ -19304,11 +19669,12 @@ defineExpose({
   display: grid;
   grid-template-columns: minmax(0, 9fr) minmax(80px, 3fr);
   align-items: center;
-  min-height: 100%;
+  min-height: calc(100% - 86px);
+  padding-bottom: 72px;
 }
 
 .ppt-modern-cover-main {
-  max-width: 82%;
+  max-width: min(980px, 88%);
 }
 
 .ppt-modern-cover-title,
@@ -19318,13 +19684,15 @@ defineExpose({
   color: var(--modern-text);
   font-family: var(--ppt-font-display, "ZCOOL XiaoWei", "Noto Serif SC", serif);
   font-weight: 900;
-  letter-spacing: -0.065em;
-  line-height: 0.86;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
 }
 
 .ppt-modern-cover-title {
   max-width: 980px;
-  font-size: clamp(72px, 9.4cqi, 150px);
+  font-size: clamp(48px, 7.1cqi, 104px);
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 .ppt-modern-accent-line,
@@ -19347,15 +19715,29 @@ defineExpose({
 .ppt-modern-cover-footer {
   position: absolute;
   right: 70px;
-  bottom: 44px;
+  bottom: 42px;
   left: 70px;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 24px;
   color: var(--modern-muted);
   font-family: "Lora", var(--ppt-font-body, serif);
-  font-size: 14px;
+  font-size: 13px;
   font-style: italic;
+  line-height: 1.25;
+}
+
+.ppt-modern-cover-footer-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ppt-modern-cover-footer-date {
+  grid-column: 2;
+  white-space: nowrap;
 }
 
 .ppt-modern-literary--section {
@@ -19509,6 +19891,500 @@ defineExpose({
   line-height: 1.5;
 }
 
+.ppt-modern-double {
+  align-self: center;
+}
+
+.ppt-modern-double--contrast {
+  position: relative;
+  display: grid;
+  min-height: 405px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 44px;
+}
+
+.ppt-modern-double-card {
+  padding: 42px 46px;
+  border: 1px solid rgba(26, 26, 26, 0.09);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 18px 36px rgba(26, 26, 26, 0.08);
+}
+
+.ppt-modern-double-card--dark {
+  color: var(--modern-bg);
+  background: var(--modern-text);
+}
+
+.ppt-modern-double-card h3 {
+  margin: 0 0 22px;
+  color: inherit;
+  font-family: var(--ppt-font-display, "Playfair Display", serif);
+  font-size: clamp(34px, 3.5cqi, 58px);
+  font-weight: 900;
+  line-height: 1.02;
+}
+
+.ppt-modern-double-card--dark h3 {
+  color: var(--modern-accent);
+}
+
+.ppt-modern-double-card-body {
+  display: block;
+  color: var(--modern-muted);
+  font-size: clamp(16px, 1.45cqi, 24px);
+  line-height: 1.48;
+}
+
+.ppt-modern-double-card--dark .ppt-modern-double-card-body {
+  color: rgba(253, 252, 248, 0.78);
+}
+
+.ppt-modern-double-quote-strip {
+  position: absolute;
+  right: 0;
+  bottom: -78px;
+  left: 0;
+  padding: 18px 28px;
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--modern-text);
+  font-size: clamp(18px, 1.65cqi, 27px);
+  font-style: italic;
+  font-weight: 900;
+  line-height: 1.28;
+  text-align: center;
+}
+
+.ppt-modern-double--split {
+  display: grid;
+  min-height: 520px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+}
+
+.ppt-modern-double-split-hero {
+  display: grid;
+  align-content: center;
+  padding: 54px 52px;
+  border-right: 10px solid var(--modern-accent);
+  color: var(--modern-bg);
+  background: var(--modern-text);
+}
+
+.ppt-modern-double-kicker {
+  margin-bottom: 18px;
+  color: var(--modern-accent);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.ppt-modern-double-split-hero h3,
+.ppt-modern-double-aside h3 {
+  margin: 0 0 24px;
+  font-family: var(--ppt-font-display, "Playfair Display", serif);
+  font-size: clamp(50px, 5.2cqi, 92px);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 0.98;
+}
+
+.ppt-modern-double-split-body,
+.ppt-modern-double-aside-body {
+  display: block;
+  color: rgba(253, 252, 248, 0.72);
+  font-size: clamp(16px, 1.45cqi, 24px);
+  line-height: 1.55;
+}
+
+.ppt-modern-double-split-side {
+  display: grid;
+  align-content: center;
+  gap: 34px;
+  padding-left: 76px;
+}
+
+.ppt-modern-double-side-card,
+.ppt-modern-double-stacked-card {
+  padding: 32px 38px;
+  border: 1px solid rgba(196, 30, 58, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 14px 30px rgba(196, 30, 58, 0.08);
+}
+
+.ppt-modern-double-side-title,
+.ppt-modern-double-stacked-card h3 {
+  display: block;
+  margin: 0 0 14px;
+  color: var(--modern-accent);
+  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-size: clamp(24px, 2.2cqi, 38px);
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.ppt-modern-double-side-body,
+.ppt-modern-double-stacked-body {
+  display: block;
+  color: var(--modern-text);
+  font-size: clamp(15px, 1.35cqi, 22px);
+  line-height: 1.5;
+}
+
+.ppt-modern-double-side-insight {
+  display: block;
+  color: var(--modern-muted);
+  font-size: clamp(15px, 1.25cqi, 21px);
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.ppt-modern-double--stacked {
+  display: grid;
+  min-height: 420px;
+  grid-template-rows: 1fr auto;
+  gap: 28px;
+}
+
+.ppt-modern-double-stacked-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-content: center;
+  max-width: 660px;
+  margin-left: auto;
+}
+
+.ppt-modern-double-stacked-card--soft {
+  background: var(--modern-surface);
+  box-shadow: none;
+}
+
+.ppt-modern-double-stacked-footer {
+  display: block;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 18px 28px;
+  border-radius: 16px;
+  color: var(--modern-text);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: clamp(17px, 1.55cqi, 25px);
+  font-style: italic;
+  font-weight: 900;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.ppt-modern-double--numbered {
+  display: grid;
+  min-height: 430px;
+  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+  gap: 58px;
+  align-items: center;
+}
+
+.ppt-modern-double-aside {
+  display: grid;
+  align-content: center;
+  min-height: 390px;
+  padding: 42px 38px;
+  border-radius: 18px;
+  color: var(--modern-bg);
+  background: var(--modern-text);
+  box-shadow: 0 20px 42px rgba(26, 26, 26, 0.18);
+}
+
+.ppt-modern-double-numbered {
+  position: relative;
+  display: grid;
+  align-content: center;
+}
+
+.ppt-modern-double-number {
+  position: absolute;
+  top: -8px;
+  left: -72px;
+  color: color-mix(in srgb, var(--modern-accent) 26%, transparent);
+  font-family: "Lora", var(--ppt-font-heading, serif);
+  font-size: clamp(58px, 6cqi, 96px);
+  line-height: 1;
+}
+
+.ppt-modern-double-number-title {
+  display: block;
+  color: var(--modern-text);
+  font-size: clamp(26px, 2.5cqi, 42px);
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.ppt-modern-double-number-body {
+  display: block;
+  margin-top: 14px;
+  max-width: 760px;
+  color: var(--modern-muted);
+  font-size: clamp(15px, 1.35cqi, 22px);
+  line-height: 1.5;
+}
+
+.ppt-modern-double-number-quote {
+  display: block;
+  margin-top: 34px;
+  padding: 18px 24px;
+  border: 1px dashed rgba(26, 26, 26, 0.16);
+  border-radius: 14px;
+  color: var(--modern-text);
+  font-size: clamp(16px, 1.45cqi, 24px);
+  font-style: italic;
+  font-weight: 900;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.ppt-modern-triple {
+  align-self: center;
+}
+
+.ppt-modern-triple--portrait {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr);
+  min-height: 430px;
+  gap: 54px;
+  align-items: center;
+}
+
+.ppt-modern-triple-portrait-hero {
+  display: grid;
+  align-content: center;
+  min-height: 390px;
+}
+
+.ppt-modern-triple-kicker {
+  margin-bottom: 18px;
+  color: var(--modern-accent);
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.ppt-modern-triple-portrait-hero h3 {
+  margin: 0 0 24px;
+  color: var(--modern-text);
+  font-family: var(--ppt-font-display, "Playfair Display", serif);
+  font-size: clamp(58px, 6.7cqi, 112px);
+  font-weight: 900;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+}
+
+.ppt-modern-triple-portrait-body {
+  display: block;
+  max-width: 560px;
+  color: var(--modern-muted);
+  font-size: clamp(17px, 1.6cqi, 26px);
+  line-height: 1.55;
+}
+
+.ppt-modern-triple-portrait-list {
+  display: grid;
+  gap: 26px;
+}
+
+.ppt-modern-triple-bullet {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.ppt-modern-triple-bullet > span {
+  width: 10px;
+  height: 10px;
+  margin-top: 11px;
+  border-radius: 999px;
+  background: var(--modern-accent);
+}
+
+.ppt-modern-triple-bullet-title {
+  display: block;
+  color: var(--modern-accent);
+  font-size: clamp(22px, 2.1cqi, 34px);
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.ppt-modern-triple-bullet-body {
+  display: block;
+  margin-top: 6px;
+  color: var(--modern-muted);
+  font-size: clamp(15px, 1.35cqi, 22px);
+  line-height: 1.38;
+}
+
+.ppt-modern-triple-insight {
+  display: block;
+  margin-top: 10px;
+  padding: 18px 24px;
+  border-radius: 18px;
+  color: var(--modern-bg);
+  background: var(--modern-accent);
+  font-size: clamp(14px, 1.2cqi, 19px);
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.ppt-modern-triple--orbit {
+  position: relative;
+  display: grid;
+  min-height: 420px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  gap: 26px;
+}
+
+.ppt-modern-triple--orbit::after {
+  content: "";
+  position: absolute;
+  right: 18%;
+  bottom: 82px;
+  left: 18%;
+  border-top: 1px dashed rgba(26, 26, 26, 0.14);
+}
+
+.ppt-modern-orbit-node {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: clamp(150px, 17cqi, 230px);
+  aspect-ratio: 1;
+  place-items: center;
+  padding: 30px;
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 14px 32px rgba(26, 26, 26, 0.12);
+  text-align: center;
+}
+
+.ppt-modern-orbit-node--dark {
+  width: clamp(170px, 19cqi, 258px);
+  color: var(--modern-bg);
+  background: var(--modern-text);
+}
+
+.ppt-modern-orbit-kicker {
+  display: block;
+  color: var(--modern-accent);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.ppt-modern-orbit-title {
+  display: block;
+  margin-top: 8px;
+  color: inherit;
+  font-size: clamp(17px, 1.55cqi, 25px);
+  line-height: 1.32;
+}
+
+.ppt-modern-orbit-insight {
+  position: absolute;
+  right: 12%;
+  bottom: 18px;
+  left: 12%;
+  color: var(--modern-muted);
+  font-size: clamp(16px, 1.45cqi, 23px);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.ppt-modern-triple--cards {
+  display: grid;
+  min-height: 420px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  align-items: stretch;
+}
+
+.ppt-modern-triple-card {
+  display: grid;
+  align-content: start;
+  min-height: 390px;
+  padding: 30px 34px;
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 14px 30px rgba(26, 26, 26, 0.08);
+}
+
+.ppt-modern-triple-card--dark {
+  color: var(--modern-bg);
+  background: var(--modern-text);
+}
+
+.ppt-modern-triple-card h3 {
+  margin: 0 0 18px;
+  color: var(--modern-accent);
+  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-size: clamp(24px, 2.3cqi, 38px);
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.ppt-modern-triple-card-body {
+  display: block;
+  color: inherit;
+  font-size: clamp(15px, 1.35cqi, 22px);
+  line-height: 1.55;
+}
+
+.ppt-modern-triple-card--dark .ppt-modern-triple-card-body {
+  color: rgba(253, 252, 248, 0.86);
+}
+
+.ppt-modern-multi {
+  align-self: center;
+}
+
+.ppt-modern-multi-grid {
+  display: grid;
+  max-width: 850px;
+  margin: 0 auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 30px 42px;
+}
+
+.ppt-modern-multi-card {
+  min-height: 116px;
+  padding: 20px 26px 20px 34px;
+  border-left: 8px solid var(--modern-accent);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--modern-surface) 84%, #ffffff 16%);
+  box-shadow: 0 10px 22px rgba(26, 26, 26, 0.08);
+}
+
+.ppt-modern-multi-card h3 {
+  margin: 0 0 8px;
+  color: var(--modern-text);
+  font-family: var(--ppt-font-heading, "Noto Serif SC", serif);
+  font-size: clamp(20px, 1.85cqi, 30px);
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.ppt-modern-multi-body {
+  display: block;
+  color: var(--modern-muted);
+  font-size: clamp(13px, 1.18cqi, 19px);
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1.42;
+}
+
 .ppt-modern-insight--footer {
   position: absolute;
   right: 70px;
@@ -19557,6 +20433,39 @@ defineExpose({
 .ppt-modern-compare-list {
   display: grid;
   gap: 16px;
+}
+
+.ppt-modern-document-figure {
+  display: flex;
+  min-height: 285px;
+  max-height: 330px;
+  margin: 0;
+  padding: 12px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--modern-bg);
+}
+
+.ppt-modern-document-figure-img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: 268px;
+  object-fit: contain;
+  background: var(--modern-bg);
+}
+
+.ppt-modern-document-figure figcaption {
+  width: 100%;
+  overflow: hidden;
+  color: var(--modern-muted);
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ppt-modern-compare-item {

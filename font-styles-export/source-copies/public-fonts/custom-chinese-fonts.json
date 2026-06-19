@@ -1,0 +1,88 @@
+{
+  "source": "manual-curation",
+  "updated": "2026-03-25T00:00:00.000Z",
+  "count": 9,
+  "fonts": [
+    {
+      "label": "思源黑体 SC",
+      "value": "Noto Sans SC",
+      "category": "chinese",
+      "preview": "思源黑体",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "label": "思源宋体 SC",
+      "value": "Noto Serif SC",
+      "category": "chinese",
+      "preview": "思源宋体",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@200;300;400;500;600;700;900&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "label": "站酷快乐体",
+      "value": "ZCOOL KuaiLe",
+      "category": "chinese",
+      "preview": "站酷快乐体",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "label": "站酷庆科黄油体",
+      "value": "ZCOOL QingKe HuangYou",
+      "category": "chinese",
+      "preview": "黄油体",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=ZCOOL+QingKe+HuangYou&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "label": "站酷小薇 LOGO 体",
+      "value": "ZCOOL XiaoWei",
+      "category": "chinese",
+      "preview": "小薇LOGO",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "label": "霞鹜文楷 Mono TC",
+      "value": "LXGW WenKai Mono TC",
+      "category": "chinese",
+      "preview": "霞鹜文楷",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=LXGW+WenKai+Mono+TC:wght@300;400;700&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "label": "刘建毛草",
+      "value": "Liu Jian Mao Cao",
+      "category": "chinese",
+      "preview": "刘建毛草",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=Liu+Jian+Mao+Cao&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "label": "马善政",
+      "value": "Ma Shan Zheng",
+      "category": "chinese",
+      "preview": "马善政",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "label": "芝麻行书",
+      "value": "Zhi Mang Xing",
+      "category": "chinese",
+      "preview": "芝麻行书",
+      "sourceType": "css",
+      "cssUrl": "https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&display=swap",
+      "license": "SIL Open Font License 1.1"
+    }
+  ]
+}
