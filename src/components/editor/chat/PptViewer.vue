@@ -11786,7 +11786,9 @@ function modernLiteraryQuoteItems(slide: PptSlide): string[] {
 function modernLiteraryBodyItems(slide: PptSlide): string[] {
   const items = (slide.content || []).filter((item) => !isModernLiteraryQuotedFragment(item));
   if (items.length) return items.slice(0, 4);
-  return (slide.content || []).slice(1, 4);
+  // 兜底：全部条目都是引用片段时，排除已展示在引文区的条目，避免重复渲染
+  const quoted = modernLiteraryQuoteItems(slide);
+  return (slide.content || []).filter((item) => !quoted.includes(item)).slice(0, 4);
 }
 
 function modernLiteraryPlainItems(slide: PptSlide): string[] {
@@ -20217,6 +20219,19 @@ defineExpose({
   min-height: 0;
 }
 
+.ppt-modern-literary--content .ppt-modern-content-body {
+  align-self: stretch;
+  align-content: center;
+  overflow: hidden;
+}
+
+.ppt-modern-literary--content .ppt-modern-content-quotes,
+.ppt-modern-literary--content .ppt-modern-explain-grid {
+  min-height: 0;
+  align-content: center;
+  overflow: hidden;
+}
+
 .ppt-modern-literary--content .ppt-modern-insight--footer {
   position: static;
   flex: 0 0 auto;
@@ -20311,6 +20326,18 @@ defineExpose({
   min-height: 0;
   max-height: 100%;
   height: 100%;
+}
+
+.ppt-modern-literary--two_column .ppt-modern-quote-strip {
+  position: static;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  padding: clamp(10px, 1.3cqi, 16px) clamp(16px, 1.8cqi, 22px);
+  font-size: clamp(12px, 1.05cqi, 16px);
+  line-height: 1.4;
 }
 
 .ppt-modern-literary--two_column .ppt-brand-footer {
