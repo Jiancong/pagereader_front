@@ -11947,7 +11947,7 @@ function modernLiteraryRightItemTitleAccentStyle(
 }
 
 function modernLiteraryDoubleItems(slide: PptSlide): string[] {
-  const items = modernLiteraryPlainItems(slide);
+  const items = (slide.content || []).filter((t) => !!modernLiteraryCleanText(t));
   return items.length === 2 ? items : [];
 }
 
@@ -11969,7 +11969,7 @@ function modernLiteraryDoubleVariant(
 }
 
 function modernLiteraryTripleItems(slide: PptSlide): string[] {
-  const items = modernLiteraryPlainItems(slide);
+  const items = (slide.content || []).filter((t) => !!modernLiteraryCleanText(t));
   return items.length === 3 ? items : [];
 }
 
