@@ -6198,6 +6198,15 @@
               </div>
               <!-- 右栏：图表 + 表格（可同时存在） -->
               <div class="ppt-content-right">
+                <PptMetricCardsRow
+                  v-if="isContentMetricChartSlide(slide)"
+                  class="ppt-data-split-metric-cards"
+                  :cards="slide.metric_cards ?? []"
+                  :page-references="slide.page_references"
+                  :card-style="metricCardStyle"
+                  :value-style="metricCardValueStyle"
+                  @ref-click="onPptTableRefClick($event, slide)"
+                />
                 <div v-if="slide.chart" class="ppt-content-chart-wrap">
                   <div class="ppt-chart-title">{{ slide.chart.title }}</div>
                   <div v-if="slide.chart.note" class="ppt-chart-note">
@@ -11423,6 +11432,7 @@ function shouldShowMetricCardsPrimaryGrid(slide: PptSlide | undefined): boolean 
 /** 无 emphasis_layout 时的 2+ 卡兜底网格（尺寸较小） */
 function shouldShowMetricCardsCompactGrid(slide: PptSlide | undefined): boolean {
   if (isHeroLeftSlide(slide)) return false;
+  if (isContentMetricChartSlide(slide)) return false;
   const cards = slideMetricCards(slide).length;
   const layout = slideEmphasisLayout(slide);
   return cards >= 2 && layout !== "metric_cards_row";
@@ -11430,10 +11440,26 @@ function shouldShowMetricCardsCompactGrid(slide: PptSlide | undefined): boolean 
 
 function shouldShowMetricCardInline(slide: PptSlide | undefined): boolean {
   if (isHeroLeftSlide(slide)) return false;
+  if (isContentMetricChartSlide(slide)) return false;
   return slideMetricCards(slide).length === 1;
 }
 
+/**
+ * data 页同时有 content + metric_cards + chart：
+ * 一侧统一展示 content，另一侧把 metric_cards 叠在图表上方。
+ * 排除显式的 metric_cards_row / metric-chart-split，以保留作者指定的布局。
+ */
+function isContentMetricChartSlide(slide: PptSlide | undefined): boolean {
+  if (!slide || slide.layout !== "data") return false;
+  if (!slide.chart) return false;
+  if ((slide.metric_cards?.length ?? 0) < 1) return false;
+  if (slideEmphasisLayout(slide) === "metric_cards_row") return false;
+  if (isMetricCardsChartSplitSlide(slide)) return false;
+  return resolveSlideBulletItems(slide).length > 0;
+}
+
 function isHeroLeftSlide(slide: PptSlide | undefined): boolean {
+  if (isContentMetricChartSlide(slide)) return false;
   return slideEmphasisLayout(slide) === "hero_left" && Boolean(slide?.hero_metric);
 }
 
@@ -11550,6 +11576,7 @@ function shouldUsePrimaryMetricCards(slide: PptSlide | undefined): boolean {
 function shouldShowHeroMetricBanner(slide: PptSlide | undefined): boolean {
   if (!slide?.hero_metric?.value && !slide?.hero_metric?.caption) return false;
   if (isHeroLeftSlide(slide)) return false;
+  if (isContentMetricChartSlide(slide)) return false;
   if (shouldShowMetricCardsPrimaryGrid(slide)) return false;
   if (shouldShowMetricCardsCompactGrid(slide)) return false;
   if (shouldShowMetricCardInline(slide)) return false;
@@ -18242,6 +18269,12 @@ defineExpose({
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+/* content + metric_cards + chart：metric_cards 叠在图表上方，图表占据剩余高度 */
+.ppt-content-right > .ppt-data-split-metric-cards {
+  flex: 0 0 auto;
+  margin-bottom: var(--ppt-gap-md);
 }
 
 .ppt-content-chart-wrap {
