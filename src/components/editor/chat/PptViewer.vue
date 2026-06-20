@@ -827,13 +827,16 @@
                     class="ppt-modern-triple-card"
                     :class="{ 'ppt-modern-triple-card--dark': ti === modernLiteraryTripleDarkIndex(slide) }"
                   >
-                    <h3>
-                      <PptMarkdownInline
-                        :text="contentPointTitle(item)"
-                        :page-references="slide.page_references"
-                        @ref-click="onPptTableRefClick($event, slide)"
-                      />
-                    </h3>
+                    <div class="ppt-modern-triple-card-head">
+                      <span class="ppt-modern-triple-card-index">{{ ti + 1 }}</span>
+                      <h3>
+                        <PptMarkdownInline
+                          :text="contentPointTitle(item)"
+                          :page-references="slide.page_references"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                      </h3>
+                    </div>
                     <PptMarkdownInline
                       class="ppt-modern-triple-card-body"
                       :text="parseContentBody(item)"
@@ -841,6 +844,15 @@
                       @ref-click="onPptTableRefClick($event, slide)"
                     />
                   </article>
+                  <PptMarkdownInline
+                    v-if="slide.key_insight"
+                    class="ppt-modern-triple-cards-insight"
+                    :text="slide.key_insight"
+                    :page-references="slide.page_references"
+                    :editable="isEditing"
+                    @blur="onCellBlur($event, `slides.${currentSlide}.key_insight`)"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
                 </template>
               </div>
 
@@ -11969,9 +11981,7 @@ function modernLiteraryInlineKeyInsight(slide: PptSlide): boolean {
   if (isModernLiteraryRightItemsContent(slide)) return true;
   if (isModernLiteraryDoubleContent(slide)) return true;
   if (isModernLiteraryQuadContent(slide)) return true;
-  if (isModernLiteraryTripleContent(slide)) {
-    return modernLiteraryTripleVariant(slide) !== "cards";
-  }
+  if (isModernLiteraryTripleContent(slide)) return true;
   return false;
 }
 
@@ -21209,44 +21219,82 @@ defineExpose({
 }
 
 .ppt-modern-triple-card {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   min-height: clamp(200px, 24cqi, 320px);
-  padding: clamp(24px, 2.8cqi, 38px) clamp(26px, 3cqi, 40px);
+  padding: clamp(22px, 2.6cqi, 34px) clamp(22px, 2.6cqi, 34px);
   border: none;
-  border-radius: 0;
-  background: var(--modern-surface);
-  box-shadow: none;
+  border-radius: 16px;
+  background: var(--modern-bg);
+  box-shadow: 0 14px 30px rgba(26, 26, 26, 0.08),
+    inset 0 0 0 1px rgba(26, 26, 26, 0.06);
+  overflow: hidden;
 }
 
 .ppt-modern-triple-card--dark {
-  color: var(--modern-bg);
   background: var(--modern-text);
-  border-left: 8px solid var(--modern-accent);
+  box-shadow: 0 16px 34px rgba(26, 26, 26, 0.28);
+}
+
+.ppt-modern-triple-card-head {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1cqi, 12px);
+  margin-bottom: clamp(10px, 1.3cqi, 16px);
+}
+
+.ppt-modern-triple-card-index {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: clamp(22px, 2.2cqi, 30px);
+  height: clamp(22px, 2.2cqi, 30px);
+  border-radius: 999px;
+  background: var(--modern-accent);
+  color: #fff;
+  font-size: clamp(12px, 1.05cqi, 16px);
+  font-weight: 900;
+  line-height: 1;
 }
 
 .ppt-modern-triple-card h3 {
-  margin: 0 0 18px;
-  color: var(--modern-accent);
+  margin: 0;
+  color: var(--modern-text);
   font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
-  font-size: clamp(22px, 2cqi, 34px);
+  font-size: clamp(20px, 1.9cqi, 30px);
   font-weight: 900;
   line-height: 1.18;
+  overflow-wrap: break-word;
 }
 
 .ppt-modern-triple-card--dark h3 {
-  color: var(--modern-bg);
+  color: var(--modern-accent);
 }
 
 .ppt-modern-triple-card-body {
   display: block;
-  color: inherit;
-  font-size: clamp(15px, 1.35cqi, 22px);
-  line-height: 1.55;
+  min-height: 0;
+  color: var(--modern-muted);
+  font-size: clamp(14px, 1.3cqi, 21px);
+  line-height: 1.5;
+  overflow-wrap: break-word;
 }
 
 .ppt-modern-triple-card--dark .ppt-modern-triple-card-body {
   color: rgba(253, 252, 248, 0.86);
+}
+
+.ppt-modern-triple-cards-insight {
+  display: block;
+  grid-column: 1 / -1;
+  margin-top: clamp(6px, 0.9cqi, 12px);
+  color: var(--modern-muted);
+  font-size: clamp(13px, 1.18cqi, 19px);
+  font-style: italic;
+  line-height: 1.45;
+  text-align: center;
+  overflow-wrap: break-word;
 }
 
 /* ── 4-items 卡片矩阵：numbered / panel / grid 三种形态按页轮换 ── */
