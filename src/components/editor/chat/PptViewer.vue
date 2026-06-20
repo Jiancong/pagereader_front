@@ -825,7 +825,7 @@
                     v-for="(item, ti) in modernLiteraryTripleItems(slide)"
                     :key="'modern-card-' + ti"
                     class="ppt-modern-triple-card"
-                    :class="{ 'ppt-modern-triple-card--dark': ti === 1 }"
+                    :class="{ 'ppt-modern-triple-card--dark': ti === modernLiteraryTripleDarkIndex(slide) }"
                   >
                     <h3>
                       <PptMarkdownInline
@@ -11908,6 +11908,11 @@ function modernLiteraryTriplePrefersCards(slide: PptSlide): boolean {
   return maxLen > 56 || avgLen > 40;
 }
 
+function modernLiteraryTripleDarkIndex(slide: PptSlide): number {
+  const n = Number(slide.index || currentSlide.value + 1);
+  return Math.abs(n - 1) % 3;
+}
+
 function modernLiteraryTripleVariant(slide: PptSlide): "portrait" | "orbit" | "cards" {
   const hinted = slideEmphasisLayout(slide);
   const prefersCards = modernLiteraryTriplePrefersCards(slide);
@@ -20302,7 +20307,10 @@ defineExpose({
 }
 
 .ppt-modern-literary--two_column .ppt-modern-document-figure-img {
-  max-height: min(240px, 100%);
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  height: 100%;
 }
 
 .ppt-modern-literary--two_column .ppt-brand-footer {
@@ -21284,12 +21292,12 @@ defineExpose({
 .ppt-modern-document-figure {
   display: flex;
   min-height: 285px;
-  max-height: 330px;
+  max-height: none;
   margin: 0;
   padding: 12px;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: stretch;
   gap: 10px;
   background: var(--modern-bg);
 }
@@ -21297,8 +21305,11 @@ defineExpose({
 .ppt-modern-document-figure-img {
   display: block;
   width: 100%;
+  height: 100%;
   max-width: 100%;
-  max-height: 268px;
+  max-height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
   object-fit: contain;
   background: var(--modern-bg);
 }
