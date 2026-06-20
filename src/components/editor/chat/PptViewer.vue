@@ -845,6 +845,55 @@
               </div>
 
               <div
+                v-else-if="isModernLiteraryQuadContent(slide)"
+                class="ppt-modern-quad"
+                :class="`ppt-modern-quad--${modernLiteraryQuadVariant(slide)}`"
+              >
+                <div class="ppt-modern-quad-grid">
+                  <article
+                    v-for="(item, qi) in modernLiteraryQuadItems(slide)"
+                    :key="'modern-quad-' + qi"
+                    class="ppt-modern-quad-card"
+                  >
+                    <div
+                      v-if="modernLiteraryQuadVariant(slide) === 'numbered'"
+                      class="ppt-modern-quad-index"
+                    >
+                      {{ "0" + (qi + 1) }}
+                    </div>
+                    <div
+                      v-else-if="modernLiteraryQuadVariant(slide) === 'panel'"
+                      class="ppt-modern-quad-kicker"
+                    >
+                      {{ "0" + (qi + 1) }}
+                    </div>
+                    <PptMarkdownInline
+                      class="ppt-modern-quad-title"
+                      :text="contentPointTitle(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                    <PptMarkdownInline
+                      v-if="hasContentPointBody(item)"
+                      class="ppt-modern-quad-body"
+                      :text="parseContentBody(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </article>
+                </div>
+                <PptMarkdownInline
+                  v-if="slide.key_insight"
+                  class="ppt-modern-quad-insight"
+                  :text="slide.key_insight"
+                  :page-references="slide.page_references"
+                  :editable="isEditing"
+                  @blur="onCellBlur($event, `slides.${currentSlide}.key_insight`)"
+                  @ref-click="onPptTableRefClick($event, slide)"
+                />
+              </div>
+
+              <div
                 v-else-if="isModernLiteraryMultiContent(slide)"
                 class="ppt-modern-multi"
               >
@@ -987,9 +1036,9 @@
                   </div>
                 </section>
               </div>
-              <div v-if="modernLiteraryFooterQuote(slide)" class="ppt-modern-quote-strip">
+              <div v-if="modernLiteraryTwoColumnFooter(slide)" class="ppt-modern-quote-strip">
                 <PptMarkdownInline
-                  :text="modernLiteraryFooterQuote(slide)"
+                  :text="modernLiteraryTwoColumnFooter(slide)"
                   :page-references="slide.page_references"
                   @ref-click="onPptTableRefClick($event, slide)"
                 />
@@ -11784,11 +11833,17 @@ function modernLiteraryQuoteItems(slide: PptSlide): string[] {
 }
 
 function modernLiteraryBodyItems(slide: PptSlide): string[] {
-  const items = (slide.content || []).filter((item) => !isModernLiteraryQuotedFragment(item));
-  if (items.length) return items.slice(0, 4);
-  // 兜底：全部条目都是引用片段时，排除已展示在引文区的条目，避免重复渲染
-  const quoted = modernLiteraryQuoteItems(slide);
-  return (slide.content || []).filter((item) => !quoted.includes(item)).slice(0, 4);
+  const all = slide.content || [];
+  // 引文区已展示的条目（按清洗后文本去重），卡片区一律排除，避免重复渲染
+  const usedInQuotes = new Set(
+    modernLiteraryQuoteItems(slide).map((t) => modernLiteraryCleanText(t)).filter(Boolean)
+  );
+  const available = all.filter(
+    (item) => !usedInQuotes.has(modernLiteraryCleanText(item))
+  );
+  const nonQuoted = available.filter((item) => !isModernLiteraryQuotedFragment(item));
+  // 优先展示非引文条目；若全部都是引文片段，则展示引文区之外剩余的条目
+  return (nonQuoted.length ? nonQuoted : available).slice(0, 4);
 }
 
 function modernLiteraryPlainItems(slide: PptSlide): string[] {
@@ -11802,6 +11857,25 @@ function modernLiteraryMultiItems(slide: PptSlide): string[] {
 
 function isModernLiteraryMultiContent(slide: PptSlide): boolean {
   return slide.layout === "content" && modernLiteraryMultiItems(slide).length > 3;
+}
+
+/** 恰好/超过 4 条 content 时，用卡片矩阵呈现（不过滤引用片段，避免拆成引文+卡片重复） */
+function modernLiteraryQuadItems(slide: PptSlide): string[] {
+  return (slide.content || []).filter((t) => !!modernLiteraryCleanText(t)).slice(0, 4);
+}
+
+function isModernLiteraryQuadContent(slide: PptSlide): boolean {
+  return slide.layout === "content" && modernLiteraryQuadItems(slide).length >= 4;
+}
+
+function modernLiteraryQuadVariant(slide: PptSlide): "numbered" | "panel" | "grid" {
+  const hinted = slideEmphasisLayout(slide);
+  if (hinted.includes("number")) return "numbered";
+  if (hinted.includes("panel") || hinted.includes("card")) return "panel";
+  if (hinted.includes("grid")) return "grid";
+  const variants = ["numbered", "panel", "grid"] as const;
+  const n = Number(slide.index || currentSlide.value + 1);
+  return variants[Math.abs(n - 1) % variants.length];
 }
 
 type ModernLiteraryRightItem = NonNullable<PptSlide["right_items"]>[number];
@@ -11894,6 +11968,7 @@ function isModernLiteraryTripleContent(slide: PptSlide): boolean {
 function modernLiteraryInlineKeyInsight(slide: PptSlide): boolean {
   if (isModernLiteraryRightItemsContent(slide)) return true;
   if (isModernLiteraryDoubleContent(slide)) return true;
+  if (isModernLiteraryQuadContent(slide)) return true;
   if (isModernLiteraryTripleContent(slide)) {
     return modernLiteraryTripleVariant(slide) !== "cards";
   }
@@ -11943,6 +12018,25 @@ function modernLiteraryRightItems(slide: PptSlide): string[] {
 
 function modernLiteraryFooterQuote(slide: PptSlide): string {
   return modernLiteraryQuoteItems(slide)[0] || "";
+}
+
+/**
+ * two_column 底部金句：优先用 key_insight，回退到引文片段。
+ * content 为空时会被规范化成 left_content，导致 footer quote 与左栏首条重复，
+ * 因此这里排除任何已展示在左/右栏的文本，避免重复渲染。
+ */
+function modernLiteraryTwoColumnFooter(slide: PptSlide): string {
+  const used = new Set(
+    [...(slide.left_content || []), ...(slide.right_content || [])]
+      .map((t) => modernLiteraryCleanText(t))
+      .filter(Boolean)
+  );
+  const candidates = [slide.key_insight || "", modernLiteraryFooterQuote(slide)];
+  for (const candidate of candidates) {
+    const clean = modernLiteraryCleanText(candidate);
+    if (clean && !used.has(clean)) return candidate;
+  }
+  return "";
 }
 
 function modernLiteraryCompareTitleDuplicatesSlide(
@@ -20211,6 +20305,7 @@ defineExpose({
 }
 
 .ppt-modern-literary--content .ppt-modern-multi,
+.ppt-modern-literary--content .ppt-modern-quad,
 .ppt-modern-literary--content .ppt-modern-double,
 .ppt-modern-literary--content .ppt-modern-triple,
 .ppt-modern-literary--content .ppt-modern-content-body,
@@ -21152,6 +21247,135 @@ defineExpose({
 
 .ppt-modern-triple-card--dark .ppt-modern-triple-card-body {
   color: rgba(253, 252, 248, 0.86);
+}
+
+/* ── 4-items 卡片矩阵：numbered / panel / grid 三种形态按页轮换 ── */
+.ppt-modern-quad {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1.6cqi, 20px);
+  align-self: stretch;
+  width: 100%;
+  min-height: 0;
+}
+
+.ppt-modern-quad-grid {
+  display: grid;
+  flex: 1 1 auto;
+  gap: clamp(14px, 1.8cqi, 22px);
+  min-height: 0;
+}
+
+.ppt-modern-quad--numbered .ppt-modern-quad-grid,
+.ppt-modern-quad--panel .ppt-modern-quad-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ppt-modern-quad--grid .ppt-modern-quad-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+}
+
+.ppt-modern-quad-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: clamp(18px, 2.2cqi, 30px) clamp(18px, 2.2cqi, 28px);
+  background: var(--modern-bg);
+  box-shadow: inset 0 0 0 1px rgba(26, 26, 26, 0.08);
+  overflow: hidden;
+}
+
+.ppt-modern-quad--numbered .ppt-modern-quad-card {
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(26, 26, 26, 0.08);
+}
+
+.ppt-modern-quad-index {
+  margin-bottom: clamp(4px, 0.8cqi, 10px);
+  color: color-mix(in srgb, var(--modern-accent) 32%, transparent);
+  font-family: var(--ppt-font-display, "Playfair Display", serif);
+  font-size: clamp(30px, 3.6cqi, 56px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ppt-modern-quad--panel .ppt-modern-quad-card {
+  border-bottom: 5px solid var(--modern-accent);
+}
+
+.ppt-modern-quad-kicker {
+  margin-bottom: clamp(6px, 0.9cqi, 12px);
+  color: var(--modern-accent);
+  font-size: clamp(13px, 1.15cqi, 17px);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.ppt-modern-quad--grid .ppt-modern-quad-card {
+  border-radius: 16px;
+  border-left: 8px solid var(--modern-accent);
+  background: color-mix(in srgb, var(--modern-surface) 72%, var(--modern-bg) 28%);
+  box-shadow: none;
+}
+
+.ppt-modern-quad--grid .ppt-modern-quad-card:first-child .ppt-modern-quad-title {
+  color: var(--modern-accent);
+}
+
+.ppt-modern-quad-title {
+  display: block;
+  margin-bottom: clamp(6px, 0.8cqi, 10px);
+  color: var(--modern-text);
+  font-family: var(--ppt-font-heading, "ZCOOL XiaoWei", "Playfair Display", serif);
+  font-size: clamp(17px, 1.7cqi, 26px);
+  font-weight: 900;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+.ppt-modern-quad-body {
+  display: block;
+  color: var(--modern-muted);
+  font-size: clamp(12px, 1.08cqi, 17px);
+  font-style: italic;
+  line-height: 1.42;
+  overflow-wrap: break-word;
+}
+
+.ppt-modern-quad-insight {
+  display: block;
+  flex: 0 0 auto;
+  overflow-wrap: break-word;
+}
+
+.ppt-modern-quad--numbered .ppt-modern-quad-insight {
+  color: var(--modern-muted);
+  font-size: clamp(13px, 1.2cqi, 19px);
+  font-style: italic;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.ppt-modern-quad--panel .ppt-modern-quad-insight {
+  padding: clamp(14px, 1.6cqi, 20px) clamp(20px, 2.2cqi, 30px);
+  border-left: 8px solid var(--modern-accent);
+  color: var(--modern-bg);
+  background: var(--modern-text);
+  font-size: clamp(13px, 1.2cqi, 19px);
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.ppt-modern-quad--grid .ppt-modern-quad-insight {
+  padding: clamp(12px, 1.4cqi, 18px) clamp(18px, 2cqi, 26px);
+  border-left: 8px solid var(--modern-accent);
+  color: var(--modern-text);
+  background: var(--modern-surface);
+  font-size: clamp(13px, 1.15cqi, 18px);
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1.38;
 }
 
 .ppt-modern-multi {
