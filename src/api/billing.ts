@@ -4,7 +4,7 @@
 import { ApiError } from "./client"
 import { CREDITS_INSUFFICIENT, type PptQueue, type SubscribeMyStatus } from "./types"
 
-/** 各队列单次生成扣费（与定价页一致） */
+/** 各生成模式单次扣费（与定价页一致） */
 export const QUEUE_CREDIT_COST: Record<PptQueue, number> = {
   CARD: 60,
   DOCUMENT: 30,

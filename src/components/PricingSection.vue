@@ -208,6 +208,7 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Loader2, HardDrive, ChevronUp } from 'lucide-vue-next'
 import { pricingApi, formatHkd, resolveWechatMonthlyHkd } from '@/api'
+import { QUEUE_CREDIT_COST } from '@/api/billing'
 import { isPaypalConfigured, renderPaypalSubscribeButton } from '@/utils/paypalSubscribe'
 import { notifyCreditsRefresh } from '@/composables/useCreditsRefresh'
 import WechatPayModal from '@/components/billing/WechatPayModal.vue'
@@ -263,8 +264,8 @@ const rolloverParams = computed(() => {
 })
 
 const creditCostParams = computed(() => ({
-  slow: 30,
-  fast: 60,
+  card: QUEUE_CREDIT_COST.CARD,
+  document: QUEUE_CREDIT_COST.DOCUMENT,
   daily: 30,
 }))
 
@@ -282,8 +283,8 @@ const faqItems = computed(() => {
         {
           type: 'ul',
           items: [
-            { key: 'pricing.faq.credits.liSlow', params: cp },
-            { key: 'pricing.faq.credits.liFast', params: cp },
+            { key: 'pricing.faq.credits.liDocument', params: cp },
+            { key: 'pricing.faq.credits.liCard', params: cp },
             { key: 'pricing.faq.credits.liDaily', params: cp },
             { key: 'pricing.faq.credits.liFollowUp' },
           ],
@@ -323,32 +324,15 @@ const faqItems = computed(() => {
       blocks: [{ type: 'p', key: 'pricing.faq.renewal.p' }],
     },
     {
-      id: 'slow',
-      questionKey: 'pricing.faq.slow.q',
+      id: 'modes',
+      questionKey: 'pricing.faq.modes.q',
       blocks: [
-        { type: 'p', key: 'pricing.faq.slow.disclosure' },
-        { type: 'strong', key: 'pricing.faq.slow.queueTitle' },
-        { type: 'p', key: 'pricing.faq.slow.queueP', params: cp },
-        { type: 'strong', key: 'pricing.faq.slow.priorityTitle' },
-        { type: 'p', key: 'pricing.faq.slow.priorityP' },
-        {
-          type: 'ul',
-          items: [
-            { key: 'pricing.faq.slow.liPro' },
-            { key: 'pricing.faq.slow.liStarter' },
-            { key: 'pricing.faq.slow.liFree' },
-          ],
-        },
-        { type: 'strong', key: 'pricing.faq.slow.timeTitle' },
-        { type: 'p', key: 'pricing.faq.slow.timeP' },
-        {
-          type: 'ul',
-          items: [
-            { key: 'pricing.faq.slow.liIdle' },
-            { key: 'pricing.faq.slow.liPeak' },
-            { key: 'pricing.faq.slow.liFast', params: cp },
-          ],
-        },
+        { type: 'p', key: 'pricing.faq.modes.intro' },
+        { type: 'strong', key: 'pricing.faq.modes.documentTitle' },
+        { type: 'p', key: 'pricing.faq.modes.documentP', params: cp },
+        { type: 'strong', key: 'pricing.faq.modes.cardTitle' },
+        { type: 'p', key: 'pricing.faq.modes.cardP', params: cp },
+        { type: 'p', key: 'pricing.faq.modes.tip' },
       ],
     },
     {
@@ -365,16 +349,16 @@ function toggleFaq(id) {
 
 const usageItems = computed(() => [
   {
-    key: 'slow',
-    title: t('pricing.usageSlow'),
-    credits: t('pricing.usageSlowCredits'),
-    desc: t('pricing.usageSlowDesc'),
+    key: 'document',
+    title: t('pricing.usageDocument'),
+    credits: t('pricing.usageDocumentCredits'),
+    desc: t('pricing.usageDocumentDesc'),
   },
   {
-    key: 'fast',
-    title: t('pricing.usageFast'),
-    credits: t('pricing.usageFastCredits'),
-    desc: t('pricing.usageFastDesc'),
+    key: 'card',
+    title: t('pricing.usageCard'),
+    credits: t('pricing.usageCardCredits'),
+    desc: t('pricing.usageCardDesc'),
   },
 ])
 
@@ -398,7 +382,7 @@ function localizeFreePlan(plan) {
     isFree: true,
     displayName: isZh && plan.displayName ? plan.displayName : t('pricing.freeName'),
     tagline: isZh && plan.tagline ? plan.tagline : t('pricing.freeBadge'),
-    highlights: isZh && plan.highlights?.length ? plan.highlights : i18nHighlights,
+    highlights: i18nHighlights,
     ctaKey: 'pricing.freeCta',
   }
 }
@@ -431,7 +415,7 @@ function localizePaidPlan(plan) {
     displayName: isZh && plan.displayName ? plan.displayName : t(`pricing.${kind}Name`),
     tagline: isZh && plan.tagline ? plan.tagline : t(`pricing.${kind}Badge`),
     recommended: plan.recommended ?? kind === 'pro',
-    highlights: isZh && plan.highlights?.length ? plan.highlights : i18nHighlights,
+    highlights: i18nHighlights,
     ctaKey: `pricing.${kind}Cta`,
   }
 }
