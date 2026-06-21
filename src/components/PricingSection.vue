@@ -34,7 +34,10 @@
       <p class="mb-6 text-center text-sm font-medium text-muted-foreground">{{ t('pricing.packsTitle') }}</p>
       <p class="mb-8 text-center text-xs text-muted-foreground">{{ t('pricing.packsHint') }}</p>
 
-      <div class="mx-auto grid max-w-4xl gap-6 md:grid-cols-2 md:gap-8">
+      <div
+        class="mx-auto grid gap-6 md:gap-8"
+        :class="displayPlans.length >= 3 ? 'max-w-6xl md:grid-cols-3' : 'max-w-4xl md:grid-cols-2'"
+      >
         <div
           v-for="plan in displayPlans"
           :key="plan.planType"
@@ -56,7 +59,9 @@
           </span>
           <h3 class="text-xl font-bold text-foreground">{{ plan.displayName }}</h3>
           <p class="mt-2 text-3xl font-bold tracking-tight text-foreground">
-            <template v-if="plan.isFree">{{ t('pricing.freeName') }}</template>
+            <template v-if="isFreePlan(plan)">
+              {{ t('pricing.freePrice') }}
+            </template>
             <template v-else>
               ${{ plan.monthly?.recurringMonth ?? '—' }}<span class="text-base font-normal text-muted-foreground">/mo</span>
             </template>
@@ -78,7 +83,7 @@
           </ul>
 
           <button
-            v-if="plan.isFree"
+            v-if="isFreePlan(plan)"
             type="button"
             class="mt-8 w-full rounded-xl border border-border bg-secondary/50 py-3 text-sm font-semibold text-foreground transition-all hover:border-primary/50"
             @click="onSelectPlan(plan.planType)"
@@ -375,9 +380,27 @@ const usageItems = computed(() => [
 
 function planKind(plan) {
   const key = String(plan.planType || '').toUpperCase()
+  if (key.includes('FREE')) return 'free'
   if (key.includes('STARTER') || key.includes('BASIC')) return 'starter'
   if (key.includes('PRO')) return 'pro'
   return null
+}
+
+function isFreePlan(plan) {
+  return planKind(plan) === 'free' || Boolean(plan.isFree)
+}
+
+function localizeFreePlan(plan) {
+  const isZh = String(locale.value || '').startsWith('zh')
+  const i18nHighlights = [t('pricing.freeF1'), t('pricing.freeF2'), t('pricing.freeF3')]
+  return {
+    ...plan,
+    isFree: true,
+    displayName: isZh && plan.displayName ? plan.displayName : t('pricing.freeName'),
+    tagline: isZh && plan.tagline ? plan.tagline : t('pricing.freeBadge'),
+    highlights: isZh && plan.highlights?.length ? plan.highlights : i18nHighlights,
+    ctaKey: 'pricing.freeCta',
+  }
 }
 
 /** 付费套餐：中文优先用 API 文案，英文走 i18n */
@@ -415,7 +438,9 @@ function localizePaidPlan(plan) {
 
 const displayPlans = computed(() => {
   void locale.value
-  return apiPlans.value.map((plan) => localizePaidPlan(plan))
+  return apiPlans.value.map((plan) =>
+    isFreePlan(plan) ? localizeFreePlan(plan) : localizePaidPlan(plan),
+  )
 })
 
 const wechatBillingNote = computed(() => {
@@ -453,6 +478,12 @@ function storageLabel(plan) {
 }
 
 function creditsLabel(plan) {
+  if (isFreePlan(plan)) {
+    if (String(locale.value || '').startsWith('zh') && plan.credits?.description) {
+      return plan.credits.description
+    }
+    return t('pricing.freeCredits')
+  }
   const monthly = plan.credits?.monthlyFastCredits
   const daily = plan.credits?.dailyFreeCredits
   if (String(locale.value || '').startsWith('zh') && plan.credits?.description) {
@@ -487,6 +518,7 @@ async function mountPaypalButtons() {
   if (!props.userId || !paypalReady) return
   await nextTick()
   for (const plan of displayPlans.value) {
+    if (isFreePlan(plan)) continue
     const planId = paypalPlanId(plan)
     const el = document.getElementById(paypalContainerId(plan.planType))
     if (!planId || !el) continue
