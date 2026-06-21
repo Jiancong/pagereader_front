@@ -217,11 +217,11 @@ export default {
     usageFastCredits: "60 credits / run",
     usageFastDesc: "Package credits only—priority processing when you need results fast.",
     packsTitle: "Plans",
-    packsHint: "Start free, or subscribe monthly for more credits and storage.",
+    packsHint: "Subscribe to Starter or Pro for more credits and storage (Free tier is not listed here—sign up to use it).",
     starterName: "Starter",
     starterBadge: "Try it",
     starterPrice: "$9.9 / mo",
-    starterCredits: "300 credits / month",
+    starterCredits: "900 credits / month",
     starterEquiv: "~10 slow or ~5 fast decks",
     starterDaily: "60 daily free credits (slow queue priority)",
     starterF1: "Great for your first book analysis",
@@ -231,7 +231,7 @@ export default {
     proName: "Pro",
     proBadge: "Best value",
     proPrice: "$29.9 / mo",
-    proCredits: "1,500 credits / month",
+    proCredits: "3,000 credits / month",
     proEquiv: "~50 slow or ~25 fast decks",
     proDaily: "90 daily free credits (slow queue priority)",
     proF1: "Reading, teaching, and research workflows",
@@ -241,10 +241,13 @@ export default {
     contactHint: "Team volume, invoicing, or custom plans?",
     contactCta: "Contact sales",
     footnote:
-      "PayPal for international checkout; WeChat scan for China. Credits and queue rules apply in the workspace.",
+      "PayPal auto-renews each billing cycle. WeChat is a one-time monthly purchase—repurchase when it expires. Credits and queue rules apply in the workspace.",
     loadingPlans: "Loading plans…",
     loadPlansFailed: "Could not load plans. Please refresh.",
     creditsPerMonth: "{n} credits / month",
+    creditsPerMonthWithDaily: "{monthly} credits / month + {daily} daily free credits",
+    wechatBillingNote: "WeChat: one-time monthly payment, valid 1 month, no auto-renewal",
+    paypalBillingNote: "PayPal: auto-renewing subscription, billed each cycle",
     paypalNotConfigured: "PayPal is not configured",
     subscribeSuccess: "Subscription successful! Your credits are updated—you're ready to go.",
     dailyFreeNote: "30 free credits / day · slow queue only",
@@ -283,11 +286,11 @@ export default {
         liRoll:
           "Unused package credits from your monthly plan roll over to the next billing cycle, subject to a <strong>maximum rollover cap</strong>.",
         liCap:
-          "<strong>The cap:</strong> Your package credit balance cannot exceed <strong>2×</strong> your current plan's monthly allocation.",
+          "<strong>The cap:</strong> Your package balance cannot exceed your plan's <strong>max rollover</strong> (Starter 900, Pro 3,000).",
         liHow:
           "<strong>On renewal:</strong> If rollover plus new monthly credits exceed the cap, the excess expires on your renewal date.",
         liExample:
-          "<strong>Example:</strong> Starter plan ({monthly} credits/month), cap {cap}. With {remain} credits left at renewal, balance is capped at {cap} and {surplus} credits expire.",
+          "<strong>Example:</strong> Starter ({monthly} credits/month), cap {cap}. With {remain} credits left at renewal, balance is capped at {cap} and {surplus} credits expire.",
         dailyTitle: "Daily free credits",
         dailyP:
           "{daily} free credits per day apply to the slow queue only—they <strong>do not roll over</strong> and reset each day.",
@@ -301,7 +304,7 @@ export default {
       },
       renewal: {
         q: "Is my subscription automatically renewed?",
-        p: "Yes. PayPal and WeChat scan subscriptions renew at the end of each billing cycle. Cancel anytime from workspace billing or PayPal; access continues through the current period.",
+        p: "<strong>PayPal:</strong> Auto-renews each billing cycle; cancel anytime from workspace billing or PayPal—access continues through the current period.<br><strong>WeChat:</strong> One-time monthly payment for 1 month of access—<strong>does not auto-renew</strong>; purchase again when it expires.",
       },
       slow: {
         q: 'How does the slow queue work? (Fair usage)',

@@ -317,18 +317,43 @@ export interface PricingPlanMonthly {
 
 export interface PricingPlanCredits {
   monthlyFastCredits?: number
+  dailyFreeCredits?: number
+  maxConcurrentTasks?: number
+  maxRollover?: number
+  description?: string
+}
+
+export interface PricingPlanStorage {
+  limitMb?: number
+  description?: string
 }
 
 export interface PricingPlan {
   planType: string
+  planName?: string
   displayName: string
-  tagline?: string
+  tagline?: string | null
   recommended?: boolean
   visible?: boolean
   monthly?: PricingPlanMonthly
   credits?: PricingPlanCredits
+  storage?: PricingPlanStorage
   highlights?: string[]
   paypalPlanIds?: string[]
+  paypalProductId?: string
+}
+
+export interface PricingBillingMeta {
+  model?: string
+  autoRenew?: boolean
+  description?: string
+}
+
+export interface PricingConfig {
+  plans?: PricingPlan[]
+  wechatBilling?: PricingBillingMeta
+  paypalBilling?: PricingBillingMeta
+  oneTimePasses?: unknown[]
 }
 
 export interface CreateUserSubscriptionReq {

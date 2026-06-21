@@ -34,7 +34,7 @@
       <p class="mb-6 text-center text-sm font-medium text-muted-foreground">{{ t('pricing.packsTitle') }}</p>
       <p class="mb-8 text-center text-xs text-muted-foreground">{{ t('pricing.packsHint') }}</p>
 
-      <div class="grid gap-6 md:grid-cols-3 md:gap-8">
+      <div class="mx-auto grid max-w-4xl gap-6 md:grid-cols-2 md:gap-8">
         <div
           v-for="plan in displayPlans"
           :key="plan.planType"
@@ -94,6 +94,12 @@
             <WechatPayButton @click="openWechat(plan)">
               {{ t('pricing.wechatPay') }}
             </WechatPayButton>
+            <p v-if="wechatBillingNote" class="text-center text-xs text-muted-foreground">
+              {{ wechatBillingNote }}
+            </p>
+            <p v-if="paypalBillingNote" class="text-center text-xs text-muted-foreground">
+              {{ paypalBillingNote }}
+            </p>
             <p v-if="wechatPriceLine(plan)" class="text-center text-xs text-muted-foreground">
               {{ wechatPriceLine(plan) }}
             </p>
@@ -214,6 +220,7 @@ const { t, locale } = useI18n()
 const plansLoading = ref(true)
 const plansError = ref(null)
 const apiPlans = ref([])
+const pricingConfig = ref(null)
 const subscribeSuccess = ref(null)
 const subscribeSuccessEl = ref(null)
 const paypalReady = isPaypalConfigured()
@@ -222,20 +229,30 @@ const wechatPlanType = ref('')
 const wechatPlanName = ref('')
 const openFaqId = ref(null)
 
-/** 结转示例：取体验包月积分，默认 300 */
+/** 结转示例：取体验包月积分与结转上限，默认 900 */
 const rolloverExampleMonthly = computed(() => {
   const starter = apiPlans.value.find((p) => {
     const key = String(p.planType || '').toUpperCase()
     return key.includes('STARTER') || key.includes('BASIC')
   })
   const n = Number(starter?.credits?.monthlyFastCredits)
-  return Number.isFinite(n) && n > 0 ? n : 300
+  return Number.isFinite(n) && n > 0 ? n : 900
+})
+
+const rolloverExampleCap = computed(() => {
+  const starter = apiPlans.value.find((p) => {
+    const key = String(p.planType || '').toUpperCase()
+    return key.includes('STARTER') || key.includes('BASIC')
+  })
+  const cap = Number(starter?.credits?.maxRollover)
+  if (Number.isFinite(cap) && cap > 0) return cap
+  return rolloverExampleMonthly.value
 })
 
 const rolloverParams = computed(() => {
   const monthly = rolloverExampleMonthly.value
-  const cap = monthly * 2
-  const remain = Math.round(monthly * 1.17)
+  const cap = rolloverExampleCap.value
+  const remain = Math.round(monthly * 0.5)
   const surplus = Math.max(remain + monthly - cap, 0)
   return { monthly, cap, remain, surplus }
 })
@@ -363,12 +380,13 @@ function planKind(plan) {
   return null
 }
 
-/** 付费套餐文案走 i18n；价格/积分仍来自 API */
+/** 付费套餐：中文优先用 API 文案，英文走 i18n */
 function localizePaidPlan(plan) {
   const kind = planKind(plan)
   if (!kind) return plan
 
-  const highlights =
+  const isZh = String(locale.value || '').startsWith('zh')
+  const i18nHighlights =
     kind === 'starter'
       ? [
           t('pricing.starterEquiv'),
@@ -387,33 +405,37 @@ function localizePaidPlan(plan) {
 
   return {
     ...plan,
-    displayName: t(`pricing.${kind}Name`),
-    tagline: t(`pricing.${kind}Badge`),
-    highlights,
+    displayName: isZh && plan.displayName ? plan.displayName : t(`pricing.${kind}Name`),
+    tagline: isZh && plan.tagline ? plan.tagline : t(`pricing.${kind}Badge`),
+    recommended: plan.recommended ?? kind === 'pro',
+    highlights: isZh && plan.highlights?.length ? plan.highlights : i18nHighlights,
     ctaKey: `pricing.${kind}Cta`,
   }
 }
 
-const freePlan = computed(() => ({
-  planType: 'FREE',
-  isFree: true,
-  displayName: t('pricing.freeName'),
-  tagline: t('pricing.freeBadge'),
-  recommended: false,
-  monthly: { recurringMonth: 0 },
-  highlights: [t('pricing.freeF1'), t('pricing.freeF2'), t('pricing.freeF3')],
-}))
-
 const displayPlans = computed(() => {
-  // 切换语言时重新映射 API 套餐文案
   void locale.value
-  return [freePlan.value, ...apiPlans.value.map((plan) => localizePaidPlan(plan))]
+  return apiPlans.value.map((plan) => localizePaidPlan(plan))
+})
+
+const wechatBillingNote = computed(() => {
+  const fromApi = pricingConfig.value?.wechatBilling?.description
+  if (fromApi && String(locale.value || '').startsWith('zh')) return fromApi
+  return t('pricing.wechatBillingNote')
+})
+
+const paypalBillingNote = computed(() => {
+  const fromApi = pricingConfig.value?.paypalBilling?.description
+  if (fromApi && String(locale.value || '').startsWith('zh')) return fromApi
+  return t('pricing.paypalBillingNote')
 })
 
 /** 各档云空间（MB）：FREE 100 / Starter 1000 / PRO 5000，按 planType 关键字匹配，价格兜底 */
 const STORAGE_MB_BY_PLAN = { FREE: 100, STARTER: 1000, PRO: 5000 }
 
 function storageMbForPlan(plan) {
+  const fromApi = Number(plan.storage?.limitMb)
+  if (Number.isFinite(fromApi) && fromApi > 0) return fromApi
   const key = String(plan.planType || '').toUpperCase()
   if (STORAGE_MB_BY_PLAN[key] != null) return STORAGE_MB_BY_PLAN[key]
   if (key.includes('FREE') || plan.isFree) return STORAGE_MB_BY_PLAN.FREE
@@ -431,8 +453,15 @@ function storageLabel(plan) {
 }
 
 function creditsLabel(plan) {
-  if (plan.isFree) return t('pricing.freeCredits')
-  return t('pricing.creditsPerMonth', { n: plan.credits?.monthlyFastCredits ?? '—' })
+  const monthly = plan.credits?.monthlyFastCredits
+  const daily = plan.credits?.dailyFreeCredits
+  if (String(locale.value || '').startsWith('zh') && plan.credits?.description) {
+    return plan.credits.description
+  }
+  if (daily != null && monthly != null) {
+    return t('pricing.creditsPerMonthWithDaily', { monthly, daily })
+  }
+  return t('pricing.creditsPerMonth', { n: monthly ?? '—' })
 }
 
 function wechatPriceLine(plan) {
@@ -474,7 +503,9 @@ async function mountPaypalButtons() {
 
 onMounted(async () => {
   try {
-    apiPlans.value = await pricingApi.getPlans()
+    const config = await pricingApi.getPricingConfig()
+    pricingConfig.value = config
+    apiPlans.value = config.plans
   } catch (e) {
     plansError.value = e?.message || t('pricing.loadPlansFailed')
   } finally {
