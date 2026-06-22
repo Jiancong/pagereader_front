@@ -66,14 +66,23 @@ function unwrapArtifactEnvelope(obj: Record<string, unknown>): Record<string, un
   return isEnvelope ? (payload as Record<string, unknown>) : obj
 }
 
-async function fetchPptJson(url: string): Promise<Record<string, unknown> | null> {
+type FetchedPptArtifact = {
+  deck: Record<string, unknown> | null
+  markdown?: string
+}
+
+async function fetchPptArtifact(url: string): Promise<FetchedPptArtifact | null> {
   const res = await fetch(url, { credentials: "omit" })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const json = await res.json()
   const obj = asRecord(json)
   if (!obj) return null
   const unwrapped = unwrapArtifactEnvelope(obj)
-  return normalizeDeckFromArtifact(unwrapped)
+  const markdown = pickMarkdownFromPayload(unwrapped) ?? pickMarkdownFromPayload(obj) ?? undefined
+  return {
+    deck: normalizeDeckFromArtifact(unwrapped),
+    markdown,
+  }
 }
 
 /** 将 complete 顶层元数据合并进 deck（chapter_images 等） */
@@ -120,7 +129,7 @@ export async function resolvePptDataFromStreamComplete(
 ): Promise<PptStreamCompleteResult | null> {
   const root = asRecord(payload)
   if (!root) return null
-  const markdown = pickMarkdownFromPayload(root) ?? undefined
+  let markdown = pickMarkdownFromPayload(root) ?? undefined
 
   const nested = asRecord(root.pptData) ?? asRecord(root.ppt_data)
   const projectId =
@@ -144,18 +153,26 @@ export async function resolvePptDataFromStreamComplete(
     }
     const nestedUrl = pickArtifactUrl({ ppt_data: nested, ppt_data_artifact: root.ppt_data_artifact })
     if (nestedUrl) {
-      const fetched = await fetchPptJson(nestedUrl)
-      if (fetched) {
-        return { pptData: finalizePptData(fetched, root), projectId, markdown }
+      const fetched = await fetchPptArtifact(nestedUrl)
+      if (fetched?.deck) {
+        return {
+          pptData: finalizePptData(fetched.deck, root),
+          projectId,
+          markdown: markdown ?? fetched.markdown,
+        }
       }
     }
   }
 
   const url = pickArtifactUrl(root)
   if (url) {
-    const fetched = await fetchPptJson(url)
-    if (fetched) {
-      return { pptData: finalizePptData(fetched, root), projectId, markdown }
+    const fetched = await fetchPptArtifact(url)
+    if (fetched?.deck) {
+      return {
+        pptData: finalizePptData(fetched.deck, root),
+        projectId,
+        markdown: markdown ?? fetched.markdown,
+      }
     }
   }
 

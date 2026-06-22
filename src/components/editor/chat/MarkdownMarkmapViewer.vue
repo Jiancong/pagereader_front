@@ -53,6 +53,7 @@ watch(
   (svg) => {
     resizeObserver?.disconnect()
     if (!svg) return
+    void nextTick(renderMarkmap)
     resizeObserver = new ResizeObserver(() => markmap?.fit())
     resizeObserver.observe(svg)
   },

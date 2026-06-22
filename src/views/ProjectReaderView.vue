@@ -119,6 +119,7 @@ const projectId = computed(() => String(route.params.projectId || ''))
 const project = ref(null)
 const history = ref([])
 const pptData = ref(null)
+const deckMarkdown = ref('')
 const loading = ref(false)
 const loadingDeck = ref(false)
 const error = ref(null)
@@ -142,7 +143,11 @@ const displayChatHistory = computed(() =>
 )
 
 const projectMarkdown = computed(() =>
-  pickMarkdownFromPayload(project.value) || pickMarkdownFromHistory(history.value) || '',
+  deckMarkdown.value ||
+  pickMarkdownFromPayload(pptData.value) ||
+  pickMarkdownFromPayload(project.value) ||
+  pickMarkdownFromHistory(history.value) ||
+  '',
 )
 
 function collectDeckUrls(proj, hist) {
@@ -166,6 +171,7 @@ async function loadPptDeck(id, proj, hist) {
       const resolved = await resolvePptDataFromStreamComplete({ projectId: id, ppt_data_url })
       if (resolved?.pptData) {
         pptData.value = resolved.pptData
+        deckMarkdown.value = resolved.markdown || ''
         return
       }
     }
@@ -199,6 +205,7 @@ const load = async (id) => {
   project.value = null
   history.value = []
   pptData.value = null
+  deckMarkdown.value = ''
   sessionEntries.value = []
   try {
     const [proj, hist] = await Promise.all([

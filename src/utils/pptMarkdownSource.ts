@@ -1,3 +1,5 @@
+const MARKMAP_KEYS = new Set(["markmap", "markmap_md", "markmapMd"])
+
 const MARKDOWN_KEYS = new Set([
   "markdow",
   "markdown",
@@ -6,6 +8,19 @@ const MARKDOWN_KEYS = new Set([
   "source_markdown",
   "sourceMarkdown",
 ])
+
+const MARKDOWN_CONTAINER_KEYS = [
+  "markmap_document",
+  "markmapDocument",
+  "markdown_document",
+  "markdownDocument",
+  "payload",
+  "data",
+  "metadata",
+  "ppt_data",
+  "pptData",
+  "result",
+] as const
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -16,7 +31,22 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function cleanMarkdown(value: unknown): string | null {
   if (typeof value !== "string") return null
   const text = value.trim()
-  return text ? text : null
+  if (!text) return null
+  // 仅有空标题（如 "#"）会在 markmap 中渲染成空节点
+  if (/^#+\s*$/.test(text)) return null
+  return text
+}
+
+function pickDirectMarkdown(obj: Record<string, unknown>): string | null {
+  for (const key of MARKMAP_KEYS) {
+    const found = cleanMarkdown(obj[key])
+    if (found) return found
+  }
+  for (const key of MARKDOWN_KEYS) {
+    const found = cleanMarkdown(obj[key])
+    if (found) return found
+  }
+  return null
 }
 
 export function pickMarkdownFromPayload(payload: unknown): string | null {
@@ -40,12 +70,10 @@ export function pickMarkdownFromPayload(payload: unknown): string | null {
     if (seen.has(obj)) return null
     seen.add(obj)
 
-    for (const key of MARKDOWN_KEYS) {
-      const found = cleanMarkdown(obj[key])
-      if (found) return found
-    }
+    const fromKeys = pickDirectMarkdown(obj)
+    if (fromKeys) return fromKeys
 
-    for (const key of ["payload", "data", "metadata", "ppt_data", "pptData", "result"]) {
+    for (const key of MARKDOWN_CONTAINER_KEYS) {
       const found = visit(obj[key], depth + 1)
       if (found) return found
     }
