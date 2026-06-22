@@ -12524,6 +12524,18 @@ const pptSource = computed<PptData>(() => {
   return normalizePptData(base);
 });
 
+// 当前幻灯片（导出时可能被 overrideContent 覆盖；须在字体 watch immediate 之前定义）
+const slideForExport = computed<PptSlide | null>(() => {
+  const source = pptSource.value;
+  const s = source.slides[currentSlide.value] ?? null;
+  if (!s) return null;
+  const base =
+    overrideContent.value === null ? s : { ...s, content: overrideContent.value };
+  return normalizeSlideData(base);
+});
+
+const slide = computed(() => slideForExport.value);
+
 const MODERN_LITERARY_TEMPLATE_ID = "modern-literary-minimal";
 /** modern-literary-minimal 中文回退：走 custom-chinese-fonts 目录，不再硬编码 Noto Serif SC */
 const MODERN_LITERARY_ZH_DISPLAY = "ZCOOL XiaoWei";
@@ -12827,18 +12839,6 @@ watch(
   },
   { immediate: true }
 );
-
-// 当前幻灯片（导出时可能被 overrideContent 覆盖）
-const slideForExport = computed<PptSlide | null>(() => {
-  const source = pptSource.value;
-  const s = source.slides[currentSlide.value] ?? null;
-  if (!s) return null;
-  const base =
-    overrideContent.value === null ? s : { ...s, content: overrideContent.value };
-  return normalizeSlideData(base);
-});
-
-const slide = computed(() => slideForExport.value);
 
 const currentBrandFooter = computed(() =>
   resolveBrandFooter(slide.value, pptSource.value)
