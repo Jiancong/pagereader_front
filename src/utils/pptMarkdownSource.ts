@@ -38,11 +38,11 @@ function cleanMarkdown(value: unknown): string | null {
 }
 
 function pickDirectMarkdown(obj: Record<string, unknown>): string | null {
-  for (const key of MARKMAP_KEYS) {
+  for (const key of MARKDOWN_KEYS) {
     const found = cleanMarkdown(obj[key])
     if (found) return found
   }
-  for (const key of MARKDOWN_KEYS) {
+  for (const key of MARKMAP_KEYS) {
     const found = cleanMarkdown(obj[key])
     if (found) return found
   }
