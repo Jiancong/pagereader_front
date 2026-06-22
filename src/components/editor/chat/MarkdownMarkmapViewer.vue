@@ -404,7 +404,7 @@ onBeforeUnmount(() => {
 }
 
 .markdown-markmap-viewer__svg .markmap-node--selected .markmap-node-card {
-  border: 2px solid rgba(167, 139, 250, 0.72);
+  border-color: rgba(167, 139, 250, 0.72);
   background: rgba(255, 255, 255, 0.98);
   box-shadow:
     0 0 0 4px rgba(167, 139, 250, 0.14),
@@ -416,10 +416,15 @@ onBeforeUnmount(() => {
   stroke-width: 2px !important;
 }
 
-.markdown-markmap-viewer__svg .markmap-foreign > div,
+.markdown-markmap-viewer__svg .markmap-foreign > div {
+  width: var(--markmap-max-width);
+  text-align: left;
+  overflow: visible;
+}
+
 .markdown-markmap-viewer__svg .markmap-foreign > div > div {
-  display: block !important;
-  width: 100%;
+  display: inline-block !important;
+  max-width: 100%;
   overflow: visible;
 }
 
@@ -450,7 +455,7 @@ onBeforeUnmount(() => {
 }
 
 .markdown-markmap-viewer__svg .markmap-node--hover .markmap-node-card {
-  border: 2px solid rgba(167, 139, 250, 0.82);
+  border-color: rgba(167, 139, 250, 0.82);
   animation: markmap-node-breathe 2.4s ease-in-out infinite;
 }
 
