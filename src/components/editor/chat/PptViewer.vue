@@ -481,10 +481,11 @@
             </template>
 
             <template v-else-if="slide.layout === 'quote'">
-              <div class="ppt-modern-quote-card">
+              <div class="ppt-modern-quote-card" :class="modernLiteraryQuoteCardClass(slide)">
                 <div class="ppt-modern-quote-mark">“</div>
                 <PptMarkdownInline
                   class="ppt-modern-quote-text"
+                  :class="modernLiteraryQuoteTextClass(slide)"
                   :text="modernLiteraryQuoteText(slide)"
                   :page-references="slide.page_references"
                   :editable="isEditing"
@@ -11908,6 +11909,44 @@ function modernLiteraryQuoteText(slide: PptSlide): string {
   );
 }
 
+function isPredominantlyLatin(text: string): boolean {
+  const latin = (text.match(/[a-zA-Z]/g) ?? []).length;
+  const cjk = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g) ?? []).length;
+  if (!latin) return false;
+  return latin >= cjk;
+}
+
+type ModernLiteraryQuoteTextScale = "short" | "medium" | "long";
+
+function modernLiteraryQuoteTextScale(slide: PptSlide): ModernLiteraryQuoteTextScale {
+  const text = modernLiteraryQuoteText(slide);
+  const len = text.length;
+  if (isPredominantlyLatin(text)) {
+    if (len > 140) return "long";
+    if (len > 70) return "medium";
+    return "short";
+  }
+  if (len > 90) return "long";
+  if (len > 45) return "medium";
+  return "short";
+}
+
+function modernLiteraryQuoteTextClass(slide: PptSlide): Record<string, boolean> {
+  const scale = modernLiteraryQuoteTextScale(slide);
+  const latin = isPredominantlyLatin(modernLiteraryQuoteText(slide));
+  return {
+    "ppt-modern-quote-text--medium": scale === "medium",
+    "ppt-modern-quote-text--long": scale === "long",
+    "ppt-modern-quote-text--latin": latin,
+  };
+}
+
+function modernLiteraryQuoteCardClass(slide: PptSlide): Record<string, boolean> {
+  return {
+    "ppt-modern-quote-card--compact": modernLiteraryQuoteTextScale(slide) !== "short",
+  };
+}
+
 function modernLiteraryQuoteItems(slide: PptSlide): string[] {
   return (slide.content || []).filter(isModernLiteraryQuotedFragment).slice(0, 2);
 }
@@ -20395,6 +20434,54 @@ defineExpose({
   font-weight: 900;
   letter-spacing: -0.035em;
   line-height: 1.12;
+}
+
+.ppt-modern-quote-text.ppt-modern-quote-text--latin:not(.ppt-modern-quote-text--medium):not(.ppt-modern-quote-text--long) {
+  font-size: clamp(26px, 3cqi, 44px);
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+}
+
+.ppt-modern-quote-text--medium {
+  font-size: clamp(20px, 2.2cqi, 32px);
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.ppt-modern-quote-text--medium.ppt-modern-quote-text--latin {
+  font-family: var(--ppt-font-body, Inter, "Source Serif 4", Georgia, serif);
+}
+
+.ppt-modern-quote-text--long {
+  font-size: clamp(14px, 1.45cqi, 21px);
+  line-height: 1.58;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0;
+}
+
+.ppt-modern-quote-text--long.ppt-modern-quote-text--latin {
+  font-family: var(--ppt-font-body, Inter, "Source Serif 4", Georgia, serif);
+}
+
+.ppt-modern-quote-card--compact {
+  min-height: 0;
+  padding: 36px 52px 32px;
+}
+
+.ppt-modern-quote-card--compact .ppt-modern-quote-mark {
+  font-size: 88px;
+  top: 6px;
+  left: 28px;
+}
+
+.ppt-modern-literary--quote:has(.ppt-modern-quote-card--compact) {
+  padding: 56px 72px;
+}
+
+.ppt-modern-literary--quote .ppt-modern-quote-card--compact + .ppt-modern-insight {
+  margin-top: 20px;
+  font-size: clamp(18px, 1.8cqi, 26px);
 }
 
 .ppt-modern-quote-author {
