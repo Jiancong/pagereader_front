@@ -27,14 +27,6 @@ let toggleClickHandler: ((event: Event) => void) | null = null
 
 const EXPAND_BTN_SIZE = 16
 
-function escapeHtml(text: string) {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-}
-
 function wrapNodeBody(content: string, depth: number) {
   const trimmed = content.trim()
   if (!trimmed) return ""
@@ -43,7 +35,7 @@ function wrapNodeBody(content: string, depth: number) {
   let body = trimmed
   if (!hasBlockHtml) {
     const tag = depth <= 1 ? "h1" : depth === 2 ? "h2" : "p"
-    body = `<${tag} class="markmap-node-lead">${escapeHtml(trimmed)}</${tag}>`
+    body = `<${tag} class="markmap-node-lead">${trimmed}</${tag}>`
   }
 
   return `<div class="markmap-node-card"><div class="markdown-body markmap-node-body">${body}</div></div>`
