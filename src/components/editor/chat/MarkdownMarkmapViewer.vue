@@ -29,6 +29,8 @@ function renderMarkmap() {
       autoFit: true,
       color: () => "#78a886",
       duration: 180,
+      // depth 1–2 默认展开，depth 3+ 折叠（markmap 根节点 depth 从 1 起计）
+      initialExpandLevel: 3,
       maxWidth: 420,
       nodeMinHeight: 20,
       paddingX: 16,
