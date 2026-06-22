@@ -42,6 +42,7 @@
       <PptViewer
         :ppt-data="activeTask.pptData"
         :project-id="activeTask.projectId"
+        :markdown="activeTask.markdown"
         @close="resetActiveTask"
         @update:ppt-data="(d) => (activeTask.pptData = d)"
       />
@@ -246,6 +247,7 @@ type GeneratorTask = {
   logs: string[]
   errorMsg: string | null
   pptData: any
+  markdown: string
   cardResult: BookCardResult | null
   projectId: string
   queue: PptQueue
@@ -261,6 +263,7 @@ function createTask(defaultQueue: PptQueue): GeneratorTask {
     logs: [],
     errorMsg: null,
     pptData: null,
+    markdown: "",
     cardResult: null,
     projectId: "",
     queue: defaultQueue,
@@ -363,6 +366,7 @@ async function handlePptStreamComplete(
     const resolved = await resolvePptDataFromStreamComplete(data)
     if (resolved) {
       task.pptData = resolved.pptData
+      task.markdown = resolved.markdown || ""
       if (resolved.projectId) task.projectId = resolved.projectId
       gtmGenerateComplete(mode, task.queue, task.projectId)
       emit("project-complete", task.projectId)
@@ -573,6 +577,7 @@ const startTask = (task: GeneratorTask) => {
   task.errorMsg = null
   task.showCreditsCta = false
   task.pptData = null
+  task.markdown = ""
   task.cardResult = null
   task.projectId = newProjectId()
   task.logs = []
@@ -657,6 +662,7 @@ onBeforeUnmount(() => {
 
 const resetActiveTask = () => {
   activeTask.value.pptData = null
+  activeTask.value.markdown = ""
   activeTask.value.cardResult = null
   activeTask.value.projectId = ""
 }

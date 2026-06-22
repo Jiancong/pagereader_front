@@ -51,6 +51,7 @@
             <PptViewer
               :ppt-data="pptData"
               :project-id="projectId"
+              :markdown="projectMarkdown"
               :chat-history="displayChatHistory"
               @update:ppt-data="(d) => (pptData = d)"
               @related-search-recorded="(e) => (sessionEntries = e)"
@@ -105,6 +106,7 @@ import AuthDialog from '@/components/AuthDialog.vue'
 import PptViewer from '@/components/editor/chat/PptViewer.vue'
 import { authApi, projectApi, isLoggedIn, getLocalAvatar } from '@/api'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
+import { pickMarkdownFromHistory, pickMarkdownFromPayload } from '@/utils/pptMarkdownSource'
 import { looksLikeDeckJson } from '@/utils/projectCommunity'
 import { buildPptChatHistoryDisplay } from '@/utils/pptChatHistoryDisplay'
 import { gtmForkProject } from '@/composables/useGtmDataLayer'
@@ -137,6 +139,10 @@ const displayChatHistory = computed(() =>
     relatedAsk: (term) => t('workspace.chatHistoryPanel.relatedAsk', { term }),
     noAnswer: t('workspace.chatHistoryPanel.noAnswer'),
   }),
+)
+
+const projectMarkdown = computed(() =>
+  pickMarkdownFromPayload(project.value) || pickMarkdownFromHistory(history.value) || '',
 )
 
 function collectDeckUrls(proj, hist) {

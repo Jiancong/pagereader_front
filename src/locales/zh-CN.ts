@@ -577,6 +577,8 @@ export default {
     pptExportMerging: "正在合并...",
     pptExportFailed: "导出失败",
     pptExportPptxFailed: "PPTX 导出失败",
+    pptViewDeck: "PPT",
+    pptViewMarkmap: "文档图谱",
     pptFullscreenExit: "退出全屏",
     pptFullscreenPlay: "全屏演示",
     pptClose: "关闭",

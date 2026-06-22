@@ -193,6 +193,8 @@ export interface ConversationHistoryVo {
   sessionId?: string
   role: "user" | "assistant"
   content: string
+  markdow?: string
+  markdown?: string
   imageUrls?: string[]
   sequenceNumber?: number
   createTime?: string

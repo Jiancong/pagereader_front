@@ -41,6 +41,7 @@
         <PptViewer
           :ppt-data="pptData"
           :project-id="projectId"
+          :markdown="projectMarkdown"
           :chat-history="displayChatHistory"
           @update:ppt-data="(d) => (pptData = d)"
         />
@@ -78,6 +79,7 @@ import { Loader2, Sparkles, ArrowLeft } from 'lucide-vue-next'
 import PptViewer from '@/components/editor/chat/PptViewer.vue'
 import { projectApi } from '../../api'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
+import { pickMarkdownFromHistory, pickMarkdownFromPayload } from '@/utils/pptMarkdownSource'
 import {
   buildShareToCommunityBody,
   collectDeckUrls,
@@ -138,6 +140,10 @@ const displayChatHistory = computed(() =>
     relatedAsk: (term) => t('workspace.chatHistoryPanel.relatedAsk', { term }),
     noAnswer: t('workspace.chatHistoryPanel.noAnswer'),
   }),
+)
+
+const projectMarkdown = computed(() =>
+  pickMarkdownFromPayload(project.value) || pickMarkdownFromHistory(history.value) || '',
 )
 
 async function loadPptDeck(id, proj, hist) {

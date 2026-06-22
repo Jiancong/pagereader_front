@@ -595,6 +595,8 @@ export default {
     pptExportMerging: "Merging…",
     pptExportFailed: "Export failed",
     pptExportPptxFailed: "PPTX export failed",
+    pptViewDeck: "PPT",
+    pptViewMarkmap: "Mind map",
     pptFullscreenExit: "Exit fullscreen",
     pptFullscreenPlay: "Present",
     pptClose: "Close",

@@ -11,7 +11,7 @@
   >
     <!-- 工具栏 -->
     <div class="ppt-toolbar">
-      <div class="ppt-nav">
+      <div v-if="activeDocumentView === 'ppt'" class="ppt-nav">
         <button
           class="ppt-nav-btn"
           :disabled="currentSlide <= 0"
@@ -40,6 +40,29 @@
               d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"
             />
           </svg>
+        </button>
+      </div>
+
+      <div v-if="hasMarkdownDocument" class="ppt-view-tabs" role="tablist">
+        <button
+          type="button"
+          class="ppt-view-tab"
+          :class="{ 'ppt-view-tab--active': activeDocumentView === 'ppt' }"
+          role="tab"
+          :aria-selected="activeDocumentView === 'ppt'"
+          @click="activeDocumentView = 'ppt'"
+        >
+          {{ t("agent.pptViewDeck") }}
+        </button>
+        <button
+          type="button"
+          class="ppt-view-tab"
+          :class="{ 'ppt-view-tab--active': activeDocumentView === 'markmap' }"
+          role="tab"
+          :aria-selected="activeDocumentView === 'markmap'"
+          @click="activeDocumentView = 'markmap'"
+        >
+          {{ t("agent.pptViewMarkmap") }}
         </button>
       </div>
 
@@ -370,7 +393,7 @@
     </div>
 
     <!-- 幻灯片主体 + 页下演讲备注（备注在 16:9 画布外） -->
-    <div class="ppt-stage">
+    <div v-if="activeDocumentView === 'ppt'" class="ppt-stage">
       <div
         ref="slideWrapperRef"
         class="ppt-slide-wrapper"
@@ -8957,7 +8980,12 @@
     </div>
 
     <!-- 缩略图导航 -->
-    <div class="ppt-thumbs">
+    <div v-else class="ppt-markmap-stage">
+      <MarkdownMarkmapViewer :markdown="markdownDocument" />
+    </div>
+
+    <!-- 缩略图导航 -->
+    <div v-if="activeDocumentView === 'ppt'" class="ppt-thumbs">
       <button
         v-for="(s, si) in pptSource.slides"
         :key="si"
@@ -9033,6 +9061,7 @@ import PptChartSourceLine from "@/components/editor/chat/PptChartSourceLine.vue"
 import PptContextMenu from "@/components/editor/chat/PptContextMenu.vue";
 import PptRelatedSearchPanel from "@/components/editor/chat/PptRelatedSearchPanel.vue";
 import PptChatHistoryRail from "@/components/editor/chat/PptChatHistoryRail.vue";
+import MarkdownMarkmapViewer from "@/components/editor/chat/MarkdownMarkmapViewer.vue";
 import { usePptRelatedSearch, type PptRelatedSearchContext } from "@/composables/usePptRelatedSearch";
 import {
   mergeRelatedSearchAnswersIntoDisplay,
@@ -9341,6 +9370,8 @@ const props = defineProps<{
   initialSlide?: number;
   /** 项目 ID，用于生成 /explore/project/{id} 分享链接 */
   projectId?: string;
+  /** 后端返回的文章 markdown（兼容 markdow 字段），用于生成 markmap 文档图谱 */
+  markdown?: string;
   /** 右侧栏展示项（由 ProjectPreview 经 buildPptChatHistoryDisplay 整理） */
   chatHistory?: ChatHistoryDisplayItem[];
 }>();
@@ -9354,6 +9385,14 @@ const emit = defineEmits<{
 const chatHistoryRailCollapsed = ref(false);
 const relatedSearchSessionEntries = ref<RelatedSearchSessionEntry[]>([]);
 const { t, locale } = useI18n();
+const activeDocumentView = ref<"ppt" | "markmap">("ppt");
+
+const markdownDocument = computed(() => String(props.markdown || "").trim());
+const hasMarkdownDocument = computed(() => markdownDocument.value.length > 0);
+
+watch(hasMarkdownDocument, (available) => {
+  if (!available) activeDocumentView.value = "ppt";
+});
 
 const MOBILE_LAYOUT_MAX = 767;
 
@@ -9652,6 +9691,8 @@ function onPptViewerKeydown(e: KeyboardEvent) {
       return;
     }
   }
+
+  if (activeDocumentView.value !== "ppt") return;
 
   const isPrev = e.key === "ArrowLeft" || e.key === "ArrowUp";
   const isNext = e.key === "ArrowRight" || e.key === "ArrowDown";
@@ -17223,6 +17264,8 @@ defineExpose({
 
   &:fullscreen .ppt-stage,
   &:-webkit-full-screen .ppt-stage,
+  &:fullscreen .ppt-markmap-stage,
+  &:-webkit-full-screen .ppt-markmap-stage,
   &.ppt-viewer--presentation .ppt-stage {
     flex: 1 1 0%;
     min-height: 0;
@@ -17231,6 +17274,14 @@ defineExpose({
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    padding: 12px 20px 16px;
+    box-sizing: border-box;
+  }
+
+  &.ppt-viewer--presentation .ppt-markmap-stage {
+    flex: 1 1 0%;
+    min-height: 0;
+    width: 100%;
     padding: 12px 20px 16px;
     box-sizing: border-box;
   }
@@ -17439,6 +17490,46 @@ defineExpose({
   color: rgba(255, 255, 255, 0.6);
   min-width: 48px;
   text-align: center;
+}
+
+.ppt-view-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+  margin-left: 14px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ppt-view-tab {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.58);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 7px 12px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.88);
+  }
+}
+
+.ppt-view-tab--active {
+  background: #f5f7f3;
+  color: #27332b;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+
+  &:hover {
+    color: #27332b;
+  }
 }
 
 .ppt-actions {
@@ -17739,6 +17830,13 @@ defineExpose({
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.ppt-markmap-stage {
+  flex: 1 1 auto;
+  min-height: 560px;
+  overflow: hidden;
+  padding: 0;
 }
 
 /* 幻灯片容器（仅正文画布，不含 speaker_notes） */

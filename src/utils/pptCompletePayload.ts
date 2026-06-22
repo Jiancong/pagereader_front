@@ -2,10 +2,12 @@
 // @author hc @date 2026-06-04
 
 import { enrichPptDataChapterImages } from "./pptChapterImages"
+import { pickMarkdownFromPayload } from "./pptMarkdownSource"
 
 export type PptStreamCompleteResult = {
   pptData: Record<string, unknown>
   projectId?: string
+  markdown?: string
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -118,6 +120,7 @@ export async function resolvePptDataFromStreamComplete(
 ): Promise<PptStreamCompleteResult | null> {
   const root = asRecord(payload)
   if (!root) return null
+  const markdown = pickMarkdownFromPayload(root) ?? undefined
 
   const nested = asRecord(root.pptData) ?? asRecord(root.ppt_data)
   const projectId =
@@ -131,19 +134,19 @@ export async function resolvePptDataFromStreamComplete(
 
   const inlineDeck = normalizeDeckFromArtifact(root)
   if (inlineDeck) {
-    return { pptData: finalizePptData(inlineDeck, root), projectId }
+    return { pptData: finalizePptData(inlineDeck, root), projectId, markdown }
   }
 
   if (nested) {
     const nestedDeck = normalizeDeckFromArtifact(nested)
     if (nestedDeck) {
-      return { pptData: finalizePptData(nestedDeck, root), projectId }
+      return { pptData: finalizePptData(nestedDeck, root), projectId, markdown }
     }
     const nestedUrl = pickArtifactUrl({ ppt_data: nested, ppt_data_artifact: root.ppt_data_artifact })
     if (nestedUrl) {
       const fetched = await fetchPptJson(nestedUrl)
       if (fetched) {
-        return { pptData: finalizePptData(fetched, root), projectId }
+        return { pptData: finalizePptData(fetched, root), projectId, markdown }
       }
     }
   }
@@ -152,7 +155,7 @@ export async function resolvePptDataFromStreamComplete(
   if (url) {
     const fetched = await fetchPptJson(url)
     if (fetched) {
-      return { pptData: finalizePptData(fetched, root), projectId }
+      return { pptData: finalizePptData(fetched, root), projectId, markdown }
     }
   }
 
