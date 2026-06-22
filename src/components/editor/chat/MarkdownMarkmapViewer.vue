@@ -32,12 +32,24 @@ let hoveredNodePath: string | null = null
 const EXPAND_BTN_SIZE = 16
 const EXPAND_HIT_SIZE = 28
 const HOVER_GLOW_PAD = 12
+const NODE_FOCUS_PADDING = 56
+const NODE_FOCUS_MAX_SCALE = 4
+
+type MarkmapNodeRect = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
 
 type MarkmapNodeDatum = {
   state?: {
     path?: string
+    rect?: MarkmapNodeRect
   }
 }
+
+type MarkmapHighlightNode = NonNullable<Parameters<Markmap["setHighlight"]>[0]>
 
 type MarkdownHeading = {
   level: number
@@ -75,9 +87,58 @@ function applyNodeSelection() {
   void markmap.setHighlight((data as Parameters<Markmap["setHighlight"]>[0]) ?? undefined)
 }
 
-function scheduleNodeSelection() {
+function createZoomTransform(scale: number, x: number, y: number) {
+  return {
+    k: scale,
+    x,
+    y,
+    invert: ([px, py]: [number, number]) =>
+      [(px - x) / scale, (py - y) / scale] as [number, number],
+  }
+}
+
+async function focusSelectedNodeOnScreen() {
+  if (!markmap || !selectedNodePath || !svgRef.value) return
+
+  const selectedEl = svgRef.value.querySelector(
+    `.markmap-node[data-path="${selectedNodePath}"]`,
+  )
+  if (!(selectedEl instanceof SVGGElement)) return
+
+  const datum = (selectedEl as SVGGElement & { __data__?: MarkmapHighlightNode }).__data__
+  const node = datum ? markmap.findElement(datum)?.data : undefined
+  const rect = node?.state?.rect
+  if (!rect?.width || !rect?.height) return
+
+  const svgNode = markmap.svg.node()
+  if (!svgNode) return
+
+  const { width: viewportWidth, height: viewportHeight } = svgNode.getBoundingClientRect()
+  const { fitRatio } = markmap.options
+  const innerWidth = Math.max(viewportWidth - NODE_FOCUS_PADDING * 2, 1)
+  const innerHeight = Math.max(viewportHeight - NODE_FOCUS_PADDING * 2, 1)
+  const scale = Math.min(
+    (innerWidth / rect.width) * fitRatio,
+    (innerHeight / rect.height) * fitRatio,
+    NODE_FOCUS_MAX_SCALE,
+  )
+  const x = (viewportWidth - rect.width * scale) / 2 - rect.x * scale
+  const y = (viewportHeight - rect.height * scale) / 2 - rect.y * scale
+  const transform = createZoomTransform(scale, x, y)
+
+  await markmap
+    .transition(markmap.svg)
+    .call(markmap.zoom.transform, transform as Parameters<typeof markmap.zoom.transform>[1])
+    .end()
+    .catch(() => undefined)
+}
+
+function scheduleNodeSelection(focusNode = false) {
   void nextTick(() => {
-    requestAnimationFrame(applyNodeSelection)
+    requestAnimationFrame(() => {
+      applyNodeSelection()
+      if (focusNode) void focusSelectedNodeOnScreen()
+    })
   })
 }
 
@@ -379,7 +440,7 @@ function renderMarkmap() {
       const hit = getMarkmapNodeFromTarget(target)
       if (hit) {
         selectedNodePath = hit.path
-        scheduleNodeSelection()
+        scheduleNodeSelection(true)
         return
       }
 
@@ -387,6 +448,7 @@ function renderMarkmap() {
 
       selectedNodePath = null
       scheduleNodeSelection()
+      void markmap?.fit()
     }
     svg.addEventListener("click", nodeSelectHandler)
 
