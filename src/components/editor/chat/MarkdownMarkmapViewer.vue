@@ -6,8 +6,8 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from "vue"
-import { Transformer } from "markmap-lib"
 import { Markmap } from "markmap-view"
+import { markdownFragmentToChatHtml } from "../../../utils/chatMarkdownPipeline"
 
 type MarkmapTreeNode = {
   content: string
@@ -20,7 +20,6 @@ const props = defineProps<{
 }>()
 
 const svgRef = ref<SVGSVGElement | null>(null)
-const transformer = new Transformer()
 let markmap: Markmap | null = null
 let resizeObserver: ResizeObserver | null = null
 let toggleClickHandler: ((event: Event) => void) | null = null
@@ -31,12 +30,19 @@ let selectedNodePath: string | null = null
 let hoveredNodePath: string | null = null
 
 const EXPAND_BTN_SIZE = 16
+const EXPAND_HIT_SIZE = 28
 const HOVER_GLOW_PAD = 12
 
 type MarkmapNodeDatum = {
   state?: {
     path?: string
   }
+}
+
+type MarkdownHeading = {
+  level: number
+  lineIndex: number
+  text: string
 }
 
 function getMarkmapNodeFromTarget(target: Element) {
@@ -127,26 +133,131 @@ function scheduleNodeHover() {
   })
 }
 
-function wrapNodeBody(content: string, depth: number) {
-  const trimmed = content.trim()
-  if (!trimmed) return ""
+function collectMarkdownHeadings(markdown: string): MarkdownHeading[] {
+  const headings: MarkdownHeading[] = []
+  const lines = markdown.split(/\r?\n/)
+  let fenceChar: "`" | "~" | null = null
 
-  const hasBlockHtml = /<(h[1-6]|p|ul|ol|div|table|pre|blockquote)\b/i.test(trimmed)
-  let body = trimmed
-  if (!hasBlockHtml) {
-    const tag = depth <= 1 ? "h1" : depth === 2 ? "h2" : "p"
-    body = `<${tag} class="markmap-node-lead">${trimmed}</${tag}>`
-  }
+  lines.forEach((line, lineIndex) => {
+    const fenceMatch = line.match(/^\s*(`{3,}|~{3,})/)
+    if (fenceMatch) {
+      const nextFenceChar = fenceMatch[1][0] as "`" | "~"
+      fenceChar = fenceChar === nextFenceChar ? null : fenceChar ?? nextFenceChar
+      return
+    }
+    if (fenceChar) return
 
-  return `<div class="markmap-node-card"><div class="markdown-body markmap-node-body">${body}</div></div>`
+    const headingMatch = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/)
+    if (!headingMatch) return
+
+    headings.push({
+      level: headingMatch[1].length,
+      lineIndex,
+      text: headingMatch[2].trim(),
+    })
+  })
+
+  return headings
 }
 
-function wrapTreeForCardStyle(node: MarkmapTreeNode, depth = 0): MarkmapTreeNode {
-  return {
-    ...node,
-    content: wrapNodeBody(node.content, depth),
-    children: node.children.map((child) => wrapTreeForCardStyle(child, depth + 1)),
+function pickChapterHeadingLevel(headings: MarkdownHeading[]) {
+  const counts = Array.from({ length: 7 }, () => 0)
+  headings.forEach((heading) => {
+    counts[heading.level] += 1
+  })
+
+  if (counts[2] > 0 && counts[1] <= 1) return 2
+  for (let level = 1; level <= 6; level += 1) {
+    if (counts[level] > 1) return level
   }
+  const nestedHeading = headings.find((heading) => heading.level > 1)
+  return nestedHeading?.level ?? headings[0]?.level ?? 1
+}
+
+function wrapMarkdownSectionBody(markdown: string) {
+  const trimmed = markdown.trim()
+  if (!trimmed) return ""
+
+  return `<div class="markmap-node-card"><div class="markdown-body markmap-node-body">${markdownFragmentToChatHtml(trimmed)}</div></div>`
+}
+
+function buildGroupedMarkdownTree(markdown: string): MarkmapTreeNode {
+  const normalizedMarkdown = markdown.replace(/\r\n/g, "\n").trim()
+  const headings = collectMarkdownHeadings(normalizedMarkdown)
+  if (!headings.length) {
+    return {
+      content: wrapMarkdownSectionBody(normalizedMarkdown),
+      children: [],
+    }
+  }
+
+  const lines = normalizedMarkdown.split("\n")
+  const chapterLevel = pickChapterHeadingLevel(headings)
+  const chapterHeadings = headings.filter((heading) => heading.level === chapterLevel)
+  const firstChapter = chapterHeadings[0]
+
+  if (!firstChapter || chapterHeadings.length <= 1) {
+    return {
+      content: wrapMarkdownSectionBody(normalizedMarkdown),
+      children: [],
+    }
+  }
+
+  const rootMarkdown =
+    chapterLevel > 1 ? lines.slice(0, firstChapter.lineIndex).join("\n").trim() : ""
+  const rootTitle = headings.find((heading) => heading.level === 1)?.text ?? "Markdown"
+  const children = chapterHeadings.map((heading, index) => {
+    const nextHeading = chapterHeadings[index + 1]
+    const sectionMarkdown = lines
+      .slice(heading.lineIndex, nextHeading?.lineIndex ?? lines.length)
+      .join("\n")
+      .trim()
+
+    return {
+      content: wrapMarkdownSectionBody(sectionMarkdown),
+      children: [],
+    }
+  })
+
+  return {
+    content: wrapMarkdownSectionBody(rootMarkdown || `# ${rootTitle}`),
+    children,
+  }
+}
+
+function getToggleCircleFromTarget(target: Element) {
+  const directCircle = target.closest(".markmap-node circle")
+  if (directCircle instanceof SVGCircleElement) return directCircle
+
+  const hitbox = target.closest(".markmap-expand-hitbox")
+  const node = hitbox?.closest(".markmap-node")
+  const circle = node?.querySelector("circle")
+  return circle instanceof SVGCircleElement ? circle : null
+}
+
+function forwardClickToToggleCircle(sourceEvent: Event, circle: SVGCircleElement) {
+  if (!(sourceEvent.target instanceof Element)) return
+  if (sourceEvent.target.closest(".markmap-node circle")) return
+
+  sourceEvent.preventDefault()
+  sourceEvent.stopImmediatePropagation()
+
+  const mouseEvent =
+    sourceEvent instanceof MouseEvent
+      ? new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: sourceEvent.clientX,
+          clientY: sourceEvent.clientY,
+          ctrlKey: sourceEvent.ctrlKey,
+          metaKey: sourceEvent.metaKey,
+          shiftKey: sourceEvent.shiftKey,
+          altKey: sourceEvent.altKey,
+        })
+      : new MouseEvent("click", { bubbles: true, cancelable: true, view: window })
+
+  circle.dispatchEvent(mouseEvent)
 }
 
 function updateToggleLabels() {
@@ -158,6 +269,7 @@ function updateToggleLabels() {
     if (!circle) {
       node.querySelector(".markmap-toggle-label")?.remove()
       node.querySelector(".markmap-expand-btn")?.remove()
+      node.querySelector(".markmap-expand-hitbox")?.remove()
       return
     }
 
@@ -170,7 +282,6 @@ function updateToggleLabels() {
       btn = document.createElementNS("http://www.w3.org/2000/svg", "rect")
       btn.setAttribute("class", "markmap-expand-btn")
       btn.setAttribute("pointer-events", "none")
-      circle.insertAdjacentElement("afterend", btn)
     }
 
     btn.setAttribute("x", String(cx - EXPAND_BTN_SIZE / 2))
@@ -179,6 +290,19 @@ function updateToggleLabels() {
     btn.setAttribute("height", String(EXPAND_BTN_SIZE))
     btn.setAttribute("rx", "3")
     btn.classList.toggle("markmap-expand-btn--fold", isFold)
+
+    let hitbox = node.querySelector<SVGRectElement>(".markmap-expand-hitbox")
+    if (!hitbox) {
+      hitbox = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+      hitbox.setAttribute("class", "markmap-expand-hitbox")
+      hitbox.setAttribute("pointer-events", "all")
+    }
+
+    hitbox.setAttribute("x", String(cx - EXPAND_HIT_SIZE / 2))
+    hitbox.setAttribute("y", String(cy - EXPAND_HIT_SIZE / 2))
+    hitbox.setAttribute("width", String(EXPAND_HIT_SIZE))
+    hitbox.setAttribute("height", String(EXPAND_HIT_SIZE))
+    hitbox.setAttribute("rx", "6")
 
     circle.setAttribute("r", String(EXPAND_BTN_SIZE / 2 + 2))
     circle.setAttribute("fill", "transparent")
@@ -199,6 +323,10 @@ function updateToggleLabels() {
     label.setAttribute("x", String(cx))
     label.setAttribute("y", String(cy))
     label.classList.toggle("markmap-toggle-label--fold", isFold)
+
+    node.appendChild(btn)
+    node.appendChild(hitbox)
+    node.appendChild(label)
   })
 }
 
@@ -217,8 +345,7 @@ function renderMarkmap() {
   const markdown = props.markdown.trim()
   if (!svg || !markdown) return
 
-  const { root } = transformer.transform(markdown)
-  const styledRoot = wrapTreeForCardStyle(root as MarkmapTreeNode)
+  const groupedRoot = buildGroupedMarkdownTree(markdown)
   if (!markmap) {
     markmap = Markmap.create(svg, {
       autoFit: true,
@@ -227,24 +354,27 @@ function renderMarkmap() {
       embedGlobalCSS: true,
       // 默认只展示前 2 层（根 + 一级分支），更深层级点击 + 展开
       initialExpandLevel: 2,
-      maxWidth: 640,
+      maxWidth: 720,
       nodeMinHeight: 24,
       paddingX: 18,
-      spacingHorizontal: 108,
+      spacingHorizontal: 128,
       spacingVertical: 28,
     })
 
     toggleClickHandler = (event: Event) => {
       const target = event.target
       if (!(target instanceof Element)) return
-      if (target.closest(".markmap-node circle")) scheduleToggleLabels()
+      const toggleCircle = getToggleCircleFromTarget(target)
+      if (!toggleCircle) return
+      forwardClickToToggleCircle(event, toggleCircle)
+      scheduleToggleLabels()
     }
     svg.addEventListener("click", toggleClickHandler)
 
     nodeSelectHandler = (event: Event) => {
       const target = event.target
       if (!(target instanceof Element)) return
-      if (target.closest(".markmap-node circle")) return
+      if (target.closest(".markmap-node circle, .markmap-expand-hitbox")) return
 
       const hit = getMarkmapNodeFromTarget(target)
       if (hit) {
@@ -278,7 +408,7 @@ function renderMarkmap() {
     svg.addEventListener("mouseleave", nodeHoverLeaveHandler)
   }
 
-  markmap.setData(styledRoot)
+  markmap.setData(groupedRoot)
   void nextTick(async () => {
     markmap?.fit()
     scheduleToggleLabels()
@@ -379,6 +509,11 @@ onBeforeUnmount(() => {
 
 .markdown-markmap-viewer__svg .markmap-expand-btn--fold {
   fill: rgba(15, 22, 30, 0.04);
+}
+
+.markdown-markmap-viewer__svg .markmap-expand-hitbox {
+  fill: transparent;
+  cursor: pointer;
 }
 
 .markdown-markmap-viewer__svg .markmap-toggle-label {
