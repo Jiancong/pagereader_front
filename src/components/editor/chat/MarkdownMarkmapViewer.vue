@@ -25,9 +25,13 @@ let markmap: Markmap | null = null
 let resizeObserver: ResizeObserver | null = null
 let toggleClickHandler: ((event: Event) => void) | null = null
 let nodeSelectHandler: ((event: Event) => void) | null = null
+let nodeHoverHandler: ((event: Event) => void) | null = null
+let nodeHoverLeaveHandler: (() => void) | null = null
 let selectedNodePath: string | null = null
+let hoveredNodePath: string | null = null
 
 const EXPAND_BTN_SIZE = 16
+const HOVER_GLOW_PAD = 12
 
 type MarkmapNodeDatum = {
   state?: {
@@ -68,6 +72,58 @@ function applyNodeSelection() {
 function scheduleNodeSelection() {
   void nextTick(() => {
     requestAnimationFrame(applyNodeSelection)
+  })
+}
+
+function updateHoverGlow() {
+  const svg = svgRef.value
+  if (!svg) return
+
+  svg.querySelectorAll<SVGGElement>(".markmap-node").forEach((nodeG) => {
+    const isHover = nodeG.classList.contains("markmap-node--hover")
+    const fo = nodeG.querySelector("foreignObject")
+    let glow = nodeG.querySelector<SVGRectElement>(".markmap-hover-glow")
+
+    if (!isHover || !fo) {
+      glow?.remove()
+      return
+    }
+
+    const x = Number(fo.getAttribute("x") ?? 18)
+    const y = Number(fo.getAttribute("y") ?? 0)
+    const w = Number(fo.getAttribute("width") ?? 0)
+    const h = Number(fo.getAttribute("height") ?? 0)
+
+    if (!glow) {
+      glow = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+      glow.setAttribute("class", "markmap-hover-glow")
+      glow.setAttribute("pointer-events", "none")
+      nodeG.insertBefore(glow, fo)
+    }
+
+    glow.setAttribute("x", String(x - HOVER_GLOW_PAD))
+    glow.setAttribute("y", String(y - HOVER_GLOW_PAD))
+    glow.setAttribute("width", String(w + HOVER_GLOW_PAD * 2))
+    glow.setAttribute("height", String(h + HOVER_GLOW_PAD * 2))
+    glow.setAttribute("rx", "14")
+    glow.setAttribute("ry", "14")
+  })
+}
+
+function applyNodeHover() {
+  const svg = svgRef.value
+  if (!svg) return
+
+  svg.querySelectorAll<SVGGElement>(".markmap-node").forEach((nodeG) => {
+    const path = nodeG.getAttribute("data-path")
+    nodeG.classList.toggle("markmap-node--hover", path === hoveredNodePath)
+  })
+  updateHoverGlow()
+}
+
+function scheduleNodeHover() {
+  void nextTick(() => {
+    requestAnimationFrame(applyNodeHover)
   })
 }
 
@@ -151,6 +207,7 @@ function scheduleToggleLabels() {
     requestAnimationFrame(() => {
       updateToggleLabels()
       applyNodeSelection()
+      applyNodeHover()
     })
   })
 }
@@ -202,6 +259,23 @@ function renderMarkmap() {
       scheduleNodeSelection()
     }
     svg.addEventListener("click", nodeSelectHandler)
+
+    nodeHoverHandler = (event: Event) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const hit = getMarkmapNodeFromTarget(target)
+      const nextPath = hit?.path ?? null
+      if (nextPath === hoveredNodePath) return
+      hoveredNodePath = nextPath
+      scheduleNodeHover()
+    }
+    nodeHoverLeaveHandler = () => {
+      if (!hoveredNodePath) return
+      hoveredNodePath = null
+      scheduleNodeHover()
+    }
+    svg.addEventListener("mouseover", nodeHoverHandler)
+    svg.addEventListener("mouseleave", nodeHoverLeaveHandler)
   }
 
   markmap.setData(styledRoot)
@@ -215,6 +289,7 @@ watch(
   () => props.markdown,
   () => {
     selectedNodePath = null
+    hoveredNodePath = null
     void nextTick(renderMarkmap)
   },
   { immediate: true },
@@ -242,6 +317,12 @@ onBeforeUnmount(() => {
   }
   if (svgRef.value && nodeSelectHandler) {
     svgRef.value.removeEventListener("click", nodeSelectHandler)
+  }
+  if (svgRef.value && nodeHoverHandler) {
+    svgRef.value.removeEventListener("mouseover", nodeHoverHandler)
+  }
+  if (svgRef.value && nodeHoverLeaveHandler) {
+    svgRef.value.removeEventListener("mouseleave", nodeHoverLeaveHandler)
   }
   markmap?.destroy()
 })
@@ -319,31 +400,33 @@ onBeforeUnmount(() => {
 }
 
 .markdown-markmap-viewer__svg .markmap-highlight rect {
-  fill: rgba(37, 99, 235, 0.1);
+  fill: rgba(167, 139, 250, 0.12);
 }
 
 .markdown-markmap-viewer__svg .markmap-node--selected .markmap-node-card {
-  border-color: rgba(37, 99, 235, 0.52);
-  background: rgba(239, 246, 255, 0.98);
+  border: 2px solid rgba(167, 139, 250, 0.72);
+  background: rgba(255, 255, 255, 0.98);
   box-shadow:
-    0 0 0 3px rgba(37, 99, 235, 0.12),
-    0 8px 20px rgba(37, 99, 235, 0.08);
+    0 0 0 4px rgba(167, 139, 250, 0.14),
+    0 10px 24px rgba(167, 139, 250, 0.12);
 }
 
 .markdown-markmap-viewer__svg .markmap-node--selected > line {
-  stroke: rgba(37, 99, 235, 0.42) !important;
+  stroke: rgba(167, 139, 250, 0.62) !important;
   stroke-width: 2px !important;
 }
 
+.markdown-markmap-viewer__svg .markmap-foreign > div,
 .markdown-markmap-viewer__svg .markmap-foreign > div > div {
   display: block !important;
   width: 100%;
+  overflow: visible;
 }
 
 .markdown-markmap-viewer__svg .markmap-node-card {
   box-sizing: border-box;
   border: 1px solid rgba(15, 22, 30, 0.08);
-  border-radius: 6px;
+  border-radius: 12px;
   background: #fff;
   box-shadow: none;
   padding: 12px 16px;
@@ -351,6 +434,99 @@ onBeforeUnmount(() => {
   line-height: 1.6;
   white-space: normal;
   word-break: break-word;
+  transform-origin: left center;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.markdown-markmap-viewer__svg .markmap-hover-glow {
+  fill: rgba(167, 139, 250, 0.06);
+  stroke: rgba(167, 139, 250, 0.48);
+  stroke-width: 1.5;
+  animation: markmap-glow-breathe 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px rgba(167, 139, 250, 0.28));
+}
+
+.markdown-markmap-viewer__svg .markmap-node--hover .markmap-node-card {
+  border: 2px solid rgba(167, 139, 250, 0.82);
+  animation: markmap-node-breathe 2.4s ease-in-out infinite;
+}
+
+.markdown-markmap-viewer__svg .markmap-node--selected.markmap-node--hover .markmap-node-card {
+  animation: markmap-node-breathe-selected 2.4s ease-in-out infinite;
+}
+
+.markdown-markmap-viewer__svg .markmap-node--hover > line {
+  stroke: rgba(167, 139, 250, 0.72) !important;
+  stroke-width: 2px !important;
+}
+
+.markdown-markmap-viewer__svg .markmap-node--hover .markmap-expand-btn {
+  animation: markmap-expand-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes markmap-glow-breathe {
+  0%,
+  100% {
+    fill: rgba(167, 139, 250, 0.04);
+    stroke: rgba(167, 139, 250, 0.38);
+    stroke-width: 1.5;
+    opacity: 0.82;
+    filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.22));
+  }
+
+  50% {
+    fill: rgba(167, 139, 250, 0.14);
+    stroke: rgba(139, 92, 246, 0.82);
+    stroke-width: 2.25;
+    opacity: 1;
+    filter: drop-shadow(0 0 22px rgba(167, 139, 250, 0.48));
+  }
+}
+
+@keyframes markmap-node-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(167, 139, 250, 0),
+      0 0 12px 0 rgba(167, 139, 250, 0.08);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(167, 139, 250, 0.16),
+      0 0 24px 4px rgba(167, 139, 250, 0.28);
+  }
+}
+
+@keyframes markmap-node-breathe-selected {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px rgba(167, 139, 250, 0.14),
+      0 10px 24px rgba(167, 139, 250, 0.12);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 8px rgba(167, 139, 250, 0.22),
+      0 16px 36px rgba(167, 139, 250, 0.22);
+  }
+}
+
+@keyframes markmap-expand-breathe {
+  0%,
+  100% {
+    stroke: rgba(167, 139, 250, 0.38);
+    fill: #fff;
+  }
+
+  50% {
+    stroke: rgba(139, 92, 246, 0.82);
+    fill: rgba(245, 243, 255, 1);
+  }
 }
 
 .markdown-markmap-viewer__svg .markmap-node-body {
