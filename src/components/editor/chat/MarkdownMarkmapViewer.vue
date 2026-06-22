@@ -24,8 +24,52 @@ const transformer = new Transformer()
 let markmap: Markmap | null = null
 let resizeObserver: ResizeObserver | null = null
 let toggleClickHandler: ((event: Event) => void) | null = null
+let nodeSelectHandler: ((event: Event) => void) | null = null
+let selectedNodePath: string | null = null
 
 const EXPAND_BTN_SIZE = 16
+
+type MarkmapNodeDatum = {
+  state?: {
+    path?: string
+  }
+}
+
+function getMarkmapNodeFromTarget(target: Element) {
+  const nodeG = target.closest(".markmap-node")
+  if (!(nodeG instanceof SVGGElement)) return null
+  const data = (nodeG as SVGGElement & { __data__?: MarkmapNodeDatum }).__data__
+  const path = nodeG.getAttribute("data-path") ?? data?.state?.path ?? null
+  if (!path) return null
+  return { nodeG, data, path }
+}
+
+function applyNodeSelection() {
+  const svg = svgRef.value
+  if (!svg) return
+
+  svg.querySelectorAll<SVGGElement>(".markmap-node").forEach((nodeG) => {
+    const path = nodeG.getAttribute("data-path")
+    nodeG.classList.toggle("markmap-node--selected", path === selectedNodePath)
+  })
+
+  if (!markmap) return
+
+  if (!selectedNodePath) {
+    void markmap.setHighlight(undefined)
+    return
+  }
+
+  const selected = svg.querySelector(`.markmap-node[data-path="${selectedNodePath}"]`)
+  const data = selected && (selected as SVGGElement & { __data__?: MarkmapNodeDatum }).__data__
+  void markmap.setHighlight((data as Parameters<Markmap["setHighlight"]>[0]) ?? undefined)
+}
+
+function scheduleNodeSelection() {
+  void nextTick(() => {
+    requestAnimationFrame(applyNodeSelection)
+  })
+}
 
 function wrapNodeBody(content: string, depth: number) {
   const trimmed = content.trim()
@@ -104,7 +148,10 @@ function updateToggleLabels() {
 
 function scheduleToggleLabels() {
   void nextTick(() => {
-    requestAnimationFrame(updateToggleLabels)
+    requestAnimationFrame(() => {
+      updateToggleLabels()
+      applyNodeSelection()
+    })
   })
 }
 
@@ -136,6 +183,25 @@ function renderMarkmap() {
       if (target.closest(".markmap-node circle")) scheduleToggleLabels()
     }
     svg.addEventListener("click", toggleClickHandler)
+
+    nodeSelectHandler = (event: Event) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest(".markmap-node circle")) return
+
+      const hit = getMarkmapNodeFromTarget(target)
+      if (hit) {
+        selectedNodePath = hit.path
+        scheduleNodeSelection()
+        return
+      }
+
+      if (target.closest(".markmap-node")) return
+
+      selectedNodePath = null
+      scheduleNodeSelection()
+    }
+    svg.addEventListener("click", nodeSelectHandler)
   }
 
   markmap.setData(styledRoot)
@@ -148,6 +214,7 @@ function renderMarkmap() {
 watch(
   () => props.markdown,
   () => {
+    selectedNodePath = null
     void nextTick(renderMarkmap)
   },
   { immediate: true },
@@ -172,6 +239,9 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   if (svgRef.value && toggleClickHandler) {
     svgRef.value.removeEventListener("click", toggleClickHandler)
+  }
+  if (svgRef.value && nodeSelectHandler) {
+    svgRef.value.removeEventListener("click", nodeSelectHandler)
   }
   markmap?.destroy()
 })
@@ -245,6 +315,24 @@ onBeforeUnmount(() => {
 .markdown-markmap-viewer__svg .markmap-foreign {
   color: #0f161e;
   overflow: visible;
+  cursor: pointer;
+}
+
+.markdown-markmap-viewer__svg .markmap-highlight rect {
+  fill: rgba(37, 99, 235, 0.1);
+}
+
+.markdown-markmap-viewer__svg .markmap-node--selected .markmap-node-card {
+  border-color: rgba(37, 99, 235, 0.52);
+  background: rgba(239, 246, 255, 0.98);
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, 0.12),
+    0 8px 20px rgba(37, 99, 235, 0.08);
+}
+
+.markdown-markmap-viewer__svg .markmap-node--selected > line {
+  stroke: rgba(37, 99, 235, 0.42) !important;
+  stroke-width: 2px !important;
 }
 
 .markdown-markmap-viewer__svg .markmap-foreign > div > div {
