@@ -3,6 +3,7 @@ import { computed, inject } from "vue";
 import PptMarkdownInline from "@/components/editor/chat/PptMarkdownInline.vue";
 import PptTableBlock from "@/components/editor/chat/PptTableBlock.vue";
 import PptBrutalistDataChart from "../../charts/PptBrutalistDataChart.vue";
+import { pptClassicContextKey } from "../../pptClassicContext";
 import { pptSlideEditorKey } from "../../pptSlideContext";
 import type { PptSlide } from "../../types";
 import {
@@ -25,6 +26,7 @@ import * as brutalist from "./editorialBrutalistHelpers";
 
 const props = defineProps<{ slide: PptSlide }>();
 const editor = inject(pptSlideEditorKey)!;
+const classic = inject(pptClassicContextKey)!;
 
 const isEditing = editor.isEditing;
 const currentSlide = editor.currentSlideIndex;
@@ -75,6 +77,15 @@ const onContentItemBlur = editor.onContentItemBlur;
 const onPptTableRefClick = editor.onPptTableRefClick;
 const onDocumentFigureCaptionBlur = editor.onDocumentFigureCaptionBlur;
 const onDocumentFigureLeftItemBlur = editor.onDocumentFigureLeftItemBlur;
+
+const heroRightCardStyle = classic.heroRightCardStyle;
+const formatRightItemIndex = classic.formatRightItemIndex;
+const rightItemTitle = classic.rightItemTitle;
+const rightItemDescription = classic.rightItemDescription;
+const heroMetricStyle = classic.heroMetricStyle;
+const normalizeAccentColor = classic.normalizeAccentColor;
+const onRightItemFieldBlur = classic.onRightItemFieldBlur;
+const onHeroMetricBlur = classic.onHeroMetricBlur;
 
 const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
 

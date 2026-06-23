@@ -8600,6 +8600,7 @@ provide(pptClassicContextKey, {
   metricCardValueStyle,
   heroRightCardStyle,
   heroMetricStyle,
+  normalizeAccentColor,
   rightItemAccentColor,
   rightItemTitle,
   rightItemDescription,

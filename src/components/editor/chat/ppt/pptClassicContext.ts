@@ -26,7 +26,8 @@ export interface PptClassicContext {
     item: { accent_color?: string },
     index: number,
   ) => Record<string, string>;
-  heroMetricStyle: (slide: PptSlide | undefined) => Record<string, string>;
+  heroMetricStyle: (hm: PptSlide["hero_metric"] | undefined) => Record<string, string>;
+  normalizeAccentColor: (raw: unknown) => string | undefined;
   rightItemAccentColor: (
     item: { accent_color?: string },
     index: number,
