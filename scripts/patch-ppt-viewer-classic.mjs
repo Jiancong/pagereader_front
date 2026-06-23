@@ -112,8 +112,8 @@ provide(pptClassicContextKey, {
 
 if (!joined.includes("provide(pptClassicContextKey")) {
   joined = joined.replace(
-    /provide\(pptChartContextKey, \{[\s\S]*?\}\);\n/,
-    (m) => `${m}${provideClassic}`,
+    /defineExpose\(\{/,
+    `${provideClassic}\ndefineExpose({`,
   );
 }
 
