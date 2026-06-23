@@ -5,6 +5,7 @@
 //   SITE_API_BASE=https://api.example.com node scripts/prerender.mjs
 // 可选环境变量：
 //   SKIP_PRERENDER=1     跳过预渲染（构建仍成功）
+//   SKIP_SEO=1           跳过全部构建后 SEO 步骤（见 postBuildSeo.mjs）
 //   PRERENDER_LIMIT      预渲染的图书页数量（默认 50）
 //   PRERENDER_PORT       本地静态服务端口（默认 4179）
 //   CHROME_PATH          使用系统已安装的 Chrome/Chromium 可执行文件
@@ -25,7 +26,9 @@ const DIST = resolve(ROOT, "dist")
 
 const PORT = Number(process.env.PRERENDER_PORT || 4179)
 const LIMIT = Number(process.env.PRERENDER_LIMIT || 50)
-const SKIP = /^(1|true|yes)$/i.test(String(process.env.SKIP_PRERENDER || ""))
+const SKIP = /^(1|true|yes)$/i.test(
+  String(process.env.SKIP_PRERENDER || process.env.SKIP_SEO || ""),
+)
 const CHROME_PATH = String(process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || "").trim()
 
 const MIME = {

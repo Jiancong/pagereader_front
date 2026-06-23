@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/prerender.mjs && node scripts/injectBookSeoPages.mjs && node scripts/generate-sitemap.mjs",
+    "build": "vite build && node scripts/postBuildSeo.mjs",
+    "build:fast": "vite build",
     "build:vite": "vite build",
     "prerender": "node scripts/prerender.mjs",
     "inject:seo": "node scripts/injectBookSeoPages.mjs",

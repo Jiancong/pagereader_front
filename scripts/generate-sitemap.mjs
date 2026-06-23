@@ -4,6 +4,7 @@
 //
 // 用法：
 //   SITE_ORIGIN=https://page2.top VITE_API_URL=https://api.example.com node scripts/generate-sitemap.mjs
+//   SKIP_SEO=1 | SKIP_SITEMAP=1  跳过 sitemap 生成
 // 默认写入 dist/sitemap.xml（需先执行 vite build）。
 
 import { writeFile, mkdir } from "node:fs/promises"
@@ -21,6 +22,9 @@ const SITE_ORIGIN = (process.env.SITE_ORIGIN || "https://page2.top").replace(/\/
 const OUT = process.env.SITEMAP_OUT || resolve(ROOT, "dist", "sitemap.xml")
 const MAX_PAGES = Number(process.env.SITEMAP_MAX_PAGES || 20)
 const PAGE_SIZE = Number(process.env.SITEMAP_PAGE_SIZE || 100)
+const SKIP = /^(1|true|yes)$/i.test(
+  String(process.env.SKIP_SITEMAP || process.env.SKIP_SEO || ""),
+)
 
 function xmlEscape(str) {
   return String(str).replace(/[<>&'"]/g, (c) =>
@@ -51,6 +55,11 @@ async function collectProjectIds() {
 }
 
 async function main() {
+  if (SKIP) {
+    console.log("[sitemap] SKIP_SITEMAP=1 or SKIP_SEO=1, skipping.")
+    return
+  }
+
   const ids = await collectProjectIds()
   const entries = [
     urlEntry(`${SITE_ORIGIN}/`, { changefreq: "daily", priority: "1.0" }),

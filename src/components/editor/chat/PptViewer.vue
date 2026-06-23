@@ -421,7 +421,10 @@
             <template v-if="editorialBrutalistLayout(slide) === 'hero'">
               <div class="ppt-brutalist-hero">
                 <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
-                <h1 class="ppt-brutalist-display">
+                <h1
+                  class="ppt-brutalist-display"
+                  :class="editorialBrutalistDisplayClass(slide)"
+                >
                   <PptMarkdownInline
                     :text="slide.title || pptSource.title || ''"
                     :editable="isEditing"
@@ -436,8 +439,19 @@
                   :editable="isEditing"
                   @blur="onCellBlur($event, `slides.${currentSlide}.subtitle`)"
                 />
+                <p
+                  v-if="editorialBrutalistHeroDate(slide)"
+                  class="ppt-brutalist-hero-date"
+                  :contenteditable="isEditing"
+                  @blur="onCellBlur($event, `slides.${currentSlide}.date`)"
+                >
+                  {{ editorialBrutalistHeroDate(slide) }}
+                </p>
               </div>
-              <div class="ppt-brutalist-watermark ppt-brutalist-watermark--vertical">
+              <div
+                v-if="shouldShowEditorialBrutalistVerticalWatermark(slide)"
+                class="ppt-brutalist-watermark ppt-brutalist-watermark--vertical"
+              >
                 {{ editorialBrutalistWatermark(slide) }}
               </div>
             </template>
@@ -470,40 +484,102 @@
                   />
                 </h2>
               </header>
-              <div class="ppt-brutalist-split">
-                <section class="ppt-brutalist-card">
-                  <h3>
+              <div
+                class="ppt-brutalist-split"
+                :class="{ 'ppt-brutalist-split--figure': hasDocumentFigurePage(slide) }"
+                :style="editorialBrutalistSplitStyle(slide)"
+              >
+                <section class="ppt-brutalist-card ppt-brutalist-card--scroll">
+                  <h3
+                    v-if="!modernLiteraryCompareTitleDuplicatesSlide(slide.left_title, slide.title)"
+                  >
                     <PptMarkdownInline
                       :text="slide.left_title || t('agent.pptLeftColumn')"
                       :editable="isEditing"
                       @blur="onCellBlur($event, `slides.${currentSlide}.left_title`)"
                     />
                   </h3>
-                  <PptMarkdownInline
-                    v-for="(item, li) in editorialBrutalistSplitLeft(slide)"
-                    :key="'brutalist-left-' + li"
-                    class="ppt-brutalist-card-body"
-                    :text="displayText(item)"
-                    :page-references="slide.page_references"
-                    @ref-click="onPptTableRefClick($event, slide)"
-                  />
+                  <div
+                    class="ppt-brutalist-point-list"
+                    :class="editorialBrutalistSplitListClass(slide)"
+                  >
+                    <article
+                      v-for="(item, li) in editorialBrutalistSplitLeft(slide)"
+                      :key="'brutalist-left-' + li"
+                      class="ppt-brutalist-point"
+                    >
+                      <div class="ppt-brutalist-point-index">
+                        {{ String(li + 1).padStart(2, "0") }}
+                      </div>
+                      <div class="ppt-brutalist-point-copy">
+                        <PptMarkdownInline
+                          v-if="hasContentPointBody(item)"
+                          class="ppt-brutalist-point-title"
+                          :text="contentPointTitle(item)"
+                          :page-references="slide.page_references"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                        <PptMarkdownInline
+                          class="ppt-brutalist-point-body"
+                          :text="
+                            hasContentPointBody(item) ? parseContentBody(item) : displayText(item)
+                          "
+                          :page-references="slide.page_references"
+                          :editable="isEditing"
+                          @blur="onDocumentFigureLeftItemBlur($event, li)"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                      </div>
+                    </article>
+                  </div>
                 </section>
-                <section class="ppt-brutalist-card ppt-brutalist-card--invert">
+                <section
+                  class="ppt-brutalist-card"
+                  :class="
+                    hasDocumentFigurePage(slide)
+                      ? 'ppt-brutalist-card--figure-panel'
+                      : 'ppt-brutalist-card--invert'
+                  "
+                >
                   <h3>
                     <PptMarkdownInline
-                      :text="slide.right_title || t('agent.pptRightColumn')"
+                      :text="
+                        slide.right_title ||
+                        (hasDocumentFigurePage(slide)
+                          ? t('agent.pptDocumentSourceImage')
+                          : t('agent.pptRightColumn'))
+                      "
                       :editable="isEditing"
                       @blur="onCellBlur($event, `slides.${currentSlide}.right_title`)"
                     />
                   </h3>
-                  <PptMarkdownInline
-                    v-for="(item, ri) in editorialBrutalistSplitRight(slide)"
-                    :key="'brutalist-right-' + ri"
-                    class="ppt-brutalist-card-body"
-                    :text="displayText(item)"
-                    :page-references="slide.page_references"
-                    @ref-click="onPptTableRefClick($event, slide)"
-                  />
+                  <figure v-if="documentFigure?.url" class="ppt-brutalist-document-figure">
+                    <img
+                      :src="documentFigure.url"
+                      class="ppt-brutalist-document-figure-img"
+                      :style="documentFigureImgStyle(documentFigure)"
+                      :alt="documentFigure.caption || documentFigure.page_label || slide.title || ''"
+                      loading="lazy"
+                      crossorigin="anonymous"
+                    />
+                    <figcaption
+                      v-if="documentFigure.caption || documentFigure.page_label || isEditing"
+                      :contenteditable="isEditing"
+                      @blur="onDocumentFigureCaptionBlur"
+                    >
+                      {{ documentFigure.caption || documentFigure.page_label || "" }}
+                    </figcaption>
+                  </figure>
+                  <template v-else>
+                    <PptMarkdownInline
+                      v-for="(item, ri) in editorialBrutalistSplitRight(slide)"
+                      :key="'brutalist-right-' + ri"
+                      class="ppt-brutalist-card-body"
+                      :text="displayText(item)"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </template>
                 </section>
               </div>
             </template>
@@ -601,6 +677,7 @@
             <PptMarkdownInline
               v-if="slide.key_insight && !['quote', 'data'].includes(slide.layout)"
               class="ppt-brutalist-insight"
+              :class="{ 'ppt-brutalist-insight--inline': editorialBrutalistInsightInline(slide) }"
               :text="slide.key_insight"
               :page-references="slide.page_references"
               :editable="isEditing"
@@ -12189,11 +12266,26 @@ function editorialBrutalistHeroBody(slide: PptSlide): string {
   );
 }
 
+function editorialBrutalistHeroDate(slide: PptSlide): string {
+  return String(slide.date || pptSource.value.date || "").trim();
+}
+
+function editorialBrutalistDisplayClass(slide: PptSlide): string {
+  const text = String(slide.title || pptSource.value.title || "").trim();
+  const words = text.split(/\s+/).filter(Boolean).length;
+  if (words >= 4 || text.length > 32) return "ppt-brutalist-display--long";
+  if (words >= 2 || text.length > 16) return "ppt-brutalist-display--medium";
+  return "";
+}
+
+function shouldShowEditorialBrutalistVerticalWatermark(slide: PptSlide): boolean {
+  return slide.layout === "section";
+}
+
 function editorialBrutalistWatermark(slide: PptSlide): string {
   if (slide.layout === "section") {
     return slide.chapter_number || String(sectionChapterNum.value).padStart(2, "0");
   }
-  if (slide.layout === "cover") return slide.date || pptSource.value.date || "2026";
   return String(slide.index || currentSlide.value + 1).padStart(2, "0");
 }
 
@@ -12248,17 +12340,39 @@ function editorialBrutalistQuoteText(slide: PptSlide): string {
 }
 
 function editorialBrutalistSplitLeft(slide: PptSlide): string[] {
-  return slide.left_content?.length ? slide.left_content : (slide.content || []).slice(0, 3);
+  if (hasDocumentFigurePage(slide)) {
+    return documentFigureLeftItems(slide);
+  }
+  if (slide.left_content?.length) return slide.left_content;
+  return (slide.content || []).slice(0, 4);
 }
 
 function editorialBrutalistSplitRight(slide: PptSlide): string[] {
+  if (hasDocumentFigurePage(slide)) return [];
   if (slide.right_content?.length) return slide.right_content;
   if (slide.right_items?.length) {
     return slide.right_items.map((item) =>
       [item.title, item.description].filter(Boolean).join("：")
     );
   }
-  return (slide.content || []).slice(3, 6);
+  return (slide.content || []).slice(4, 8);
+}
+
+function editorialBrutalistSplitStyle(slide: PptSlide): Record<string, string> | undefined {
+  return documentFigureColumnStyle(slide);
+}
+
+function editorialBrutalistSplitListClass(slide: PptSlide): Record<string, boolean> {
+  const count = editorialBrutalistSplitLeft(slide).length;
+  return {
+    "ppt-brutalist-point-list--dense": count >= 5,
+    "ppt-brutalist-point-list--ultra": count >= 7,
+    "ppt-brutalist-point-list--fill": count >= 4,
+  };
+}
+
+function editorialBrutalistInsightInline(slide: PptSlide): boolean {
+  return ["two_column", "content", "toc"].includes(slide.layout);
 }
 
 function isModernLiteraryQuotedFragment(item: unknown): boolean {
@@ -20733,10 +20847,21 @@ defineExpose({
 }
 
 .ppt-brutalist-display {
-  max-width: min(980px, 76%);
+  max-width: min(920px, 90%);
   font-family: var(--ppt-font-display, Anton, "Noto Sans SC", sans-serif);
-  font-size: clamp(72px, 10cqi, 154px);
-  letter-spacing: -0.045em;
+  font-size: clamp(40px, 5.6cqi, 88px);
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+}
+
+.ppt-brutalist-display--medium {
+  font-size: clamp(34px, 4.6cqi, 72px);
+  line-height: 1.06;
+}
+
+.ppt-brutalist-display--long {
+  font-size: clamp(28px, 3.6cqi, 56px);
+  line-height: 1.1;
 }
 
 .ppt-brutalist-title {
@@ -20771,7 +20896,18 @@ defineExpose({
 }
 
 .ppt-brutalist-hero .ppt-brutalist-lead {
-  max-width: 60%;
+  max-width: min(560px, 62%);
+}
+
+.ppt-brutalist-hero-date {
+  margin: clamp(18px, 2.4cqi, 32px) 0 0;
+  color: var(--brutalist-muted);
+  font-family: var(--ppt-font-body, Inter, "Noto Sans SC", sans-serif);
+  font-size: clamp(14px, 1.15cqi, 20px);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.3;
+  text-transform: none;
 }
 
 .ppt-brutalist-watermark {
@@ -20779,20 +20915,21 @@ defineExpose({
   justify-self: end;
   color: var(--brutalist-text);
   font-family: var(--ppt-font-display, Anton, "Noto Sans SC", sans-serif);
-  font-size: clamp(92px, 15cqi, 220px);
+  font-size: clamp(72px, 11cqi, 160px);
   font-weight: 900;
   letter-spacing: -0.05em;
   line-height: 0.85;
   opacity: 0.05;
   pointer-events: none;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .ppt-brutalist-watermark--vertical {
   position: absolute;
-  top: 58px;
-  right: 54px;
+  top: clamp(48px, 6vh, 96px);
+  right: clamp(56px, 6vw, 120px);
   writing-mode: vertical-rl;
+  text-orientation: mixed;
 }
 
 .ppt-brutalist-header {
@@ -20845,6 +20982,171 @@ defineExpose({
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
   min-height: 0;
+}
+
+.ppt-editorial-brutalist--two_column {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.4cqi, 18px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--two_column .ppt-brutalist-header {
+  flex: 0 0 auto;
+  gap: clamp(6px, 0.8cqi, 10px);
+  padding-top: clamp(10px, 1.2cqi, 16px);
+}
+
+.ppt-editorial-brutalist--two_column .ppt-brutalist-title {
+  font-size: clamp(26px, 3cqi, 42px);
+  line-height: 1.04;
+}
+
+.ppt-editorial-brutalist--two_column .ppt-brutalist-split {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.ppt-brutalist-card--scroll {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ppt-brutalist-point-list {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.1cqi, 14px);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ppt-brutalist-point-list--fill {
+  justify-content: space-between;
+}
+
+.ppt-brutalist-point {
+  display: grid;
+  grid-template-columns: clamp(28px, 3cqi, 40px) minmax(0, 1fr);
+  gap: clamp(8px, 1cqi, 12px);
+  align-items: start;
+  padding-bottom: clamp(8px, 1cqi, 12px);
+  border-bottom: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+}
+
+.ppt-brutalist-point:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ppt-brutalist-point-index {
+  color: var(--brutalist-accent);
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  font-size: clamp(18px, 1.8cqi, 28px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ppt-brutalist-point-title {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--brutalist-text);
+  font-size: clamp(13px, 1.08cqi, 16px);
+  font-weight: 700;
+  line-height: 1.28;
+}
+
+.ppt-brutalist-point-body {
+  display: block;
+  color: var(--brutalist-muted);
+  font-size: clamp(12px, 1cqi, 15px);
+  line-height: 1.34;
+}
+
+.ppt-brutalist-point-list--dense {
+  gap: clamp(6px, 0.75cqi, 10px);
+}
+
+.ppt-brutalist-point-list--dense .ppt-brutalist-point {
+  padding-bottom: clamp(5px, 0.7cqi, 8px);
+}
+
+.ppt-brutalist-point-list--dense .ppt-brutalist-point-body {
+  font-size: clamp(11px, 0.92cqi, 13px);
+  line-height: 1.28;
+}
+
+.ppt-brutalist-point-list--dense .ppt-brutalist-point-title {
+  font-size: clamp(12px, 0.98cqi, 14px);
+}
+
+.ppt-brutalist-point-list--ultra {
+  gap: clamp(4px, 0.55cqi, 8px);
+}
+
+.ppt-brutalist-point-list--ultra .ppt-brutalist-point {
+  padding-bottom: clamp(4px, 0.55cqi, 6px);
+}
+
+.ppt-brutalist-point-list--ultra .ppt-brutalist-point-index {
+  font-size: clamp(14px, 1.35cqi, 20px);
+}
+
+.ppt-brutalist-point-list--ultra .ppt-brutalist-point-body {
+  font-size: clamp(10px, 0.82cqi, 12px);
+  line-height: 1.24;
+}
+
+.ppt-brutalist-point-list--ultra .ppt-brutalist-point-title {
+  font-size: clamp(11px, 0.88cqi, 13px);
+  margin-bottom: 2px;
+}
+
+.ppt-brutalist-card--figure-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--brutalist-bg);
+  background: var(--brutalist-text);
+  border-color: var(--brutalist-text);
+  border-left-color: var(--brutalist-accent);
+}
+
+.ppt-brutalist-card--figure-panel h3,
+.ppt-brutalist-card--figure-panel .ppt-md-inline,
+.ppt-brutalist-card--figure-panel figcaption {
+  color: inherit;
+}
+
+.ppt-brutalist-document-figure {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+}
+
+.ppt-brutalist-document-figure-img {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center top;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ppt-brutalist-document-figure figcaption {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  font-size: clamp(10px, 0.85cqi, 12px);
+  line-height: 1.3;
+  opacity: 0.72;
+}
+
+.ppt-brutalist-card--figure-panel .ppt-table-ref {
+  color: var(--brutalist-accent);
 }
 
 .ppt-brutalist-card--invert {
@@ -20940,6 +21242,24 @@ defineExpose({
   font-size: clamp(16px, 1.35cqi, 22px);
   font-weight: 900;
   line-height: 1.24;
+}
+
+.ppt-brutalist-insight--inline {
+  position: static;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding: clamp(10px, 1.2cqi, 14px) 0 0;
+  font-size: clamp(13px, 1.1cqi, 17px);
+  line-height: 1.32;
+}
+
+.ppt-editorial-brutalist--two_column .ppt-brand-footer {
+  position: static;
+  flex: 0 0 auto;
+  margin-top: 2px;
 }
 
 .ppt-editorial-brutalist .ppt-brand-footer {

@@ -23,7 +23,9 @@ const ROOT = resolve(__dirname, "..")
 const DIST = resolve(ROOT, "dist")
 const SITE_ORIGIN = (process.env.SITE_ORIGIN || "https://page2.top").replace(/\/$/, "")
 const LIMIT = Number(process.env.INJECT_SEO_LIMIT || process.env.PRERENDER_LIMIT || 50)
-const SKIP = /^(1|true|yes)$/i.test(String(process.env.SKIP_INJECT_SEO || ""))
+const SKIP = /^(1|true|yes)$/i.test(
+  String(process.env.SKIP_INJECT_SEO || process.env.SKIP_SEO || ""),
+)
 
 function htmlEscape(str) {
   return String(str)
