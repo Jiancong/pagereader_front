@@ -12351,11 +12351,20 @@ function editorialBrutalistHeroDate(slide: PptSlide): string {
   return String(slide.date || pptSource.value.date || "").trim();
 }
 
+function editorialBrutalistDisplayUnits(text: string): number {
+  const cjk = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g) ?? []).length;
+  const latinWords = text
+    .replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean).length;
+  return cjk + latinWords;
+}
+
 function editorialBrutalistDisplayClass(slide: PptSlide): string {
   const text = String(slide.title || pptSource.value.title || "").trim();
-  const words = text.split(/\s+/).filter(Boolean).length;
-  if (words >= 4 || text.length > 32) return "ppt-brutalist-display--long";
-  if (words >= 2 || text.length > 16) return "ppt-brutalist-display--medium";
+  const units = editorialBrutalistDisplayUnits(text);
+  if (units >= 10 || text.length > 28) return "ppt-brutalist-display--long";
+  if (units >= 5 || text.length > 14) return "ppt-brutalist-display--medium";
   return "";
 }
 
@@ -20994,6 +21003,30 @@ defineExpose({
 .ppt-brutalist-display--long {
   font-size: clamp(28px, 3.6cqi, 56px);
   line-height: 1.1;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-display,
+.ppt-editorial-brutalist--end .ppt-brutalist-display {
+  max-width: min(780px, 86%);
+  font-size: clamp(26px, 3.2cqi, 44px);
+  line-height: 1.08;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-display--medium,
+.ppt-editorial-brutalist--end .ppt-brutalist-display--medium {
+  font-size: clamp(22px, 2.7cqi, 36px);
+  line-height: 1.1;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-display--long,
+.ppt-editorial-brutalist--end .ppt-brutalist-display--long {
+  font-size: clamp(18px, 2.2cqi, 30px);
+  line-height: 1.12;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-divider,
+.ppt-editorial-brutalist--end .ppt-brutalist-divider {
+  margin: clamp(14px, 2cqi, 24px) 0;
 }
 
 .ppt-brutalist-title {
