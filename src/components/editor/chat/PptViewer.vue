@@ -8544,6 +8544,8 @@ provide(pptSlideEditorKey, {
   onCellBlur,
   onContentItemBlur,
   onPptTableRefClick,
+  onDocumentFigureCaptionBlur,
+  onDocumentFigureLeftItemBlur,
 });
 
 provide(pptChartContextKey, {

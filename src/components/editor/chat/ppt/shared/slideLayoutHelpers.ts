@@ -1,12 +1,22 @@
 import {
   hasDocumentFigurePage,
+  normalizeDocumentFigure,
   parseColumnSplit,
   resolveSectionSubtitle,
+  type DocumentFigure,
 } from "@/utils/pptChapterImages";
 import type { PptSlide, PptTocEntry } from "../types";
 import { parseTocDesc, parseTocTitle, resolveSlideBulletItems } from "./contentHelpers";
 
-export { hasDocumentFigurePage, resolveSectionSubtitle };
+export { hasDocumentFigurePage, normalizeDocumentFigure, resolveSectionSubtitle };
+
+export function documentFigureImgStyle(fig: DocumentFigure): Record<string, string> {
+  const style: Record<string, string> = {};
+  if (fig.width && fig.height) {
+    style.aspectRatio = `${fig.width} / ${fig.height}`;
+  }
+  return style;
+}
 
 export function isLikelyUrl(text: string): boolean {
   const value = text.trim();

@@ -74,15 +74,51 @@ function renderKatex(latex: string, displayMode: boolean): string {
 }
 
 function plainMathToLatex(expr: string): string {
-  return expr
-    .replace(/\bd_model\b/g, "d_{\\text{model}}")
-    .replace(/\bsin\b/g, "\\sin")
-    .replace(/\bcos\b/g, "\\cos")
-    .replace(/\btan\b/g, "\\tan")
-    .replace(/\blog\b/g, "\\log")
-    .replace(/\bln\b/g, "\\ln")
-    .replace(/\^(\([^)]+\))/g, (_m, inner: string) => `^{${inner.slice(1, -1)}}`)
-    .replace(/\^([A-Za-z0-9_/+\-]+)/g, "^{$1}");
+  return plainAcademicMathToLatex(expr);
+}
+
+/** 将 LLM/原文摘录中的半结构化公式转为 KaTeX 可渲染的 LaTeX */
+function plainAcademicMathToLatex(expr: string): string {
+  let s = expr.trim();
+  s = s.replace(/dimension\s*d\s*model/gi, "d_{\\text{model}}");
+  s = s.replace(/dmodel/gi, "d_{\\text{model}}");
+  s = s.replace(/\bd_model\b/gi, "d_{\\text{model}}");
+  s = s.replace(/\bMultiHead\s*\(\s*Q\s*,\s*K\s*,\s*V\s*\)/gi, "\\text{MultiHead}(Q, K, V)");
+  s = s.replace(/\bConcat\s*\(/gi, "\\text{Concat}(");
+  s = s.replace(/\bAttention\s*\(/gi, "\\text{Attention}(");
+  s = s.replace(/\bLayerNorm\s*\(/gi, "\\text{LayerNorm}(");
+  s = s.replace(/\bSublayer\s*\(/gi, "\\text{Sublayer}(");
+  s = s.replace(/\bSoftmax\s*\(/gi, "\\text{Softmax}(");
+  s = s.replace(/\bW\s+O\b/g, "W^O");
+  s = s.replace(/\bQW\s+Q\s+i\b/gi, "QW^Q_i");
+  s = s.replace(/\bKW\s+K\s+i\b/gi, "KW^K_i");
+  s = s.replace(/\bVW\s+V\s+i\b/gi, "VW^V_i");
+  s = s.replace(/\bhead\s+(\d+)/gi, "head_$1");
+  s = s.replace(/\bheadh\b/gi, "head_h");
+  s = s.replace(/\bheadi\b/gi, "head_i");
+  s = s.replace(/\s+where\s+/gi, " \\text{ where } ");
+  s = s.replace(/\^(\([^)]+\))/g, (_m, inner: string) => `^{${inner.slice(1, -1)}}`);
+  s = s.replace(/\^([A-Za-z0-9_/+\-]+)/g, "^{$1}");
+  s = s.replace(/\bsin\b/g, "\\sin");
+  s = s.replace(/\bcos\b/g, "\\cos");
+  s = s.replace(/\btan\b/g, "\\tan");
+  s = s.replace(/\blog\b/g, "\\log");
+  s = s.replace(/\bln\b/g, "\\ln");
+  return s;
+}
+
+function looksLikeAcademicMath(text: string): boolean {
+  const t = text.trim();
+  if (t.length < 6) return false;
+  if (/\$[^$]+\$/.test(t)) return true;
+  if (/d\s*model|dmodel|d_model/i.test(t)) return true;
+  if (
+    /\b(MultiHead|LayerNorm|Attention|Concat|Sublayer|Softmax)\b/i.test(t) &&
+    /[=+\-*/()]/.test(t)
+  ) {
+    return true;
+  }
+  return /\b[A-Z][a-zA-Z]+\([^)]{2,}\)\s*=/.test(t);
 }
 
 function readBalancedParenGroup(text: string, openIndex: number): string | null {
@@ -153,8 +189,46 @@ function plainBigOToLatex(expr: string): string {
 function segmentValueToLatex(value: string): string {
   const trimmed = value.trim();
   if (trimmed.startsWith("O(")) return plainBigOToLatex(trimmed);
+  if (looksLikeAcademicMath(trimmed)) return plainAcademicMathToLatex(trimmed);
   if (trimmed.includes("\\") || trimmed.includes("$")) return trimmed;
-  return plainMathToLatex(trimmed);
+  return plainAcademicMathToLatex(trimmed);
+}
+
+function findQuotedAcademicSpans(text: string): Array<{ start: number; end: number; raw: string }> {
+  const spans: Array<{ start: number; end: number; raw: string }> = [];
+  const re = /「([^」]+)」/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    const inner = match[1].trim();
+    if (looksLikeAcademicMath(inner)) {
+      spans.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        raw: inner,
+      });
+    }
+  }
+  return spans;
+}
+
+function findAcademicFormulaSpans(text: string): Array<{ start: number; end: number; raw: string }> {
+  const spans: Array<{ start: number; end: number; raw: string }> = [];
+  const patterns = [
+    /MultiHead\([^)]+\)\s*=\s*[^。，；\n—\[]+/gi,
+    /LayerNorm\([^)]+\)(?:\s*=\s*[^。，；\n—\[]+)?/gi,
+    /dimension?\s*d\s*model\s*=\s*\d+|dmodel\s*=\s*\d+/gi,
+  ];
+  for (const re of patterns) {
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(text)) !== null) {
+      spans.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        raw: match[0].trim(),
+      });
+    }
+  }
+  return spans;
 }
 
 function findPlainMathSpans(text: string): Array<{ start: number; end: number; raw: string }> {
@@ -214,7 +288,12 @@ function tokenizeInlineSegments(text: string): InlineSegment[] {
 }
 
 function tokenizePlainMathSegments(text: string): InlineSegment[] {
-  const spans = mergeMathSpans(findPlainMathSpans(text), findBigOSpans(text));
+  const spans = mergeMathSpans(
+    findPlainMathSpans(text),
+    findBigOSpans(text),
+    findQuotedAcademicSpans(text),
+    findAcademicFormulaSpans(text),
+  );
   if (!spans.length) return [{ kind: "text", value: text }];
   const segments: InlineSegment[] = [];
   let cursor = 0;
@@ -250,9 +329,11 @@ function renderInlineSegments(segments: InlineSegment[]): string {
       return parts
         .map((part, index) => {
           const latex = segmentValueToLatex(part);
-          const rendered = renderKatex(latex, !!segment.display);
+          const isLongFormula =
+            part.length > 48 || /\b(MultiHead|LayerNorm|Attention)\b/i.test(part);
+          const rendered = renderKatex(latex, !!segment.display || isLongFormula);
           const prefix = index > 0 ? "，" : "";
-          return `${prefix}<span class="ppt-inline-math${segment.display ? " ppt-inline-math--display" : ""}">${rendered}</span>`;
+          return `${prefix}<span class="ppt-inline-math${segment.display || isLongFormula ? " ppt-inline-math--display" : ""}">${rendered}</span>`;
         })
         .join("");
     })

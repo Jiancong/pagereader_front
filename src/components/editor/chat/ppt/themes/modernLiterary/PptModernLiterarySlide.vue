@@ -10,10 +10,14 @@ import {
   hasContentPointBody,
   parseContentBody,
 } from "../../shared/contentHelpers";
+import {
+  documentFigureImgStyle,
+  normalizeDocumentFigure,
+} from "../../shared/slideLayoutHelpers";
 import type { ModernLiteraryContext } from "./modernLiteraryHelpers";
 import * as modern from "./modernLiteraryHelpers";
 
-defineProps<{ slide: PptSlide }>();
+const props = defineProps<{ slide: PptSlide }>();
 
 const editor = inject(pptSlideEditorKey)!;
 const { locale } = useI18n();
@@ -63,6 +67,8 @@ const t = editor.t;
 const onCellBlur = editor.onCellBlur;
 const onContentItemBlur = editor.onContentItemBlur;
 const onPptTableRefClick = editor.onPptTableRefClick;
+
+const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
 </script>
 
 <template>

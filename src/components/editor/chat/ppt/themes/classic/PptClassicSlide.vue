@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject } from "vue";
+import { computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import PptMarkdownInline from "@/components/editor/chat/PptMarkdownInline.vue";
 import PptTableBlock from "@/components/editor/chat/PptTableBlock.vue";
@@ -32,12 +32,13 @@ import {
   isContentMetricChartSlide,
   isHeroLeftSlide,
   isMetricCardsChartSplitSlide,
+  normalizeDocumentFigure,
   resolveSectionSubtitle,
   tocDensityLevel,
 } from "../../shared/slideLayoutHelpers";
 import type { PptSlide } from "../../types";
 
-defineProps<{ slide: PptSlide }>();
+const props = defineProps<{ slide: PptSlide }>();
 
 const editor = inject(pptSlideEditorKey)!;
 const chart = inject(pptChartContextKey)!;
@@ -53,7 +54,9 @@ const t = editor.t;
 const onCellBlur = editor.onCellBlur;
 const onContentItemBlur = editor.onContentItemBlur;
 const onPptTableRefClick = editor.onPptTableRefClick;
+const onDocumentFigureCaptionBlur = editor.onDocumentFigureCaptionBlur;
 
+const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
 
 const {
   isMultiSeriesLine,

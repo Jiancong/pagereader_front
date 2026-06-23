@@ -13,6 +13,8 @@ export interface PptSlideEditorContext {
   onCellBlur: (event: Event, path: string) => void;
   onContentItemBlur: (event: Event, slideIdx: number, itemIdx: number) => void;
   onPptTableRefClick: (refId: string, slide: PptSlide) => void;
+  onDocumentFigureCaptionBlur: (event: Event) => void;
+  onDocumentFigureLeftItemBlur: (event: Event, itemIdx: number) => void;
 }
 
 export const pptSlideEditorKey: InjectionKey<PptSlideEditorContext> = Symbol("pptSlideEditor");

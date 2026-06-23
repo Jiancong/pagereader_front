@@ -13,8 +13,10 @@ import {
   resolveSlideBulletItems,
 } from "../../shared/contentHelpers";
 import {
+  documentFigureImgStyle,
   hasDocumentFigurePage,
   isHeroLeftSlide,
+  normalizeDocumentFigure,
   tocDensityLevel,
 } from "../../shared/slideLayoutHelpers";
 import { modernLiteraryCompareTitleDuplicatesSlide } from "../modernLiterary/modernLiteraryHelpers";
@@ -71,6 +73,10 @@ const t = editor.t;
 const onCellBlur = editor.onCellBlur;
 const onContentItemBlur = editor.onContentItemBlur;
 const onPptTableRefClick = editor.onPptTableRefClick;
+const onDocumentFigureCaptionBlur = editor.onDocumentFigureCaptionBlur;
+const onDocumentFigureLeftItemBlur = editor.onDocumentFigureLeftItemBlur;
+
+const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
 
 const slideClass = computed(() => [
   `ppt-editorial-brutalist--${props.slide.layout}`,
@@ -662,7 +668,6 @@ const slideClass = computed(() => [
                   @blur="onCellBlur($event, `slides.${currentSlide}.key_insight`)"
                   @ref-click="onPptTableRefClick($event, slide)"
                 />
-                <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
     <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
   </div>
 </template>

@@ -1199,6 +1199,24 @@
   font-size: clamp(10px, 0.85cqi, 12px);
 }
 
+.ppt-brutalist-quote--multi :deep(.ppt-inline-math) {
+  display: block;
+  max-width: 100%;
+  margin: 0.15em 0;
+  overflow-x: auto;
+}
+
+.ppt-brutalist-quote--multi :deep(.ppt-inline-math .katex) {
+  font-size: clamp(0.62em, 2.2cqmin, 0.88em);
+  white-space: normal;
+  text-align: left;
+}
+
+.ppt-brutalist-quote--multi .ppt-brutalist-point-body :deep(.ppt-inline-math) {
+  margin-top: 0.2em;
+  margin-bottom: 0.1em;
+}
+
 .ppt-brutalist-quote-list--longtext:not(.ppt-brutalist-point-list--quote-fill) .ppt-brutalist-point-body {
   font-size: clamp(10px, 0.78cqi, 12px);
   line-height: 1.2;
