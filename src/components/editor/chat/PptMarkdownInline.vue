@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import "katex/dist/katex.min.css";
 import {
   formatPptInlineMarkdown,
   formatPptTableCellMarkdown,
@@ -81,5 +82,23 @@ function onClick(ev: MouseEvent) {
   &:hover {
     text-decoration: none;
   }
+}
+
+.ppt-md-inline :deep(.ppt-inline-math) {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 0.05em;
+  vertical-align: middle;
+  overflow-x: auto;
+}
+
+.ppt-md-inline :deep(.ppt-inline-math--display) {
+  display: block;
+  margin: 0.35em 0;
+  overflow-x: auto;
+}
+
+.ppt-md-inline :deep(.katex) {
+  font-size: 1em;
 }
 </style>

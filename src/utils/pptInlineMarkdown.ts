@@ -1,6 +1,8 @@
 /**
- * PPT 行内 Markdown：**粗体**、*斜体*、`代码`（不解析块级语法）。
+ * PPT 行内 Markdown：**粗体**、*斜体*、`代码`、$...$ / $$...$$ 数学公式（不解析块级语法）。
  */
+
+import katex from "katex";
 
 /** 全角星号 → ASCII，避免 LLM 输出不可解析字符 */
 function normalizeAsterisks(text: string): string {
@@ -56,6 +58,205 @@ function convertSingleAsteriskItalicToEmHtml(html: string): string {
 
 function convertBacktickCodeToHtml(html: string): string {
   return html.replace(/`([^`\n]+?)`/g, (_m, inner: string) => `<code>${escapeHtml(inner)}</code>`);
+}
+
+function renderKatex(latex: string, displayMode: boolean): string {
+  try {
+    return katex.renderToString(latex, {
+      displayMode,
+      throwOnError: false,
+      strict: "ignore",
+      trust: false,
+    });
+  } catch {
+    return escapeHtml(latex);
+  }
+}
+
+function plainMathToLatex(expr: string): string {
+  return expr
+    .replace(/\bd_model\b/g, "d_{\\text{model}}")
+    .replace(/\bsin\b/g, "\\sin")
+    .replace(/\bcos\b/g, "\\cos")
+    .replace(/\btan\b/g, "\\tan")
+    .replace(/\blog\b/g, "\\log")
+    .replace(/\bln\b/g, "\\ln")
+    .replace(/\^(\([^)]+\))/g, (_m, inner: string) => `^{${inner.slice(1, -1)}}`)
+    .replace(/\^([A-Za-z0-9_/+\-]+)/g, "^{$1}");
+}
+
+function readBalancedParenGroup(text: string, openIndex: number): string | null {
+  if (text[openIndex] !== "(") return null;
+  let depth = 0;
+  for (let i = openIndex; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") {
+      depth -= 1;
+      if (depth === 0) return text.slice(openIndex, i + 1);
+    }
+  }
+  return null;
+}
+
+function readPlainMathExpression(text: string, start: number): string | null {
+  const fnMatch = text.slice(start).match(/^[A-Za-z]+(?:\([^)]*\))?\s*=\s*(?:sin|cos|tan|log|ln|exp)\(/);
+  if (!fnMatch) return null;
+  let cursor = start + fnMatch[0].length - 1;
+  const fnArgs = readBalancedParenGroup(text, cursor);
+  if (!fnArgs) return null;
+  cursor += fnArgs.length;
+  return text.slice(start, cursor);
+}
+
+function findBigOSpans(text: string): Array<{ start: number; end: number; raw: string }> {
+  const spans: Array<{ start: number; end: number; raw: string }> = [];
+  const trigger = /O\(/g;
+  let match: RegExpExecArray | null;
+  while ((match = trigger.exec(text)) !== null) {
+    const start = match.index;
+    const group = readBalancedParenGroup(text, start + 1);
+    if (!group) continue;
+    spans.push({
+      start,
+      end: start + 1 + group.length,
+      raw: text.slice(start, start + 1 + group.length),
+    });
+  }
+  return spans;
+}
+
+function mergeMathSpans(
+  ...lists: Array<Array<{ start: number; end: number; raw: string }>>
+): Array<{ start: number; end: number; raw: string }> {
+  const merged = lists.flat().sort((a, b) => a.start - b.start || a.end - b.end);
+  const out: Array<{ start: number; end: number; raw: string }> = [];
+  for (const span of merged) {
+    const last = out[out.length - 1];
+    if (!last || span.start >= last.end) out.push(span);
+    else if (span.end > last.end) last.end = span.end;
+  }
+  return out;
+}
+
+function plainBigOToLatex(expr: string): string {
+  const body = expr.startsWith("O(") ? expr.slice(2, -1) : expr;
+  const normalized = body
+    .replace(/²/g, "^{2}")
+    .replace(/³/g, "^{3}")
+    .replace(/·/g, " \\cdot ")
+    .replace(/log_k/g, "\\log_k")
+    .replace(/_k/g, "_{k}");
+  return `O(${normalized})`;
+}
+
+function segmentValueToLatex(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("O(")) return plainBigOToLatex(trimmed);
+  if (trimmed.includes("\\") || trimmed.includes("$")) return trimmed;
+  return plainMathToLatex(trimmed);
+}
+
+function findPlainMathSpans(text: string): Array<{ start: number; end: number; raw: string }> {
+  const spans: Array<{ start: number; end: number; raw: string }> = [];
+  const trigger = /[A-Za-z]+\([^)]*\)\s*=\s*(?:sin|cos|tan|log|ln|exp)\(/g;
+  let match: RegExpExecArray | null;
+  while ((match = trigger.exec(text)) !== null) {
+    const start = match.index;
+    const first = readPlainMathExpression(text, start);
+    if (!first) continue;
+    let end = start + first.length;
+    while (text[end] === " " || text[end] === "，" || text[end] === ",") {
+      const sep = text[end];
+      let nextStart = end + 1;
+      if (sep !== " ") nextStart = end + 1;
+      else {
+        while (text[nextStart] === " ") nextStart += 1;
+      }
+      const next = readPlainMathExpression(text, nextStart);
+      if (!next) break;
+      end = nextStart + next.length;
+      if (text[end - 1] !== ")" && text[end] !== "，" && text[end] !== ",") break;
+      if (sep === " " && text[end] !== "，" && text[end] !== ",") break;
+    }
+    spans.push({ start, end, raw: text.slice(start, end) });
+    trigger.lastIndex = end;
+  }
+  return spans;
+}
+
+type InlineSegment =
+  | { kind: "text"; value: string }
+  | { kind: "math"; value: string; display?: boolean };
+
+function tokenizeInlineSegments(text: string): InlineSegment[] {
+  const segments: InlineSegment[] = [];
+  if (text.includes("$")) {
+    let cursor = 0;
+    const re = /\$\$[\s\S]*?\$\$|\$(?:\\.|[^$\\])+\$/g;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(text)) !== null) {
+      if (match.index > cursor) {
+        segments.push(...tokenizePlainMathSegments(text.slice(cursor, match.index)));
+      }
+      const token = match[0];
+      if (token.startsWith("$$")) {
+        segments.push({ kind: "math", value: token.slice(2, -2).trim(), display: true });
+      } else {
+        segments.push({ kind: "math", value: token.slice(1, -1).trim() });
+      }
+      cursor = match.index + token.length;
+    }
+    if (cursor < text.length) segments.push(...tokenizePlainMathSegments(text.slice(cursor)));
+    return segments.length ? segments : [{ kind: "text", value: text }];
+  }
+  return tokenizePlainMathSegments(text);
+}
+
+function tokenizePlainMathSegments(text: string): InlineSegment[] {
+  const spans = mergeMathSpans(findPlainMathSpans(text), findBigOSpans(text));
+  if (!spans.length) return [{ kind: "text", value: text }];
+  const segments: InlineSegment[] = [];
+  let cursor = 0;
+  for (const span of spans) {
+    if (span.start > cursor) segments.push({ kind: "text", value: text.slice(cursor, span.start) });
+    segments.push({ kind: "math", value: span.raw });
+    cursor = span.end;
+  }
+  if (cursor < text.length) segments.push({ kind: "text", value: text.slice(cursor) });
+  return segments;
+}
+
+function applyInlineMarkdownToText(text: string): string {
+  let html = convertDoubleAsteriskBoldToStrongHtml(text);
+  html = convertSingleAsteriskItalicToEmHtml(html);
+  html = convertBacktickCodeToHtml(html);
+  return html;
+}
+
+function renderInlineSegments(segments: InlineSegment[]): string {
+  return segments
+    .map((segment) => {
+      if (segment.kind === "text") {
+        return applyInlineMarkdownToText(segment.value);
+      }
+      const parts =
+        segment.value.startsWith("O(") ||
+        !/=\s*(?:sin|cos|tan|log|ln|exp)\(/.test(segment.value)
+          ? [segment.value]
+          : segment.value.split(
+              /(?<=[)])\s*[，,]\s*(?=[A-Za-z]+\([^)]*\)\s*=\s*(?:sin|cos|tan|log|ln|exp)\()/
+            );
+      return parts
+        .map((part, index) => {
+          const latex = segmentValueToLatex(part);
+          const rendered = renderKatex(latex, !!segment.display);
+          const prefix = index > 0 ? "，" : "";
+          return `${prefix}<span class="ppt-inline-math${segment.display ? " ppt-inline-math--display" : ""}">${rendered}</span>`;
+        })
+        .join("");
+    })
+    .join("");
 }
 
 /** 去掉行内标记，供字体选择等逻辑使用 */
@@ -186,10 +387,7 @@ export function formatPptInlineMarkdown(source: unknown): string {
   }
   const text = normalizeAsterisks(String(source));
   if (text.trim() === "[object Object]") return "";
-  let html = convertDoubleAsteriskBoldToStrongHtml(text);
-  html = convertSingleAsteriskItalicToEmHtml(html);
-  html = convertBacktickCodeToHtml(html);
-  return html;
+  return renderInlineSegments(tokenizeInlineSegments(text));
 }
 
 export interface PptPageReference {

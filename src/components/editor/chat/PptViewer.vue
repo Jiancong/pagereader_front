@@ -669,46 +669,328 @@
                 </h2>
               </header>
               <div
-                v-if="slide.layout === 'data' && slide.chart"
+                v-if="editorialBrutalistIsDataSlide(slide)"
                 class="ppt-brutalist-data-panel"
+                :class="{
+                  'ppt-brutalist-data-panel--table': editorialBrutalistShowDataTable(slide),
+                }"
               >
-                <section class="ppt-brutalist-chart-summary">
-                  <p class="ppt-brutalist-kicker">{{ slide.chart.type }}</p>
-                  <h3>{{ slide.chart.title || slide.title }}</h3>
-                  <PptMarkdownInline
-                    v-if="slide.key_insight || slide.chart.note"
-                    class="ppt-brutalist-card-body"
-                    :text="slide.key_insight || slide.chart.note || ''"
+                <section
+                  v-if="resolveSlideBulletItems(slide).length"
+                  class="ppt-brutalist-data-notes"
+                >
+                  <div
+                    class="ppt-brutalist-point-list"
+                    :class="editorialBrutalistSplitListClass(slide)"
+                  >
+                    <article
+                      v-for="(item, bi) in resolveSlideBulletItems(slide)"
+                      :key="'brutalist-data-' + bi"
+                      class="ppt-brutalist-point"
+                    >
+                      <div class="ppt-brutalist-point-index">
+                        {{ String(bi + 1).padStart(2, "0") }}
+                      </div>
+                      <div class="ppt-brutalist-point-copy">
+                        <PptMarkdownInline
+                          v-if="hasContentPointBody(item)"
+                          class="ppt-brutalist-point-title"
+                          :text="contentPointTitle(item)"
+                          :page-references="slide.page_references"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                        <PptMarkdownInline
+                          class="ppt-brutalist-point-body"
+                          :text="
+                            hasContentPointBody(item) ? parseContentBody(item) : displayText(item)
+                          "
+                          :page-references="slide.page_references"
+                          :editable="isEditing"
+                          @blur="onContentItemBlur($event, currentSlide, bi)"
+                          @ref-click="onPptTableRefClick($event, slide)"
+                        />
+                      </div>
+                    </article>
+                  </div>
+                </section>
+                <section class="ppt-brutalist-data-chart">
+                  <PptTableBlock
+                    v-if="editorialBrutalistShowDataTable(slide) && slide.table"
+                    class="ppt-brutalist-data-table"
+                    :table="slide.table"
                     :page-references="slide.page_references"
+                    compact
                     @ref-click="onPptTableRefClick($event, slide)"
                   />
-                </section>
-                <div class="ppt-brutalist-card-grid ppt-brutalist-card-grid--data">
-                  <article
-                    v-for="card in editorialBrutalistChartCards(slide)"
-                    :key="'brutalist-chart-' + card.index"
-                    class="ppt-brutalist-card"
-                  >
-                    <div class="ppt-brutalist-card-index">{{ card.index }}</div>
-                    <h3>{{ card.title }}</h3>
-                    <PptMarkdownInline
-                      v-if="card.body"
-                      class="ppt-brutalist-card-body"
-                      :text="card.body"
+                  <template v-else-if="slide.chart">
+                    <h3 class="ppt-brutalist-data-chart-title">
+                      {{ slide.chart.title || slide.title }}
+                    </h3>
+                    <PptChartSourceLine
+                      :chart="slide.chart"
                       :page-references="slide.page_references"
-                      @ref-click="onPptTableRefClick($event, slide)"
                     />
-                  </article>
-                </div>
+                    <div
+                      v-if="slide.chart.type === 'line'"
+                      class="ppt-line-chart-wrap ppt-brutalist-line-chart-wrap"
+                    >
+                    <div v-if="lineChartLegendItems.length" class="ppt-line-legend">
+                      <span
+                        v-for="(label, si) in lineChartLegendItems"
+                        :key="'brutalist-leg-' + si"
+                        class="ppt-line-legend-item"
+                      >
+                        <span
+                          class="ppt-line-legend-dot"
+                          :style="{ background: getSeriesColor(si) }"
+                        ></span>
+                        {{ label }}
+                      </span>
+                    </div>
+                    <svg
+                      class="ppt-chart-svg"
+                      :viewBox="LINE_CHART_VIEWBOX"
+                      preserveAspectRatio="xMidYMid meet"
+                    >
+                      <template v-for="(tick, ti) in getLineYTicks()" :key="'blyt' + ti">
+                        <text
+                          x="48"
+                          :y="mapLineY(tick) + 4"
+                          class="ppt-chart-label"
+                          text-anchor="end"
+                        >
+                          {{ formatTickValue(tick) }}
+                        </text>
+                        <line
+                          x1="52"
+                          :y1="mapLineY(tick)"
+                          x2="460"
+                          :y2="mapLineY(tick)"
+                          stroke="var(--ppt-chart-grid)"
+                          stroke-width="0.5"
+                        />
+                      </template>
+                      <template v-if="isMultiSeriesLine">
+                        <template
+                          v-for="(s, si) in lineChartSeriesList"
+                          :key="'bml' + si"
+                        >
+                          <polyline
+                            :points="lineSeriesPoints(si)"
+                            class="ppt-polyline"
+                            fill="none"
+                            :style="chartStrokeStyle(si)"
+                          />
+                        </template>
+                        <template
+                          v-for="(cat, ci) in lineChartCategories"
+                          :key="'blx' + ci"
+                        >
+                          <text
+                            :x="lineCategoryLabelX(ci)"
+                            :y="
+                              shouldRotateLabels
+                                ? LINE_CHART_X_CAT_Y_ROTATED
+                                : LINE_CHART_X_CAT_Y
+                            "
+                            class="ppt-chart-label"
+                            :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
+                            :transform="
+                              shouldRotateLabels
+                                ? `rotate(-45, ${lineCategoryLabelX(ci)}, ${LINE_CHART_X_CAT_Y_ROTATED})`
+                                : undefined
+                            "
+                            :style="shouldRotateLabels ? 'font-size: 8px' : ''"
+                          >
+                            {{ cat }}
+                          </text>
+                        </template>
+                        <template
+                          v-for="(s, si) in lineChartSeriesList"
+                          :key="'bld' + si"
+                        >
+                          <circle
+                            v-for="(cat, ci) in lineChartCategories"
+                            :key="'bld' + si + '-' + ci"
+                            :cx="lineCategoryLabelX(ci)"
+                            :cy="mapLineY(lineSeriesValue(ci, si))"
+                            r="4"
+                            class="ppt-line-dot"
+                            :style="chartFillStyle(si)"
+                          />
+                        </template>
+                      </template>
+                      <template v-else>
+                        <polyline
+                          :points="linePoints"
+                          class="ppt-polyline"
+                          fill="none"
+                          :style="chartStrokeStyle(0)"
+                        />
+                        <polyline
+                          v-if="multiLinePoints.secondary"
+                          :points="multiLinePoints.secondary"
+                          class="ppt-polyline ppt-line-secondary"
+                          fill="none"
+                          :style="chartStrokeStyle(1)"
+                        />
+                        <polyline
+                          v-if="multiLinePoints.tertiary"
+                          :points="multiLinePoints.tertiary"
+                          class="ppt-polyline ppt-line-tertiary"
+                          fill="none"
+                          :style="chartStrokeStyle(2)"
+                        />
+                        <template v-for="(d, di) in slide.chart.data" :key="'bl' + di">
+                          <circle
+                            :cx="55 + di * (400 / Math.max(slide.chart.data.length - 1, 1))"
+                            :cy="mapLineY(d.value)"
+                            r="4"
+                            class="ppt-line-dot"
+                            :style="chartFillStyle(0)"
+                          />
+                          <text
+                            :x="55 + di * (400 / Math.max(slide.chart.data.length - 1, 1))"
+                            :y="
+                              shouldRotateLabels
+                                ? LINE_CHART_X_CAT_Y_ROTATED
+                                : LINE_CHART_X_CAT_Y
+                            "
+                            class="ppt-chart-label"
+                            :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
+                            :transform="
+                              shouldRotateLabels
+                                ? `rotate(-45, ${
+                                    55 + di * (400 / Math.max(slide.chart.data.length - 1, 1))
+                                  }, ${LINE_CHART_X_CAT_Y_ROTATED})`
+                                : undefined
+                            "
+                            :style="shouldRotateLabels ? 'font-size: 8px' : ''"
+                          >
+                            {{ d.label }}
+                          </text>
+                        </template>
+                      </template>
+                    </svg>
+                  </div>
+                  <div
+                    v-else-if="slide.chart.type === 'bar' && isGroupedBar"
+                    class="ppt-grouped-bar-wrap ppt-brutalist-grouped-bar-wrap"
+                  >
+                    <div v-if="groupedBarSeriesList.length" class="ppt-grouped-bar-legend">
+                      <span
+                        v-for="(s, si) in groupedBarSeriesList"
+                        :key="'brutalist-gbl-' + si"
+                        class="ppt-grouped-bar-legend-item"
+                      >
+                        <span
+                          class="ppt-pie-dot"
+                          :style="{ background: getSeriesColor(si) }"
+                        ></span>
+                        {{ groupedBarSeriesLabel(s) }}
+                      </span>
+                    </div>
+                    <svg
+                      class="ppt-chart-svg"
+                      viewBox="0 0 500 260"
+                      preserveAspectRatio="xMidYMid meet"
+                    >
+                      <template v-for="(tick, ti) in getBarYTicks()" :key="'bgbyt' + ti">
+                        <text
+                          x="48"
+                          :y="mapBarY(tick) + 4"
+                          class="ppt-chart-label"
+                          text-anchor="end"
+                        >
+                          {{ formatTickValue(tick) }}
+                        </text>
+                        <line
+                          x1="52"
+                          :y1="mapBarY(tick)"
+                          x2="460"
+                          :y2="mapBarY(tick)"
+                          stroke="var(--ppt-chart-grid)"
+                          stroke-width="0.5"
+                        />
+                      </template>
+                      <line
+                        v-if="barChartYRange.min < 0"
+                        x1="52"
+                        :y1="barZeroY"
+                        x2="460"
+                        :y2="barZeroY"
+                        stroke="var(--ppt-chart-zero-line)"
+                        stroke-width="1"
+                      />
+                      <template
+                        v-for="(cat, ci) in groupedBarCategories"
+                        :key="'bgbcat-' + ci"
+                      >
+                        <template
+                          v-for="(s, si) in groupedBarSeriesList"
+                          :key="'bgbb-' + ci + '-' + si"
+                        >
+                          <rect
+                            :x="groupedBarRectX(ci, si, 'compact')"
+                            :y="Math.min(mapBarYSmall(groupedBarValue(ci, si)), mapBarYSmall(0))"
+                            :width="groupedBarRectWidth('compact')"
+                            :height="
+                              Math.max(
+                                1,
+                                Math.abs(mapBarYSmall(groupedBarValue(ci, si)) - mapBarYSmall(0))
+                              )
+                            "
+                            :style="groupedBarRectStyle(si, groupedBarValue(ci, si))"
+                            :class="[
+                              'ppt-bar-rect',
+                              groupedBarValue(ci, si) < 0 ? 'ppt-bar-negative' : '',
+                            ]"
+                            rx="3"
+                          />
+                        </template>
+                        <text
+                          :x="groupedBarCategoryLabelX(ci, 'compact')"
+                          :y="shouldRotateLabels ? BAR_CHART_X_CAT_Y_ROTATED : BAR_CHART_X_CAT_Y"
+                          class="ppt-chart-label"
+                          :text-anchor="shouldRotateLabels ? 'end' : 'middle'"
+                          :transform="
+                            shouldRotateLabels
+                              ? chartXCatLabelTransform(
+                                  groupedBarCategoryLabelX(ci, 'compact'),
+                                  BAR_CHART_X_CAT_Y_ROTATED
+                                )
+                              : undefined
+                          "
+                          :style="shouldRotateLabels ? 'font-size: 8px' : ''"
+                        >
+                          {{ cat }}
+                        </text>
+                      </template>
+                    </svg>
+                  </div>
+                  <div v-else class="ppt-brutalist-data-chart-fallback">
+                    <div
+                      v-for="card in editorialBrutalistChartCards(slide)"
+                      :key="'brutalist-chart-' + card.index"
+                      class="ppt-brutalist-data-chart-row"
+                    >
+                      <strong>{{ card.title }}</strong>
+                      <PptMarkdownInline
+                        v-if="card.body"
+                        class="ppt-brutalist-card-body"
+                        :text="card.body"
+                        :page-references="slide.page_references"
+                        @ref-click="onPptTableRefClick($event, slide)"
+                      />
+                    </div>
+                  </div>
+                  </template>
+                </section>
               </div>
               <div
                 v-else
                 class="ppt-brutalist-card-grid"
-                :class="
-                  slide.layout === 'toc'
-                    ? `ppt-brutalist-card-grid--${tocDensityLevel(slide)}`
-                    : undefined
-                "
+                :class="`ppt-brutalist-card-grid--${editorialBrutalistCardGridDensity(slide)}`"
               >
                 <article
                   v-for="card in editorialBrutalistContentCards(slide)"
@@ -756,7 +1038,7 @@
             </template>
 
             <PptMarkdownInline
-              v-if="slide.key_insight && !['quote', 'data'].includes(slide.layout)"
+              v-if="slide.key_insight && !['quote'].includes(slide.layout)"
               class="ppt-brutalist-insight"
               :class="{ 'ppt-brutalist-insight--inline': editorialBrutalistInsightInline(slide) }"
               :text="slide.key_insight"
@@ -12179,6 +12461,18 @@ function tocDensityLevel(slide: PptSlide | undefined): "default" | "medium" | "c
   return "default";
 }
 
+function editorialBrutalistCardGridDensity(
+  slide: PptSlide,
+): "default" | "medium" | "compact" {
+  if (slide.layout === "toc") return tocDensityLevel(slide);
+  const cards = editorialBrutalistContentCards(slide);
+  const count = cards.length;
+  const maxBodyLen = cards.reduce((max, card) => Math.max(max, (card.body || "").length), 0);
+  if (count >= 4 || maxBodyLen >= 50) return "medium";
+  if (count >= 3 || maxBodyLen >= 30) return "medium";
+  return "default";
+}
+
 /** 目录图标槽位（0–5），与模板内 SVG 分支对应 */
 function tocIconIndex(entry: PptTocEntry, ti: number): number {
   const icon = (entry.icon || "").toLowerCase();
@@ -12325,7 +12619,13 @@ function editorialBrutalistLayout(slide: PptSlide): EditorialBrutalistLayout {
 
 function editorialBrutalistKicker(slide: PptSlide): string {
   if (slide.layout === "cover") {
-    return slide.author || slide.organization || pptSource.value.author || t("agent.pptDefaultOrg");
+    const candidates = [
+      slide.organization,
+      slide.author,
+      pptSource.value.organization,
+      pptSource.value.author,
+    ].map((value) => String(value || "").trim()).filter((value) => value && !isLikelyUrl(value));
+    return candidates[0] || t("agent.pptDefaultOrg");
   }
   if (slide.layout === "section") {
     return t("agent.pptChapterLabel", {
@@ -12360,12 +12660,30 @@ function editorialBrutalistDisplayUnits(text: string): number {
   return cjk + latinWords;
 }
 
-function editorialBrutalistDisplayClass(slide: PptSlide): string {
+function editorialBrutalistDisplayClass(slide: PptSlide): Record<string, boolean> {
   const text = String(slide.title || pptSource.value.title || "").trim();
   const units = editorialBrutalistDisplayUnits(text);
-  if (units >= 10 || text.length > 28) return "ppt-brutalist-display--long";
-  if (units >= 5 || text.length > 14) return "ppt-brutalist-display--medium";
-  return "";
+  const latin = isPredominantlyLatin(text);
+  const latinWords = text.split(/\s+/).filter(Boolean).length;
+
+  if (latin) {
+    return {
+      "ppt-brutalist-display--latin": true,
+      "ppt-brutalist-display--medium": latinWords >= 3 && latinWords < 6,
+      "ppt-brutalist-display--long": latinWords >= 6 || text.length > 24,
+    };
+  }
+
+  return {
+    "ppt-brutalist-display--cjk": true,
+    "ppt-brutalist-display--medium": units >= 4 && units < 10 && text.length <= 28,
+    "ppt-brutalist-display--long": units >= 10 || text.length > 28,
+  };
+}
+
+function isLikelyUrl(text: string): boolean {
+  const value = text.trim();
+  return /^https?:\/\//i.test(value) || /^www\./i.test(value);
 }
 
 function shouldShowEditorialBrutalistVerticalWatermark(slide: PptSlide): boolean {
@@ -12414,13 +12732,70 @@ function editorialBrutalistContentCards(slide: PptSlide): EditorialBrutalistCard
 function editorialBrutalistChartCards(slide: PptSlide): EditorialBrutalistCard[] {
   const chart = slide.chart;
   if (!chart?.data?.length) return [];
-  return chart.data.slice(0, 4).map((item, i) => ({
+  if (isMultiSeriesLineChart(chart)) return [];
+  if (isGroupedBarChart(chart)) return [];
+  const rows = chart.data;
+  if (rows.some((item) => Array.isArray(item.values) && item.values.length)) return [];
+  return rows.slice(0, 4).map((item, i) => ({
     index: String(i + 1).padStart(2, "0"),
     title: item.label || item.stage || item.name || item.title || `Item ${i + 1}`,
     body: [formatChartDataValue(item.value), item.description || item.desc || item.text]
       .filter(Boolean)
       .join(" / "),
   }));
+}
+
+function getGroupedBarSeriesRows(chart: PptChart | undefined): ChartDataItem[] {
+  if (!chart || chart.type !== "bar") return [];
+  return (chart.data ?? []).filter((d) => Array.isArray(d.values) && d.values.length > 0);
+}
+
+function isGroupedBarChart(chart: PptChart | undefined): boolean {
+  if (!chart || chart.type !== "bar") return false;
+  const rows = chart.data ?? [];
+  const seriesRows = getGroupedBarSeriesRows(chart);
+  if (seriesRows.length <= 1) return false;
+  const simpleRows = rows.filter(
+    (d) =>
+      d.label != null &&
+      d.value != null &&
+      Number.isFinite(Number(d.value)) &&
+      !(Array.isArray(d.values) && d.values.length)
+  );
+  if (simpleRows.length === rows.length) return false;
+  const cats = chart.categories ?? chart.labels ?? [];
+  return cats.length > 0 && seriesRows.length > 1;
+}
+
+function chartHasPlottableValues(chart: PptChart | undefined): boolean {
+  if (!chart?.data?.length) return false;
+  for (const item of chart.data) {
+    if (Array.isArray(item.values) && item.values.length) {
+      for (const raw of item.values) {
+        const n = typeof raw === "number" ? raw : Number(raw);
+        if (Number.isFinite(n) && n !== 0) return true;
+      }
+    } else if (item.value != null) {
+      const n = typeof item.value === "number" ? item.value : Number(item.value);
+      if (Number.isFinite(n) && n !== 0) return true;
+    }
+  }
+  return false;
+}
+
+function editorialBrutalistIsDataSlide(slide: PptSlide): boolean {
+  if (slide.layout !== "data") return false;
+  return !!(
+    slide.chart ||
+    slide.table?.rows?.length ||
+    resolveSlideBulletItems(slide).length
+  );
+}
+
+function editorialBrutalistShowDataTable(slide: PptSlide): boolean {
+  if (!slide.table?.rows?.length) return false;
+  if (!slide.chart) return true;
+  return !chartHasPlottableValues(slide.chart);
 }
 
 function editorialBrutalistQuoteText(slide: PptSlide): string {
@@ -12503,17 +12878,21 @@ function editorialBrutalistSplitStyle(slide: PptSlide): Record<string, string> |
 }
 
 function editorialBrutalistSplitListClass(slide: PptSlide): Record<string, boolean> {
-  const count = editorialBrutalistSplitLeft(slide).length;
+  const count = Math.max(
+    editorialBrutalistSplitLeft(slide).length,
+    resolveSlideBulletItems(slide).length,
+  );
+  const docFigure = hasDocumentFigurePage(slide);
   return {
     "ppt-brutalist-point-list--dense": count >= 5,
-    "ppt-brutalist-point-list--ultra": count >= 6,
+    "ppt-brutalist-point-list--ultra": count >= 6 && !docFigure,
     "ppt-brutalist-point-list--many": count >= 6,
-    "ppt-brutalist-point-list--fill": count >= 4 && count <= 5,
+    "ppt-brutalist-point-list--fill": docFigure ? count >= 4 : count >= 4 && count <= 5,
   };
 }
 
 function editorialBrutalistInsightInline(slide: PptSlide): boolean {
-  return ["two_column", "content", "toc"].includes(slide.layout);
+  return ["two_column", "content", "toc", "data"].includes(slide.layout);
 }
 
 function isModernLiteraryQuotedFragment(item: unknown): boolean {
@@ -20992,7 +21371,21 @@ defineExpose({
   font-family: var(--ppt-font-display, Anton, "Noto Sans SC", sans-serif);
   font-size: clamp(40px, 5.6cqi, 88px);
   letter-spacing: -0.03em;
-  line-height: 1.04;
+  line-height: 1.12;
+  text-transform: none;
+}
+
+.ppt-brutalist-display .ppt-md-inline {
+  display: block;
+  line-height: inherit;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.ppt-brutalist-display--cjk {
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  letter-spacing: -0.01em;
+  line-height: 1.14;
 }
 
 .ppt-brutalist-display--medium {
@@ -21005,28 +21398,151 @@ defineExpose({
   line-height: 1.1;
 }
 
+.ppt-editorial-brutalist--cover {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(12px, 1.5cqi, 20px);
+  padding: clamp(40px, 5vh, 72px) clamp(48px, 5.5vw, 96px) clamp(48px, 5.5vh, 72px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-hero {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: clamp(10px, 1.2cqi, 16px);
+  width: 100%;
+  max-width: 100%;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-hero .ppt-brutalist-kicker {
+  margin-bottom: 0;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-display {
+  max-width: 100%;
+  font-size: clamp(36px, 4.4cqi, 72px);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-display .ppt-md-inline {
+  display: block;
+  line-height: inherit;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-display--latin {
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  letter-spacing: -0.01em;
+  line-height: 1.16;
+  text-transform: none;
+  text-wrap: balance;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-display--latin.ppt-brutalist-display--medium {
+  font-size: clamp(28px, 3.2cqi, 48px);
+  line-height: 1.18;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-display--latin.ppt-brutalist-display--long {
+  font-size: clamp(22px, 2.5cqi, 38px);
+  line-height: 1.2;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-divider {
+  margin: clamp(12px, 1.6cqi, 20px) 0;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-hero .ppt-brutalist-lead {
+  max-width: min(640px, 72%);
+}
+
+.ppt-editorial-brutalist--cover .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(14px, 1.8vh, 22px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ppt-editorial-brutalist--section,
+.ppt-editorial-brutalist--end {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(10px, 1.2cqi, 16px);
+  padding: clamp(36px, 4.5vh, 56px) clamp(44px, 5vw, 80px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-hero,
+.ppt-editorial-brutalist--end .ppt-brutalist-hero {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  gap: clamp(10px, 1.2cqi, 16px);
+  width: 100%;
+  max-width: min(780px, 78%);
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-hero .ppt-brutalist-kicker,
+.ppt-editorial-brutalist--end .ppt-brutalist-hero .ppt-brutalist-kicker {
+  margin-bottom: 0;
+}
+
 .ppt-editorial-brutalist--section .ppt-brutalist-display,
 .ppt-editorial-brutalist--end .ppt-brutalist-display {
-  max-width: min(780px, 86%);
-  font-size: clamp(26px, 3.2cqi, 44px);
-  line-height: 1.08;
+  max-width: 100%;
+  font-size: clamp(28px, 3.4cqi, 48px);
+  line-height: 1.14;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-display--cjk,
+.ppt-editorial-brutalist--end .ppt-brutalist-display--cjk {
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  letter-spacing: 0;
+  line-height: 1.16;
+  text-wrap: balance;
 }
 
 .ppt-editorial-brutalist--section .ppt-brutalist-display--medium,
 .ppt-editorial-brutalist--end .ppt-brutalist-display--medium {
-  font-size: clamp(22px, 2.7cqi, 36px);
-  line-height: 1.1;
+  font-size: clamp(24px, 2.8cqi, 40px);
+  line-height: 1.16;
 }
 
 .ppt-editorial-brutalist--section .ppt-brutalist-display--long,
 .ppt-editorial-brutalist--end .ppt-brutalist-display--long {
-  font-size: clamp(18px, 2.2cqi, 30px);
-  line-height: 1.12;
+  font-size: clamp(20px, 2.3cqi, 32px);
+  line-height: 1.18;
 }
 
 .ppt-editorial-brutalist--section .ppt-brutalist-divider,
 .ppt-editorial-brutalist--end .ppt-brutalist-divider {
   margin: clamp(14px, 2cqi, 24px) 0;
+}
+
+.ppt-editorial-brutalist--section .ppt-brand-footer,
+.ppt-editorial-brutalist--end .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(14px, 1.8vh, 22px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ppt-brutalist-watermark--vertical {
+  position: absolute;
+  top: clamp(48px, 6vh, 96px);
+  right: clamp(56px, 6vw, 120px);
+  z-index: 0;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
 }
 
 .ppt-brutalist-title {
@@ -21089,14 +21605,6 @@ defineExpose({
   text-transform: none;
 }
 
-.ppt-brutalist-watermark--vertical {
-  position: absolute;
-  top: clamp(48px, 6vh, 96px);
-  right: clamp(56px, 6vw, 120px);
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-}
-
 .ppt-brutalist-header {
   display: grid;
   gap: clamp(10px, 1.4cqi, 18px);
@@ -21157,6 +21665,65 @@ defineExpose({
   margin-top: 2px;
   transform: none;
   left: auto;
+}
+
+.ppt-editorial-brutalist--content {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 12px);
+  padding: clamp(28px, 3.5vh, 48px) clamp(36px, 4.5vw, 72px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-header {
+  flex: 0 0 auto;
+  gap: clamp(6px, 0.8cqi, 10px);
+  padding-top: clamp(10px, 1.2cqi, 16px);
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-title {
+  font-size: clamp(24px, 2.8cqi, 38px);
+  line-height: 1.06;
+  text-transform: none;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card {
+  overflow: hidden;
+  padding: clamp(12px, 1.4cqi, 18px);
+  gap: clamp(6px, 0.7cqi, 10px);
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card-index {
+  font-size: clamp(18px, 2cqi, 28px);
+  line-height: 1;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card h3 {
+  font-size: clamp(15px, 1.35cqi, 20px);
+  line-height: 1.15;
+  text-transform: none;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  font-size: clamp(11px, 0.88cqi, 13px);
+  line-height: 1.28;
+  overflow-wrap: break-word;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card-grid--medium .ppt-brutalist-card-body,
+.ppt-editorial-brutalist--content .ppt-brutalist-card-grid--medium .ppt-brutalist-card h3 {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
 }
 
 .ppt-brutalist-card-grid--medium {
@@ -21354,9 +21921,59 @@ defineExpose({
 }
 
 .ppt-editorial-brutalist--document-figure .ppt-brutalist-card--scroll {
+  display: flex;
+  flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-card--scroll .ppt-brutalist-point-list {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill {
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill .ppt-brutalist-point {
+  flex: 1 1 0%;
+  min-height: 0;
+  align-content: start;
+  padding: clamp(5px, 0.65cqi, 10px) 0;
+  border-bottom: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill .ppt-brutalist-point:last-child {
+  border-bottom: none;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill .ppt-brutalist-point-index {
+  font-size: clamp(14px, 1.35cqi, 20px);
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill .ppt-brutalist-point-title {
+  font-size: clamp(12px, 1.05cqi, 15px);
+  margin-bottom: 2px;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill .ppt-brutalist-point-body {
+  font-size: clamp(11px, 0.95cqi, 14px);
+  line-height: 1.3;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill.ppt-brutalist-point-list--many .ppt-brutalist-point,
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill.ppt-brutalist-point-list--ultra .ppt-brutalist-point {
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  padding-bottom: clamp(5px, 0.65cqi, 10px);
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-card--scroll {
+  padding: clamp(10px, 1.2cqi, 14px);
 }
 
 .ppt-brutalist-point-list {
@@ -21453,27 +22070,13 @@ defineExpose({
   padding-bottom: 0;
 }
 
-.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--many {
-  gap: clamp(2px, 0.35cqi, 5px);
-}
-
-.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--many .ppt-brutalist-point-body {
-  font-size: clamp(10px, 0.78cqi, 12px);
-  line-height: 1.2;
-}
-
-.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--many .ppt-brutalist-point-title {
-  font-size: clamp(10px, 0.85cqi, 12px);
-  margin-bottom: 0;
-}
-
 .ppt-brutalist-card--figure-panel {
   display: flex;
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  color: var(--brutalist-bg);
-  background: var(--brutalist-text);
+  color: var(--brutalist-text);
+  background: var(--brutalist-bg, #ffffff);
   border-color: var(--brutalist-text);
   border-left-color: var(--brutalist-accent);
 }
@@ -21481,7 +22084,7 @@ defineExpose({
 .ppt-brutalist-card--figure-panel h3,
 .ppt-brutalist-card--figure-panel .ppt-md-inline,
 .ppt-brutalist-card--figure-panel figcaption {
-  color: inherit;
+  color: var(--brutalist-text);
 }
 
 .ppt-brutalist-document-figure {
@@ -21490,6 +22093,7 @@ defineExpose({
   flex-direction: column;
   min-height: 0;
   margin: 0;
+  background: var(--brutalist-bg, #ffffff);
 }
 
 .ppt-brutalist-document-figure-img {
@@ -21499,7 +22103,7 @@ defineExpose({
   max-height: 100%;
   object-fit: contain;
   object-position: center top;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--brutalist-bg, #ffffff);
 }
 
 .ppt-brutalist-document-figure figcaption {
@@ -21507,7 +22111,7 @@ defineExpose({
   margin-top: 8px;
   font-size: clamp(10px, 0.85cqi, 12px);
   line-height: 1.3;
-  opacity: 0.72;
+  color: var(--brutalist-muted);
 }
 
 .ppt-brutalist-card--figure-panel .ppt-table-ref {
@@ -21652,9 +22256,173 @@ defineExpose({
 
 .ppt-brutalist-data-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
   gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  flex: 1 1 auto;
   min-height: 0;
+  align-items: stretch;
+}
+
+.ppt-editorial-brutalist--data {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 12px);
+  padding: clamp(28px, 3.5vh, 48px) clamp(36px, 4.5vw, 72px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--data .ppt-brutalist-header {
+  flex: 0 0 auto;
+}
+
+.ppt-editorial-brutalist--data .ppt-brutalist-title {
+  font-size: clamp(22px, 2.6cqi, 36px);
+  line-height: 1.06;
+  text-transform: none;
+}
+
+.ppt-editorial-brutalist--data .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(14px, 1.8vh, 22px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ppt-brutalist-data-notes {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(12px, 1.4cqi, 18px);
+  border: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+  border-left: var(--ppt-rule-accent, 8px solid var(--brutalist-accent));
+  background: var(--brutalist-surface);
+}
+
+.ppt-brutalist-data-notes .ppt-brutalist-point-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ppt-brutalist-data-chart {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 12px);
+  overflow: hidden;
+  padding: clamp(12px, 1.4cqi, 18px);
+  border: var(--ppt-rule-bold, 8px solid var(--brutalist-text));
+  background: var(--brutalist-bg);
+}
+
+.ppt-brutalist-data-chart-title {
+  margin: 0;
+  font-size: clamp(14px, 1.25cqi, 18px);
+  line-height: 1.15;
+  text-transform: none;
+}
+
+.ppt-brutalist-data-notes .ppt-brutalist-point-body {
+  overflow-x: auto;
+}
+
+.ppt-brutalist-data-notes .ppt-brutalist-point-body :deep(.ppt-inline-math) {
+  display: block;
+  margin-top: 0.25em;
+}
+
+.ppt-brutalist-data-panel--table {
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+}
+
+.ppt-brutalist-data-table {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table-wrap) {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(6px, 0.8cqi, 10px);
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table-scroll) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table-title) {
+  font-size: clamp(13px, 1.1cqi, 16px);
+  line-height: 1.2;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: clamp(10px, 0.82cqi, 12px);
+  line-height: 1.25;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table th),
+.ppt-brutalist-data-table :deep(.ppt-table td) {
+  padding: clamp(4px, 0.55cqi, 7px) clamp(5px, 0.65cqi, 8px);
+  border: 1px solid var(--brutalist-text);
+  vertical-align: top;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table th) {
+  background: var(--brutalist-text);
+  color: var(--brutalist-bg);
+  font-weight: 700;
+  text-transform: none;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table td.is-highlight),
+.ppt-brutalist-data-table :deep(.ppt-table th.is-highlight) {
+  background: color-mix(in srgb, var(--brutalist-accent) 18%, var(--brutalist-bg));
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table-source) {
+  font-size: clamp(9px, 0.75cqi, 11px);
+}
+
+.ppt-brutalist-grouped-bar-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ppt-brutalist-line-chart-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ppt-brutalist-line-chart-wrap .ppt-chart-svg {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 140px;
+  max-height: 100%;
+}
+
+.ppt-brutalist-data-chart-fallback {
+  display: grid;
+  gap: clamp(8px, 1cqi, 12px);
+  overflow-y: auto;
+}
+
+.ppt-brutalist-data-chart-row {
+  display: grid;
+  gap: 4px;
+  font-size: clamp(11px, 0.92cqi, 13px);
+  line-height: 1.28;
 }
 
 .ppt-brutalist-chart-summary {
