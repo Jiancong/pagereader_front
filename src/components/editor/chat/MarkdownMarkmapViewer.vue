@@ -24,6 +24,7 @@ let markmap: Markmap | null = null
 let resizeObserver: ResizeObserver | null = null
 let toggleClickHandler: ((event: Event) => void) | null = null
 let nodeSelectHandler: ((event: Event) => void) | null = null
+let nodeDblClickHandler: ((event: Event) => void) | null = null
 let nodeHoverHandler: ((event: Event) => void) | null = null
 let nodeHoverLeaveHandler: (() => void) | null = null
 let selectedNodePath: string | null = null
@@ -32,8 +33,7 @@ let hoveredNodePath: string | null = null
 const EXPAND_BTN_SIZE = 16
 const EXPAND_HIT_SIZE = 28
 const HOVER_GLOW_PAD = 12
-const NODE_FOCUS_PADDING = 56
-const NODE_FOCUS_MAX_SCALE = 4
+const NODE_FOCUS_WIDTH_PADDING = 24
 
 type MarkmapNodeRect = {
   x: number
@@ -97,31 +97,40 @@ function createZoomTransform(scale: number, x: number, y: number) {
   }
 }
 
-async function focusSelectedNodeOnScreen() {
-  if (!markmap || !selectedNodePath || !svgRef.value) return
+function getNodeFocusRect(nodeG: SVGGElement, layoutRect: MarkmapNodeRect): MarkmapNodeRect {
+  const card = nodeG.querySelector(".markmap-node-card")
+  if (!(card instanceof HTMLElement) || !markmap) return layoutRect
 
-  const selectedEl = svgRef.value.querySelector(
-    `.markmap-node[data-path="${selectedNodePath}"]`,
-  )
+  const paddingX = markmap.options.paddingX
+  const cardWidth = Math.max(card.scrollWidth, card.offsetWidth, 1)
+  const cardHeight = Math.max(card.scrollHeight, card.offsetHeight, 1)
+
+  return {
+    x: layoutRect.x,
+    y: layoutRect.y,
+    width: Math.max(layoutRect.width, cardWidth + paddingX * 2),
+    height: Math.max(layoutRect.height, cardHeight),
+  }
+}
+
+async function focusNodeToScreenWidth(nodePath: string) {
+  if (!markmap || !svgRef.value) return
+
+  const selectedEl = svgRef.value.querySelector(`.markmap-node[data-path="${nodePath}"]`)
   if (!(selectedEl instanceof SVGGElement)) return
 
   const datum = (selectedEl as SVGGElement & { __data__?: MarkmapHighlightNode }).__data__
   const node = datum ? markmap.findElement(datum)?.data : undefined
-  const rect = node?.state?.rect
-  if (!rect?.width || !rect?.height) return
+  const layoutRect = node?.state?.rect
+  if (!layoutRect?.width || !layoutRect?.height) return
 
+  const rect = getNodeFocusRect(selectedEl, layoutRect)
   const svgNode = markmap.svg.node()
   if (!svgNode) return
 
   const { width: viewportWidth, height: viewportHeight } = svgNode.getBoundingClientRect()
-  const { fitRatio } = markmap.options
-  const innerWidth = Math.max(viewportWidth - NODE_FOCUS_PADDING * 2, 1)
-  const innerHeight = Math.max(viewportHeight - NODE_FOCUS_PADDING * 2, 1)
-  const scale = Math.min(
-    (innerWidth / rect.width) * fitRatio,
-    (innerHeight / rect.height) * fitRatio,
-    NODE_FOCUS_MAX_SCALE,
-  )
+  const innerWidth = Math.max(viewportWidth - NODE_FOCUS_WIDTH_PADDING * 2, 1)
+  const scale = innerWidth / rect.width
   const x = (viewportWidth - rect.width * scale) / 2 - rect.x * scale
   const y = (viewportHeight - rect.height * scale) / 2 - rect.y * scale
   const transform = createZoomTransform(scale, x, y)
@@ -133,13 +142,34 @@ async function focusSelectedNodeOnScreen() {
     .catch(() => undefined)
 }
 
-function scheduleNodeSelection(focusNode = false) {
+function scheduleNodeSelection() {
   void nextTick(() => {
-    requestAnimationFrame(() => {
-      applyNodeSelection()
-      if (focusNode) void focusSelectedNodeOnScreen()
-    })
+    requestAnimationFrame(applyNodeSelection)
   })
+}
+
+async function selectAndFocusNode(nodePath: string) {
+  if (!markmap || !svgRef.value) return
+
+  selectedNodePath = nodePath
+
+  svgRef.value.querySelectorAll<SVGGElement>(".markmap-node").forEach((nodeG) => {
+    const path = nodeG.getAttribute("data-path")
+    nodeG.classList.toggle("markmap-node--selected", path === nodePath)
+  })
+
+  const selectedEl = svgRef.value.querySelector(`.markmap-node[data-path="${nodePath}"]`)
+  const datum =
+    selectedEl && (selectedEl as SVGGElement & { __data__?: MarkmapHighlightNode }).__data__
+
+  await markmap.setHighlight(
+    (datum as Parameters<Markmap["setHighlight"]>[0]) ?? undefined,
+  )
+  await nextTick()
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve())
+  })
+  await focusNodeToScreenWidth(nodePath)
 }
 
 function updateHoverGlow() {
@@ -421,6 +451,7 @@ function renderMarkmap() {
       spacingHorizontal: 128,
       spacingVertical: 28,
     })
+    markmap.svg.on("dblclick.zoom", null)
 
     toggleClickHandler = (event: Event) => {
       const target = event.target
@@ -440,7 +471,7 @@ function renderMarkmap() {
       const hit = getMarkmapNodeFromTarget(target)
       if (hit) {
         selectedNodePath = hit.path
-        scheduleNodeSelection(true)
+        scheduleNodeSelection()
         return
       }
 
@@ -448,9 +479,23 @@ function renderMarkmap() {
 
       selectedNodePath = null
       scheduleNodeSelection()
-      void markmap?.fit()
     }
     svg.addEventListener("click", nodeSelectHandler)
+
+    nodeDblClickHandler = (event: Event) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest(".markmap-node circle, .markmap-expand-hitbox")) return
+
+      const hit = getMarkmapNodeFromTarget(target)
+      if (!hit) return
+
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      void selectAndFocusNode(hit.path)
+    }
+    // markmap 节点内容在 foreignObject 内会 stopPropagation，需用捕获阶段监听双击
+    svg.addEventListener("dblclick", nodeDblClickHandler, true)
 
     nodeHoverHandler = (event: Event) => {
       const target = event.target
@@ -509,6 +554,9 @@ onBeforeUnmount(() => {
   }
   if (svgRef.value && nodeSelectHandler) {
     svgRef.value.removeEventListener("click", nodeSelectHandler)
+  }
+  if (svgRef.value && nodeDblClickHandler) {
+    svgRef.value.removeEventListener("dblclick", nodeDblClickHandler, true)
   }
   if (svgRef.value && nodeHoverHandler) {
     svgRef.value.removeEventListener("mouseover", nodeHoverHandler)
