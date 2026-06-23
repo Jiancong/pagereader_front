@@ -75,6 +75,10 @@ function onClick(ev: MouseEvent) {
   }
 }
 
+.ppt-md-inline :deep(.ppt-table-ref + .ppt-table-ref) {
+  margin-left: 2px;
+}
+
 .ppt-md-inline :deep(.ppt-table-ref--muted) {
   cursor: default;
   color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.55));

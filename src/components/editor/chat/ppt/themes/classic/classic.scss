@@ -1,0 +1,2265 @@
+.ppt-slide {
+  width: 100%;
+  height: 100%;
+  background-color: var(--ppt-bg, #0d1b2e);
+  color: var(--ppt-text, #e8f0fe);
+  padding: var(--ppt-pad-y) var(--ppt-pad-x);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  /* 背景图铺满：确保 image_url 总能覆盖整个幻灯片 */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* 背景图蒙层 —— 当 slide.image_url 存在时覆盖在背景图上方、内容下方 */
+.ppt-slide-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* 当 slide 使用了背景图时，确保普通流子元素位于蒙层之上。
+   排除本身已 absolute 定位的元素（skyline / info / bottom-line / corner / footer 等） */
+.ppt-slide
+  > *:not(.ppt-slide-bg-overlay):not(.ppt-cover-skyline):not(.ppt-scenic-skyline):not(.ppt-cover-info):not(.ppt-cover-bottom-line):not(.ppt-section-corner):not(.ppt-section-footer):not(.ppt-brand-footer) {
+  position: relative;
+  z-index: 1;
+}
+
+/* 通用标题 */
+.ppt-slide-title {
+  font-family: var(--ppt-font-heading, var(--ppt-font-family, inherit));
+  letter-spacing: var(--ppt-heading-letter-spacing, normal);
+  font-size: var(--ppt-fs-title);
+  font-weight: 700;
+  margin: 0 0 20px;
+  color: var(--ppt-accent, #4a90e2);
+  border-left: 4px solid var(--ppt-accent, #4a90e2);
+  padding-left: 14px;
+  line-height: 1.3;
+}
+
+/* 要点列表 */
+.ppt-bullet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ppt-gap-sm);
+}
+
+.ppt-bullet-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ppt-gap-sm);
+  font-size: var(--ppt-fs-body-lg);
+  line-height: 1.55;
+  opacity: 0.92;
+}
+
+.ppt-bullet-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ppt-accent, #4a90e2);
+  margin-top: 6px;
+}
+
+/* ── 子主题卡片网格（content 页面） ── */
+.ppt-content {
+  justify-content: flex-start !important;
+
+  .ppt-content-summary {
+    flex-shrink: 0;
+  }
+}
+
+.ppt-slide--metric-only {
+  .ppt-slide-title {
+    margin-bottom: clamp(8px, 1.2cqi, 14px);
+  }
+
+  .ppt-chart-subtitle {
+    flex-shrink: 0;
+    margin-bottom: clamp(6px, 1cqi, 10px);
+  }
+}
+
+.ppt-metric-cards-fullpage--active {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.ppt-metric-cards-row--fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  align-content: stretch;
+  grid-template-columns: repeat(var(--ppt-metric-fill-cols, 2), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--ppt-metric-fill-rows, 2), minmax(0, 1fr));
+  gap: clamp(12px, 2cqi, 20px);
+
+  .ppt-metric-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .ppt-metric-card-value {
+    font-size: clamp(18px, 3.2cqi, 28px);
+  }
+
+  .ppt-metric-card-detail {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .ppt-metric-card-source {
+    margin-top: auto;
+  }
+}
+
+/* ── right_items 叙事卡（content 分栏 / two_column） ── */
+.ppt-hero-right-items {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 2cqi, 16px);
+}
+
+.ppt-hero-right-card {
+  border-left: 3px solid var(--ppt-item-accent, var(--ppt-hero-gold, #d4af37));
+  padding: clamp(10px, 2cqi, 16px) clamp(12px, 2.4cqi, 18px);
+  background: var(--ppt-bg-secondary, rgba(255, 255, 255, 0.04));
+  border-radius: 0 var(--ppt-radius-card, 8px) var(--ppt-radius-card, 8px) 0;
+}
+
+.ppt-hero-right-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.ppt-hero-right-card-index {
+  flex-shrink: 0;
+  font-size: clamp(13px, 2.4cqi, 17px);
+  font-weight: 800;
+  color: var(--ppt-item-accent, var(--ppt-hero-gold, #d4af37));
+  letter-spacing: 0.04em;
+}
+
+.ppt-hero-right-card-title {
+  font-size: clamp(14px, 2.6cqi, 18px);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ppt-text, #e8f0fe);
+}
+
+.ppt-hero-right-card-desc {
+  font-size: clamp(12px, 2.2cqi, 15px);
+  line-height: 1.55;
+  color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.68));
+  word-break: break-word;
+}
+
+.ppt-hero-right-card--after-metrics {
+  margin-top: clamp(6px, 1.2cqi, 10px);
+}
+
+.ppt-data-source-line {
+  flex-shrink: 0;
+  font-size: clamp(10px, 1.6cqi, 12px);
+  line-height: 1.45;
+  color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.5));
+  opacity: 0.85;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ppt-metric-chart-split .ppt-content-left {
+  flex: 0 0 38%;
+  gap: clamp(10px, 1.8cqi, 14px);
+}
+
+.ppt-metric-card--column {
+  flex: 0 0 auto;
+  border-top: none;
+  border-left: 3px solid var(--ppt-metric-accent, var(--ppt-accent, #4a90e2));
+}
+
+.ppt-content-point {
+  border-left-color: var(--ppt-metric-accent, var(--ppt-accent, #4a90e2));
+}
+
+.ppt-content-point-icon {
+  color: var(--ppt-metric-accent, var(--ppt-accent, #4a90e2));
+}
+
+.ppt-metric-cards-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  gap: clamp(10px, 2cqi, 16px);
+  margin: 0 0 clamp(12px, 2cqi, 18px);
+  flex-wrap: wrap;
+}
+
+.ppt-metric-card {
+  flex: 1 1 0;
+  min-width: min(100%, 140px);
+  max-width: 100%;
+  padding: clamp(10px, 1.8cqi, 14px) clamp(12px, 2cqi, 16px);
+  border-radius: var(--ppt-radius-card, 8px);
+  background: var(--ppt-bg-secondary, rgba(255, 255, 255, 0.06));
+  border: var(--ppt-card-border-width, 1px) solid rgba(255, 255, 255, 0.08);
+  border-top: 3px solid var(--ppt-metric-accent, var(--ppt-accent, #4a90e2));
+}
+
+.ppt-metric-card-value {
+  font-size: clamp(22px, 4cqi, 32px);
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--ppt-metric-accent, var(--ppt-accent, #4a90e2));
+  margin-bottom: 4px;
+}
+
+.ppt-metric-card-label {
+  font-size: clamp(11px, 1.8cqi, 13px);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ppt-text, #e8f0fe);
+  margin-bottom: 2px;
+}
+
+.ppt-metric-card-detail {
+  font-size: clamp(10px, 1.6cqi, 12px);
+  line-height: 1.4;
+  color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.65));
+}
+
+.ppt-hero-left-split .ppt-hero-left-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 38%;
+}
+
+.ppt-hero-left-split .ppt-content-right {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.ppt-hero-left-split .ppt-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ppt-metric-content-split .ppt-metric-cards-side {
+  flex: 0 0 38%;
+  min-width: 0;
+}
+
+.ppt-body-inline-metric {
+  margin-bottom: clamp(10px, 2cqi, 16px);
+}
+
+.ppt-palette-light {
+  .ppt-hero-right-card {
+    background: rgba(0, 0, 0, 0.03);
+  }
+  .ppt-data-source-line {
+    border-top-color: rgba(0, 0, 0, 0.08);
+  }
+}
+
+.ppt-topic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--ppt-gap-md);
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  align-content: start;
+}
+
+.ppt-topic-grid--fill {
+  align-content: stretch;
+  align-items: stretch;
+  overflow-y: hidden;
+
+  .ppt-topic-card {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .ppt-topic-card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+.ppt-topic-card {
+  border: var(--ppt-card-border-width, 1px) solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--ppt-radius-card, 10px);
+  padding: clamp(12px, 2cqi, 22px) clamp(14px, 2.2cqi, 24px);
+  background: var(--ppt-bg-secondary, rgba(255, 255, 255, 0.03));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 1cqi, 12px);
+  min-height: 0;
+  overflow: visible;
+}
+
+.ppt-topic-grid--stack {
+  grid-template-columns: 1fr;
+}
+
+.ppt-topic-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ppt-gap-sm);
+}
+
+.ppt-topic-card-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ppt-accent, #4a90e2);
+}
+
+.ppt-topic-card-title {
+  font-size: clamp(14px, 2.2cqi, 22px);
+  font-weight: 700;
+  color: var(--ppt-text, #e8f0fe);
+  line-height: 1.35;
+}
+
+.ppt-topic-card-body {
+  font-size: clamp(13px, 1.85cqi, 18px);
+  line-height: 1.6;
+  color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.88));
+  opacity: 1;
+  flex: 1;
+  min-height: 0;
+  word-break: break-word;
+  white-space: normal;
+}
+
+/* 图表卡片 */
+.ppt-topic-chart-card {
+  padding: 12px 14px;
+  overflow: hidden;
+
+  .ppt-content-chart {
+    margin-top: 0 !important;
+  }
+
+  .ppt-chart-svg {
+    max-height: none;
+    height: auto;
+  }
+}
+
+/* ── content 页左右分栏布局（有图表时） ── */
+.ppt-content-split {
+  display: flex;
+  gap: var(--ppt-gap-lg);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+
+  .ppt-content-right {
+    overflow: visible;
+  }
+}
+
+.ppt-content-split--table-chart-dual {
+  .ppt-content-right {
+    flex: 1;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(12px, 2cqi, 18px);
+    align-items: stretch;
+    min-height: 0;
+  }
+
+  .ppt-content-chart-wrap,
+  .ppt-table-wrap {
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+  }
+}
+
+.ppt-content-split--table-chart-with-bullets {
+  .ppt-content-right {
+    gap: clamp(10px, 1.8cqi, 14px);
+  }
+
+  .ppt-content-chart-wrap {
+    flex: 0 1 46%;
+    min-height: 160px;
+  }
+
+  .ppt-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
+
+.ppt-content-left {
+  flex: 0 0 45%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ppt-gap-md);
+  min-height: 0;
+  overflow-x: visible;
+  overflow-y: auto;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+.ppt-content-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* content + metric_cards + chart：metric_cards 叠在图表上方，图表占据剩余高度 */
+.ppt-content-right > .ppt-data-split-metric-cards {
+  flex: 0 0 auto;
+  margin-bottom: var(--ppt-gap-md);
+}
+
+.ppt-content-chart-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--ppt-bg-secondary, rgba(255, 255, 255, 0.03));
+  border: var(--ppt-card-border-width, 1px) solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--ppt-radius-card, 10px);
+  padding: 16px 16px 12px;
+  min-height: 0;
+  overflow: visible;
+
+  .ppt-chart-title {
+    flex: 0 0 auto;
+    font-size: var(--ppt-fs-body-lg);
+    margin-bottom: var(--ppt-gap-sm);
+  }
+
+  .ppt-line-chart-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .ppt-line-legend {
+    flex: 0 0 auto;
+  }
+
+  .ppt-chart-svg {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 180px;
+    max-height: none;
+    height: auto;
+    overflow: visible;
+  }
+
+  .ppt-pie-svg {
+    max-height: none;
+    min-height: 140px;
+  }
+
+  .ppt-radar-svg {
+    max-height: none;
+    min-height: 140px;
+  }
+
+  .ppt-grouped-bar-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ppt-funnel-chart {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .ppt-timeline-chart {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
+/* 左栏内容要点 */
+.ppt-content-point {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--ppt-accent, #4a90e2);
+  background: var(--ppt-bg-secondary, rgba(255, 255, 255, 0.03));
+  border-radius: 0 8px 8px 0;
+}
+
+.ppt-content-point-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ppt-content-point-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ppt-accent, #4a90e2);
+}
+
+.ppt-content-point-title {
+  font-size: var(--ppt-fs-body-lg);
+  font-weight: 700;
+  color: var(--ppt-text, #e8f0fe);
+  line-height: 1.3;
+}
+
+.ppt-content-point-body {
+  font-size: var(--ppt-fs-body);
+  line-height: 1.6;
+  color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.75));
+  padding-left: 30px;
+}
+
+/* 行内 Markdown（**粗体** 等） */
+.ppt-md-inline {
+  :deep(strong),
+  strong {
+    font-weight: 700;
+    color: inherit;
+  }
+  :deep(em),
+  em {
+    font-style: italic;
+  }
+  :deep(code),
+  code {
+    font-size: 0.92em;
+    padding: 0 0.12em 0.2em;
+    border-radius: 3px;
+    background: rgba(128, 128, 128, 0.15);
+  }
+}
+
+.ppt-content-point-title.ppt-md-inline,
+.ppt-content-summary-body.ppt-md-inline,
+.ppt-summary-label .ppt-md-inline {
+  display: inline;
+}
+
+.ppt-cover-title .ppt-md-inline,
+.ppt-slide-title .ppt-md-inline,
+.ppt-section-title .ppt-md-inline,
+.ppt-section-sub .ppt-md-inline,
+.ppt-toc-title .ppt-md-inline,
+.ppt-end-title .ppt-md-inline {
+  display: block;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* 关键洞察 */
+.ppt-content-items-split .ppt-content-right {
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+}
+
+.ppt-content-insight--page-callout {
+  flex-shrink: 0;
+}
+
+.ppt-hero-metric {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 clamp(12px, 2cqi, 16px);
+  padding: 14px 18px;
+  border-left: 4px solid var(--ppt-hero-accent, var(--ppt-accent, #4a90e2));
+  border-radius: var(--ppt-radius-card, 10px);
+  background: color-mix(
+    in srgb,
+    var(--ppt-hero-accent, var(--ppt-accent, #4a90e2)) 10%,
+    transparent
+  );
+}
+
+.ppt-hero-metric-value {
+  font-size: clamp(28px, 4cqi, 42px);
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--ppt-hero-accent, var(--ppt-accent, #4a90e2));
+}
+
+.ppt-hero-metric-caption {
+  font-size: var(--ppt-fs-body-sm, 13px);
+  line-height: 1.5;
+  color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.78));
+}
+
+.ppt-data-hero-metric {
+  margin-bottom: clamp(10px, 1.6cqi, 14px);
+}
+
+/* 标题下全宽洞察条：比正文卡片更醒目 */
+.ppt-content-insight--page-callout {
+  width: 100%;
+  margin: 0 0 clamp(12px, 2cqi, 18px);
+  padding: clamp(12px, 1.8cqi, 16px) clamp(14px, 2.2cqi, 20px);
+  font-size: clamp(12px, 1.35vw, 16px);
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--ppt-text, #e8f0fe);
+  border: 1px solid rgba(74, 144, 226, 0.35);
+  border-left: 5px solid var(--ppt-accent, #4a90e2);
+  border-radius: var(--ppt-radius-card, 10px);
+  background: rgba(74, 144, 226, 0.16);
+  box-sizing: border-box;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 3px;
+    color: var(--ppt-accent, #4a90e2);
+  }
+
+  .ppt-content-insight-text {
+    flex: 1;
+    min-width: 0;
+    color: inherit;
+  }
+}
+
+.ppt-palette-light .ppt-content-insight--page-callout {
+  color: var(--ppt-text, #1e2d46);
+  background: rgba(74, 144, 226, 0.1);
+  border-color: rgba(74, 144, 226, 0.28);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.ppt-chart-note {
+  font-size: var(--ppt-fs-body-sm);
+  line-height: 1.45;
+  color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.72));
+  margin: calc(-1 * var(--ppt-gap-sm) / 2) 0 var(--ppt-gap-sm);
+  padding: 0 2px;
+}
+
+/* 画布外演讲备注（独立浅色区域，不继承幻灯片背景色） */
+.ppt-speaker-notes-pane {
+  flex: 0 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 18px 14px;
+  max-height: min(168px, 30vh);
+  overflow-y: auto;
+  background: #f6f7f9;
+  border-top: 1px solid #e2e4e8;
+  color: #374151;
+  font-size: 12px;
+  line-height: 1.65;
+
+  .ppt-speaker-notes-label {
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    opacity: 1;
+  }
+
+  .ppt-speaker-notes-content {
+    color: #374151;
+    opacity: 1;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+.ppt-slide.ppt-content {
+  justify-content: flex-start;
+}
+
+.ppt-content-footer-source {
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+.ppt-content-insight {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-top: auto;
+  background: rgba(74, 144, 226, 0.08);
+  border: 1px solid rgba(74, 144, 226, 0.2);
+  border-radius: 8px;
+  font-size: var(--ppt-fs-body-sm);
+  line-height: 1.5;
+  color: var(--ppt-accent, #4a90e2);
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+}
+
+/* 底部总结栏 */
+.ppt-content-summary {
+  margin-top: auto;
+  padding: 10px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: var(--ppt-fs-body-sm);
+  line-height: 1.6;
+  opacity: 0.82;
+  color: var(--ppt-text, #e8f0fe);
+}
+
+.ppt-summary-label {
+  color: var(--ppt-accent, #4a90e2);
+  font-weight: 700;
+}
+
+/* 来源 */
+.ppt-sources {
+  margin-top: 16px;
+  font-size: 11px;
+  opacity: 0.55;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.ppt-sources-label {
+  font-weight: 600;
+}
+
+.ppt-source-link {
+  color: var(--ppt-accent, #4a90e2);
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+/* speaker_notes 内容参考 */
+.ppt-speaker-notes {
+  color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.72));
+  overflow-y: auto;
+}
+
+.ppt-speaker-notes-label {
+  font-weight: 600;
+  margin-bottom: 4px;
+  opacity: 0.7;
+  font-size: 10px;
+}
+
+.ppt-speaker-notes-content {
+  opacity: 0.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── cover ── */
+.ppt-cover {
+  background-image: linear-gradient(
+    180deg,
+    var(--ppt-bg, #0d1b2e) 0%,
+    color-mix(in srgb, var(--ppt-accent, #4a90e2) 8%, var(--ppt-bg, #0d1b2e)) 100%
+  );
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 城市天际线 SVG 背景 */
+.ppt-cover-skyline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 65%;
+  color: var(--ppt-accent, #4a90e2);
+  pointer-events: none;
+  z-index: 0;
+
+  :deep(svg) {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+}
+
+.ppt-cover-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 48px;
+  margin-top: -5%;
+}
+
+.ppt-cover-title {
+  font-family: var(--ppt-font-heading, var(--ppt-font-family, inherit));
+  letter-spacing: var(--ppt-heading-letter-spacing, normal);
+  font-size: var(--ppt-fs-display);
+  font-weight: 800;
+  margin: 0 0 16px;
+  line-height: 1.25;
+  color: var(--ppt-accent, #4a90e2);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.4);
+}
+
+.ppt-cover-subtitle {
+  font-size: var(--ppt-fs-body-lg);
+  color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.7));
+  opacity: 1;
+  margin: 0;
+  letter-spacing: 2px;
+}
+
+/* 底部信息卡片 */
+.ppt-cover-info {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.ppt-cover-info-inner {
+  background: rgba(255, 255, 255, 0.06);
+  border: var(--ppt-card-border-width, 1px) solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ppt-radius-card, 8px);
+  padding: 12px 36px;
+  backdrop-filter: blur(8px);
+  text-align: center;
+}
+
+.ppt-cover-author {
+  font-size: 13px;
+  color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.75));
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.ppt-cover-date {
+  font-size: 12px;
+  color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.5));
+}
+
+/* 底部装饰线 */
+.ppt-cover-bottom-line {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--ppt-accent, #4a90e2);
+  opacity: 0.6;
+  z-index: 2;
+}
+
+/* ── section ── */
+.ppt-section {
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--ppt-accent, #4a90e2) 18%, var(--ppt-bg, #0d1b2e)) 0%,
+    var(--ppt-bg, #0d1b2e) 100%
+  );
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 章节页 / 配图页：与封面共用的底部意境装饰 */
+.ppt-scenic-skyline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 65%;
+  color: var(--ppt-accent, #4a90e2);
+  pointer-events: none;
+  z-index: 0;
+
+  :deep(svg) {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+}
+
+.ppt-section-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(88%, 960px);
+  padding: 0 12px;
+  margin-top: -4%;
+}
+
+.ppt-section-label,
+.ppt-section-title,
+.ppt-section-divider,
+.ppt-section-sub {
+  position: relative;
+  z-index: 1;
+}
+
+/* 四角装饰 */
+.ppt-section-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: var(--ppt-accent, #4a90e2);
+  border-style: solid;
+  border-width: 0;
+  opacity: 0.5;
+  z-index: 2;
+
+  &--tl {
+    top: 24px;
+    left: 28px;
+    border-top-width: 2.5px;
+    border-left-width: 2.5px;
+  }
+  &--tr {
+    top: 24px;
+    right: 28px;
+    border-top-width: 2.5px;
+    border-right-width: 2.5px;
+  }
+  &--bl {
+    bottom: 24px;
+    left: 28px;
+    border-bottom-width: 2.5px;
+    border-left-width: 2.5px;
+  }
+  &--br {
+    bottom: 24px;
+    right: 28px;
+    border-bottom-width: 2.5px;
+    border-right-width: 2.5px;
+  }
+}
+
+/* CHAPTER 01 标签 */
+.ppt-section-label {
+  font-size: var(--ppt-fs-body-lg);
+  font-weight: 600;
+  color: var(--ppt-accent, #4a90e2);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.ppt-section-title {
+  font-family: var(--ppt-font-heading, var(--ppt-font-family, inherit));
+  letter-spacing: var(--ppt-heading-letter-spacing, normal);
+  font-size: var(--ppt-fs-display);
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.3;
+  width: 100%;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* 标题下方短横线 */
+.ppt-section-divider {
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--ppt-accent, #4a90e2);
+  margin: 18px 0;
+}
+
+.ppt-section-sub {
+  font-size: var(--ppt-fs-body-lg);
+  color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.6));
+  opacity: 1;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.ppt-section-chapter-images {
+  position: relative;
+  z-index: 1;
+  width: min(92%, 720px);
+  margin: 10px 0 6px;
+}
+
+.ppt-content-with-side-image {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+
+  .ppt-topic-grid {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.ppt-data-metric-with-image {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+
+  .ppt-metric-cards-row {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* 页底品牌标识（brand_footer） */
+.ppt-brand-footer {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--ppt-fs-caption);
+  color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.3));
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* 底部报告标题（旧版，保留兼容） */
+.ppt-section-footer {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--ppt-fs-caption);
+  color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.3));
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── two_column ── */
+.ppt-chapter-image-page {
+  background-image: linear-gradient(
+    180deg,
+    var(--ppt-bg, #0d1b2e) 0%,
+    color-mix(in srgb, var(--ppt-accent, #4a90e2) 8%, var(--ppt-bg, #0d1b2e)) 100%
+  );
+  overflow: hidden;
+}
+
+.ppt-chapter-image-page-sub {
+  margin-top: -4px;
+  margin-bottom: 8px;
+}
+
+.ppt-chapter-image-page-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.ppt-chapter-image-page-col {
+  min-width: 0;
+}
+
+.ppt-chapter-image-page-insight {
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+
+.ppt-document-figure-page {
+  background: var(--ppt-bg, #0d1b2e);
+}
+
+.ppt-document-figure-page-body {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+
+.ppt-document-figure-col {
+  min-width: 0;
+}
+
+.ppt-document-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  min-height: min(40vh, var(--ppt-document-figure-min-height, 288px));
+  background: var(--ppt-bg-secondary, rgba(255, 255, 255, 0.04));
+  border-radius: var(--ppt-radius-card, 8px);
+  padding: 12px;
+}
+
+.ppt-document-figure-img {
+  max-width: 100%;
+  max-height: min(55vh, var(--ppt-document-figure-max-height, 420px));
+  width: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.ppt-document-figure-caption {
+  margin: 0;
+  font-size: var(--ppt-fs-caption, 12px);
+  line-height: 1.45;
+  color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.72));
+  text-align: center;
+}
+
+.ppt-two-col-body {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.ppt-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.ppt-col-header {
+  font-size: var(--ppt-fs-body-lg);
+  font-weight: 700;
+  color: var(--ppt-accent, #4a90e2);
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ppt-col-divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 20px;
+  flex-shrink: 0;
+}
+
+/* ── right_items 结构化卡片 ── */
+.ppt-right-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.ppt-right-item-card {
+  background: var(--ppt-bg-secondary, rgba(255, 255, 255, 0.04));
+  border: var(--ppt-card-border-width, 1px) solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid var(--ppt-item-accent, var(--ppt-accent, #4a90e2));
+  border-radius: var(--ppt-radius-card, 8px);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ppt-right-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ppt-right-item-index {
+  flex-shrink: 0;
+  font-size: var(--ppt-fs-body-lg);
+  font-weight: 800;
+  color: var(--ppt-item-accent, var(--ppt-hero-gold, #d4af37));
+  letter-spacing: 0.04em;
+}
+
+.ppt-right-item-icon {
+  flex-shrink: 0;
+  width: var(--ppt-icon-sm);
+  height: var(--ppt-icon-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ppt-accent, #4a90e2);
+}
+
+.ppt-right-item-title {
+  font-size: var(--ppt-fs-body-lg);
+  font-weight: 700;
+  color: var(--ppt-text, #e8f0fe);
+}
+
+.ppt-right-item-desc {
+  font-size: var(--ppt-fs-body-sm);
+  line-height: 1.6;
+  color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.65));
+}
+
+/* ── 分组柱状图 grouped bar ── */
+.ppt-grouped-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ppt-grouped-bar-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  opacity: 0.8;
+  flex-wrap: wrap;
+  padding: 0 4px;
+}
+
+.ppt-grouped-bar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ppt-text, #e8f0fe);
+}
+
+/* ── data ── */
+.ppt-chart-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.ppt-chart-area-full {
+  .ppt-chart-svg {
+    max-height: none;
+    flex: 1;
+    min-height: 200px;
+  }
+
+  .ppt-timeline-chart {
+    flex: 1;
+    min-height: 200px;
+  }
+
+  &.ppt-chart-contained {
+    flex: 0 1 auto;
+    align-self: center;
+    width: 100%;
+    max-width: 70%;
+    padding: clamp(10px, 4cqi, 24px) clamp(12px, 5cqi, 32px);
+    margin-inline: auto;
+
+    .ppt-chart-svg {
+      flex: 0 1 auto;
+      min-height: 120px;
+      max-height: min(46cqi, 42vh);
+    }
+
+    .ppt-timeline-chart {
+      flex: 0 1 auto;
+      max-height: min(46cqi, 42vh);
+    }
+  }
+}
+
+.ppt-table-area-full {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+
+  .ppt-table-wrap {
+    flex: 1;
+    min-height: 180px;
+  }
+}
+
+.ppt-two-col-table {
+  .ppt-table-wrap {
+    max-height: 42cqi;
+  }
+}
+
+.ppt-chart-title {
+  font-size: var(--ppt-fs-body-sm);
+  color: var(--ppt-text, #e8f0fe);
+  opacity: 0.85;
+}
+
+.ppt-chart-svg {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* 非分栏页内图表限制高度；content 分栏图表由 wrap 控制 */
+.ppt-chart-area .ppt-chart-svg,
+.ppt-data-chart .ppt-chart-svg {
+  max-height: 160px;
+}
+
+.ppt-grouped-bar-wrap .ppt-bar-rect {
+  /* 系列色由 groupedBarRectStyle inline style 提供 */
+  fill: unset;
+  opacity: unset;
+}
+
+.ppt-bar-rect {
+  fill: var(--ppt-accent, #4a90e2);
+  opacity: 0.85;
+}
+
+.ppt-bar-rect.ppt-bar-total {
+  fill: var(--ppt-accent, #4a90e2);
+  opacity: 0.95;
+}
+
+.ppt-bar-rect.ppt-bar-negative {
+  fill: #e74c3c;
+  opacity: 0.85;
+}
+
+.ppt-line-dot {
+  fill: var(--ppt-accent, #4a90e2);
+}
+
+.ppt-polyline {
+  stroke: var(--ppt-accent, #4a90e2);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.ppt-chart-label {
+  font-size: var(--ppt-fs-caption);
+  fill: var(--ppt-chart-label-fill, rgba(255, 255, 255, 0.82));
+  font-family: var(--ppt-font-family, inherit);
+  font-weight: 500;
+}
+
+/* ── pie chart SVG ── */
+.ppt-pie-svg {
+  max-height: 200px;
+  overflow: visible;
+}
+.ppt-pie-label {
+  font-size: 9px;
+  fill: var(--ppt-text, var(--ppt-chart-value, rgba(232, 240, 254, 0.88)));
+  font-weight: 600;
+}
+.ppt-pie-legend-text {
+  font-size: 9px;
+  fill: var(--ppt-text, var(--ppt-chart-label-fill, rgba(255, 255, 255, 0.82)));
+  dominant-baseline: middle;
+}
+.ppt-pie-leader {
+  stroke: var(--ppt-chart-grid, rgba(255, 255, 255, 0.35));
+  stroke-width: 1;
+}
+
+.ppt-pie-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.ppt-pie-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.ppt-pie-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ppt-data-notes {
+  margin-top: 10px;
+}
+
+.ppt-chart-subtitle {
+  font-size: var(--ppt-fs-body-sm);
+  opacity: 0.55;
+  margin: -12px 0 8px 18px;
+}
+
+/* ── combo / multi-line extras ── */
+.ppt-line-secondary {
+  stroke: #f5a623;
+  stroke-width: 2;
+}
+.ppt-line-tertiary {
+  stroke: #50e3c2;
+  stroke-width: 2;
+  stroke-dasharray: 4 2;
+}
+.ppt-dot-secondary {
+  fill: #f5a623;
+}
+.ppt-fill-secondary {
+  fill: #f5a623;
+}
+.ppt-fill-tertiary {
+  fill: #50e3c2;
+}
+.ppt-chart-legend-text {
+  font-size: 10px;
+  fill: var(--ppt-chart-label-fill, rgba(255, 255, 255, 0.82));
+}
+
+/* ── axis labels ── */
+.ppt-axis-label {
+  font-size: var(--ppt-fs-caption);
+  fill: var(--ppt-chart-label-fill, rgba(255, 255, 255, 0.82));
+  font-family: var(--ppt-font-family, inherit);
+  font-weight: 500;
+}
+.ppt-axis-label-secondary {
+  fill: var(--ppt-accent, #4a90e2);
+  opacity: 0.9;
+}
+.ppt-axis-zero-line {
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.ppt-axis-labels-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.ppt-axis-label-text {
+  font-size: var(--ppt-fs-body-sm);
+  color: rgba(255, 255, 255, 0.75);
+  font-style: italic;
+}
+
+/* ── area chart ── */
+.ppt-area-fill {
+  fill: var(--ppt-accent, #4a90e2);
+  opacity: 0.18;
+}
+
+/* ── horizontal bar ── */
+.ppt-chart-svg-hbar {
+  max-height: 200px;
+}
+.ppt-bar-negative {
+  fill: #e25c5c;
+  opacity: 0.85;
+}
+.ppt-chart-value-label {
+  font-size: 11px;
+  fill: var(--ppt-text, var(--ppt-chart-value, rgba(232, 240, 254, 0.88)));
+  font-weight: 600;
+}
+
+/* ── timeline chart（事件时间线） ── */
+.ppt-timeline-chart {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 140px;
+  max-height: min(340px, 46vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  text-align: left;
+  color: var(--ppt-text, #e8f0fe);
+  -webkit-overflow-scrolling: touch;
+}
+.ppt-timeline-chart--compact {
+  max-height: min(280px, 40vh);
+  min-height: 120px;
+}
+.ppt-timeline-chart--full {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  min-height: 200px;
+  max-height: min(420px, 55vh);
+}
+.ppt-timeline-axis-hint {
+  font-size: var(--ppt-fs-body-sm);
+  color: rgba(232, 240, 254, 0.55);
+  margin-bottom: 10px;
+  line-height: 1.35;
+}
+.ppt-timeline-item {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+.ppt-timeline-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 16px;
+  flex-shrink: 0;
+}
+.ppt-timeline-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.ppt-timeline-line {
+  flex: 1;
+  width: 2px;
+  min-height: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 2px 0 0;
+  border-radius: 1px;
+}
+.ppt-timeline-body {
+  flex: 1;
+  padding-bottom: 14px;
+  min-width: 0;
+}
+.ppt-timeline-step {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(232, 240, 254, 0.45);
+  margin-bottom: 2px;
+}
+.ppt-timeline-date {
+  font-size: var(--ppt-fs-body);
+  font-weight: 600;
+  color: rgba(232, 240, 254, 0.95);
+  margin-bottom: 4px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+.ppt-timeline-desc {
+  font-size: var(--ppt-fs-body-sm);
+  line-height: 1.45;
+  color: rgba(232, 240, 254, 0.78);
+  word-break: break-word;
+}
+
+/* ── funnel chart ── */
+.ppt-funnel-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  justify-content: center;
+}
+.ppt-funnel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ppt-funnel-label {
+  font-size: var(--ppt-fs-body-lg);
+  line-height: 1.35;
+  min-width: 84px;
+  text-align: right;
+  color: var(--ppt-text, #e8f0fe);
+  opacity: 0.92;
+  flex-shrink: 0;
+}
+.ppt-funnel-bar-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+.ppt-funnel-bar {
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  min-width: 36px;
+  transition: width 0.3s;
+}
+.ppt-funnel-value {
+  font-size: 14px;
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* ── stacked bar ── */
+.ppt-stacked-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+.ppt-stacked-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+.ppt-stacked-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ppt-stacked-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ppt-stacked-label {
+  font-size: 12px;
+  min-width: 50px;
+  text-align: right;
+  opacity: 0.75;
+}
+.ppt-stacked-bar-track {
+  flex: 1;
+  display: flex;
+  height: 24px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.ppt-stacked-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width 0.3s;
+  min-width: 0;
+}
+.ppt-stacked-seg-text {
+  font-size: 10px;
+  color: #fff;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+/* ── radar (svg spider chart) ── */
+.ppt-radar-chart-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
+.ppt-radar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 4px;
+}
+.ppt-radar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--ppt-text-secondary, rgba(232, 240, 254, 0.68));
+  opacity: 0.95;
+}
+.ppt-radar-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ppt-radar-svg {
+  max-height: 220px;
+  overflow: visible;
+}
+.ppt-radar-grid {
+  fill: color-mix(in srgb, var(--ppt-text, #e8f0fe) 4%, transparent);
+  stroke: var(--ppt-chart-grid, rgba(255, 255, 255, 0.22));
+  stroke-width: 1;
+}
+.ppt-radar-axis {
+  stroke: var(--ppt-chart-zero-line, rgba(255, 255, 255, 0.28));
+  stroke-width: 1;
+}
+.ppt-radar-series-fill {
+  fill-opacity: 0.25;
+  stroke-width: 2.5;
+  stroke-opacity: 0.9;
+}
+.ppt-radar-axis-label {
+  font-size: 11px;
+  fill: var(--ppt-text, #e8f0fe);
+  font-family: var(--ppt-font-family, inherit);
+  font-weight: 500;
+}
+.ppt-radar-tick {
+  font-size: 9px;
+  fill: var(--ppt-chart-label-fill, rgba(255, 255, 255, 0.56));
+  font-family: var(--ppt-font-family, inherit);
+}
+
+/* ── scatter chart ── */
+.ppt-chart-svg circle {
+  transition: r 0.2s;
+}
+
+/* ── gauge chart ── */
+.ppt-gauge-svg {
+  max-width: 280px;
+  margin: 0 auto;
+}
+.ppt-gauge-value {
+  font-size: 24px;
+  font-weight: 800;
+  fill: var(--ppt-accent, #4a90e2);
+}
+.ppt-gauge-label {
+  font-size: 11px;
+  fill: rgba(255, 255, 255, 0.6);
+}
+
+/* ── treemap chart ── */
+.ppt-chart-svg rect {
+  transition: opacity 0.2s;
+}
+
+/* (ppt-content-split 已弃用，保留兼容) */
+/* two_column 右栏内嵌图表 */
+.ppt-col-chart-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+}
+
+/* ── content page chart area ── */
+.ppt-content-chart {
+  margin-top: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+/* ── two_column chart area ── */
+.ppt-two-col-chart {
+  margin-top: 8px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  .ppt-chart-svg,
+  .ppt-grouped-bar-wrap,
+  .ppt-line-chart-wrap {
+    width: 100%;
+    max-width: 70%;
+    max-height: min(40cqi, 36vh);
+  }
+
+  &.ppt-chart-contained {
+    flex: 0 1 auto;
+    width: 100%;
+    max-width: 70%;
+    padding: clamp(10px, 4cqi, 24px) clamp(12px, 5cqi, 32px);
+    margin-inline: auto;
+
+    .ppt-chart-svg,
+    .ppt-grouped-bar-wrap,
+    .ppt-line-chart-wrap,
+    .ppt-timeline-chart,
+    .ppt-funnel-chart {
+      max-width: 100%;
+      max-height: min(46cqi, 42vh);
+    }
+  }
+}
+
+.ppt-content-split.ppt-content-chart-only {
+  justify-content: center;
+
+  .ppt-content-right {
+    flex: 0 1 auto !important;
+    width: 100%;
+    max-width: 70%;
+    margin-inline: auto;
+  }
+
+  .ppt-content-chart-wrap {
+    flex: 0 1 auto;
+    width: 100%;
+
+    .ppt-chart-svg,
+    .ppt-grouped-bar-wrap,
+    .ppt-line-chart-wrap {
+      flex: 0 1 auto;
+      max-height: min(46cqi, 42vh);
+    }
+  }
+}
+
+/* ── toc ── */
+.ppt-toc {
+  justify-content: flex-start;
+  padding: clamp(20px, 3cqi, 32px) clamp(28px, 4cqi, 44px) clamp(12px, 2cqi, 20px);
+  overflow: hidden;
+}
+
+.ppt-toc--medium {
+  padding: clamp(16px, 2.4cqi, 26px) clamp(22px, 3.2cqi, 36px) clamp(10px, 1.6cqi, 16px);
+
+  .ppt-toc-header {
+    margin-bottom: clamp(8px, 1.4cqi, 14px);
+  }
+
+  .ppt-toc-title {
+    font-size: clamp(18px, 3.6cqi, 28px);
+  }
+
+  .ppt-toc-subtitle {
+    font-size: clamp(11px, 1.8cqi, 14px);
+    margin-top: 4px;
+  }
+}
+
+.ppt-toc--compact {
+  padding: clamp(12px, 2cqi, 20px) clamp(18px, 2.8cqi, 28px) clamp(8px, 1.2cqi, 12px);
+
+  .ppt-toc-header {
+    margin-bottom: clamp(6px, 1cqi, 10px);
+  }
+
+  .ppt-toc-title {
+    font-size: clamp(16px, 3cqi, 24px);
+  }
+
+  .ppt-toc-subtitle {
+    font-size: clamp(11px, 1.65cqi, 13px);
+    margin-top: 2px;
+  }
+}
+
+/* 标题区域 */
+.ppt-toc-header {
+  margin-bottom: clamp(10px, 1.8cqi, 18px);
+  flex-shrink: 0;
+}
+
+.ppt-toc-title {
+  font-size: clamp(20px, 4cqi, 32px);
+  font-weight: 800;
+  margin: 0 0 2px;
+  color: var(--ppt-accent, #4a90e2);
+  border-left: 4px solid var(--ppt-accent, #4a90e2);
+  padding-left: 14px;
+  line-height: 1.3;
+}
+
+.ppt-toc-subtitle {
+  font-size: clamp(12px, 2cqi, 15px);
+  opacity: 0.55;
+  margin: 6px 0 0 18px;
+}
+
+/* 卡片网格：2 列自适应 */
+.ppt-toc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(10px, 1.8cqi, 16px);
+  flex: 1;
+  min-height: 0;
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.ppt-toc-grid--medium {
+  gap: clamp(8px, 1.4cqi, 12px);
+
+  .ppt-toc-card {
+    padding: clamp(10px, 1.8cqi, 14px) clamp(12px, 2cqi, 16px);
+    gap: clamp(8px, 1.4cqi, 10px);
+  }
+
+  .ppt-toc-card-icon {
+    width: clamp(32px, 4.5cqi, 40px);
+    height: clamp(32px, 4.5cqi, 40px);
+    margin-top: 2px;
+
+    svg {
+      width: clamp(18px, 2.6cqi, 22px);
+      height: clamp(18px, 2.6cqi, 22px);
+    }
+  }
+
+  .ppt-toc-card-body {
+    gap: clamp(4px, 0.8cqi, 8px);
+  }
+
+  .ppt-toc-card-title {
+    font-size: clamp(14px, 2.6cqi, 18px);
+    line-height: 1.3;
+  }
+
+  .ppt-toc-card-desc {
+    font-size: clamp(11px, 1.8cqi, 14px);
+    line-height: 1.35;
+  }
+}
+
+.ppt-toc-grid--compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(6px, 1cqi, 10px);
+  align-content: start;
+  grid-auto-rows: auto;
+
+  .ppt-toc-card {
+    padding: clamp(8px, 1.4cqi, 12px) clamp(10px, 1.6cqi, 14px);
+    gap: clamp(6px, 1cqi, 8px);
+    align-items: center;
+  }
+
+  .ppt-toc-card-icon {
+    width: clamp(28px, 3.8cqi, 36px);
+    height: clamp(28px, 3.8cqi, 36px);
+    margin-top: 0;
+
+    svg {
+      width: clamp(16px, 2.2cqi, 20px);
+      height: clamp(16px, 2.2cqi, 20px);
+    }
+  }
+
+  .ppt-toc-card-body {
+    gap: clamp(3px, 0.6cqi, 6px);
+  }
+
+  .ppt-toc-card-title {
+    font-size: clamp(13px, 2.3cqi, 17px);
+    line-height: 1.3;
+    font-weight: 700;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .ppt-toc-card-num {
+    margin-right: 6px;
+    font-size: 0.95em;
+  }
+
+  .ppt-toc-card-desc {
+    font-size: clamp(11px, 1.75cqi, 14px);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* 单个卡片 */
+.ppt-toc-card {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(10px, 1.8cqi, 14px);
+  padding: clamp(12px, 2.2cqi, 18px) clamp(14px, 2.4cqi, 20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: var(--ppt-bg-secondary, rgba(255, 255, 255, 0.03));
+  transition: border-color 0.25s, background 0.25s;
+  cursor: default;
+  min-height: 0;
+  overflow: hidden;
+
+  &:hover {
+    border-color: var(--ppt-accent, #4a90e2);
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* 图标容器 */
+.ppt-toc-card-icon {
+  flex-shrink: 0;
+  width: clamp(36px, 5cqi, 44px);
+  height: clamp(36px, 5cqi, 44px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ppt-accent, #4a90e2);
+  margin-top: 2px;
+
+  svg {
+    width: clamp(20px, 3cqi, 26px);
+    height: clamp(20px, 3cqi, 26px);
+  }
+}
+
+/* 卡片文字区域 */
+.ppt-toc-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(4px, 0.9cqi, 8px);
+  min-width: 0;
+  flex: 1;
+}
+
+.ppt-toc-card-title {
+  font-size: clamp(16px, 3.2cqi, 22px);
+  font-weight: 800;
+  color: var(--ppt-text, #e8f0fe);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.ppt-toc-card-num {
+  color: var(--ppt-accent, #4a90e2);
+  font-weight: 800;
+  font-size: 1.05em;
+  margin-right: 8px;
+}
+
+.ppt-toc-card-desc {
+  font-size: clamp(12px, 2.2cqi, 15px);
+  color: var(--ppt-text-secondary, rgba(255, 255, 255, 0.62));
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* 底部报告标题 */
+.ppt-toc-footer {
+  text-align: center;
+  font-size: clamp(11px, 1.8cqi, 13px);
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-top: 12px;
+  padding-top: 10px;
+  flex-shrink: 0;
+}
+
+/* ── references ── */
+.ppt-references {
+  justify-content: flex-start;
+  padding-top: 36px;
+}
+.ppt-ref-subtitle {
+  font-size: var(--ppt-fs-body-sm);
+  opacity: 0.5;
+  margin: -12px 0 12px 18px;
+}
+.ppt-ref-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+.ppt-ref-item {
+  font-size: var(--ppt-fs-caption);
+  line-height: 1.45;
+  opacity: 0.6;
+  word-break: break-all;
+}
+.ppt-ref-item--link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.ppt-ref-item--link:hover {
+  opacity: 0.9;
+  text-decoration: underline;
+}
+
+/* ── quote ── */
+.ppt-quote {
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+  gap: 16px;
+  background-image: linear-gradient(
+    135deg,
+    var(--ppt-bg, #0d1b2e),
+    color-mix(in srgb, var(--ppt-accent, #4a90e2) 12%, var(--ppt-bg, #0d1b2e))
+  );
+}
+
+.ppt-quote-mark {
+  font-size: var(--ppt-fs-quote-mark);
+  line-height: 0.8;
+  color: var(--ppt-accent, #4a90e2);
+  opacity: 0.3;
+  font-family: Georgia, serif;
+}
+
+.ppt-quote-text {
+  display: block;
+  font-size: var(--ppt-fs-heading);
+  font-family: var(--ppt-quote-font-family, "ZCOOL XiaoWei", "Playfair Display", serif);
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 80%;
+}
+
+.ppt-quote-author {
+  font-size: var(--ppt-fs-body-sm);
+  opacity: 0.55;
+}
+
+/* ── end ── */
+.ppt-end {
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  background-image: linear-gradient(
+    135deg,
+    var(--ppt-bg, #0d1b2e),
+    color-mix(in srgb, var(--ppt-accent, #4a90e2) 15%, var(--ppt-bg, #0d1b2e))
+  );
+}
+
+.ppt-end-icon {
+  font-size: 48px;
+}
+
+.ppt-end-title {
+  font-size: var(--ppt-fs-display);
+  font-weight: 800;
+  margin: 0;
+}
+
+.ppt-end-sub {
+  font-size: var(--ppt-fs-body-lg);
+  opacity: 0.6;
+  margin: 0;
+}
+
+/* 缩略图导航 */
+.ppt-thumbs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  &::-webkit-scrollbar {
+    height: 3px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+  }
+}
+
+.ppt-thumb {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.15s;
+  min-width: 44px;
+  max-width: 64px;
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.75);
+  }
+  &.ppt-thumb-active {
+    border-color: var(--ppt-accent, #4a90e2);
+    color: #fff;
+    background: rgba(74, 144, 226, 0.15);
+  }
+}
+
+.ppt-thumb-num {
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.ppt-thumb-label {
+  font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 56px;
+  opacity: 0.7;
+}

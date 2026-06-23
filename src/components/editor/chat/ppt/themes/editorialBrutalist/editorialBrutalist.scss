@@ -1,0 +1,1498 @@
+.ppt-editorial-brutalist {
+  --brutalist-bg: var(--ppt-bg, #ffffff);
+  --brutalist-surface: var(--ppt-bg-alt, var(--ppt-bg-secondary, #f5f5f5));
+  --brutalist-text: var(--ppt-text, #000000);
+  --brutalist-muted: var(--ppt-text-muted, var(--ppt-text-secondary, #666666));
+  --brutalist-accent: var(--ppt-accent, #ff3300);
+  display: grid;
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  width: 100%;
+  height: 100%;
+  padding: clamp(48px, 6vh, 96px) clamp(56px, 6vw, 120px);
+  overflow: hidden;
+  color: var(--brutalist-text);
+  background: var(--brutalist-bg);
+  font-family: var(--ppt-font-body, Inter, "Noto Sans SC", sans-serif);
+}
+
+.ppt-editorial-brutalist *,
+.ppt-editorial-brutalist *::before,
+.ppt-editorial-brutalist *::after {
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.ppt-editorial-brutalist .ppt-table-ref {
+  color: var(--brutalist-accent);
+  font-size: 0.58em;
+  text-decoration: none;
+  vertical-align: super;
+}
+
+.ppt-brutalist-kicker {
+  margin: 0;
+  color: var(--brutalist-muted);
+  font-family: var(--ppt-font-body, Inter, "Noto Sans SC", sans-serif);
+  font-size: clamp(14px, 1.1cqi, 18px);
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.ppt-brutalist-display,
+.ppt-brutalist-title,
+.ppt-brutalist-card h3,
+.ppt-brutalist-chart-summary h3 {
+  margin: 0;
+  color: var(--brutalist-text);
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 0.96;
+  text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+
+.ppt-brutalist-display {
+  max-width: min(920px, 90%);
+  font-family: var(--ppt-font-display, Anton, "Noto Sans SC", sans-serif);
+  font-size: clamp(40px, 5.6cqi, 88px);
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  text-transform: none;
+}
+
+.ppt-brutalist-display .ppt-md-inline {
+  display: block;
+  line-height: inherit;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.ppt-brutalist-display--cjk {
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  letter-spacing: -0.01em;
+  line-height: 1.14;
+}
+
+.ppt-brutalist-display--medium {
+  font-size: clamp(34px, 4.6cqi, 72px);
+  line-height: 1.06;
+}
+
+.ppt-brutalist-display--long {
+  font-size: clamp(28px, 3.6cqi, 56px);
+  line-height: 1.1;
+}
+
+.ppt-editorial-brutalist--cover {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(12px, 1.5cqi, 20px);
+  padding: clamp(40px, 5vh, 72px) clamp(48px, 5.5vw, 96px) clamp(48px, 5.5vh, 72px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-hero {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: clamp(10px, 1.2cqi, 16px);
+  width: 100%;
+  max-width: 100%;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-hero .ppt-brutalist-kicker {
+  margin-bottom: 0;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-display {
+  max-width: 100%;
+  font-size: clamp(36px, 4.4cqi, 72px);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-display .ppt-md-inline {
+  display: block;
+  line-height: inherit;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-display--latin {
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  letter-spacing: -0.01em;
+  line-height: 1.16;
+  text-transform: none;
+  text-wrap: balance;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-display--latin.ppt-brutalist-display--medium {
+  font-size: clamp(28px, 3.2cqi, 48px);
+  line-height: 1.18;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-display--latin.ppt-brutalist-display--long {
+  font-size: clamp(22px, 2.5cqi, 38px);
+  line-height: 1.2;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-divider {
+  margin: clamp(12px, 1.6cqi, 20px) 0;
+}
+
+.ppt-editorial-brutalist--cover .ppt-brutalist-hero .ppt-brutalist-lead {
+  max-width: min(640px, 72%);
+}
+
+.ppt-editorial-brutalist--cover .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(14px, 1.8vh, 22px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ppt-editorial-brutalist--section,
+.ppt-editorial-brutalist--end {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(10px, 1.2cqi, 16px);
+  padding: clamp(36px, 4.5vh, 56px) clamp(44px, 5vw, 80px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-hero,
+.ppt-editorial-brutalist--end .ppt-brutalist-hero {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  gap: clamp(10px, 1.2cqi, 16px);
+  width: 100%;
+  max-width: min(780px, 78%);
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-hero .ppt-brutalist-kicker,
+.ppt-editorial-brutalist--end .ppt-brutalist-hero .ppt-brutalist-kicker {
+  margin-bottom: 0;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-display,
+.ppt-editorial-brutalist--end .ppt-brutalist-display {
+  max-width: 100%;
+  font-size: clamp(28px, 3.4cqi, 48px);
+  line-height: 1.14;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-display--cjk,
+.ppt-editorial-brutalist--end .ppt-brutalist-display--cjk {
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  letter-spacing: 0;
+  line-height: 1.16;
+  text-wrap: balance;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-display--medium,
+.ppt-editorial-brutalist--end .ppt-brutalist-display--medium {
+  font-size: clamp(24px, 2.8cqi, 40px);
+  line-height: 1.16;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-display--long,
+.ppt-editorial-brutalist--end .ppt-brutalist-display--long {
+  font-size: clamp(20px, 2.3cqi, 32px);
+  line-height: 1.18;
+}
+
+.ppt-editorial-brutalist--section .ppt-brutalist-divider,
+.ppt-editorial-brutalist--end .ppt-brutalist-divider {
+  margin: clamp(14px, 2cqi, 24px) 0;
+}
+
+.ppt-editorial-brutalist--section .ppt-brand-footer,
+.ppt-editorial-brutalist--end .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(14px, 1.8vh, 22px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ppt-brutalist-watermark--vertical {
+  position: absolute;
+  top: clamp(48px, 6vh, 96px);
+  right: clamp(56px, 6vw, 120px);
+  z-index: 0;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.ppt-brutalist-title {
+  max-width: 980px;
+  font-size: clamp(44px, 5.5cqi, 86px);
+}
+
+.ppt-brutalist-lead,
+.ppt-brutalist-body-block,
+.ppt-brutalist-card-body {
+  display: block;
+  color: var(--brutalist-muted);
+  font-size: clamp(18px, 1.45cqi, 26px);
+  line-height: 1.32;
+  overflow-wrap: break-word;
+}
+
+.ppt-brutalist-divider {
+  width: min(420px, 42%);
+  height: 8px;
+  margin: clamp(22px, 3cqi, 42px) 0;
+  background: var(--brutalist-text);
+}
+
+.ppt-brutalist-hero {
+  align-self: center;
+  max-width: 100%;
+}
+
+.ppt-brutalist-hero .ppt-brutalist-kicker {
+  margin-bottom: clamp(18px, 2cqi, 30px);
+}
+
+.ppt-brutalist-hero .ppt-brutalist-lead {
+  max-width: min(560px, 62%);
+}
+
+.ppt-brutalist-hero-date {
+  margin: clamp(18px, 2.4cqi, 32px) 0 0;
+  color: var(--brutalist-muted);
+  font-family: var(--ppt-font-body, Inter, "Noto Sans SC", sans-serif);
+  font-size: clamp(14px, 1.15cqi, 20px);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.3;
+  text-transform: none;
+}
+
+.ppt-brutalist-watermark {
+  align-self: center;
+  justify-self: end;
+  color: var(--brutalist-text);
+  font-family: var(--ppt-font-display, Anton, "Noto Sans SC", sans-serif);
+  font-size: clamp(72px, 11cqi, 160px);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 0.85;
+  opacity: 0.05;
+  pointer-events: none;
+  text-transform: none;
+}
+
+.ppt-brutalist-header {
+  display: grid;
+  gap: clamp(10px, 1.4cqi, 18px);
+  align-self: start;
+  border-top: var(--ppt-rule-bold, 8px solid var(--brutalist-text));
+  padding-top: clamp(16px, 2cqi, 28px);
+}
+
+.ppt-brutalist-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  min-height: 0;
+}
+
+.ppt-editorial-brutalist--toc {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.2cqi, 16px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--toc-medium {
+  padding: clamp(32px, 4.5vh, 52px) clamp(40px, 5vw, 72px);
+  gap: clamp(8px, 1cqi, 12px);
+}
+
+.ppt-editorial-brutalist--toc-compact {
+  padding: clamp(24px, 3.5vh, 40px) clamp(32px, 4vw, 56px);
+  gap: clamp(6px, 0.8cqi, 10px);
+}
+
+.ppt-editorial-brutalist--toc .ppt-brutalist-header {
+  flex: 0 0 auto;
+  gap: clamp(6px, 0.8cqi, 10px);
+  padding-top: clamp(10px, 1.2cqi, 16px);
+}
+
+.ppt-editorial-brutalist--toc .ppt-brutalist-title {
+  font-size: clamp(26px, 3cqi, 42px);
+  line-height: 1.04;
+}
+
+.ppt-editorial-brutalist--toc-compact .ppt-brutalist-title {
+  font-size: clamp(22px, 2.6cqi, 34px);
+}
+
+.ppt-editorial-brutalist--toc .ppt-brutalist-card-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.ppt-editorial-brutalist--toc .ppt-brand-footer {
+  position: static;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  transform: none;
+  left: auto;
+}
+
+.ppt-editorial-brutalist--content {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 12px);
+  padding: clamp(28px, 3.5vh, 48px) clamp(36px, 4.5vw, 72px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-header {
+  flex: 0 0 auto;
+  gap: clamp(6px, 0.8cqi, 10px);
+  padding-top: clamp(10px, 1.2cqi, 16px);
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-title {
+  font-size: clamp(24px, 2.8cqi, 38px);
+  line-height: 1.06;
+  text-transform: none;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-data-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ppt-editorial-brutalist--content .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(14px, 1.8vh, 22px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ppt-editorial-brutalist--hero-left {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 12px);
+  padding: clamp(24px, 3vh, 40px) clamp(32px, 4vw, 64px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--hero-left .ppt-brutalist-header {
+  flex: 0 0 auto;
+}
+
+.ppt-editorial-brutalist--hero-left .ppt-brutalist-title {
+  font-size: clamp(22px, 2.5cqi, 34px);
+  line-height: 1.06;
+  text-transform: none;
+}
+
+.ppt-brutalist-hero-left {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(10px, 1.2cqi, 16px);
+}
+
+.ppt-brutalist-hero-left-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.42fr) minmax(0, 0.58fr);
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  flex: 0 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.ppt-brutalist-hero-left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.2cqi, 16px);
+  min-height: 0;
+}
+
+.ppt-brutalist-hero-metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(8px, 1cqi, 12px);
+  min-height: clamp(120px, 16cqi, 180px);
+  padding: clamp(16px, 2cqi, 28px);
+  border: var(--ppt-rule-bold, 8px solid var(--brutalist-text));
+  border-left: var(--ppt-rule-accent, 8px solid var(--brutalist-accent));
+  background: var(--brutalist-surface);
+}
+
+.ppt-brutalist-hero-metric-value {
+  font-family: var(--ppt-font-display, Anton, sans-serif);
+  font-size: clamp(42px, 6cqi, 72px);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+.ppt-brutalist-hero-metric-caption {
+  color: var(--brutalist-muted);
+  font-size: clamp(11px, 0.95cqi, 14px);
+  line-height: 1.3;
+}
+
+.ppt-brutalist-hero-mini-metrics {
+  display: grid;
+  gap: clamp(8px, 1cqi, 12px);
+}
+
+.ppt-brutalist-hero-mini-metric {
+  display: grid;
+  gap: 2px;
+  padding: clamp(8px, 1cqi, 12px);
+  border: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+  border-left: 4px solid var(--brutalist-accent);
+  background: var(--brutalist-bg);
+}
+
+.ppt-brutalist-hero-mini-metric strong {
+  font-family: var(--ppt-font-display, Anton, sans-serif);
+  font-size: clamp(20px, 2.2cqi, 28px);
+  line-height: 1;
+}
+
+.ppt-brutalist-hero-mini-metric-label {
+  color: var(--brutalist-muted);
+  font-size: clamp(10px, 0.82cqi, 12px);
+  line-height: 1.25;
+}
+
+.ppt-brutalist-hero-left-aside {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 12px);
+  overflow-y: auto;
+  padding: clamp(10px, 1.2cqi, 16px);
+  border: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+  border-left: var(--ppt-rule-accent, 8px solid var(--brutalist-accent));
+  background: var(--brutalist-surface);
+}
+
+.ppt-brutalist-point--hero-side {
+  padding-bottom: clamp(6px, 0.8cqi, 10px);
+  border-bottom: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+}
+
+.ppt-brutalist-point--hero-side:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.ppt-brutalist-hero-left-notes {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(10px, 1.2cqi, 16px);
+  border: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+  border-left: var(--ppt-rule-accent, 8px solid var(--brutalist-accent));
+  background: var(--brutalist-bg);
+}
+
+.ppt-brutalist-hero-left-notes .ppt-brutalist-point-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ppt-editorial-brutalist--hero-left .ppt-brutalist-insight {
+  flex: 0 0 auto;
+}
+
+.ppt-editorial-brutalist--hero-left .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(14px, 1.8vh, 22px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ppt-editorial-brutalist--content-split {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 12px);
+  padding: clamp(24px, 3vh, 40px) clamp(32px, 4vw, 64px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--content-split .ppt-brutalist-header {
+  flex: 0 0 auto;
+}
+
+.ppt-editorial-brutalist--content-split .ppt-brutalist-title {
+  font-size: clamp(22px, 2.5cqi, 34px);
+  line-height: 1.06;
+  text-transform: none;
+}
+
+.ppt-brutalist-split--content {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1.15fr) minmax(220px, 0.85fr);
+  align-items: stretch;
+}
+
+.ppt-brutalist-content-split-aside {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(10px, 1.2cqi, 16px);
+  overflow-y: auto;
+  padding: clamp(12px, 1.4cqi, 18px);
+  border-left: var(--ppt-rule-accent, 8px solid var(--brutalist-accent));
+}
+
+.ppt-editorial-brutalist--content-split .ppt-brutalist-card--scroll {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--content-split .ppt-brutalist-point-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ppt-editorial-brutalist--content-split .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(14px, 1.8vh, 22px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card {
+  overflow: hidden;
+  padding: clamp(12px, 1.4cqi, 18px);
+  gap: clamp(6px, 0.7cqi, 10px);
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card-index {
+  font-size: clamp(18px, 2cqi, 28px);
+  line-height: 1;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card h3 {
+  font-size: clamp(15px, 1.35cqi, 20px);
+  line-height: 1.15;
+  text-transform: none;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  font-size: clamp(11px, 0.88cqi, 13px);
+  line-height: 1.28;
+  overflow-wrap: break-word;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card-grid--medium .ppt-brutalist-card-body,
+.ppt-editorial-brutalist--content .ppt-brutalist-card-grid--medium .ppt-brutalist-card h3 {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.ppt-brutalist-card-grid--medium {
+  gap: clamp(10px, 1.2cqi, 14px);
+}
+
+.ppt-brutalist-card-grid--medium .ppt-brutalist-card {
+  gap: clamp(6px, 0.8cqi, 10px);
+  padding: clamp(14px, 1.6cqi, 22px);
+  overflow: hidden;
+}
+
+.ppt-brutalist-card-grid--medium .ppt-brutalist-card-index {
+  font-size: clamp(24px, 2.6cqi, 40px);
+}
+
+.ppt-brutalist-card-grid--medium .ppt-brutalist-card h3 {
+  font-size: clamp(18px, 2cqi, 28px);
+  line-height: 1.08;
+}
+
+.ppt-brutalist-card-grid--medium .ppt-brutalist-card-body {
+  font-size: clamp(12px, 1cqi, 15px);
+  line-height: 1.32;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ppt-brutalist-card-grid--compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(8px, 1cqi, 12px);
+  align-content: start;
+  grid-auto-rows: auto;
+}
+
+.ppt-brutalist-card-grid--compact .ppt-brutalist-card {
+  gap: clamp(4px, 0.6cqi, 8px);
+  padding: clamp(10px, 1.2cqi, 16px);
+  overflow: hidden;
+}
+
+.ppt-brutalist-card-grid--compact .ppt-brutalist-card-index {
+  font-size: clamp(20px, 2cqi, 32px);
+}
+
+.ppt-brutalist-card-grid--compact .ppt-brutalist-card h3 {
+  font-size: clamp(14px, 1.5cqi, 20px);
+  line-height: 1.12;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ppt-brutalist-card-grid--compact .ppt-brutalist-card-body {
+  font-size: clamp(10px, 0.85cqi, 13px);
+  line-height: 1.28;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ppt-brutalist-card {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(10px, 1.2cqi, 18px);
+  padding: clamp(22px, 2.6cqi, 38px);
+  border: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+  border-left: var(--ppt-rule-accent, 8px solid var(--brutalist-accent));
+  background: var(--brutalist-surface);
+}
+
+.ppt-brutalist-card-index {
+  color: var(--brutalist-accent);
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  font-size: clamp(32px, 3.6cqi, 56px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+}
+
+.ppt-brutalist-card h3,
+.ppt-brutalist-chart-summary h3 {
+  font-size: clamp(28px, 2.9cqi, 48px);
+  line-height: 1.02;
+}
+
+.ppt-brutalist-card-body {
+  font-size: clamp(16px, 1.25cqi, 22px);
+}
+
+.ppt-brutalist-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  min-height: 0;
+}
+
+.ppt-editorial-brutalist--two_column {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 14px);
+  padding: clamp(28px, 3.5vh, 48px) clamp(36px, 4.5vw, 72px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--two_column .ppt-brutalist-header {
+  flex: 0 0 auto;
+  gap: clamp(6px, 0.8cqi, 10px);
+  padding-top: clamp(10px, 1.2cqi, 16px);
+}
+
+.ppt-editorial-brutalist--two_column .ppt-brutalist-title {
+  font-size: clamp(26px, 3cqi, 42px);
+  line-height: 1.04;
+}
+
+.ppt-editorial-brutalist--two_column .ppt-brutalist-split {
+  flex: 1 1 0%;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.ppt-editorial-brutalist--two_column.ppt-editorial-brutalist--document-figure {
+  position: relative;
+  padding: clamp(20px, 2.8vh, 36px) clamp(28px, 3.5vw, 52px) clamp(30px, 3.5vh, 44px);
+  gap: clamp(6px, 0.7cqi, 10px);
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-header {
+  gap: clamp(4px, 0.5cqi, 6px);
+  padding-top: clamp(6px, 0.8cqi, 10px);
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-kicker {
+  font-size: clamp(11px, 0.9cqi, 13px);
+  letter-spacing: 0.16em;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-title {
+  font-size: clamp(20px, 2.4cqi, 32px);
+  line-height: 1.06;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-split {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.ppt-brutalist-split--figure {
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-card {
+  height: 100%;
+  padding: clamp(12px, 1.4cqi, 18px);
+  gap: clamp(6px, 0.7cqi, 10px);
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-card--figure-panel h3 {
+  flex: 0 0 auto;
+  font-size: clamp(14px, 1.25cqi, 18px);
+  line-height: 1.1;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-document-figure figcaption {
+  margin-top: 4px;
+  font-size: clamp(9px, 0.75cqi, 11px);
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-insight--inline {
+  flex: 0 0 auto;
+  padding: clamp(4px, 0.5cqi, 8px) 0 0;
+  font-size: clamp(11px, 0.92cqi, 14px);
+  line-height: 1.28;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(10px, 1.2vh, 16px);
+  left: 50%;
+  flex: none;
+  margin-top: 0;
+  transform: translateX(-50%);
+}
+
+.ppt-brutalist-card--scroll {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-card--scroll {
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-card--scroll .ppt-brutalist-point-list {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill {
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill .ppt-brutalist-point {
+  flex: 1 1 0%;
+  min-height: 0;
+  align-content: start;
+  padding: clamp(5px, 0.65cqi, 10px) 0;
+  border-bottom: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill .ppt-brutalist-point:last-child {
+  border-bottom: none;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill .ppt-brutalist-point-index {
+  font-size: clamp(14px, 1.35cqi, 20px);
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill .ppt-brutalist-point-title {
+  font-size: clamp(12px, 1.05cqi, 15px);
+  margin-bottom: 2px;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill .ppt-brutalist-point-body {
+  font-size: clamp(11px, 0.95cqi, 14px);
+  line-height: 1.3;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill.ppt-brutalist-point-list--many .ppt-brutalist-point,
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--fill.ppt-brutalist-point-list--ultra .ppt-brutalist-point {
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  padding-bottom: clamp(5px, 0.65cqi, 10px);
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-card--scroll {
+  padding: clamp(10px, 1.2cqi, 14px);
+}
+
+.ppt-brutalist-point-list {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.1cqi, 14px);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ppt-brutalist-point-list--fill {
+  justify-content: space-between;
+}
+
+.ppt-brutalist-point-list--scroll {
+  justify-content: flex-start;
+  gap: clamp(6px, 0.75cqi, 10px);
+}
+
+.ppt-brutalist-point-list--scroll .ppt-brutalist-point {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
+.ppt-brutalist-point-list--many.ppt-brutalist-point-list--scroll .ppt-brutalist-point {
+  padding-bottom: clamp(5px, 0.65cqi, 8px);
+  border-bottom: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+}
+
+.ppt-brutalist-point-list--many.ppt-brutalist-point-list--scroll .ppt-brutalist-point:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--many .ppt-brutalist-point,
+.ppt-editorial-brutalist--document-figure .ppt-brutalist-point-list--scroll .ppt-brutalist-point {
+  flex: 0 0 auto;
+  min-height: auto;
+  align-content: start;
+}
+
+.ppt-brutalist-point-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ppt-brutalist-point {
+  display: grid;
+  grid-template-columns: clamp(28px, 3cqi, 40px) minmax(0, 1fr);
+  gap: clamp(8px, 1cqi, 12px);
+  align-items: start;
+  padding-bottom: clamp(8px, 1cqi, 12px);
+  border-bottom: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+}
+
+.ppt-brutalist-point:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ppt-brutalist-point-index {
+  color: var(--brutalist-accent);
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  font-size: clamp(18px, 1.8cqi, 28px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ppt-brutalist-point-title {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--brutalist-text);
+  font-size: clamp(13px, 1.08cqi, 16px);
+  font-weight: 700;
+  line-height: 1.28;
+}
+
+.ppt-brutalist-point-body {
+  display: block;
+  color: var(--brutalist-muted);
+  font-size: clamp(12px, 1cqi, 15px);
+  line-height: 1.34;
+}
+
+.ppt-brutalist-point-list--dense {
+  gap: clamp(6px, 0.75cqi, 10px);
+}
+
+.ppt-brutalist-point-list--dense .ppt-brutalist-point {
+  padding-bottom: clamp(5px, 0.7cqi, 8px);
+}
+
+.ppt-brutalist-point-list--dense .ppt-brutalist-point-body {
+  font-size: clamp(11px, 0.92cqi, 13px);
+  line-height: 1.28;
+}
+
+.ppt-brutalist-point-list--dense .ppt-brutalist-point-title {
+  font-size: clamp(12px, 0.98cqi, 14px);
+}
+
+.ppt-brutalist-point-list--ultra {
+  gap: clamp(3px, 0.45cqi, 6px);
+}
+
+.ppt-brutalist-point-list--ultra .ppt-brutalist-point {
+  padding-bottom: clamp(3px, 0.45cqi, 5px);
+}
+
+.ppt-brutalist-point-list--ultra .ppt-brutalist-point-index {
+  font-size: clamp(13px, 1.2cqi, 18px);
+}
+
+.ppt-brutalist-point-list--ultra .ppt-brutalist-point-body {
+  font-size: clamp(10px, 0.82cqi, 12px);
+  line-height: 1.22;
+}
+
+.ppt-brutalist-point-list--ultra .ppt-brutalist-point-title {
+  font-size: clamp(11px, 0.88cqi, 13px);
+  margin-bottom: 1px;
+}
+
+.ppt-brutalist-point-list--many:not(.ppt-brutalist-point-list--scroll) .ppt-brutalist-point {
+  border-bottom-width: 0;
+  padding-bottom: 0;
+}
+
+.ppt-brutalist-card--figure-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--brutalist-text);
+  background: var(--brutalist-bg, #ffffff);
+  border-color: var(--brutalist-text);
+  border-left-color: var(--brutalist-accent);
+}
+
+.ppt-brutalist-card--figure-panel h3,
+.ppt-brutalist-card--figure-panel .ppt-md-inline,
+.ppt-brutalist-card--figure-panel figcaption {
+  color: var(--brutalist-text);
+}
+
+.ppt-brutalist-document-figure {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  background: var(--brutalist-bg, #ffffff);
+}
+
+.ppt-brutalist-document-figure-img {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center top;
+  background: var(--brutalist-bg, #ffffff);
+}
+
+.ppt-brutalist-document-figure figcaption {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  font-size: clamp(10px, 0.85cqi, 12px);
+  line-height: 1.3;
+  color: var(--brutalist-muted);
+}
+
+.ppt-brutalist-card--figure-panel .ppt-table-ref {
+  color: var(--brutalist-accent);
+}
+
+.ppt-brutalist-card--invert {
+  color: var(--brutalist-bg);
+  background: var(--brutalist-text);
+  border-color: var(--brutalist-text);
+  border-left-color: var(--brutalist-accent);
+}
+
+.ppt-brutalist-card--invert h3,
+.ppt-brutalist-card--invert .ppt-brutalist-card-body,
+.ppt-brutalist-card--invert .ppt-md-inline {
+  color: inherit;
+}
+
+.ppt-brutalist-card--invert .ppt-brutalist-card-body {
+  opacity: 0.82;
+}
+
+.ppt-brutalist-quote {
+  align-self: center;
+  margin: 0;
+  padding: clamp(34px, 4cqi, 64px);
+  border-left: var(--ppt-rule-accent, 8px solid var(--brutalist-accent));
+  background: var(--brutalist-surface);
+}
+
+.ppt-editorial-brutalist--quote {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 12px);
+  padding: clamp(24px, 3vh, 40px) clamp(32px, 4vw, 64px) clamp(28px, 3.5vh, 44px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--quote.ppt-editorial-brutalist--quote-multi {
+  justify-content: flex-start;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.ppt-editorial-brutalist-quote-page {
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  min-height: 0;
+  gap: clamp(6px, 0.8cqi, 10px);
+}
+
+.ppt-editorial-brutalist--quote-multi .ppt-editorial-brutalist-quote-page {
+  flex: 1 1 auto;
+  height: 100%;
+}
+
+.ppt-brutalist-header--compact {
+  flex: 0 0 auto;
+  gap: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.ppt-brutalist-quote-page-title {
+  font-size: clamp(18px, 2.2cqi, 28px);
+  line-height: 1.08;
+}
+
+.ppt-brutalist-quote--multi {
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  align-self: stretch;
+  min-height: 0;
+  padding: clamp(14px, 1.6cqi, 20px);
+  overflow: hidden;
+  container-type: size;
+  container-name: brutalist-quote-multi;
+}
+
+.ppt-brutalist-quote--multi .ppt-brutalist-point-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ppt-brutalist-quote--multi .ppt-brutalist-point-list--quote-fill {
+  flex: 1 1 auto;
+  height: 100%;
+  justify-content: space-between;
+  gap: clamp(2px, 0.35cqi, 6px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ppt-brutalist-quote--multi .ppt-brutalist-point-list--quote-fill .ppt-brutalist-point {
+  flex: 1 1 0%;
+  min-height: 0;
+  align-content: start;
+  overflow: hidden;
+  padding-bottom: clamp(3px, 0.4cqi, 6px);
+  border-bottom: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+}
+
+.ppt-brutalist-quote--multi .ppt-brutalist-point-list--quote-fill .ppt-brutalist-point:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ppt-brutalist-quote--multi
+  .ppt-brutalist-point-list--quote-fill.ppt-brutalist-point-list--many
+  .ppt-brutalist-point {
+  border-bottom-width: 1px;
+  padding-bottom: clamp(3px, 0.4cqi, 6px);
+}
+
+.ppt-brutalist-quote--multi
+  .ppt-brutalist-point-list--quote-fill.ppt-brutalist-point-list--many
+  .ppt-brutalist-point:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ppt-brutalist-quote--multi .ppt-brutalist-point-list--quote-fill .ppt-brutalist-point-body {
+  overflow: hidden;
+  font-size: clamp(9px, 2.6cqmin, 14px);
+  line-height: 1.22;
+}
+
+.ppt-brutalist-quote--multi
+  .ppt-brutalist-point-list--quote-fill.ppt-brutalist-point-list--ultra
+  .ppt-brutalist-point-title {
+  font-size: clamp(10px, 2.2cqmin, 13px);
+  margin-bottom: 1px;
+}
+
+.ppt-brutalist-quote--multi
+  .ppt-brutalist-point-list--quote-fill.ppt-brutalist-point-list--ultra
+  .ppt-brutalist-point-index {
+  font-size: clamp(14px, 2.4cqmin, 22px);
+}
+
+.ppt-brutalist-quote--multi cite {
+  flex: 0 0 auto;
+  margin-top: clamp(8px, 1cqi, 12px);
+  font-size: clamp(10px, 0.85cqi, 12px);
+}
+
+.ppt-brutalist-quote-list--longtext:not(.ppt-brutalist-point-list--quote-fill) .ppt-brutalist-point-body {
+  font-size: clamp(10px, 0.78cqi, 12px);
+  line-height: 1.2;
+}
+
+.ppt-brutalist-quote--compact {
+  padding: clamp(22px, 2.8cqi, 40px);
+}
+
+.ppt-brutalist-quote-text {
+  display: block;
+  color: var(--brutalist-text);
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  font-size: clamp(36px, 4.8cqi, 78px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+}
+
+.ppt-brutalist-quote-text--medium {
+  font-size: clamp(26px, 3.4cqi, 52px);
+  line-height: 1.1;
+}
+
+.ppt-brutalist-quote-text--long {
+  font-size: clamp(20px, 2.6cqi, 36px);
+  line-height: 1.14;
+}
+
+.ppt-brutalist-quote-text--latin:not(.ppt-brutalist-quote-text--medium):not(.ppt-brutalist-quote-text--long) {
+  font-size: clamp(24px, 3cqi, 44px);
+  line-height: 1.18;
+}
+
+.ppt-editorial-brutalist--quote .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(10px, 1.2vh, 16px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ppt-editorial-brutalist--quote .ppt-brutalist-insight--inline {
+  flex: 0 0 auto;
+  padding: clamp(4px, 0.5cqi, 8px) 0 0;
+  font-size: clamp(11px, 0.92cqi, 14px);
+  line-height: 1.28;
+}
+
+.ppt-brutalist-quote cite {
+  display: block;
+  margin-top: clamp(20px, 2.4cqi, 34px);
+  color: var(--brutalist-muted);
+  font-size: clamp(14px, 1.1cqi, 18px);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ppt-brutalist-data-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.ppt-editorial-brutalist--data {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 12px);
+  padding: clamp(28px, 3.5vh, 48px) clamp(36px, 4.5vw, 72px);
+  overflow: hidden;
+}
+
+.ppt-editorial-brutalist--data .ppt-brutalist-header {
+  flex: 0 0 auto;
+}
+
+.ppt-editorial-brutalist--data .ppt-brutalist-title {
+  font-size: clamp(22px, 2.6cqi, 36px);
+  line-height: 1.06;
+  text-transform: none;
+}
+
+.ppt-editorial-brutalist--data .ppt-brand-footer {
+  position: absolute;
+  bottom: clamp(14px, 1.8vh, 22px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ppt-brutalist-data-notes {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(12px, 1.4cqi, 18px);
+  border: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+  border-left: var(--ppt-rule-accent, 8px solid var(--brutalist-accent));
+  background: var(--brutalist-surface);
+}
+
+.ppt-brutalist-data-notes .ppt-brutalist-point-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ppt-brutalist-data-chart {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(8px, 1cqi, 12px);
+  overflow: hidden;
+  padding: clamp(12px, 1.4cqi, 18px);
+  border: var(--ppt-rule-bold, 8px solid var(--brutalist-text));
+  background: var(--brutalist-bg);
+}
+
+.ppt-brutalist-data-chart-title {
+  margin: 0;
+  font-size: clamp(14px, 1.25cqi, 18px);
+  line-height: 1.15;
+  text-transform: none;
+}
+
+.ppt-brutalist-data-notes .ppt-brutalist-point-body {
+  overflow-x: auto;
+}
+
+.ppt-brutalist-data-notes .ppt-brutalist-point-body :deep(.ppt-inline-math) {
+  display: block;
+  margin-top: 0.25em;
+}
+
+.ppt-brutalist-data-panel--table {
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+}
+
+.ppt-brutalist-data-table {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table-wrap) {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(6px, 0.8cqi, 10px);
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table-scroll) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table-title) {
+  font-size: clamp(13px, 1.1cqi, 16px);
+  line-height: 1.2;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: clamp(10px, 0.82cqi, 12px);
+  line-height: 1.25;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table th),
+.ppt-brutalist-data-table :deep(.ppt-table td) {
+  padding: clamp(4px, 0.55cqi, 7px) clamp(5px, 0.65cqi, 8px);
+  border: 1px solid var(--brutalist-text);
+  vertical-align: top;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table th) {
+  background: var(--brutalist-text);
+  color: var(--brutalist-bg);
+  font-weight: 700;
+  text-transform: none;
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table td.is-highlight),
+.ppt-brutalist-data-table :deep(.ppt-table th.is-highlight) {
+  background: color-mix(in srgb, var(--brutalist-accent) 18%, var(--brutalist-bg));
+}
+
+.ppt-brutalist-data-table :deep(.ppt-table-source) {
+  font-size: clamp(9px, 0.75cqi, 11px);
+}
+
+.ppt-brutalist-grouped-bar-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ppt-brutalist-line-chart-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ppt-brutalist-line-chart-wrap .ppt-chart-svg {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 140px;
+  max-height: 100%;
+}
+
+.ppt-brutalist-data-chart-fallback {
+  display: grid;
+  gap: clamp(8px, 1cqi, 12px);
+  overflow-y: auto;
+}
+
+.ppt-brutalist-data-chart-row {
+  display: grid;
+  gap: 4px;
+  font-size: clamp(11px, 0.92cqi, 13px);
+  line-height: 1.28;
+}
+
+.ppt-brutalist-chart-summary {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: clamp(18px, 2cqi, 30px);
+  padding: clamp(28px, 3.2cqi, 52px);
+  border: var(--ppt-rule-bold, 8px solid var(--brutalist-text));
+  background: var(--brutalist-bg);
+}
+
+.ppt-brutalist-card-grid--data {
+  grid-template-columns: 1fr;
+}
+
+.ppt-brutalist-asymmetric {
+  display: grid;
+  grid-template-columns: minmax(0, 0.62fr) minmax(220px, 0.38fr);
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  align-items: center;
+}
+
+.ppt-brutalist-asymmetric section {
+  display: grid;
+  gap: clamp(14px, 1.6cqi, 22px);
+}
+
+.ppt-brutalist-insight {
+  position: absolute;
+  right: clamp(56px, 6vw, 120px);
+  bottom: clamp(42px, 5vh, 72px);
+  left: clamp(56px, 6vw, 120px);
+  display: block;
+  padding-top: 14px;
+  border-top: 1px solid var(--brutalist-text);
+  color: var(--brutalist-accent);
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  font-size: clamp(16px, 1.35cqi, 22px);
+  font-weight: 900;
+  line-height: 1.24;
+}
+
+.ppt-brutalist-insight--inline {
+  position: static;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding: clamp(10px, 1.2cqi, 14px) 0 0;
+  font-size: clamp(13px, 1.1cqi, 17px);
+  line-height: 1.32;
+}
+
+.ppt-editorial-brutalist--two_column .ppt-brand-footer {
+  position: static;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.ppt-editorial-brutalist .ppt-brand-footer {
+  color: var(--brutalist-muted);
+  font-family: var(--ppt-font-body, Inter, "Noto Sans SC", sans-serif);
+  letter-spacing: 0.22em;
+  opacity: 0.72;
+  text-transform: uppercase;
+}
