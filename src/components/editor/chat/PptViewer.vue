@@ -409,9 +409,210 @@
         @contextmenu.prevent="onPptSlideContextMenu"
       >
         <template v-if="slide">
+          <!-- editorial-brutalist-modern：编辑型粗野主义渲染分支 -->
+          <div
+            v-if="shouldUseEditorialBrutalistSlide(slide)"
+            class="ppt-slide ppt-editorial-brutalist"
+            :class="[
+              `ppt-editorial-brutalist--${slide.layout}`,
+              `ppt-editorial-brutalist--${editorialBrutalistLayout(slide)}`,
+            ]"
+          >
+            <template v-if="editorialBrutalistLayout(slide) === 'hero'">
+              <div class="ppt-brutalist-hero">
+                <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
+                <h1 class="ppt-brutalist-display">
+                  <PptMarkdownInline
+                    :text="slide.title || pptSource.title || ''"
+                    :editable="isEditing"
+                    @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                  />
+                </h1>
+                <div class="ppt-brutalist-divider"></div>
+                <PptMarkdownInline
+                  v-if="editorialBrutalistHeroBody(slide) || isEditing"
+                  class="ppt-brutalist-lead"
+                  :text="editorialBrutalistHeroBody(slide)"
+                  :editable="isEditing"
+                  @blur="onCellBlur($event, `slides.${currentSlide}.subtitle`)"
+                />
+              </div>
+              <div class="ppt-brutalist-watermark ppt-brutalist-watermark--vertical">
+                {{ editorialBrutalistWatermark(slide) }}
+              </div>
+            </template>
+
+            <template v-else-if="editorialBrutalistLayout(slide) === 'quote'">
+              <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
+              <blockquote class="ppt-brutalist-quote">
+                <PptMarkdownInline
+                  class="ppt-brutalist-quote-text"
+                  :text="editorialBrutalistQuoteText(slide)"
+                  :page-references="slide.page_references"
+                  :editable="isEditing"
+                  @blur="onCellBlur($event, `slides.${currentSlide}.quote`)"
+                  @ref-click="onPptTableRefClick($event, slide)"
+                />
+                <cite v-if="slide.quote_author || slide.author || isEditing">
+                  {{ slide.quote_author || slide.author }}
+                </cite>
+              </blockquote>
+            </template>
+
+            <template v-else-if="editorialBrutalistLayout(slide) === 'split'">
+              <header class="ppt-brutalist-header">
+                <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
+                <h2 class="ppt-brutalist-title">
+                  <PptMarkdownInline
+                    :text="slide.title || ''"
+                    :editable="isEditing"
+                    @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                  />
+                </h2>
+              </header>
+              <div class="ppt-brutalist-split">
+                <section class="ppt-brutalist-card">
+                  <h3>
+                    <PptMarkdownInline
+                      :text="slide.left_title || t('agent.pptLeftColumn')"
+                      :editable="isEditing"
+                      @blur="onCellBlur($event, `slides.${currentSlide}.left_title`)"
+                    />
+                  </h3>
+                  <PptMarkdownInline
+                    v-for="(item, li) in editorialBrutalistSplitLeft(slide)"
+                    :key="'brutalist-left-' + li"
+                    class="ppt-brutalist-card-body"
+                    :text="displayText(item)"
+                    :page-references="slide.page_references"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
+                </section>
+                <section class="ppt-brutalist-card ppt-brutalist-card--invert">
+                  <h3>
+                    <PptMarkdownInline
+                      :text="slide.right_title || t('agent.pptRightColumn')"
+                      :editable="isEditing"
+                      @blur="onCellBlur($event, `slides.${currentSlide}.right_title`)"
+                    />
+                  </h3>
+                  <PptMarkdownInline
+                    v-for="(item, ri) in editorialBrutalistSplitRight(slide)"
+                    :key="'brutalist-right-' + ri"
+                    class="ppt-brutalist-card-body"
+                    :text="displayText(item)"
+                    :page-references="slide.page_references"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
+                </section>
+              </div>
+            </template>
+
+            <template v-else-if="editorialBrutalistLayout(slide) === 'grid'">
+              <header class="ppt-brutalist-header">
+                <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
+                <h2 class="ppt-brutalist-title">
+                  <PptMarkdownInline
+                    :text="slide.title || ''"
+                    :editable="isEditing"
+                    @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                  />
+                </h2>
+              </header>
+              <div
+                v-if="slide.layout === 'data' && slide.chart"
+                class="ppt-brutalist-data-panel"
+              >
+                <section class="ppt-brutalist-chart-summary">
+                  <p class="ppt-brutalist-kicker">{{ slide.chart.type }}</p>
+                  <h3>{{ slide.chart.title || slide.title }}</h3>
+                  <PptMarkdownInline
+                    v-if="slide.key_insight || slide.chart.note"
+                    class="ppt-brutalist-card-body"
+                    :text="slide.key_insight || slide.chart.note || ''"
+                    :page-references="slide.page_references"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
+                </section>
+                <div class="ppt-brutalist-card-grid ppt-brutalist-card-grid--data">
+                  <article
+                    v-for="card in editorialBrutalistChartCards(slide)"
+                    :key="'brutalist-chart-' + card.index"
+                    class="ppt-brutalist-card"
+                  >
+                    <div class="ppt-brutalist-card-index">{{ card.index }}</div>
+                    <h3>{{ card.title }}</h3>
+                    <PptMarkdownInline
+                      v-if="card.body"
+                      class="ppt-brutalist-card-body"
+                      :text="card.body"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
+                  </article>
+                </div>
+              </div>
+              <div v-else class="ppt-brutalist-card-grid">
+                <article
+                  v-for="card in editorialBrutalistContentCards(slide)"
+                  :key="'brutalist-card-' + card.index"
+                  class="ppt-brutalist-card"
+                >
+                  <div class="ppt-brutalist-card-index">{{ card.index }}</div>
+                  <h3>{{ card.title }}</h3>
+                  <PptMarkdownInline
+                    v-if="card.body"
+                    class="ppt-brutalist-card-body"
+                    :text="card.body"
+                    :page-references="slide.page_references"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
+                </article>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="ppt-brutalist-asymmetric">
+                <section>
+                  <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
+                  <h2 class="ppt-brutalist-title">
+                    <PptMarkdownInline
+                      :text="slide.title || ''"
+                      :editable="isEditing"
+                      @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                    />
+                  </h2>
+                  <div class="ppt-brutalist-divider"></div>
+                  <PptMarkdownInline
+                    v-for="(item, bi) in slide.content || []"
+                    :key="'brutalist-body-' + bi"
+                    class="ppt-brutalist-body-block"
+                    :text="displayText(item)"
+                    :page-references="slide.page_references"
+                    @ref-click="onPptTableRefClick($event, slide)"
+                  />
+                </section>
+                <aside class="ppt-brutalist-watermark">
+                  {{ editorialBrutalistWatermark(slide) }}
+                </aside>
+              </div>
+            </template>
+
+            <PptMarkdownInline
+              v-if="slide.key_insight && !['quote', 'data'].includes(slide.layout)"
+              class="ppt-brutalist-insight"
+              :text="slide.key_insight"
+              :page-references="slide.page_references"
+              :editable="isEditing"
+              @blur="onCellBlur($event, `slides.${currentSlide}.key_insight`)"
+              @ref-click="onPptTableRefClick($event, slide)"
+            />
+            <div v-if="currentBrandFooter" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
+          </div>
+
           <!-- modern-literary-minimal：现代文学极简渲染分支 -->
           <div
-            v-if="shouldUseModernLiterarySlide(slide)"
+            v-else-if="shouldUseModernLiterarySlide(slide)"
             class="ppt-slide ppt-modern-literary"
             :class="`ppt-modern-literary--${slide.layout}`"
           >
@@ -9350,11 +9551,14 @@ interface PptHtmlTemplateRecommendation {
   accent_colors?: string[];
   css_variables?: Record<string, string>;
   palette_from_html_template?: Partial<PptPalette>;
+  theme_tokens?: PptThemeTokens;
 }
 
 interface PptData {
   title: string;
   subtitle?: string;
+  author?: string;
+  date?: string;
   /** 全 deck 默认页脚（单页 brand_footer 优先） */
   brand_footer?: string;
   theme?: string;
@@ -10391,6 +10595,51 @@ const paletteStyle = computed(() => {
     vars[`--ppt-accent-${i + 1}`] = c;
   });
   ensureReadablePaletteVars(vars);
+  if (isEditorialBrutalistModern.value) {
+    const colors = editorialBrutalistColors.value;
+    const fonts = editorialBrutalistFonts.value;
+    Object.assign(vars, {
+      "--ppt-bg": colors.bg,
+      "--ppt-bg-alt": colors.surface,
+      "--ppt-bg-secondary": colors.surface,
+      "--ppt-accent": colors.accent,
+      "--ppt-text": colors.text,
+      "--ppt-text-muted": colors.muted,
+      "--ppt-text-secondary": colors.muted,
+      "--ppt-rule-hair": `1px solid ${colors.text}`,
+      "--ppt-rule-bold": `8px solid ${colors.text}`,
+      "--ppt-rule-accent": `8px solid ${colors.accent}`,
+      "--ppt-grid-gutter": "clamp(16px, 2vw, 32px)",
+      "--ppt-font-display": fonts.display,
+      "--ppt-font-heading": fonts.heading,
+      "--ppt-font-body": fonts.body,
+      "--ppt-font-family": fonts.body,
+      "--ppt-quote-font-family": fonts.heading,
+      fontFamily: fonts.body,
+    });
+    for (const source of [
+      p?.css_variables,
+      pptSource.value.html_template_recommendation?.css_variables,
+    ]) {
+      for (const [rawKey, rawValue] of Object.entries(source ?? {})) {
+        if (rawValue == null || rawValue === "") continue;
+        const key = rawKey.trim().replace(/^--/, "");
+        const value = String(rawValue);
+        if (key === "bg") vars["--ppt-bg"] = value;
+        else if (key === "c-bg-alt" || key === "soft") {
+          vars["--ppt-bg-alt"] = value;
+          vars["--ppt-bg-secondary"] = value;
+        } else if (key === "text" || key === "black") vars["--ppt-text"] = value;
+        else if (key === "text-muted" || key === "muted") {
+          vars["--ppt-text-muted"] = value;
+          vars["--ppt-text-secondary"] = value;
+        } else if (key === "accent" || key === "primary") vars["--ppt-accent"] = value;
+      }
+    }
+    vars["--ppt-rule-hair"] = `1px solid ${vars["--ppt-text"] || colors.text}`;
+    vars["--ppt-rule-bold"] = `8px solid ${vars["--ppt-text"] || colors.text}`;
+    vars["--ppt-rule-accent"] = `8px solid ${vars["--ppt-accent"] || colors.accent}`;
+  }
   if (isModernLiteraryMinimal.value) {
     const colors = modernLiteraryColors.value;
     const fonts = modernLiteraryFonts.value;
@@ -11893,6 +12142,125 @@ function shouldUseModernLiterarySlide(slide: PptSlide | null | undefined): boole
   return ["cover", "section", "quote", "content", "two_column"].includes(slide.layout);
 }
 
+function shouldUseEditorialBrutalistSlide(slide: PptSlide | null | undefined): boolean {
+  if (!isEditorialBrutalistModern.value || !slide) return false;
+  return ["cover", "section", "end", "quote", "content", "two_column", "toc", "data"].includes(
+    slide.layout
+  );
+}
+
+type EditorialBrutalistLayout = "hero" | "split" | "grid" | "asymmetric" | "quote";
+
+interface EditorialBrutalistCard {
+  index: string;
+  title: string;
+  body: string;
+}
+
+function editorialBrutalistLayout(slide: PptSlide): EditorialBrutalistLayout {
+  if (["cover", "section", "end"].includes(slide.layout)) return "hero";
+  if (slide.layout === "two_column") return "split";
+  if (slide.layout === "quote") return "quote";
+  if (slide.layout === "toc" || slide.layout === "data") return "grid";
+  return (slide.content?.length ?? 0) >= 3 ? "grid" : "asymmetric";
+}
+
+function editorialBrutalistKicker(slide: PptSlide): string {
+  if (slide.layout === "cover") {
+    return slide.author || slide.organization || pptSource.value.author || t("agent.pptDefaultOrg");
+  }
+  if (slide.layout === "section") {
+    return t("agent.pptChapterLabel", {
+      number: slide.chapter_number || String(sectionChapterNum.value).padStart(2, "0"),
+    });
+  }
+  if (slide.layout === "toc") return "Table of Contents";
+  if (slide.layout === "data") return "Evidence / Data";
+  return slide.subtitle || slide.subtitle_en || `Slide ${String(slide.index || currentSlide.value + 1).padStart(2, "0")}`;
+}
+
+function editorialBrutalistHeroBody(slide: PptSlide): string {
+  return (
+    slide.subtitle ||
+    resolveSectionSubtitle(slide) ||
+    pptSource.value.subtitle ||
+    slide.key_insight ||
+    ""
+  );
+}
+
+function editorialBrutalistWatermark(slide: PptSlide): string {
+  if (slide.layout === "section") {
+    return slide.chapter_number || String(sectionChapterNum.value).padStart(2, "0");
+  }
+  if (slide.layout === "cover") return slide.date || pptSource.value.date || "2026";
+  return String(slide.index || currentSlide.value + 1).padStart(2, "0");
+}
+
+function editorialBrutalistContentCards(slide: PptSlide): EditorialBrutalistCard[] {
+  if (slide.layout === "toc") {
+    return getTocEntries(slide)
+      .slice(0, 6)
+      .map((entry, i) => ({
+        index: entry.number || String(i + 1).padStart(2, "0"),
+        title: entry.title,
+        body: entry.description,
+      }));
+  }
+
+  if (slide.metric_cards?.length) {
+    return slide.metric_cards.slice(0, 4).map((card, i) => ({
+      index: String(i + 1).padStart(2, "0"),
+      title: card.value || card.label || "",
+      body: [card.label && card.value ? card.label : "", card.detail].filter(Boolean).join(" — "),
+    }));
+  }
+
+  if (slide.right_items?.length) {
+    return slide.right_items.slice(0, 4).map((item, i) => ({
+      index: item.index || String(i + 1).padStart(2, "0"),
+      title: item.title || "",
+      body: item.description || "",
+    }));
+  }
+
+  return (slide.content || []).slice(0, 4).map((item, i) => ({
+    index: String(i + 1).padStart(2, "0"),
+    title: contentPointTitle(item),
+    body: hasContentPointBody(item) ? parseContentBody(item) : "",
+  }));
+}
+
+function editorialBrutalistChartCards(slide: PptSlide): EditorialBrutalistCard[] {
+  const chart = slide.chart;
+  if (!chart?.data?.length) return [];
+  return chart.data.slice(0, 4).map((item, i) => ({
+    index: String(i + 1).padStart(2, "0"),
+    title: item.label || item.stage || item.name || item.title || `Item ${i + 1}`,
+    body: [formatChartDataValue(item.value), item.description || item.desc || item.text]
+      .filter(Boolean)
+      .join(" / "),
+  }));
+}
+
+function editorialBrutalistQuoteText(slide: PptSlide): string {
+  return slide.quote || slide.content?.[0] || slide.key_insight || slide.title || "";
+}
+
+function editorialBrutalistSplitLeft(slide: PptSlide): string[] {
+  return slide.left_content?.length ? slide.left_content : (slide.content || []).slice(0, 3);
+}
+
+function editorialBrutalistSplitRight(slide: PptSlide): string[] {
+  if (slide.right_content?.length) return slide.right_content;
+  if (slide.right_items?.length) {
+    return slide.right_items.map((item) =>
+      [item.title, item.description].filter(Boolean).join("：")
+    );
+  }
+  return (slide.content || []).slice(3, 6);
+}
+
 function isModernLiteraryQuotedFragment(item: unknown): boolean {
   const text = modernLiteraryCleanText(item);
   if (!text || !/\[\d+\]/.test(text)) return false;
@@ -12576,6 +12944,11 @@ const slideForExport = computed<PptSlide | null>(() => {
 const slide = computed(() => slideForExport.value);
 
 const MODERN_LITERARY_TEMPLATE_ID = "modern-literary-minimal";
+const EDITORIAL_BRUTALIST_TEMPLATE_ID = "editorial-brutalist-modern";
+const EDITORIAL_BRUTALIST_DEFAULT_GOOGLE_FONTS =
+  "https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;900&display=swap";
+const EDITORIAL_BRUTALIST_ZH_STACK =
+  '"Noto Sans SC", "Source Han Sans SC", "PingFang SC", "OPPO Sans", "Alibaba PuHuiTi 2.0", "方正兰亭黑", sans-serif';
 /** modern-literary-minimal 中文回退：走 custom-chinese-fonts 目录，不再硬编码 Noto Serif SC */
 const MODERN_LITERARY_ZH_DISPLAY = "ZCOOL XiaoWei";
 const MODERN_LITERARY_ZH_BODY = "LXGW WenKai TC";
@@ -12593,6 +12966,28 @@ const modernLiteraryTemplateId = computed(
 );
 const isModernLiteraryMinimal = computed(
   () => modernLiteraryTemplateId.value === MODERN_LITERARY_TEMPLATE_ID
+);
+
+const editorialBrutalistTokens = computed(
+  () =>
+    pptSource.value.palette?.theme_tokens ??
+    pptSource.value.html_template_recommendation?.theme_tokens ??
+    {}
+);
+const editorialBrutalistTemplateId = computed(
+  () =>
+    editorialBrutalistTokens.value.template_id ||
+    pptSource.value.html_template_recommendation?.template_id ||
+    pptSource.value.theme ||
+    ""
+);
+const isEditorialBrutalistModern = computed(
+  () =>
+    [
+      pptSource.value.theme,
+      editorialBrutalistTokens.value.template_id,
+      pptSource.value.html_template_recommendation?.template_id,
+    ].includes(EDITORIAL_BRUTALIST_TEMPLATE_ID)
 );
 
 const modernLiteraryColors = computed(() => {
@@ -12636,6 +13031,43 @@ const modernLiteraryGoogleFontUrls = computed(() => {
   const urls = pptSource.value.palette?.theme_tokens?.typography?.google_fonts_urls ?? [];
   if (!isModernLiteraryMinimal.value) return urls;
   return [...new Set([...urls, ...MODERN_LITERARY_DEFAULT_GOOGLE_FONTS])];
+});
+
+const editorialBrutalistColors = computed(() => {
+  const palette = pptSource.value.palette || {};
+  return {
+    bg: palette.bg_color || "#ffffff",
+    surface: palette.bg_color_secondary || "#f5f5f5",
+    accent: palette.accent_color || "#ff3300",
+    text: palette.text_color || "#000000",
+    muted: palette.text_secondary || "#666666",
+  };
+});
+
+const editorialBrutalistFonts = computed(() => {
+  const typography = editorialBrutalistTokens.value.typography || {};
+  const display = typography.font_display || "Anton";
+  const heading = typography.font_heading || "Archivo";
+  const body = typography.font_body || "Inter";
+  return {
+    display: `${display}, ${EDITORIAL_BRUTALIST_ZH_STACK}`,
+    heading: `${heading}, ${EDITORIAL_BRUTALIST_ZH_STACK}`,
+    body: `${body}, ${EDITORIAL_BRUTALIST_ZH_STACK}`,
+  };
+});
+
+const editorialBrutalistGoogleFontUrls = computed(() => {
+  const urls =
+    pptSource.value.palette?.theme_tokens?.typography?.google_fonts_urls ??
+    pptSource.value.html_template_recommendation?.theme_tokens?.typography?.google_fonts_urls ??
+    [];
+  if (!isEditorialBrutalistModern.value) return urls;
+  return [...new Set([...urls, EDITORIAL_BRUTALIST_DEFAULT_GOOGLE_FONTS])];
+});
+
+const pptGoogleFontUrls = computed(() => {
+  if (isEditorialBrutalistModern.value) return editorialBrutalistGoogleFontUrls.value;
+  return modernLiteraryGoogleFontUrls.value;
 });
 
 /** 章节联网配图索引（ppt_data.chapter_images + section slide 兜底） */
@@ -12718,8 +13150,25 @@ const pptDeckFontCss = computed(() => buildFontFamilyCss(pptDeckFontFamily.value
 watch(
   pptDeckFontFamily,
   (family) => {
-    if (isModernLiteraryMinimal.value) return;
+    if (isModernLiteraryMinimal.value || isEditorialBrutalistModern.value) return;
     void loadFont(family);
+  },
+  { immediate: true }
+);
+
+watch(
+  () => (isEditorialBrutalistModern.value ? editorialBrutalistFonts.value : null),
+  (fonts) => {
+    if (!fonts) return;
+    const families = new Set<string>();
+    for (const stack of [fonts.display, fonts.heading, fonts.body]) {
+      for (const family of parseFontFamilyCssStack(stack)) {
+        families.add(family);
+      }
+    }
+    for (const family of families) {
+      void loadFont(family);
+    }
   },
   { immediate: true }
 );
@@ -12742,7 +13191,7 @@ watch(
 );
 
 watch(
-  modernLiteraryGoogleFontUrls,
+  pptGoogleFontUrls,
   (urls) => syncPptGoogleFontLinks(urls),
   { immediate: true }
 );
@@ -20225,6 +20674,280 @@ defineExpose({
   white-space: nowrap;
   max-width: 56px;
   opacity: 0.7;
+}
+
+.ppt-editorial-brutalist {
+  --brutalist-bg: var(--ppt-bg, #ffffff);
+  --brutalist-surface: var(--ppt-bg-alt, var(--ppt-bg-secondary, #f5f5f5));
+  --brutalist-text: var(--ppt-text, #000000);
+  --brutalist-muted: var(--ppt-text-muted, var(--ppt-text-secondary, #666666));
+  --brutalist-accent: var(--ppt-accent, #ff3300);
+  display: grid;
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  width: 100%;
+  height: 100%;
+  padding: clamp(48px, 6vh, 96px) clamp(56px, 6vw, 120px);
+  overflow: hidden;
+  color: var(--brutalist-text);
+  background: var(--brutalist-bg);
+  font-family: var(--ppt-font-body, Inter, "Noto Sans SC", sans-serif);
+}
+
+.ppt-editorial-brutalist *,
+.ppt-editorial-brutalist *::before,
+.ppt-editorial-brutalist *::after {
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.ppt-editorial-brutalist .ppt-table-ref {
+  color: var(--brutalist-accent);
+  font-size: 0.58em;
+  text-decoration: none;
+  vertical-align: super;
+}
+
+.ppt-brutalist-kicker {
+  margin: 0;
+  color: var(--brutalist-muted);
+  font-family: var(--ppt-font-body, Inter, "Noto Sans SC", sans-serif);
+  font-size: clamp(14px, 1.1cqi, 18px);
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.ppt-brutalist-display,
+.ppt-brutalist-title,
+.ppt-brutalist-card h3,
+.ppt-brutalist-chart-summary h3 {
+  margin: 0;
+  color: var(--brutalist-text);
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 0.96;
+  text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+
+.ppt-brutalist-display {
+  max-width: min(980px, 76%);
+  font-family: var(--ppt-font-display, Anton, "Noto Sans SC", sans-serif);
+  font-size: clamp(72px, 10cqi, 154px);
+  letter-spacing: -0.045em;
+}
+
+.ppt-brutalist-title {
+  max-width: 980px;
+  font-size: clamp(44px, 5.5cqi, 86px);
+}
+
+.ppt-brutalist-lead,
+.ppt-brutalist-body-block,
+.ppt-brutalist-card-body {
+  display: block;
+  color: var(--brutalist-muted);
+  font-size: clamp(18px, 1.45cqi, 26px);
+  line-height: 1.32;
+  overflow-wrap: break-word;
+}
+
+.ppt-brutalist-divider {
+  width: min(420px, 42%);
+  height: 8px;
+  margin: clamp(22px, 3cqi, 42px) 0;
+  background: var(--brutalist-text);
+}
+
+.ppt-brutalist-hero {
+  align-self: center;
+  max-width: 100%;
+}
+
+.ppt-brutalist-hero .ppt-brutalist-kicker {
+  margin-bottom: clamp(18px, 2cqi, 30px);
+}
+
+.ppt-brutalist-hero .ppt-brutalist-lead {
+  max-width: 60%;
+}
+
+.ppt-brutalist-watermark {
+  align-self: center;
+  justify-self: end;
+  color: var(--brutalist-text);
+  font-family: var(--ppt-font-display, Anton, "Noto Sans SC", sans-serif);
+  font-size: clamp(92px, 15cqi, 220px);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 0.85;
+  opacity: 0.05;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.ppt-brutalist-watermark--vertical {
+  position: absolute;
+  top: 58px;
+  right: 54px;
+  writing-mode: vertical-rl;
+}
+
+.ppt-brutalist-header {
+  display: grid;
+  gap: clamp(10px, 1.4cqi, 18px);
+  align-self: start;
+  border-top: var(--ppt-rule-bold, 8px solid var(--brutalist-text));
+  padding-top: clamp(16px, 2cqi, 28px);
+}
+
+.ppt-brutalist-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  min-height: 0;
+}
+
+.ppt-brutalist-card {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(10px, 1.2cqi, 18px);
+  padding: clamp(22px, 2.6cqi, 38px);
+  border: var(--ppt-rule-hair, 1px solid var(--brutalist-text));
+  border-left: var(--ppt-rule-accent, 8px solid var(--brutalist-accent));
+  background: var(--brutalist-surface);
+}
+
+.ppt-brutalist-card-index {
+  color: var(--brutalist-accent);
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  font-size: clamp(32px, 3.6cqi, 56px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+}
+
+.ppt-brutalist-card h3,
+.ppt-brutalist-chart-summary h3 {
+  font-size: clamp(28px, 2.9cqi, 48px);
+  line-height: 1.02;
+}
+
+.ppt-brutalist-card-body {
+  font-size: clamp(16px, 1.25cqi, 22px);
+}
+
+.ppt-brutalist-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  min-height: 0;
+}
+
+.ppt-brutalist-card--invert {
+  color: var(--brutalist-bg);
+  background: var(--brutalist-text);
+  border-color: var(--brutalist-text);
+  border-left-color: var(--brutalist-accent);
+}
+
+.ppt-brutalist-card--invert h3,
+.ppt-brutalist-card--invert .ppt-brutalist-card-body,
+.ppt-brutalist-card--invert .ppt-md-inline {
+  color: inherit;
+}
+
+.ppt-brutalist-card--invert .ppt-brutalist-card-body {
+  opacity: 0.82;
+}
+
+.ppt-brutalist-quote {
+  align-self: center;
+  margin: 0;
+  padding: clamp(34px, 4cqi, 64px);
+  border-left: var(--ppt-rule-accent, 8px solid var(--brutalist-accent));
+  background: var(--brutalist-surface);
+}
+
+.ppt-brutalist-quote-text {
+  display: block;
+  color: var(--brutalist-text);
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  font-size: clamp(36px, 4.8cqi, 78px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+}
+
+.ppt-brutalist-quote cite {
+  display: block;
+  margin-top: clamp(20px, 2.4cqi, 34px);
+  color: var(--brutalist-muted);
+  font-size: clamp(14px, 1.1cqi, 18px);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ppt-brutalist-data-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  min-height: 0;
+}
+
+.ppt-brutalist-chart-summary {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: clamp(18px, 2cqi, 30px);
+  padding: clamp(28px, 3.2cqi, 52px);
+  border: var(--ppt-rule-bold, 8px solid var(--brutalist-text));
+  background: var(--brutalist-bg);
+}
+
+.ppt-brutalist-card-grid--data {
+  grid-template-columns: 1fr;
+}
+
+.ppt-brutalist-asymmetric {
+  display: grid;
+  grid-template-columns: minmax(0, 0.62fr) minmax(220px, 0.38fr);
+  gap: var(--ppt-grid-gutter, clamp(16px, 2vw, 32px));
+  align-items: center;
+}
+
+.ppt-brutalist-asymmetric section {
+  display: grid;
+  gap: clamp(14px, 1.6cqi, 22px);
+}
+
+.ppt-brutalist-insight {
+  position: absolute;
+  right: clamp(56px, 6vw, 120px);
+  bottom: clamp(42px, 5vh, 72px);
+  left: clamp(56px, 6vw, 120px);
+  display: block;
+  padding-top: 14px;
+  border-top: 1px solid var(--brutalist-text);
+  color: var(--brutalist-accent);
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  font-size: clamp(16px, 1.35cqi, 22px);
+  font-weight: 900;
+  line-height: 1.24;
+}
+
+.ppt-editorial-brutalist .ppt-brand-footer {
+  color: var(--brutalist-muted);
+  font-family: var(--ppt-font-body, Inter, "Noto Sans SC", sans-serif);
+  letter-spacing: 0.22em;
+  opacity: 0.72;
+  text-transform: uppercase;
 }
 
 .ppt-modern-literary {

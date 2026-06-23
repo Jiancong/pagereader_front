@@ -309,6 +309,42 @@ export interface ChatStreamReq {
   enable_search?: boolean
 }
 
+/** BFF YouTube PPT：/api2/agent/ppt/youtube-stream | youtube-transcript */
+export interface YoutubePptStreamReq {
+  youtube_url: string
+  project_id: string
+  message?: string
+  /** BFF 队列：FAST / SLOW（与 CARD / DOCUMENT 计费对应） */
+  queue?: "FAST" | "SLOW" | PptQueue
+  stream_request_id?: string
+  locale?: string
+  languages?: string[]
+}
+
+export interface YoutubeTranscriptReq {
+  youtube_url: string
+  project_id: string
+  languages?: string[]
+  locale?: string
+}
+
+export interface YoutubeTranscriptResult {
+  success: boolean
+  video_id?: string
+  title?: string
+  language?: string
+  char_count?: number
+  section_count?: number
+  content_hash?: string
+  script_preview?: string
+  error?: string
+}
+
+export interface ChatStreamCancelReq {
+  project_id: string
+  stream_request_id: string
+}
+
 // ===== Pricing / subscription =====
 export interface PricingPlanMonthly {
   /** PayPal 等：美元月费 */

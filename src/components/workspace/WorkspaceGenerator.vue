@@ -27,6 +27,18 @@
               <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
           </button>
+          <button :class="tabClass('youtube')" @click="activeTab = 'youtube'">
+            <Youtube class="h-4 w-4" />
+            {{ t('workspace.tabYoutube') }}
+            <span
+              v-if="youtubeTask.isGenerating && activeTab !== 'youtube'"
+              class="relative ml-1 flex h-2 w-2"
+              :title="t('workspace.taskRunning')"
+            >
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+            </span>
+          </button>
         </div>
     </div>
 
@@ -117,7 +129,7 @@
         </div>
 
         <!-- 一句话 / 联网搜索 -->
-        <div v-else class="p-6 sm:p-8">
+        <div v-else-if="activeTab === 'prompt'" class="p-6 sm:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('promptTitle')) }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('promptHint')) }}</p>
@@ -138,6 +150,88 @@
               {{ promptTask.isGenerating ? t('workspace.generating') : t(workspaceCopyKey('generateDeck')) }}
             </button>
           </form>
+        </div>
+
+        <!-- YouTube 视频生成 PPT -->
+        <div v-else class="p-6 sm:p-8">
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.youtubeTitle') }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.youtubeHint') }}</p>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="mb-2 block text-sm font-medium text-foreground">{{ t('workspace.youtubeUrlLabel') }}</label>
+              <input
+                v-model="youtubeUrl"
+                type="url"
+                inputmode="url"
+                :disabled="youtubeTask.isGenerating"
+                class="w-full rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                :placeholder="t('workspace.youtubeUrlPlaceholder')"
+              />
+            </div>
+
+            <div>
+              <label class="mb-2 block text-sm font-medium text-foreground">{{ t('workspace.youtubePromptLabel') }}</label>
+              <p class="mb-2 text-xs text-muted-foreground">{{ t('workspace.youtubePromptHint') }}</p>
+              <textarea
+                v-model="youtubePrompt"
+                :disabled="youtubeTask.isGenerating"
+                class="min-h-[120px] w-full resize-y rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                :placeholder="t('workspace.youtubePromptPlaceholder')"
+              />
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+              <button
+                type="button"
+                :disabled="!isYoutubeUrlValid || transcriptLoading || youtubeTask.isGenerating"
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+                @click="onPreviewYoutubeTranscript"
+              >
+                <Loader2 v-if="transcriptLoading" class="h-4 w-4 animate-spin" />
+                {{ transcriptLoading ? t('workspace.youtubeTranscriptLoading') : t('workspace.youtubeTranscriptPreview') }}
+              </button>
+              <button
+                v-if="youtubeTask.isGenerating"
+                type="button"
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/15"
+                @click="onCancelYoutube"
+              >
+                {{ t('workspace.youtubeCancel') }}
+              </button>
+            </div>
+
+            <div
+              v-if="transcriptPreview?.success"
+              class="rounded-xl border border-border bg-secondary/30 px-4 py-3 text-sm text-foreground"
+            >
+              <p class="font-medium">{{ transcriptPreview.title || transcriptPreview.video_id }}</p>
+              <p class="mt-1 text-xs text-muted-foreground">
+                {{ t('workspace.youtubeTranscriptMeta', {
+                  language: transcriptPreview.language || '-',
+                  sections: transcriptPreview.section_count ?? 0,
+                  chars: transcriptPreview.char_count ?? 0,
+                }) }}
+              </p>
+              <pre
+                v-if="transcriptPreview.script_preview"
+                class="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-background/70 p-3 text-xs text-muted-foreground"
+              >{{ transcriptPreview.script_preview }}</pre>
+            </div>
+
+            <button
+              type="button"
+              :disabled="!isYoutubeUrlValid || !youtubePrompt.trim() || youtubeTask.isGenerating"
+              class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="onYoutubeSubmit"
+            >
+              <Loader2 v-if="youtubeTask.isGenerating" class="h-5 w-5 animate-spin" />
+              <Sparkles v-else class="h-5 w-5" />
+              {{ youtubeTask.isGenerating ? t('workspace.generating') : t('workspace.youtubeGenerate') }}
+            </button>
+          </div>
         </div>
 
         <!-- 错误（当前标签任务） -->
@@ -201,7 +295,7 @@
 import { ref, computed, reactive, watch, onBeforeUnmount } from "vue"
 import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
-import { MessageSquare, Upload, Sparkles, FileText, Loader2, X } from "lucide-vue-next"
+import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube } from "lucide-vue-next"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
 import {
@@ -220,7 +314,7 @@ import {
   isCreditsInsufficientMessage,
   canAffordQueue,
 } from "../../api"
-import type { PptQueue } from "@/api/types"
+import type { PptQueue, YoutubeTranscriptResult } from "@/api/types"
 import { resolvePptDataFromStreamComplete, isPptStreamPayload } from "@/utils/pptCompletePayload"
 import { notifyCreditsRefresh } from "@/composables/useCreditsRefresh"
 import type { UploadedDocument } from "@/utils/pptDocumentRag"
@@ -252,6 +346,7 @@ type GeneratorTask = {
   projectId: string
   queue: PptQueue
   showCreditsCta: boolean
+  streamRequestId: string | null
   /** 点击生成时记录；complete 时写入总耗时 */
   timerStartAt: number | null
   elapsedMs: number | null
@@ -268,6 +363,7 @@ function createTask(defaultQueue: PptQueue): GeneratorTask {
     projectId: "",
     queue: defaultQueue,
     showCreditsCta: false,
+    streamRequestId: null,
     timerStartAt: null,
     elapsedMs: null,
   }
@@ -277,9 +373,16 @@ function createTask(defaultQueue: PptQueue): GeneratorTask {
 const promptTask = reactive<GeneratorTask>(createTask("CARD"))
 /** RAG 文档分析：独立任务 */
 const ragTask = reactive<GeneratorTask>(createTask("DOCUMENT"))
+/** YouTube 视频生成 PPT：独立任务 */
+const youtubeTask = reactive<GeneratorTask>(createTask("DOCUMENT"))
 
-const activeTab = ref<"prompt" | "upload">("upload")
+const activeTab = ref<"prompt" | "upload" | "youtube">("upload")
 const input = ref(props.initialPrompt || "")
+const youtubeUrl = ref("")
+const youtubePrompt = ref("")
+const transcriptPreview = ref<YoutubeTranscriptResult | null>(null)
+const transcriptLoading = ref(false)
+let youtubeAbort: AbortController | null = null
 const uploadedFile = ref<File | null>(null)
 const cloudDocument = ref<UploadedDocument | null>(null)
 const cloudDocumentSize = ref<number | undefined>(undefined)
@@ -296,7 +399,12 @@ const attachedDocSizeLabel = computed(() => {
   return ""
 })
 
-const activeTask = computed(() => (activeTab.value === "prompt" ? promptTask : ragTask))
+const activeTask = computed(() => {
+  if (activeTab.value === "prompt") return promptTask
+  if (activeTab.value === "youtube") return youtubeTask
+  return ragTask
+})
+const isYoutubeUrlValid = computed(() => agentApi.isLikelyYoutubeUrl(youtubeUrl.value))
 const isCardMode = computed(() => activeTask.value.queue === "CARD")
 const activeLastLogs = computed(() => activeTask.value.logs.slice(-3))
 
@@ -325,7 +433,7 @@ function ensureTimerTick() {
 }
 
 function stopTimerTickIfIdle() {
-  if (promptTask.isGenerating || ragTask.isGenerating) return
+  if (promptTask.isGenerating || ragTask.isGenerating || youtubeTask.isGenerating) return
   if (timerTickId != null) {
     clearInterval(timerTickId)
     timerTickId = null
@@ -348,7 +456,7 @@ const activeElapsedDisplay = computed(() => {
   return null
 })
 
-const tabClass = (tab: "prompt" | "upload") => [
+const tabClass = (tab: "prompt" | "upload" | "youtube") => [
   "flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-all",
   activeTab.value === tab ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground",
 ]
@@ -505,6 +613,64 @@ const toText = (data: unknown): string => {
   return ""
 }
 
+const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, message: string) => {
+  const streamRequestId = String(Date.now())
+  task.streamRequestId = streamRequestId
+  youtubeAbort?.abort()
+  youtubeAbort = new AbortController()
+
+  await agentApi.youtubePptStream(
+    {
+      youtube_url: youtubeUrlValue,
+      project_id: task.projectId,
+      message,
+      queue: agentApi.mapPptQueueToBffQueue(task.queue),
+      stream_request_id: streamRequestId,
+    },
+    {
+      onStarted: () => {
+        emit("project-started", task.projectId)
+        refreshCreditsBar()
+      },
+      onProgress: (data: unknown) => {
+        const line = toText(data)
+        if (line) appendLog(task, line)
+      },
+      onEvent: async (event, data) => {
+        if (task.cardResult || task.pptData) return
+        if (event === "ppt_ping") {
+          appendLog(task, t("workspace.youtubeStillGenerating"))
+          return
+        }
+        if (event === "ppt_complete" || (event === "design_complete" && isPptStreamPayload(data))) {
+          await handlePptStreamComplete(task, data, "upload")
+          return
+        }
+        if (event === "design_complete" && isBookCardStreamPayload(data)) {
+          await handleCardStreamComplete(task, data, "upload")
+        }
+      },
+      onComplete: async (data: unknown) => {
+        if (task.pptData || task.cardResult) return
+        const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+        if (isPptStreamPayload(o)) {
+          await handlePptStreamComplete(task, data, "upload")
+          return
+        }
+        if (isBookCardStreamPayload(o)) {
+          await handleCardStreamComplete(task, data, "upload")
+        }
+      },
+      onError: (msg: string) => {
+        stopTaskTimer(task)
+        applyStreamError(task, msg, "upload")
+        refreshCreditsBar()
+      },
+    },
+    youtubeAbort.signal,
+  )
+}
+
 const runStream = async (
   task: GeneratorTask,
   message: string,
@@ -580,6 +746,7 @@ const startTask = (task: GeneratorTask) => {
   task.markdown = ""
   task.cardResult = null
   task.projectId = newProjectId()
+  task.streamRequestId = null
   task.logs = []
   task.timerStartAt = Date.now()
   task.elapsedMs = null
@@ -656,7 +823,84 @@ const onAnalyze = async () => {
   }
 }
 
+function applyDefaultYoutubePrompt() {
+  if (!youtubePrompt.value.trim()) {
+    youtubePrompt.value = t("workspace.youtubePromptDefault")
+  }
+}
+
+watch(activeTab, (tab) => {
+  if (tab === "youtube") applyDefaultYoutubePrompt()
+})
+
+const onPreviewYoutubeTranscript = async () => {
+  if (!isYoutubeUrlValid.value || transcriptLoading.value || youtubeTask.isGenerating) return
+  transcriptPreview.value = null
+  transcriptLoading.value = true
+  youtubeTask.errorMsg = null
+  try {
+    if (!(await resolveUserId())) {
+      youtubeTask.errorMsg = t("workspace.loginRequiredGenerate")
+      return
+    }
+    const projectId = youtubeTask.projectId || newProjectId()
+    if (!youtubeTask.projectId) youtubeTask.projectId = projectId
+    transcriptPreview.value = await agentApi.fetchYoutubeTranscript({
+      youtube_url: youtubeUrl.value.trim(),
+      project_id: projectId,
+    })
+  } catch (e: unknown) {
+    youtubeTask.errorMsg = e instanceof ApiError ? e.message : (e as Error)?.message || t("workspace.generateFailed")
+  } finally {
+    transcriptLoading.value = false
+  }
+}
+
+const onCancelYoutube = async () => {
+  if (!youtubeTask.isGenerating) return
+  youtubeAbort?.abort()
+  const projectId = youtubeTask.projectId
+  const streamRequestId = youtubeTask.streamRequestId
+  if (projectId && streamRequestId) {
+    try {
+      await agentApi.cancelChatStream({
+        project_id: projectId,
+        stream_request_id: streamRequestId,
+      })
+    } catch {
+      /* ignore cancel failures */
+    }
+  }
+  stopTaskTimer(youtubeTask)
+  youtubeTask.isGenerating = false
+  appendLog(youtubeTask, t("workspace.youtubeCanceled"))
+}
+
+const onYoutubeSubmit = async () => {
+  if (!isYoutubeUrlValid.value || !youtubePrompt.value.trim() || youtubeTask.isGenerating) return
+  startTask(youtubeTask)
+  if (!(await ensureCreditsForTask(youtubeTask))) {
+    stopTaskTimer(youtubeTask)
+    youtubeTask.isGenerating = false
+    gtmGenerateFail("upload", "credits")
+    return
+  }
+  gtmGenerateStart("upload", youtubeTask.queue)
+  try {
+    await runYoutubeStream(youtubeTask, youtubeUrl.value.trim(), youtubePrompt.value.trim())
+  } catch (e: unknown) {
+    if ((e as Error)?.name === "AbortError") return
+    handleGenerateError(youtubeTask, e, "upload")
+  } finally {
+    stopTaskTimer(youtubeTask)
+    youtubeTask.isGenerating = false
+    youtubeAbort = null
+    await refreshCreditsBar()
+  }
+}
+
 onBeforeUnmount(() => {
+  youtubeAbort?.abort()
   if (timerTickId != null) clearInterval(timerTickId)
 })
 
