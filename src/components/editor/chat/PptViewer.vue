@@ -603,6 +603,7 @@ import {
   rightItemDescription,
   rightItemTitle,
   splitContentItem,
+  stripContentPointTitleMarkdown,
 } from "@/components/editor/chat/ppt/shared/contentHelpers";
 import {
   accentColorAt,
