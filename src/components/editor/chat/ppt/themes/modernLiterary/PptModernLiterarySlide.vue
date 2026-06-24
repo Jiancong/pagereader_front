@@ -5,11 +5,11 @@ import PptMarkdownInline from "@/components/editor/chat/PptMarkdownInline.vue";
 import { pptSlideEditorKey } from "../../pptSlideContext";
 import type { PptSlide } from "../../types";
 import {
+  contentPointBodyForDisplay,
   contentPointTitle,
   displayText,
   hasContentPointBody,
   modernLiteraryCleanText,
-  parseContentBody,
 } from "../../shared/contentHelpers";
 import {
   documentFigureImgStyle,
@@ -282,7 +282,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         </h3>
                         <PptMarkdownInline
                           class="ppt-modern-double-card-body"
-                          :text="parseContentBody(item)"
+                          :text="contentPointBodyForDisplay(item)"
                           :page-references="slide.page_references"
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
@@ -298,9 +298,6 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
 
                     <template v-else-if="modernLiteraryDoubleVariant(slide) === 'split'">
                       <section class="ppt-modern-double-split-hero">
-                        <div class="ppt-modern-double-kicker">
-                          {{ contentPointTitle(modernLiteraryDoubleItems(slide)[0]) }}
-                        </div>
                         <h3>
                           <PptMarkdownInline
                             :text="contentPointTitle(modernLiteraryDoubleItems(slide)[0])"
@@ -310,7 +307,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         </h3>
                         <PptMarkdownInline
                           class="ppt-modern-double-split-body"
-                          :text="parseContentBody(modernLiteraryDoubleItems(slide)[0])"
+                          :text="contentPointBodyForDisplay(modernLiteraryDoubleItems(slide)[0])"
                           :page-references="slide.page_references"
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
@@ -325,7 +322,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                           />
                           <PptMarkdownInline
                             class="ppt-modern-double-side-body"
-                            :text="parseContentBody(modernLiteraryDoubleItems(slide)[1])"
+                            :text="contentPointBodyForDisplay(modernLiteraryDoubleItems(slide)[1])"
                             :page-references="slide.page_references"
                             @ref-click="onPptTableRefClick($event, slide)"
                           />
@@ -357,7 +354,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                           </h3>
                           <PptMarkdownInline
                             class="ppt-modern-double-stacked-body"
-                            :text="parseContentBody(item)"
+                            :text="contentPointBodyForDisplay(item)"
                             :page-references="slide.page_references"
                             @ref-click="onPptTableRefClick($event, slide)"
                           />
@@ -374,9 +371,6 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
 
                     <template v-else>
                       <aside class="ppt-modern-double-aside">
-                        <div class="ppt-modern-double-kicker">
-                          {{ contentPointTitle(modernLiteraryDoubleItems(slide)[0]) }}
-                        </div>
                         <h3>
                           <PptMarkdownInline
                             :text="contentPointTitle(modernLiteraryDoubleItems(slide)[0])"
@@ -386,7 +380,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         </h3>
                         <PptMarkdownInline
                           class="ppt-modern-double-aside-body"
-                          :text="parseContentBody(modernLiteraryDoubleItems(slide)[0])"
+                          :text="contentPointBodyForDisplay(modernLiteraryDoubleItems(slide)[0])"
                           :page-references="slide.page_references"
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
@@ -401,7 +395,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         />
                         <PptMarkdownInline
                           class="ppt-modern-double-number-body"
-                          :text="parseContentBody(modernLiteraryDoubleItems(slide)[1])"
+                          :text="contentPointBodyForDisplay(modernLiteraryDoubleItems(slide)[1])"
                           :page-references="slide.page_references"
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
@@ -437,7 +431,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         </div>
                         <PptMarkdownInline
                           class="ppt-modern-triple-portrait-body"
-                          :text="parseContentBody(modernLiteraryTripleItems(slide)[0])"
+                          :text="contentPointBodyForDisplay(modernLiteraryTripleItems(slide)[0])"
                           :page-references="slide.page_references"
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
@@ -458,7 +452,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                             />
                             <PptMarkdownInline
                               class="ppt-modern-triple-bullet-body"
-                              :text="parseContentBody(item)"
+                              :text="contentPointBodyForDisplay(item)"
                               :page-references="slide.page_references"
                               @ref-click="onPptTableRefClick($event, slide)"
                             />
@@ -491,7 +485,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         />
                         <PptMarkdownInline
                           class="ppt-modern-orbit-title"
-                          :text="parseContentBody(item)"
+                          :text="contentPointBodyForDisplay(item)"
                           :page-references="slide.page_references"
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
@@ -524,7 +518,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         </div>
                         <PptMarkdownInline
                           class="ppt-modern-triple-card-body"
-                          :text="parseContentBody(item)"
+                          :text="contentPointBodyForDisplay(item)"
                           :page-references="slide.page_references"
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
@@ -573,7 +567,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         <PptMarkdownInline
                           v-if="hasContentPointBody(item)"
                           class="ppt-modern-quad-body"
-                          :text="parseContentBody(item)"
+                          :text="contentPointBodyForDisplay(item)"
                           :page-references="slide.page_references"
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
@@ -613,7 +607,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         </h3>
                         <PptMarkdownInline
                           class="ppt-modern-multi-body"
-                          :text="parseContentBody(item)"
+                          :text="contentPointBodyForDisplay(item)"
                           :page-references="slide.page_references"
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
@@ -650,7 +644,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         <PptMarkdownInline
                           v-if="hasContentPointBody(item)"
                           class="ppt-modern-explain-body"
-                          :text="parseContentBody(item)"
+                          :text="contentPointBodyForDisplay(item)"
                           :page-references="slide.page_references"
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
@@ -743,9 +737,6 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                 </template>
 
                 <div v-if="currentBrandFooter && slide.layout !== 'cover'" class="ppt-brand-footer">{{ currentBrandFooter }}</div>
-    <div v-if="currentBrandFooter && slide.layout !== 'cover'" class="ppt-brand-footer">
-      {{ currentBrandFooter }}
-    </div>
   </div>
 </template>
 

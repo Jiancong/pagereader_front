@@ -602,6 +602,7 @@ import {
   resolveSlideBulletItemsRaw,
   rightItemDescription,
   rightItemTitle,
+  splitContentItem,
 } from "@/components/editor/chat/ppt/shared/contentHelpers";
 import {
   accentColorAt,

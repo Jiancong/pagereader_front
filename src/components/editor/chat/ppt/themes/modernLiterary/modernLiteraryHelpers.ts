@@ -1,8 +1,9 @@
 import type { PptSlide } from "../../types";
 import {
+  contentPointBodyForDisplay,
+  hasContentPointBody,
   isPredominantlyLatin,
   modernLiteraryCleanText,
-  parseContentBody,
   pickDisplayString,
 } from "../../shared/contentHelpers";
 import { slideEmphasisLayout } from "../../shared/slideLayoutHelpers";
@@ -187,6 +188,10 @@ export function modernLiteraryDoubleVariant(
   if (hinted.includes("stack") || hinted.includes("quote")) return "stacked";
   if (hinted.includes("number") || hinted.includes("list")) return "numbered";
   if (hinted.includes("contrast") || hinted.includes("compare")) return "contrast";
+  const items = modernLiteraryDoubleItems(slide);
+  if (items.length === 2 && items.every((item) => hasContentPointBody(item))) {
+    return "stacked";
+  }
   const variants = ["contrast", "split", "stacked", "numbered"] as const;
   const n = Number(slide.index || ctx.currentSlideIndex + 1);
   return variants[Math.abs(n - 1) % variants.length];
@@ -212,7 +217,9 @@ export function modernLiteraryInlineKeyInsight(slide: PptSlide): boolean {
 function modernLiteraryTriplePrefersCards(slide: PptSlide): boolean {
   const items = modernLiteraryTripleItems(slide);
   if (!items.length) return false;
-  const bodyLengths = items.map((item) => parseContentBody(item).replace(/\s+/g, "").length);
+  const bodyLengths = items.map((item) =>
+    contentPointBodyForDisplay(item).replace(/\s+/g, "").length,
+  );
   const maxLen = Math.max(...bodyLengths);
   const avgLen = bodyLengths.reduce((sum, len) => sum + len, 0) / bodyLengths.length;
   return maxLen > 56 || avgLen > 40;

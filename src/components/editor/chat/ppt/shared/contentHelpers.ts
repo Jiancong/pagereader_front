@@ -195,9 +195,42 @@ export function contentPointBody(item: unknown): string {
   return parseContentBody(item);
 }
 
+/** 去掉正文末尾「 — 来源: …」等溯源行（后端常拼在 bullet 尾部） */
+export function stripContentAttributionSuffix(text: string): string {
+  let t = text.trim();
+  t = t.replace(/\s*[—–\-－―‒−]\s*(来源|Source|出处|References?)\s*[:：][\s\S]*$/i, "");
+  t = t.replace(/\s*[—–\-－―‒−]\s*[^。！？.!?]{0,240}?\(\d{4}\)\s*(\[\d+\]\s*)*$/i, "");
+  return t.trim();
+}
+
+/** 后端常见「标题：标题，正文…」重复，展示时去掉正文开头的重复标题 */
+export function dedupeContentBodyTitle(title: string, body: string): string {
+  const t = stripContentPointTitleMarkdown(title).trim();
+  let b = body.trim();
+  if (!t || !b) return b;
+  if (b.startsWith(t)) {
+    const rest = b.slice(t.length).replace(/^[\s，,。．.:：、\-—–－]+/, "").trim();
+    if (rest.length >= 2) return rest;
+  }
+  return b;
+}
+
+/** 要点正文：拆分 + 去重标题 + 去溯源尾注 + 清理 PDF 链接 */
+export function contentPointBodyForDisplay(item: unknown): string {
+  const title = contentPointTitle(item);
+  let body = parseContentBody(item);
+  body = dedupeContentBodyTitle(title, body);
+  body = stripContentAttributionSuffix(body);
+  return body
+    .replace(/(^|\s)\((\/resource\/[^)]+|https?:\/\/[^)\s]+#page=[^)]+)\)/g, "$1")
+    .replace(/\bhttps?:\/\/\S+#page=\S+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export function hasContentPointBody(item: unknown): boolean {
   const title = contentPointTitle(item).trim();
-  const body = contentPointBody(item).trim();
+  const body = contentPointBodyForDisplay(item).trim();
   return body.length > 0 && body !== title;
 }
 
