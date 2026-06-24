@@ -625,6 +625,7 @@ import {
 import {
   normalizePptData,
   normalizeSlideData,
+  resolveSlideSpeakerNotes,
 } from "@/components/editor/chat/ppt/shared/normalizePptSlide";
 
 
