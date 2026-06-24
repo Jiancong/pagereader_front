@@ -235,6 +235,37 @@
   font-family: var(--ppt-font-body, Inter, "Source Serif 4", Georgia, serif);
 }
 
+/* Large display quote: generic super/sub misaligns citation marks after CJK punctuation */
+.ppt-modern-literary .ppt-modern-quote-text .ppt-table-ref {
+  display: inline-block;
+  font-family: var(--ppt-font-body, "LXGW WenKai TC", sans-serif);
+  font-size: max(10px, 0.36em);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: baseline;
+  position: relative;
+  top: -0.52em;
+  margin-left: 0.14em;
+  opacity: 0.6;
+}
+
+.ppt-modern-quote-text--medium .ppt-table-ref {
+  top: -0.42em;
+  font-size: max(9px, 0.42em);
+}
+
+.ppt-modern-quote-text--long .ppt-table-ref {
+  top: -0.28em;
+  font-size: 0.68em;
+  vertical-align: super;
+}
+
+.ppt-modern-quote-card--compact .ppt-table-ref {
+  top: -0.38em;
+  font-size: max(9px, 0.44em);
+}
+
 .ppt-modern-quote-card--compact {
   min-height: 0;
   padding: 36px 52px 32px;
