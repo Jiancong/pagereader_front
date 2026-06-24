@@ -391,6 +391,14 @@
   }
 }
 
+.ppt-content-split.ppt-hero-left-split .ppt-content-right {
+  justify-content: flex-start;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .ppt-content-split--table-chart-dual {
   .ppt-content-right {
     flex: 1;
