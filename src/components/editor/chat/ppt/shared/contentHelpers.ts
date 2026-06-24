@@ -125,6 +125,14 @@ export function modernLiteraryCleanText(item: unknown): string {
     .trim();
 }
 
+export function rightItemTitle(ri: { title?: unknown }): string {
+  return pickDisplayString(ri.title);
+}
+
+export function rightItemDescription(ri: { description?: unknown }): string {
+  return pickDisplayString(ri.description);
+}
+
 /** 标题与正文之间的分隔符（含多种 Unicode 破折号） */
 export const CONTENT_TITLE_SEP_RE =
   /\s*([—–\-－―‒−]|[：:])\s*/;

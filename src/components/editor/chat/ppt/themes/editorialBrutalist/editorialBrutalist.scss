@@ -587,6 +587,46 @@
   transform: translateX(-50%);
 }
 
+.ppt-editorial-brutalist--content-list .ppt-brutalist-card--scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(12px, 1.4cqi, 18px);
+}
+
+.ppt-editorial-brutalist--content-list .ppt-brutalist-point-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ppt-editorial-brutalist--content-list .ppt-brutalist-point-body {
+  overflow-wrap: break-word;
+}
+
+.ppt-editorial-brutalist--content-list .ppt-brutalist-point-body :deep(.ppt-inline-math:not(.ppt-inline-math--display)) {
+  display: inline;
+  margin: 0 0.06em;
+  vertical-align: baseline;
+}
+
+.ppt-editorial-brutalist--content-list .ppt-brutalist-point-body :deep(.ppt-inline-math .katex) {
+  font-size: 1.05em;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card-body :deep(.ppt-inline-math:not(.ppt-inline-math--display)) {
+  display: inline;
+  margin: 0 0.06em;
+  vertical-align: baseline;
+}
+
+.ppt-editorial-brutalist--content .ppt-brutalist-card-body :deep(.ppt-inline-math .katex) {
+  font-size: 1.05em;
+}
+
 .ppt-editorial-brutalist--content .ppt-brutalist-card-grid {
   flex: 1 1 auto;
   min-height: 0;

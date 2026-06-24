@@ -18,6 +18,7 @@ import {
   hasDocumentFigurePage,
   isHeroLeftSlide,
   normalizeDocumentFigure,
+  resolveSectionSubtitle,
   tocDensityLevel,
 } from "../../shared/slideLayoutHelpers";
 import { modernLiteraryCompareTitleDuplicatesSlide } from "../modernLiterary/modernLiteraryHelpers";
@@ -47,6 +48,8 @@ const editorialBrutalistDisplayClass = (s: PptSlide) =>
   brutalist.editorialBrutalistDisplayClass(s, brutalistCtx.value);
 const editorialBrutalistWatermark = (s: PptSlide) =>
   brutalist.editorialBrutalistWatermark(s, brutalistCtx.value);
+const editorialBrutalistHeroTitle = (s: PptSlide) =>
+  brutalist.editorialBrutalistHeroTitle(s, brutalistCtx.value);
 const editorialBrutalistHeroBody = (s: PptSlide) =>
   brutalist.editorialBrutalistHeroBody(s, brutalistCtx.value);
 const editorialBrutalistHeroDate = (s: PptSlide) =>
@@ -65,6 +68,7 @@ const editorialBrutalistSplitListClass = brutalist.editorialBrutalistSplitListCl
 const editorialBrutalistSplitLeft = brutalist.editorialBrutalistSplitLeft;
 const editorialBrutalistSplitRight = brutalist.editorialBrutalistSplitRight;
 const editorialBrutalistIsContentSplit = brutalist.editorialBrutalistIsContentSplit;
+const editorialBrutalistPreferBulletList = brutalist.editorialBrutalistPreferBulletList;
 const editorialBrutalistIsDataSlide = brutalist.editorialBrutalistIsDataSlide;
 const editorialBrutalistShowDataTable = brutalist.editorialBrutalistShowDataTable;
 const editorialBrutalistCardGridDensity = brutalist.editorialBrutalistCardGridDensity;
@@ -99,6 +103,9 @@ const slideClass = computed(() => [
   editorialBrutalistIsContentSplit(props.slide)
     ? "ppt-editorial-brutalist--content-split"
     : undefined,
+  editorialBrutalistPreferBulletList(props.slide)
+    ? "ppt-editorial-brutalist--content-list"
+    : undefined,
   hasDocumentFigurePage(props.slide) ? "ppt-editorial-brutalist--document-figure" : undefined,
   editorialBrutalistIsMultiQuote(props.slide) ? "ppt-editorial-brutalist--quote-multi" : undefined,
 ]);
@@ -106,7 +113,7 @@ const slideClass = computed(() => [
 
 <template>
   <div class="ppt-slide ppt-editorial-brutalist" :class="slideClass">
-                <template v-if="editorialBrutalistLayout(slide) === 'hero'">
+                <template v-if="editorialBrutalistLayout(slide) === 'hero' && slide.layout === 'section'">
                   <div class="ppt-brutalist-hero">
                     <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
                     <h1
@@ -114,7 +121,37 @@ const slideClass = computed(() => [
                       :class="editorialBrutalistDisplayClass(slide)"
                     >
                       <PptMarkdownInline
-                        :text="slide.title || pptSource.title || ''"
+                        :text="editorialBrutalistHeroTitle(slide)"
+                        :editable="isEditing"
+                        @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
+                      />
+                    </h1>
+                    <div class="ppt-brutalist-divider"></div>
+                    <PptMarkdownInline
+                      v-if="resolveSectionSubtitle(slide) || isEditing"
+                      class="ppt-brutalist-lead"
+                      :text="resolveSectionSubtitle(slide)"
+                      :editable="isEditing"
+                      @blur="onCellBlur($event, `slides.${currentSlide}.subtitle_en`)"
+                    />
+                  </div>
+                  <div
+                    v-if="shouldShowEditorialBrutalistVerticalWatermark(slide)"
+                    class="ppt-brutalist-watermark ppt-brutalist-watermark--vertical"
+                  >
+                    {{ editorialBrutalistWatermark(slide) }}
+                  </div>
+                </template>
+
+                <template v-else-if="editorialBrutalistLayout(slide) === 'hero'">
+                  <div class="ppt-brutalist-hero">
+                    <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
+                    <h1
+                      class="ppt-brutalist-display"
+                      :class="editorialBrutalistDisplayClass(slide)"
+                    >
+                      <PptMarkdownInline
+                        :text="editorialBrutalistHeroTitle(slide)"
                         :editable="isEditing"
                         @blur="onCellBlur($event, `slides.${currentSlide}.title`)"
                       />
@@ -619,6 +656,44 @@ const slideClass = computed(() => [
                       <PptBrutalistDataChart v-else-if="slide.chart" :slide="slide" />
     </section>
                   </div>
+                  <section
+                    v-else-if="editorialBrutalistPreferBulletList(slide)"
+                    class="ppt-brutalist-card ppt-brutalist-card--scroll"
+                  >
+                    <div
+                      class="ppt-brutalist-point-list"
+                      :class="editorialBrutalistSplitListClass(slide)"
+                    >
+                      <article
+                        v-for="(item, bi) in resolveSlideBulletItems(slide)"
+                        :key="'brutalist-list-' + bi"
+                        class="ppt-brutalist-point"
+                      >
+                        <div class="ppt-brutalist-point-index">
+                          {{ String(bi + 1).padStart(2, "0") }}
+                        </div>
+                        <div class="ppt-brutalist-point-copy">
+                          <PptMarkdownInline
+                            v-if="hasContentPointBody(item)"
+                            class="ppt-brutalist-point-title"
+                            :text="contentPointTitle(item)"
+                            :page-references="slide.page_references"
+                            @ref-click="onPptTableRefClick($event, slide)"
+                          />
+                          <PptMarkdownInline
+                            class="ppt-brutalist-point-body"
+                            :text="
+                              hasContentPointBody(item) ? parseContentBody(item) : displayText(item)
+                            "
+                            :page-references="slide.page_references"
+                            :editable="isEditing"
+                            @blur="onContentItemBlur($event, currentSlide, bi)"
+                            @ref-click="onPptTableRefClick($event, slide)"
+                          />
+                        </div>
+                      </article>
+                    </div>
+                  </section>
                   <div
                     v-else
                     class="ppt-brutalist-card-grid"

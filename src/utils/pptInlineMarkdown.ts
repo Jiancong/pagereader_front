@@ -9,6 +9,23 @@ function normalizeAsterisks(text: string): string {
   return text.replace(/\uFF0A/g, "*");
 }
 
+/** Wrap common paper/ML parameter tokens in $...$ for inline KaTeX inside prose. */
+function wrapInlineMathTokens(text: string): string {
+  let s = text;
+  s = s.replace(/\bd\s+model\b/gi, "$d_{\\text{model}}$");
+  s = s.replace(/\bdmodel\b/gi, "$d_{\\text{model}}$");
+  s = s.replace(/\bd_model\b/gi, "$d_{\\text{model}}$");
+  s = s.replace(/\bd\s+ff\b/gi, "$d_{\\text{ff}}$");
+  s = s.replace(/\bdff\b/gi, "$d_{\\text{ff}}$");
+  s = s.replace(/\bd\s*([kKvV])\b/g, (_m, sub: string) => `$d_${sub.toLowerCase()}$`);
+  s = s.replace(/\bPdrop\b/gi, "$P_{\\text{drop}}$");
+  s = s.replace(/\bPPL\b/g, "$\\text{PPL}$");
+  s = s.replace(/[ϵε]\s*ls\b/gi, "$\\epsilon_{\\text{ls}}$");
+  s = s.replace(/O\(\s*n\s*²\s*\)/g, "$O(n^2)$");
+  s = s.replace(/O\(n²\)/g, "$O(n^2)$");
+  return s;
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -107,18 +124,38 @@ function plainAcademicMathToLatex(expr: string): string {
   return s;
 }
 
+function looksLikeNamedMathCall(text: string): boolean {
+  return /\b(?:MultiHead|LayerNorm|Attention|Concat|Sublayer|Softmax)\s*\(/i.test(text);
+}
+
+/** English prose with spaces — not a compact formula even if it mentions "attention". */
+function looksLikeNaturalLanguageProse(text: string): boolean {
+  const t = text.trim();
+  if (!/\s/.test(t) || t.length < 24) return false;
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length < 5) return false;
+  return /\b(?:the|this|we|is|are|in|or|and|a|an|of|to|for)\b/i.test(t);
+}
+
 function looksLikeAcademicMath(text: string): boolean {
   const t = text.trim();
   if (t.length < 6) return false;
+  if (looksLikeNaturalLanguageProse(t)) return false;
   if (/\$[^$]+\$/.test(t)) return true;
   if (/d\s*model|dmodel|d_model/i.test(t)) return true;
-  if (
-    /\b(MultiHead|LayerNorm|Attention|Concat|Sublayer|Softmax)\b/i.test(t) &&
-    /[=+\-*/()]/.test(t)
-  ) {
-    return true;
-  }
+  if (looksLikeNamedMathCall(t) && /[=+\-*/()]/.test(t)) return true;
   return /\b[A-Z][a-zA-Z]+\([^)]{2,}\)\s*=/.test(t);
+}
+
+function escapeLatexText(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/([{}%&#_$])/g, (_m, ch: string) => {
+    if (ch === "_") return "\\_";
+    if (ch === "%") return "\\%";
+    if (ch === "&") return "\\&";
+    if (ch === "#") return "\\#";
+    if (ch === "$") return "\\$";
+    return `\\${ch}`;
+  });
 }
 
 function readBalancedParenGroup(text: string, openIndex: number): string | null {
@@ -191,6 +228,7 @@ function segmentValueToLatex(value: string): string {
   if (trimmed.startsWith("O(")) return plainBigOToLatex(trimmed);
   if (looksLikeAcademicMath(trimmed)) return plainAcademicMathToLatex(trimmed);
   if (trimmed.includes("\\") || trimmed.includes("$")) return trimmed;
+  if (looksLikeNaturalLanguageProse(trimmed)) return `\\text{${escapeLatexText(trimmed)}}`;
   return plainAcademicMathToLatex(trimmed);
 }
 
@@ -330,7 +368,8 @@ function renderInlineSegments(segments: InlineSegment[]): string {
         .map((part, index) => {
           const latex = segmentValueToLatex(part);
           const isLongFormula =
-            part.length > 48 || /\b(MultiHead|LayerNorm|Attention)\b/i.test(part);
+            looksLikeAcademicMath(part) &&
+            (part.length > 48 || looksLikeNamedMathCall(part));
           const rendered = renderKatex(latex, !!segment.display || isLongFormula);
           const prefix = index > 0 ? "，" : "";
           return `${prefix}<span class="ppt-inline-math${segment.display || isLongFormula ? " ppt-inline-math--display" : ""}">${rendered}</span>`;
@@ -466,7 +505,7 @@ export function formatPptInlineMarkdown(source: unknown): string {
     }
     return "";
   }
-  const text = normalizeAsterisks(String(source));
+  const text = wrapInlineMathTokens(normalizeAsterisks(String(source)));
   if (text.trim() === "[object Object]") return "";
   return renderInlineSegments(tokenizeInlineSegments(text));
 }

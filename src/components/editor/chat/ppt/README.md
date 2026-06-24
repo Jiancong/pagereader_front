@@ -10,9 +10,12 @@ ppt/
 ├── pptSlideContext.ts       # 编辑、品牌、i18n inject 契约
 ├── pptChartContext.ts       # 图表 SVG 计算 inject 契约
 ├── shared/
-│   ├── contentHelpers.ts    # content 解析、displayText、resolveSlideBulletItems
+│   ├── contentHelpers.ts    # content 解析、displayText、resolveSlideBulletItems、rightItem*
 │   ├── slideLayoutHelpers.ts# TOC、hero_left、document figure 等布局判定
-│   └── chartHelpers.ts      # 图表类型判定、formatChartDataValue
+│   ├── chartHelpers.ts      # 图表类型判定、formatChartDataValue
+│   ├── paletteHelpers.ts    # 调色板/对比度、accent 色板、resolveChartColorList
+│   ├── normalizeChart.ts    # chart.data 归一化（bar/line/combo/stacked 等）
+│   └── normalizePptSlide.ts # normalizeSlideData / normalizePptData、metric_cards、table
 ├── pptClassicContext.ts     # 经典主题专用 inject（backdrop、layout 判定、扩展 chart API）
 ├── charts/
 │   └── PptBrutalistDataChart.vue
@@ -46,7 +49,9 @@ ppt/
 
 ## 后续
 
-- Chart 引擎可进一步抽为 `composables/usePptChartGeometry.ts`。
+- Chart 几何计算可抽为 `composables/usePptChartGeometry.ts`（约 2300 行）。
+- 导出流程可抽为 `ppt/export/`（html2canvas、PPTX 栅格层、PDF/PNG 批量，约 2400 行）。
+- 工具栏可抽为 `PptViewerToolbar.vue`。
 - 可选：`defineAsyncComponent` 懒加载主题 SFC，减小首屏 bundle。
 
 ## 主题与 layout 映射
@@ -72,11 +77,11 @@ ppt/
 - [ ] **编辑**：`contenteditable` blur 写回、`onPptTableRefClick` 跳转
 - [ ] **导出**：html2canvas / PDF 仍命中 `.ppt-slide`；根 class `ppt-editorial-brutalist` / `ppt-modern-literary` 未改名
 
-## 壳层保留职责（PptViewer.vue）
+## 壳层保留职责（PptViewer.vue，约 7600 行）
 
-- 幻灯片导航与 `normalizeSlideData`
+- 幻灯片导航；数据归一化已迁至 `shared/normalizePptSlide.ts` + `shared/normalizeChart.ts`
 - Chart 几何计算与 `provide(pptChartContextKey)`
-- Palette / 字体加载（含主题 token CSS 变量）
+- 字体加载与主题 token CSS 变量（色板 helper 在 `shared/paletteHelpers.ts`）
 - 经典主题通过 `PptClassicSlide`（`v-else` fallback）渲染
-- 导出、PDF、相关搜索等周边能力
+- 导出、PDF、PPTX、相关搜索等周边能力
 

@@ -69,7 +69,21 @@ export function editorialBrutalistKicker(slide: PptSlide, ctx: EditorialBrutalis
   );
 }
 
+/** Hero 主标题：section 只用页内 title，不 fallback 到 deck title（避免误显示 Part 1 等） */
+export function editorialBrutalistHeroTitle(
+  slide: PptSlide,
+  ctx: EditorialBrutalistContext,
+): string {
+  const pageTitle = String(slide.title ?? "").trim();
+  if (pageTitle) return pageTitle;
+  if (slide.layout === "section") return "";
+  return String(ctx.pptSource.title ?? "").trim();
+}
+
 export function editorialBrutalistHeroBody(slide: PptSlide, ctx: EditorialBrutalistContext): string {
+  if (slide.layout === "section") {
+    return resolveSectionSubtitle(slide);
+  }
   return (
     slide.subtitle ||
     resolveSectionSubtitle(slide) ||
@@ -96,7 +110,7 @@ export function editorialBrutalistDisplayClass(
   slide: PptSlide,
   ctx: EditorialBrutalistContext,
 ): Record<string, boolean> {
-  const text = String(slide.title || ctx.pptSource.title || "").trim();
+  const text = editorialBrutalistHeroTitle(slide, ctx);
   const units = editorialBrutalistDisplayUnits(text);
   const latin = isPredominantlyLatin(text);
   const latinWords = text.split(/\s+/).filter(Boolean).length;
@@ -233,6 +247,15 @@ export function editorialBrutalistIsContentSplit(slide: PptSlide): boolean {
   if (slide.chart || slide.table) return false;
   const bullets = resolveSlideBulletItems(slide);
   return bullets.length > 0 && (slide.right_items?.length ?? 0) > 0;
+}
+
+/** Many plain content bullets — card grid truncates; use scrollable point list. */
+export function editorialBrutalistPreferBulletList(slide: PptSlide): boolean {
+  if (slide.layout !== "content") return false;
+  if (isHeroLeftSlide(slide) || editorialBrutalistIsContentSplit(slide)) return false;
+  if (editorialBrutalistIsDataSlide(slide)) return false;
+  const count = (slide.content || []).filter((item) => !!displayText(item).trim()).length;
+  return count >= 6;
 }
 
 export function editorialBrutalistQuoteText(slide: PptSlide): string {
