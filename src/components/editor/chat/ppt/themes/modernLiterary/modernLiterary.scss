@@ -410,6 +410,10 @@
 }
 
 .ppt-modern-literary--two_column .ppt-modern-compare-card {
+  --ppt-card-typo-body-fs: clamp(14px, 1.35cqi, 22px);
+  --ppt-card-typo-title-fs: clamp(20px, 2cqi, 32px);
+  --ppt-card-typo-body-lh: 1.42;
+  --ppt-card-typo-gap: 12px;
   display: flex;
   min-height: 0;
   max-height: 100%;
@@ -421,7 +425,7 @@
 .ppt-modern-literary--two_column .ppt-modern-compare-card h3 {
   flex: 0 0 auto;
   margin-bottom: 14px;
-  font-size: clamp(18px, 1.65cqi, 28px);
+  font-size: var(--ppt-card-typo-title-fs);
   line-height: 1.15;
   overflow-wrap: break-word;
 }
@@ -429,13 +433,13 @@
 .ppt-modern-literary--two_column .ppt-modern-compare-list {
   flex: 1 1 auto;
   min-height: 0;
-  gap: 12px;
+  gap: var(--ppt-card-typo-gap);
   overflow: hidden;
 }
 
 .ppt-modern-literary--two_column .ppt-modern-compare-item {
-  font-size: clamp(12px, 1.05cqi, 16px);
-  line-height: 1.42;
+  font-size: var(--ppt-card-typo-body-fs);
+  line-height: var(--ppt-card-typo-body-lh);
   overflow-wrap: break-word;
 }
 
@@ -1572,6 +1576,10 @@
 }
 
 .ppt-modern-compare-card {
+  --ppt-card-typo-body-fs: clamp(17px, 1.55cqi, 25px);
+  --ppt-card-typo-title-fs: clamp(34px, 3.9cqi, 62px);
+  --ppt-card-typo-body-lh: 1.38;
+  --ppt-card-typo-gap: 16px;
   min-height: 390px;
   min-width: 0;
   padding: 34px 38px;
@@ -1582,7 +1590,7 @@
 .ppt-modern-compare-card h3 {
   margin: 0 0 28px;
   font-family: var(--ppt-font-display, "ZCOOL XiaoWei", serif);
-  font-size: clamp(34px, 3.9cqi, 62px);
+  font-size: var(--ppt-card-typo-title-fs);
   font-weight: 900;
   letter-spacing: -0.045em;
   line-height: 0.95;
@@ -1605,7 +1613,7 @@
 
 .ppt-modern-compare-list {
   display: grid;
-  gap: 16px;
+  gap: var(--ppt-card-typo-gap, 16px);
 }
 
 .ppt-modern-document-figure {
@@ -1647,8 +1655,8 @@
 .ppt-modern-compare-item {
   display: block;
   color: inherit;
-  font-size: clamp(17px, 1.55cqi, 25px);
-  line-height: 1.38;
+  font-size: var(--ppt-card-typo-body-fs, clamp(17px, 1.55cqi, 25px));
+  line-height: var(--ppt-card-typo-body-lh, 1.38);
 }
 
 .ppt-modern-quote-strip {
@@ -1662,4 +1670,73 @@
   background: rgba(255, 255, 255, 0.72);
   font-size: 16px;
   font-style: italic;
+}
+
+/* ── Adaptive card typography (see ppt/shared/cardTypography.ts) ── */
+.ppt-card-typography,
+.ppt-modern-card-typography {
+  --ppt-card-typo-body-fs: clamp(14px, 1.35cqi, 22px);
+  --ppt-card-typo-title-fs: clamp(18px, 1.65cqi, 28px);
+  --ppt-card-typo-body-lh: 1.42;
+  --ppt-card-typo-gap: 12px;
+}
+
+.ppt-card-typography .ppt-modern-compare-item,
+.ppt-modern-card-typography .ppt-modern-compare-item,
+.ppt-card-typography .ppt-modern-portrait-item-body,
+.ppt-modern-card-typography .ppt-modern-portrait-item-body,
+.ppt-card-typography .ppt-modern-double-card-body,
+.ppt-modern-card-typography .ppt-modern-double-card-body,
+.ppt-card-typography .ppt-modern-double-split-body,
+.ppt-modern-card-typography .ppt-modern-double-split-body,
+.ppt-card-typography .ppt-modern-double-aside-body,
+.ppt-modern-card-typography .ppt-modern-double-aside-body,
+.ppt-card-typography .ppt-modern-double-stacked-body,
+.ppt-modern-card-typography .ppt-modern-double-stacked-body,
+.ppt-card-typography .ppt-modern-double-number-body,
+.ppt-modern-card-typography .ppt-modern-double-number-body,
+.ppt-card-typography .ppt-modern-triple-portrait-body,
+.ppt-modern-card-typography .ppt-modern-triple-portrait-body,
+.ppt-card-typography .ppt-modern-triple-bullet-body,
+.ppt-modern-card-typography .ppt-modern-triple-bullet-body,
+.ppt-card-typography .ppt-modern-triple-card-body,
+.ppt-modern-card-typography .ppt-modern-triple-card-body,
+.ppt-card-typography .ppt-modern-orbit-title,
+.ppt-modern-card-typography .ppt-modern-orbit-title,
+.ppt-card-typography .ppt-modern-quad-body,
+.ppt-modern-card-typography .ppt-modern-quad-body,
+.ppt-card-typography .ppt-modern-multi-body,
+.ppt-modern-card-typography .ppt-modern-multi-body,
+.ppt-card-typography .ppt-modern-explain-body,
+.ppt-modern-card-typography .ppt-modern-explain-body {
+  font-size: var(--ppt-card-typo-body-fs);
+  line-height: var(--ppt-card-typo-body-lh);
+}
+
+.ppt-card-typography h3,
+.ppt-modern-card-typography h3,
+.ppt-card-typography .ppt-modern-portrait-item-title,
+.ppt-modern-card-typography .ppt-modern-portrait-item-title,
+.ppt-card-typography .ppt-modern-explain-title,
+.ppt-modern-card-typography .ppt-modern-explain-title,
+.ppt-card-typography .ppt-modern-quad-title,
+.ppt-modern-card-typography .ppt-modern-quad-title,
+.ppt-card-typography .ppt-modern-double-side-title,
+.ppt-modern-card-typography .ppt-modern-double-side-title,
+.ppt-card-typography .ppt-modern-double-number-title,
+.ppt-modern-card-typography .ppt-modern-double-number-title,
+.ppt-card-typography .ppt-modern-triple-bullet-title,
+.ppt-modern-card-typography .ppt-modern-triple-bullet-title,
+.ppt-card-typography .ppt-modern-orbit-kicker,
+.ppt-modern-card-typography .ppt-modern-orbit-kicker {
+  font-size: var(--ppt-card-typo-title-fs);
+}
+
+.ppt-card-typography .ppt-modern-compare-list,
+.ppt-modern-card-typography .ppt-modern-compare-list,
+.ppt-card-typography .ppt-modern-portrait-list,
+.ppt-modern-card-typography .ppt-modern-portrait-list,
+.ppt-card-typography .ppt-modern-triple-portrait-list,
+.ppt-modern-card-typography .ppt-modern-triple-portrait-list {
+  gap: var(--ppt-card-typo-gap);
 }

@@ -1,6 +1,14 @@
 import type { PptSlide } from "../../types";
 import {
+  CARD_TYPOGRAPHY_TIERS,
+  analyzeCardTypography,
+  cardTypographyBindings,
+  type CardTypographyMetrics,
+} from "../../shared/cardTypography";
+import {
   contentPointBodyForDisplay,
+  contentPointTitle,
+  displayText,
   hasContentPointBody,
   isPredominantlyLatin,
   modernLiteraryCleanText,
@@ -286,3 +294,57 @@ export function modernLiteraryCompareTitleDuplicatesSlide(
   const title = (slideTitle ?? "").trim();
   return Boolean(col && title && col === title);
 }
+
+function normalizeModernLiteraryCardTexts(items: unknown[] | string[]): string[] {
+  return items
+    .map((item) =>
+      typeof item === "string"
+        ? modernLiteraryCleanText(item)
+        : modernLiteraryCleanText(displayText(item)),
+    )
+    .filter(Boolean);
+}
+
+export function modernLiteraryTextsFromContentItems(items: unknown[]): string[] {
+  return items
+    .map((item) => {
+      const title = contentPointTitle(item);
+      const body = contentPointBodyForDisplay(item);
+      const combined = title && body ? `${title} — ${body}` : title || body;
+      return modernLiteraryCleanText(combined);
+    })
+    .filter(Boolean);
+}
+
+export function modernLiteraryTextsFromRightItems(
+  items: ModernLiteraryRightItem[] | undefined,
+): string[] {
+  return (items ?? [])
+    .map((item) => {
+      const title = rightItemTitle(item);
+      const desc = rightItemDescription(item);
+      return modernLiteraryCleanText(title && desc ? `${title} — ${desc}` : title || desc);
+    })
+    .filter(Boolean);
+}
+
+/** Bindings for card containers: class tier + CSS vars + data-typo-* metrics. */
+export function modernLiteraryCardTypographyBindings(items: unknown[] | string[]) {
+  const texts =
+    items.length && typeof items[0] === "string"
+      ? normalizeModernLiteraryCardTexts(items)
+      : modernLiteraryTextsFromContentItems(items as unknown[]);
+  return cardTypographyBindings(texts);
+}
+
+export function modernLiteraryCardTypographyBindingsForRightItems(
+  items: ModernLiteraryRightItem[] | undefined,
+) {
+  return cardTypographyBindings(modernLiteraryTextsFromRightItems(items));
+}
+
+export function modernLiteraryCardTypographyBindingsForSingleItem(item: unknown) {
+  return modernLiteraryCardTypographyBindings([item]);
+}
+
+export { CARD_TYPOGRAPHY_TIERS, analyzeCardTypography, type CardTypographyMetrics };

@@ -2271,3 +2271,40 @@
   max-width: 56px;
   opacity: 0.7;
 }
+
+/* ── Adaptive card typography (see ppt/shared/cardTypography.ts) ── */
+.ppt-card-typography {
+  --ppt-card-typo-body-fs: clamp(14px, 1.35cqi, 22px);
+  --ppt-card-typo-title-fs: clamp(18px, 1.65cqi, 28px);
+  --ppt-card-typo-body-lh: 1.42;
+  --ppt-card-typo-gap: 12px;
+}
+
+.ppt-card-typography.ppt-hero-right-items,
+.ppt-card-typography.ppt-metric-cards-row,
+.ppt-card-typography.ppt-metric-cards-column,
+.ppt-card-typography.ppt-topic-grid,
+.ppt-card-typography.ppt-bullet-list {
+  gap: var(--ppt-card-typo-gap);
+}
+
+.ppt-card-typography .ppt-hero-right-card-title,
+.ppt-card-typography .ppt-content-point-title,
+.ppt-card-typography .ppt-topic-card-title,
+.ppt-card-typography .ppt-metric-card-label {
+  font-size: var(--ppt-card-typo-title-fs);
+}
+
+.ppt-card-typography .ppt-hero-right-card-desc,
+.ppt-card-typography .ppt-content-point-body,
+.ppt-card-typography .ppt-topic-card-body,
+.ppt-card-typography .ppt-metric-card-detail,
+.ppt-card-typography .ppt-bullet-item,
+.ppt-card-typography .ppt-data-notes .ppt-md-inline {
+  font-size: var(--ppt-card-typo-body-fs);
+  line-height: var(--ppt-card-typo-body-lh);
+}
+
+.ppt-card-typography .ppt-metric-card-value {
+  font-size: var(--ppt-card-typo-title-fs);
+}

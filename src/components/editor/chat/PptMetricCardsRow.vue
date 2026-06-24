@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { PptPageReference } from "@/utils/pptInlineMarkdown";
+import { cardTypographyBindings } from "@/components/editor/chat/ppt/shared/cardTypography";
 
 export interface PptMetricCard {
   value?: string;
@@ -74,6 +75,14 @@ const fillGridStyle = computed(() => {
   };
 });
 
+const typographyBindings = computed(() =>
+  cardTypographyBindings(
+    props.cards
+      .map((card) => [card.value, card.label, card.detail].filter(Boolean).join(" "))
+      .filter(Boolean),
+  ),
+);
+
 function cardSourceRefs(card: PptMetricCard): number[] {
   const raw = card.source_ref;
   const refsFromField =
@@ -120,7 +129,7 @@ function shouldShowCardLabel(card: PptMetricCard): boolean {
 </script>
 
 <template>
-  <div :class="rowClass" :style="fillGridStyle">
+  <div :class="rowClass" :style="fillGridStyle" v-bind="typographyBindings">
     <div
       v-for="(card, index) in cards"
       :key="'mc-' + index"

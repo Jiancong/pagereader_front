@@ -60,6 +60,11 @@ const modernLiteraryInlineKeyInsight = modern.modernLiteraryInlineKeyInsight;
 const modernLiteraryRightItems = modern.modernLiteraryRightItems;
 const modernLiteraryTwoColumnFooter = modern.modernLiteraryTwoColumnFooter;
 const modernLiteraryCompareTitleDuplicatesSlide = modern.modernLiteraryCompareTitleDuplicatesSlide;
+const modernLiteraryCardTypographyBindings = modern.modernLiteraryCardTypographyBindings;
+const modernLiteraryCardTypographyBindingsForRightItems =
+  modern.modernLiteraryCardTypographyBindingsForRightItems;
+const modernLiteraryCardTypographyBindingsForSingleItem =
+  modern.modernLiteraryCardTypographyBindingsForSingleItem;
 const isModernLiteraryRightItemsContent = modern.isModernLiteraryRightItemsContent;
 const isModernLiteraryQuadContent = modern.isModernLiteraryQuadContent;
 const isModernLiteraryMultiContent = modern.isModernLiteraryMultiContent;
@@ -205,6 +210,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                       <div
                         class="ppt-modern-portrait-list"
                         :class="{ 'ppt-modern-portrait-list--dense': (slide.right_items?.length ?? 0) >= 4 }"
+                        v-bind="modernLiteraryCardTypographyBindingsForRightItems(slide.right_items)"
                       >
                         <article
                           v-for="(ri, idx) in slide.right_items"
@@ -272,6 +278,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                           :key="'modern-double-contrast-' + di"
                           class="ppt-modern-double-card"
                           :class="{ 'ppt-modern-double-card--dark': di === 1, 'ppt-modern-double-card--light': di === 0 }"
+                          v-bind="modernLiteraryCardTypographyBindingsForSingleItem(item)"
                         >
                         <h3>
                           <PptMarkdownInline
@@ -297,7 +304,10 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                     </template>
 
                     <template v-else-if="modernLiteraryDoubleVariant(slide) === 'split'">
-                      <section class="ppt-modern-double-split-hero">
+                      <section
+                        class="ppt-modern-double-split-hero"
+                        v-bind="modernLiteraryCardTypographyBindingsForSingleItem(modernLiteraryDoubleItems(slide)[0])"
+                      >
                         <h3>
                           <PptMarkdownInline
                             :text="contentPointTitle(modernLiteraryDoubleItems(slide)[0])"
@@ -313,7 +323,10 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         />
                       </section>
                       <section class="ppt-modern-double-split-side">
-                        <div class="ppt-modern-double-side-card">
+                        <div
+                          class="ppt-modern-double-side-card"
+                          v-bind="modernLiteraryCardTypographyBindingsForSingleItem(modernLiteraryDoubleItems(slide)[1])"
+                        >
                           <PptMarkdownInline
                             class="ppt-modern-double-side-title"
                             :text="contentPointTitle(modernLiteraryDoubleItems(slide)[1])"
@@ -344,6 +357,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                           :key="'modern-double-stacked-' + di"
                           class="ppt-modern-double-stacked-card"
                           :class="{ 'ppt-modern-double-stacked-card--impact': di === 0, 'ppt-modern-double-stacked-card--soft': di === 1 }"
+                          v-bind="modernLiteraryCardTypographyBindingsForSingleItem(item)"
                         >
                           <h3>
                             <PptMarkdownInline
@@ -370,7 +384,10 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                     </template>
 
                     <template v-else>
-                      <aside class="ppt-modern-double-aside">
+                      <aside
+                        class="ppt-modern-double-aside"
+                        v-bind="modernLiteraryCardTypographyBindingsForSingleItem(modernLiteraryDoubleItems(slide)[0])"
+                      >
                         <h3>
                           <PptMarkdownInline
                             :text="contentPointTitle(modernLiteraryDoubleItems(slide)[0])"
@@ -385,7 +402,10 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
                       </aside>
-                      <section class="ppt-modern-double-numbered">
+                      <section
+                        class="ppt-modern-double-numbered"
+                        v-bind="modernLiteraryCardTypographyBindingsForSingleItem(modernLiteraryDoubleItems(slide)[1])"
+                      >
                         <div class="ppt-modern-double-number">01</div>
                         <PptMarkdownInline
                           class="ppt-modern-double-number-title"
@@ -436,7 +456,10 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                           @ref-click="onPptTableRefClick($event, slide)"
                         />
                       </section>
-                      <section class="ppt-modern-triple-portrait-list">
+                      <section
+                        class="ppt-modern-triple-portrait-list"
+                        v-bind="modernLiteraryCardTypographyBindings(modernLiteraryTripleItems(slide).slice(1))"
+                      >
                         <div
                           v-for="(item, ti) in modernLiteraryTripleItems(slide).slice(1)"
                           :key="'modern-portrait-' + ti"
@@ -476,6 +499,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         :key="'modern-orbit-' + ti"
                         class="ppt-modern-orbit-node"
                         :class="{ 'ppt-modern-orbit-node--dark': ti === 1 }"
+                        v-bind="modernLiteraryCardTypographyBindingsForSingleItem(item)"
                       >
                         <PptMarkdownInline
                           class="ppt-modern-orbit-kicker"
@@ -505,6 +529,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         :key="'modern-card-' + ti"
                         class="ppt-modern-triple-card"
                         :class="{ 'ppt-modern-triple-card--dark': ti === modernLiteraryTripleDarkIndex(slide) }"
+                        v-bind="modernLiteraryCardTypographyBindingsForSingleItem(item)"
                       >
                         <div class="ppt-modern-triple-card-head">
                           <span class="ppt-modern-triple-card-index">{{ ti + 1 }}</span>
@@ -545,6 +570,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         v-for="(item, qi) in modernLiteraryQuadItems(slide)"
                         :key="'modern-quad-' + qi"
                         class="ppt-modern-quad-card"
+                        v-bind="modernLiteraryCardTypographyBindingsForSingleItem(item)"
                       >
                         <div
                           v-if="modernLiteraryQuadVariant(slide) === 'numbered'"
@@ -597,6 +623,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                           'ppt-modern-multi-card--impact': mi === 0,
                           'ppt-modern-multi-card--dark': mi === 1,
                         }"
+                        v-bind="modernLiteraryCardTypographyBindingsForSingleItem(item)"
                       >
                         <h3>
                           <PptMarkdownInline
@@ -634,6 +661,7 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         v-for="(item, bi) in modernLiteraryBodyItems(slide)"
                         :key="'modern-body-' + bi"
                         class="ppt-modern-explain-card"
+                        v-bind="modernLiteraryCardTypographyBindingsForSingleItem(item)"
                       >
                         <PptMarkdownInline
                           class="ppt-modern-explain-title"
@@ -675,7 +703,10 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                     <div class="ppt-modern-accent-line"></div>
                   </div>
                   <div class="ppt-modern-two-col-grid">
-                    <section class="ppt-modern-compare-card ppt-modern-compare-card--light">
+                    <section
+                      class="ppt-modern-compare-card ppt-modern-compare-card--light"
+                      v-bind="modernLiteraryCardTypographyBindings(slide.left_content || [])"
+                    >
                       <h3 v-if="!modernLiteraryCompareTitleDuplicatesSlide(slide.left_title, slide.title)">
                         <PptMarkdownInline
                           :text="slide.left_title || t('agent.pptLeftColumn')"
@@ -694,7 +725,10 @@ const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
                         />
                       </div>
                     </section>
-                    <section class="ppt-modern-compare-card ppt-modern-compare-card--dark">
+                    <section
+                      class="ppt-modern-compare-card ppt-modern-compare-card--dark"
+                      v-bind="modernLiteraryCardTypographyBindings(modernLiteraryRightItems(slide))"
+                    >
                       <h3>
                         <PptMarkdownInline
                           :text="slide.right_title || t('agent.pptRightColumn')"

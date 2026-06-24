@@ -36,6 +36,13 @@ import {
   resolveSectionSubtitle,
   tocDensityLevel,
 } from "../../shared/slideLayoutHelpers";
+import {
+  classicBulletListTypography,
+  classicContentPointsTypography,
+  classicDataContentLeftTypography,
+  classicHeroRightColumnTypography,
+  classicTopicGridTypography,
+} from "../../shared/classicTypographyHelpers";
 import type { PptSlide } from "../../types";
 
 const props = defineProps<{ slide: PptSlide }>();
@@ -585,7 +592,10 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
                     />
                   </div>
                 </div>
-                <div class="ppt-content-right ppt-hero-right-items">
+                <div
+                  class="ppt-content-right ppt-hero-right-items"
+                  v-bind="classicHeroRightColumnTypography(slide, heroLeftContentRightItems(slide))"
+                >
                   <template v-if="slide.right_items?.length">
                     <div
                       v-for="(ri, idx) in slide.right_items"
@@ -681,7 +691,11 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
                 }"
               >
                 <!-- 左栏：文字要点 -->
-                <div v-if="shouldShowContentBullets(slide)" class="ppt-content-left">
+                <div
+                  v-if="shouldShowContentBullets(slide)"
+                  class="ppt-content-left"
+                  v-bind="classicContentPointsTypography(resolveSlideBulletItems(slide))"
+                >
                   <div
                     v-for="(item, bi) in resolveSlideBulletItems(slide)"
                     :key="'tc' + bi"
@@ -2208,6 +2222,7 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
                 <ul
                   v-if="shouldShowContentBullets(slide)"
                   class="ppt-bullet-list ppt-data-notes"
+                  v-bind="classicBulletListTypography(slide)"
                 >
                   <li
                     v-for="(item, bi) in resolveSlideBulletItems(slide)"
@@ -2240,6 +2255,7 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
                 <ul
                   v-if="shouldShowContentBullets(slide)"
                   class="ppt-bullet-list ppt-data-notes"
+                  v-bind="classicBulletListTypography(slide)"
                 >
                   <li
                     v-for="(item, bi) in resolveSlideBulletItems(slide)"
@@ -2267,7 +2283,10 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
                 v-else-if="isContentWithRightItemsSlide(slide)"
                 class="ppt-content-split ppt-content-items-split"
               >
-                <div class="ppt-content-left">
+                <div
+                  class="ppt-content-left"
+                  v-bind="classicContentPointsTypography(getContentItems(slide.content))"
+                >
                   <div
                     v-for="(item, bi) in getContentItems(slide.content)"
                     :key="'cri' + bi"
@@ -2306,7 +2325,10 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
                     />
                   </div>
                 </div>
-                <div class="ppt-content-right ppt-hero-right-items">
+                <div
+                  class="ppt-content-right ppt-hero-right-items"
+                  v-bind="classicHeroRightColumnTypography(slide, heroLeftContentRightItems(slide))"
+                >
                   <div
                     v-for="(ri, idx) in slide.right_items"
                     :key="'cri-ri-' + idx"
@@ -2355,6 +2377,7 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
                     'ppt-topic-grid--fill': resolveSlideBulletItems(slide).length >= 2,
                   }"
                   :style="topicGridFillStyle(slide)"
+                  v-bind="classicTopicGridTypography(slide)"
                 >
                   <div
                     v-for="(item, bi) in resolveSlideBulletItems(slide)"
@@ -5065,7 +5088,10 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
                     />
                   </div>
                 </div>
-                <div class="ppt-content-right ppt-hero-right-items">
+                <div
+                  class="ppt-content-right ppt-hero-right-items"
+                  v-bind="classicHeroRightColumnTypography(slide, heroLeftContentRightItems(slide))"
+                >
                   <template v-if="slide.right_items?.length">
                     <div
                       v-for="(ri, idx) in slide.right_items"
@@ -5203,6 +5229,7 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
                 <div
                   v-if="isMetricCardsChartSplitSlide(slide) || shouldShowContentBullets(slide)"
                   class="ppt-content-left"
+                  v-bind="classicDataContentLeftTypography(slide)"
                 >
                   <PptMetricCardsRow
                     v-if="isMetricCardsChartSplitSlide(slide)"
@@ -7945,6 +7972,7 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
               <ul
                 v-else-if="shouldShowContentBullets(slide) && !hasBodyPrimaryVisual(slide)"
                 class="ppt-bullet-list ppt-data-notes"
+                v-bind="classicBulletListTypography(slide)"
               >
                 <li
                   v-for="(item, bi) in resolveSlideBulletItems(slide)"
