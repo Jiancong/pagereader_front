@@ -13,6 +13,7 @@ import {
 import {
   documentFigureImgStyle,
   normalizeDocumentFigure,
+  resolveSectionSubtitle,
 } from "../../shared/slideLayoutHelpers";
 import type { ModernLiteraryContext } from "./modernLiteraryHelpers";
 import * as modern from "./modernLiteraryHelpers";
@@ -27,6 +28,7 @@ const currentSlide = editor.currentSlideIndex;
 const pptSource = editor.pptSource;
 const currentBrandFooter = editor.brandFooter;
 const modernLiteraryCoverTagline = editor.modernLiteraryCoverTagline;
+const sectionChapterNum = editor.sectionChapterNum;
 
 const modernCtx = computed<ModernLiteraryContext>(() => ({
   currentSlideIndex: editor.currentSlideIndex.value,
