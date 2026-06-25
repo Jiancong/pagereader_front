@@ -48,10 +48,24 @@
   color: var(--brutalist-text);
   font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
   font-weight: 900;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--ppt-heading-letter-spacing, -0.02em);
   line-height: 0.96;
   text-transform: uppercase;
   overflow-wrap: break-word;
+}
+
+.ppt-brutalist-heading--latin,
+.ppt-brutalist-title.ppt-brutalist-heading--latin,
+.ppt-brutalist-card h3.ppt-brutalist-heading--latin,
+.ppt-brutalist-chart-summary h3.ppt-brutalist-heading--latin {
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  letter-spacing: 0.04em;
+  line-height: 1.12;
+}
+
+.ppt-brutalist-card-grid--compact .ppt-brutalist-card h3.ppt-brutalist-heading--latin {
+  letter-spacing: 0.035em;
+  line-height: 1.18;
 }
 
 .ppt-brutalist-display {
@@ -68,6 +82,12 @@
   line-height: inherit;
   white-space: normal;
   overflow-wrap: break-word;
+}
+
+.ppt-brutalist-display--latin {
+  font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
+  letter-spacing: 0.03em;
+  line-height: 1.14;
 }
 
 .ppt-brutalist-display--cjk {
@@ -125,7 +145,7 @@
 
 .ppt-editorial-brutalist--cover .ppt-brutalist-display--latin {
   font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.03em;
   line-height: 1.16;
   text-transform: none;
   text-wrap: balance;
@@ -745,7 +765,7 @@
   font-family: var(--ppt-font-heading, Archivo, "Noto Sans SC", sans-serif);
   font-size: clamp(32px, 3.6cqi, 56px);
   font-weight: 900;
-  letter-spacing: -0.04em;
+  letter-spacing: 0.04em;
   line-height: 0.9;
 }
 
@@ -1289,6 +1309,7 @@
 .ppt-brutalist-quote-text--latin:not(.ppt-brutalist-quote-text--medium):not(.ppt-brutalist-quote-text--long) {
   font-size: clamp(24px, 3cqi, 44px);
   line-height: 1.18;
+  letter-spacing: 0.02em;
 }
 
 .ppt-editorial-brutalist--quote .ppt-brand-footer {

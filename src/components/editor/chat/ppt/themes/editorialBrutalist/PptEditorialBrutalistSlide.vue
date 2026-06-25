@@ -73,6 +73,7 @@ const editorialBrutalistIsDataSlide = brutalist.editorialBrutalistIsDataSlide;
 const editorialBrutalistShowDataTable = brutalist.editorialBrutalistShowDataTable;
 const editorialBrutalistCardGridDensity = brutalist.editorialBrutalistCardGridDensity;
 const editorialBrutalistContentCards = brutalist.editorialBrutalistContentCards;
+const editorialBrutalistHeadingClass = brutalist.editorialBrutalistHeadingClass;
 const editorialBrutalistInsightInline = brutalist.editorialBrutalistInsightInline;
 
 const t = editor.t;
@@ -187,7 +188,10 @@ const slideClass = computed(() => [
                     class="ppt-editorial-brutalist-quote-page"
                   >
                     <header v-if="slide.title" class="ppt-brutalist-header ppt-brutalist-header--compact">
-                      <h2 class="ppt-brutalist-title ppt-brutalist-quote-page-title">
+                      <h2
+                        class="ppt-brutalist-title ppt-brutalist-quote-page-title"
+                        :class="editorialBrutalistHeadingClass(slide.title || '')"
+                      >
                         <PptMarkdownInline
                           :text="slide.title"
                           :editable="isEditing"
@@ -270,7 +274,7 @@ const slideClass = computed(() => [
                     <p v-if="!hasDocumentFigurePage(slide)" class="ppt-brutalist-kicker">
                       {{ editorialBrutalistKicker(slide) }}
                     </p>
-                    <h2 class="ppt-brutalist-title">
+                    <h2 class="ppt-brutalist-title" :class="editorialBrutalistHeadingClass(slide.title || '')">
                       <PptMarkdownInline
                         :text="slide.title || ''"
                         :editable="isEditing"
@@ -286,6 +290,7 @@ const slideClass = computed(() => [
                     <section class="ppt-brutalist-card ppt-brutalist-card--scroll">
                       <h3
                         v-if="!modernLiteraryCompareTitleDuplicatesSlide(slide.left_title, slide.title)"
+                        :class="editorialBrutalistHeadingClass(slide.left_title || t('agent.pptLeftColumn'))"
                       >
                         <PptMarkdownInline
                           :text="slide.left_title || t('agent.pptLeftColumn')"
@@ -335,7 +340,16 @@ const slideClass = computed(() => [
                           : 'ppt-brutalist-card--invert'
                       "
                     >
-                      <h3>
+                      <h3
+                        :class="
+                          editorialBrutalistHeadingClass(
+                            slide.right_title ||
+                              (hasDocumentFigurePage(slide)
+                                ? t('agent.pptDocumentSourceImage')
+                                : t('agent.pptRightColumn')),
+                          )
+                        "
+                      >
                         <PptMarkdownInline
                           :text="
                             slide.right_title ||
@@ -381,7 +395,7 @@ const slideClass = computed(() => [
                 <template v-else-if="isHeroLeftSlide(slide)">
                   <header class="ppt-brutalist-header">
                     <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
-                    <h2 class="ppt-brutalist-title">
+                    <h2 class="ppt-brutalist-title" :class="editorialBrutalistHeadingClass(slide.title || '')">
                       <PptMarkdownInline
                         :text="slide.title || ''"
                         :editable="isEditing"
@@ -510,7 +524,7 @@ const slideClass = computed(() => [
                 <template v-else-if="editorialBrutalistIsContentSplit(slide)">
                   <header class="ppt-brutalist-header">
                     <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
-                    <h2 class="ppt-brutalist-title">
+                    <h2 class="ppt-brutalist-title" :class="editorialBrutalistHeadingClass(slide.title || '')">
                       <PptMarkdownInline
                         :text="slide.title || ''"
                         :editable="isEditing"
@@ -591,7 +605,7 @@ const slideClass = computed(() => [
                 <template v-else-if="editorialBrutalistLayout(slide) === 'grid'">
                   <header class="ppt-brutalist-header">
                     <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
-                    <h2 class="ppt-brutalist-title">
+                    <h2 class="ppt-brutalist-title" :class="editorialBrutalistHeadingClass(slide.title || '')">
                       <PptMarkdownInline
                         :text="slide.title || ''"
                         :editable="isEditing"
@@ -705,7 +719,7 @@ const slideClass = computed(() => [
                       class="ppt-brutalist-card"
                     >
                       <div class="ppt-brutalist-card-index">{{ card.index }}</div>
-                      <h3>{{ card.title }}</h3>
+                      <h3 :class="editorialBrutalistHeadingClass(card.title)">{{ card.title }}</h3>
                       <PptMarkdownInline
                         v-if="card.body"
                         class="ppt-brutalist-card-body"
@@ -721,7 +735,7 @@ const slideClass = computed(() => [
                   <div class="ppt-brutalist-asymmetric">
                     <section>
                       <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
-                      <h2 class="ppt-brutalist-title">
+                      <h2 class="ppt-brutalist-title" :class="editorialBrutalistHeadingClass(slide.title || '')">
                         <PptMarkdownInline
                           :text="slide.title || ''"
                           :editable="isEditing"

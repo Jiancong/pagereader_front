@@ -106,6 +106,15 @@ export function editorialBrutalistDisplayUnits(text: string): number {
   return cjk + latinWords;
 }
 
+/** Latin headings use Archivo + positive tracking; CJK keeps theme token spacing. */
+export function editorialBrutalistHeadingClass(text: string): Record<string, boolean> {
+  const latin = isPredominantlyLatin(String(text ?? "").trim());
+  return {
+    "ppt-brutalist-heading--latin": latin,
+    "ppt-brutalist-heading--cjk": !latin,
+  };
+}
+
 export function editorialBrutalistDisplayClass(
   slide: PptSlide,
   ctx: EditorialBrutalistContext,
