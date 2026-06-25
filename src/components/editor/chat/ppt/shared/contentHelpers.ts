@@ -133,6 +133,15 @@ export function rightItemDescription(ri: { description?: unknown }): string {
   return pickDisplayString(ri.description);
 }
 
+export function formatRightItemIndex(
+  ri: { index?: unknown; number?: unknown },
+  idx: number,
+): string {
+  const raw = pickDisplayString(ri.index ?? ri.number);
+  if (raw) return raw;
+  return String(idx + 1).padStart(2, "0");
+}
+
 /** 标题与正文之间的分隔符（含多种 Unicode 破折号） */
 export const CONTENT_TITLE_SEP_RE =
   /\s*([—–\-－―‒−]|[：:])\s*/;

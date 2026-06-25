@@ -9,9 +9,12 @@ import type { PptSlide } from "../../types";
 import {
   contentPointTitle,
   displayText,
+  formatRightItemIndex,
   hasContentPointBody,
   parseContentBody,
   resolveSlideBulletItems,
+  rightItemDescription,
+  rightItemTitle,
 } from "../../shared/contentHelpers";
 import {
   documentFigureImgStyle,
@@ -90,9 +93,6 @@ const onDocumentFigureCaptionBlur = editor.onDocumentFigureCaptionBlur;
 const onDocumentFigureLeftItemBlur = editor.onDocumentFigureLeftItemBlur;
 
 const heroRightCardStyle = classic.heroRightCardStyle;
-const formatRightItemIndex = classic.formatRightItemIndex;
-const rightItemTitle = classic.rightItemTitle;
-const rightItemDescription = classic.rightItemDescription;
 const heroMetricStyle = classic.heroMetricStyle;
 const normalizeAccentColor = classic.normalizeAccentColor;
 const onRightItemFieldBlur = classic.onRightItemFieldBlur;

@@ -10,6 +10,8 @@ import {
   displayText,
   hasContentPointBody,
   modernLiteraryCleanText,
+  rightItemDescription,
+  rightItemTitle,
 } from "../../shared/contentHelpers";
 import {
   documentFigureImgStyle,
