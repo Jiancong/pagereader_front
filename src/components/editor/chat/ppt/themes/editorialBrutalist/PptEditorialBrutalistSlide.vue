@@ -24,6 +24,7 @@ import {
 import { modernLiteraryCompareTitleDuplicatesSlide } from "../modernLiterary/modernLiteraryHelpers";
 import type { EditorialBrutalistContext } from "./editorialBrutalistHelpers";
 import * as brutalist from "./editorialBrutalistHelpers";
+import * as brutalistTypo from "./editorialBrutalistTypographyHelpers";
 
 const props = defineProps<{ slide: PptSlide }>();
 const editor = inject(pptSlideEditorKey)!;
@@ -75,6 +76,11 @@ const editorialBrutalistCardGridDensity = brutalist.editorialBrutalistCardGridDe
 const editorialBrutalistContentCards = brutalist.editorialBrutalistContentCards;
 const editorialBrutalistHeadingClass = brutalist.editorialBrutalistHeadingClass;
 const editorialBrutalistInsightInline = brutalist.editorialBrutalistInsightInline;
+const editorialBrutalistCardGridTypography = brutalistTypo.editorialBrutalistCardGridTypography;
+const editorialBrutalistCardTypography = brutalistTypo.editorialBrutalistCardTypography;
+const editorialBrutalistSlideBulletTypography = brutalistTypo.editorialBrutalistSlideBulletTypography;
+const editorialBrutalistSplitLeftTypography = brutalistTypo.editorialBrutalistSplitLeftTypography;
+const editorialBrutalistQuoteListTypography = brutalistTypo.editorialBrutalistQuoteListTypography;
 
 const t = editor.t;
 const onCellBlur = editor.onCellBlur;
@@ -203,6 +209,7 @@ const slideClass = computed(() => [
                       <div
                         class="ppt-brutalist-point-list"
                         :class="editorialBrutalistQuoteListClass(slide)"
+                        v-bind="editorialBrutalistQuoteListTypography(slide)"
                       >
                         <article
                           v-for="(item, qi) in editorialBrutalistQuoteItems(slide)"
@@ -301,6 +308,7 @@ const slideClass = computed(() => [
                       <div
                         class="ppt-brutalist-point-list"
                         :class="editorialBrutalistSplitListClass(slide)"
+                        v-bind="editorialBrutalistSplitLeftTypography(slide)"
                       >
                         <article
                           v-for="(item, li) in editorialBrutalistSplitLeft(slide)"
@@ -487,6 +495,7 @@ const slideClass = computed(() => [
                       <div
                         class="ppt-brutalist-point-list"
                         :class="editorialBrutalistSplitListClass(slide)"
+                        v-bind="editorialBrutalistSlideBulletTypography(slide)"
                       >
                         <article
                           v-for="(item, bi) in resolveSlideBulletItems(slide)"
@@ -537,6 +546,7 @@ const slideClass = computed(() => [
                       <div
                         class="ppt-brutalist-point-list"
                         :class="editorialBrutalistSplitListClass(slide)"
+                        v-bind="editorialBrutalistSlideBulletTypography(slide)"
                       >
                         <article
                           v-for="(item, bi) in resolveSlideBulletItems(slide)"
@@ -627,6 +637,7 @@ const slideClass = computed(() => [
                       <div
                         class="ppt-brutalist-point-list"
                         :class="editorialBrutalistSplitListClass(slide)"
+                        v-bind="editorialBrutalistSlideBulletTypography(slide)"
                       >
                         <article
                           v-for="(item, bi) in resolveSlideBulletItems(slide)"
@@ -677,6 +688,7 @@ const slideClass = computed(() => [
                     <div
                       class="ppt-brutalist-point-list"
                       :class="editorialBrutalistSplitListClass(slide)"
+                      v-bind="editorialBrutalistSlideBulletTypography(slide)"
                     >
                       <article
                         v-for="(item, bi) in resolveSlideBulletItems(slide)"
@@ -712,11 +724,13 @@ const slideClass = computed(() => [
                     v-else
                     class="ppt-brutalist-card-grid"
                     :class="`ppt-brutalist-card-grid--${editorialBrutalistCardGridDensity(slide)}`"
+                    v-bind="editorialBrutalistCardGridTypography(editorialBrutalistContentCards(slide))"
                   >
                     <article
                       v-for="card in editorialBrutalistContentCards(slide)"
                       :key="'brutalist-card-' + card.index"
                       class="ppt-brutalist-card"
+                      v-bind="editorialBrutalistCardTypography(card)"
                     >
                       <div class="ppt-brutalist-card-index">{{ card.index }}</div>
                       <h3 :class="editorialBrutalistHeadingClass(card.title)">{{ card.title }}</h3>
