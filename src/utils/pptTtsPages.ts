@@ -3,11 +3,12 @@ import {
   contentPointBodyForDisplay,
   contentPointTitle,
   displayText,
+  isPredominantlyLatin,
   modernLiteraryCleanText,
 } from "@/components/editor/chat/ppt/shared/contentHelpers";
 import { resolveSlideSpeakerNotes } from "@/components/editor/chat/ppt/shared/normalizePptSlide";
 import { getTocEntries } from "@/components/editor/chat/ppt/shared/slideLayoutHelpers";
-import type { TtsPageInput } from "@/api/agent";
+import { TTS_VOICE_EN, TTS_VOICE_ZH, type TtsPageInput } from "@/api/agent";
 
 function cleanTtsText(value: string | undefined): string {
   return (value ?? "").trim();
@@ -81,6 +82,10 @@ function buildStructuredTexts(slide: PptSlide): string[] {
   return [...buildTocCardTexts(slide), ...buildModernQuadCardTexts(slide)];
 }
 
+function resolveTtsVoiceForTitle(title: string): string {
+  return isPredominantlyLatin(title) ? TTS_VOICE_EN : TTS_VOICE_ZH;
+}
+
 function buildSlideTtsText(
   slide: PptSlide,
   title: string,
@@ -127,6 +132,7 @@ export function buildTtsPagesFromPptData(pptData: PptData): TtsPageInput[] {
       title,
       ...(subtitle ? { subtitle } : {}),
       text: text || title || "",
+      voice: resolveTtsVoiceForTitle(title),
       ...(content.length ? { content } : {}),
     };
   });

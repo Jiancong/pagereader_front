@@ -322,12 +322,16 @@ export async function chatStream(
   await readSseResponse(res, cb)
 }
 
+export const TTS_VOICE_ZH = "zh-CN-XiaoxiaoNeural"
+export const TTS_VOICE_EN = "en-US-AlloyMultilingualNeural"
+
 export interface TtsPageInput {
   index?: number
   title?: string
   subtitle?: string
   text?: string
   content?: string | string[]
+  voice?: string
 }
 
 export interface TtsPageItem {
@@ -344,16 +348,52 @@ export interface TtsPagesResult {
   items: TtsPageItem[]
 }
 
+function resolveTtsPageVoice(
+  page: string | TtsPageInput,
+  defaultVoice: string,
+): string {
+  if (typeof page === "object" && page.voice?.trim()) {
+    return page.voice.trim()
+  }
+  return defaultVoice
+}
+
+function stripPageVoiceForRequest(page: string | TtsPageInput): string | TtsPageInput {
+  if (typeof page === "string") return page
+  const { voice: _voice, ...rest } = page
+  return rest
+}
+
 export async function generatePageTts(params: {
   projectId: string
   userId: number
   pages: Array<string | TtsPageInput>
   voice?: string
 }): Promise<TtsPagesResult> {
-  return postJson<TtsPagesResult>("/agent/audio/tts/pages", {
-    projectId: params.projectId,
-    userId: params.userId,
-    voice: params.voice ?? "zh-CN-XiaoxiaoNeural",
-    pages: params.pages,
-  })
+  const defaultVoice = params.voice ?? TTS_VOICE_ZH
+  const pagesByVoice = new Map<string, Array<string | TtsPageInput>>()
+
+  for (const page of params.pages) {
+    const voice = resolveTtsPageVoice(page, defaultVoice)
+    const group = pagesByVoice.get(voice)
+    if (group) group.push(page)
+    else pagesByVoice.set(voice, [page])
+  }
+
+  const requests = [...pagesByVoice.entries()].map(([voice, pages]) =>
+    postJson<TtsPagesResult>("/agent/audio/tts/pages", {
+      projectId: params.projectId,
+      userId: params.userId,
+      voice,
+      pages: pages.map(stripPageVoiceForRequest),
+    }),
+  )
+
+  const results = await Promise.all(requests)
+  if (results.length === 1) return results[0]
+
+  return {
+    provider: results.find((result) => result.provider)?.provider,
+    items: results.flatMap((result) => result.items ?? []),
+  }
 }
