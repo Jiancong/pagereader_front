@@ -1774,8 +1774,12 @@
   }
 
   .ppt-modern-literary--quote {
-    align-content: center;
-    padding: clamp(14px, 5cqi, 42px) clamp(16px, 6cqi, 56px);
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    align-content: stretch;
+    align-items: stretch;
+    gap: clamp(6px, 2.2cqi, 16px);
+    padding: clamp(12px, 4cqi, 34px) clamp(14px, 5cqi, 46px) clamp(18px, 6cqi, 52px);
   }
 
   .ppt-modern-quote-card,
@@ -1784,12 +1788,18 @@
   }
 
   .ppt-modern-quote-card {
+    display: flex;
+    min-width: 0;
     min-height: 0;
-    padding: clamp(16px, 5cqi, 40px) clamp(18px, 6cqi, 56px);
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    padding: clamp(14px, 4cqi, 32px) clamp(16px, 5cqi, 46px);
   }
 
   .ppt-modern-quote-card--compact {
-    padding: clamp(10px, 3.2cqi, 28px) clamp(14px, 4.6cqi, 42px);
+    justify-content: space-between;
+    padding: clamp(10px, 3cqi, 24px) clamp(14px, 4.2cqi, 38px);
   }
 
   .ppt-modern-quote-mark,
@@ -1800,25 +1810,41 @@
   }
 
   .ppt-modern-quote-text {
+    max-width: none;
     font-size: clamp(18px, 6cqi, 34px);
     line-height: 1.12;
   }
 
   .ppt-modern-quote-text--long {
-    font-size: clamp(8px, 2.35cqi, 14px);
-    line-height: 1.38;
+    font-size: clamp(7px, 2.05cqi, 12px);
+    line-height: 1.32;
   }
 
   .ppt-modern-quote-author {
-    margin-top: clamp(6px, 2cqi, 18px);
+    margin-top: clamp(4px, 1.5cqi, 12px);
     font-size: clamp(7px, 2cqi, 12px);
     letter-spacing: 0.08em;
   }
 
-  .ppt-modern-literary--quote .ppt-modern-quote-card--compact + .ppt-modern-insight,
+  .ppt-modern-literary--quote .ppt-modern-insight {
+    align-self: stretch;
+    margin-top: 0;
+    padding: clamp(5px, 1.7cqi, 12px) clamp(8px, 2.4cqi, 20px);
+    border-left: clamp(3px, 1cqi, 8px) solid var(--modern-accent);
+    background: color-mix(in srgb, var(--modern-accent) 8%, transparent);
+    font-size: clamp(10px, 2.8cqi, 17px);
+    line-height: 1.16;
+  }
+
   .ppt-modern-insight {
     margin-top: clamp(6px, 2cqi, 16px);
     font-size: clamp(10px, 3cqi, 18px);
     line-height: 1.18;
+  }
+
+  .ppt-modern-literary--quote .ppt-brand-footer {
+    bottom: clamp(4px, 1.4cqi, 12px);
+    font-size: clamp(6px, 1.6cqi, 10px);
+    letter-spacing: 0.12em;
   }
 }
