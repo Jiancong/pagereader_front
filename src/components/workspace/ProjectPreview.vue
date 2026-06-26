@@ -1,5 +1,5 @@
 <template>
-  <div :class="pptData ? 'mx-auto w-full max-w-[min(100%,96rem)]' : 'mx-auto max-w-5xl'">
+  <div :class="pptData ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)]' : 'mx-auto w-full min-w-0 max-w-5xl'">
     <button
       class="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       @click="$emit('back')"
@@ -13,15 +13,15 @@
     <div v-if="error" class="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{{ error }}</div>
 
     <template v-if="project">
-      <div class="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h2 class="text-2xl font-bold text-foreground">{{ previewTitle }}</h2>
+      <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0">
+          <h2 class="text-xl font-bold text-foreground sm:text-2xl">{{ previewTitle }}</h2>
           <p v-if="project.description" class="mt-1 text-sm text-muted-foreground">{{ project.description }}</p>
         </div>
-        <div class="flex flex-shrink-0 items-center gap-2">
+        <div class="flex w-full flex-shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
           <button
             type="button"
-            class="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-primary/50 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+            class="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-primary/50 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
             :disabled="sharing || sharedToCommunity || !canShare"
             @click="onShareToCommunity"
           >
@@ -29,7 +29,7 @@
           </button>
           <button
             type="button"
-            class="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            class="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:flex-none"
             @click="fork"
           >
             <Sparkles class="h-4 w-4" /> {{ t('workspace.fork') }}
@@ -37,7 +37,7 @@
         </div>
       </div>
 
-      <div v-if="pptData" class="mb-8">
+      <div v-if="pptData" class="mb-8 min-w-0 overflow-hidden">
         <PptViewer
           :ppt-data="pptData"
           :project-id="projectId"

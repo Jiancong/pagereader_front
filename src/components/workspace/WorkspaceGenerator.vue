@@ -1,8 +1,8 @@
 <template>
-  <div :class="(activeTask.pptData || activeTask.cardResult) ? 'mx-auto w-full max-w-[min(100%,96rem)]' : 'mx-auto max-w-3xl'">
+  <div :class="(activeTask.pptData || activeTask.cardResult) ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)]' : 'mx-auto w-full min-w-0 max-w-3xl'">
     <!-- Tab 切换：两套任务状态独立，可并行生成 -->
-    <div class="mb-8 flex items-center justify-center">
-        <div class="inline-flex rounded-xl border border-border bg-secondary/30 p-1.5">
+    <div class="mb-4 flex w-full justify-center sm:mb-8">
+        <div class="inline-flex max-w-full flex-wrap justify-center gap-1 rounded-xl border border-border bg-secondary/30 p-1 sm:flex-nowrap sm:gap-0 sm:p-1.5">
           <button :class="tabClass('upload')" @click="activeTab = 'upload'">
             <Upload class="h-4 w-4" />
             {{ t('workspace.tabUpload') }}
@@ -50,7 +50,7 @@
     />
 
     <!-- 已生成：展示当前标签对应任务的 PptViewer -->
-    <div v-else-if="activeTask.pptData" class="rounded-2xl border border-border bg-card">
+    <div v-else-if="activeTask.pptData" class="min-w-0 overflow-hidden rounded-2xl border border-border bg-card">
       <PptViewer
         :ppt-data="activeTask.pptData"
         :project-id="activeTask.projectId"
@@ -90,16 +90,19 @@
             @click="fileInput?.click()"
           >
             <input ref="fileInput" type="file" accept=".pdf,.doc,.docx,.txt,.md" class="hidden" @change="onFileChange" />
-            <div v-if="hasAttachedDoc" class="flex items-center justify-center gap-3">
-              <FileText class="h-10 w-10 text-primary" />
-              <div class="text-left">
-                <p class="font-medium text-foreground">{{ attachedDocName }}</p>
+            <div v-if="hasAttachedDoc" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
+              <FileText class="hidden h-10 w-10 text-primary sm:block" />
+              <div class="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+              <FileText class="h-10 w-10 flex-shrink-0 text-primary sm:hidden" />
+              <div class="min-w-0 flex-1 text-left">
+                <p class="break-words font-medium text-foreground">{{ attachedDocName }}</p>
                 <p v-if="attachedDocSizeLabel" class="text-sm text-muted-foreground">{{ attachedDocSizeLabel }}</p>
                 <p v-if="cloudDocument" class="text-xs text-muted-foreground">{{ t('workspace.fromCloudLibrary') }}</p>
               </div>
-              <button type="button" class="ml-4 rounded-lg p-1 hover:bg-secondary" @click.stop="clearAttachedDoc">
+              <button type="button" class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary" @click.stop="clearAttachedDoc">
                 <X class="h-5 w-5 text-muted-foreground" />
               </button>
+              </div>
             </div>
             <template v-else>
               <Upload class="mx-auto h-12 w-12 text-muted-foreground/50" />
@@ -457,7 +460,7 @@ const activeElapsedDisplay = computed(() => {
 })
 
 const tabClass = (tab: "prompt" | "upload" | "youtube") => [
-  "flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-all",
+  "flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm",
   activeTab.value === tab ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground",
 ]
 

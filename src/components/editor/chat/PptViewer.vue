@@ -69,67 +69,109 @@
             {{ t("agent.pptViewMarkmap") }}
           </button>
         </div>
-        <button
-          v-if="activeDocumentView === 'ppt'"
-          type="button"
-          class="ppt-audio-btn"
-          :class="{
-            'ppt-audio-btn--active': ttsPlaying,
-            'ppt-audio-btn--loading': ttsLoading,
-          }"
-          :disabled="ttsLoading || !canPlaySlideAudio"
-          :aria-label="slideAudioButtonTitle"
-          @click="toggleSlideAudio"
-        >
-          <span class="ppt-audio-btn-tooltip" role="tooltip">{{
-            slideAudioButtonTitle
-          }}</span>
-          <svg
-            v-if="ttsLoading"
-            class="ppt-audio-btn-icon ppt-audio-btn-icon--spin"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            aria-hidden="true"
+        <div v-if="activeDocumentView === 'ppt'" class="ppt-audio-actions">
+          <button
+            type="button"
+            class="ppt-audio-btn"
+            :class="{
+              'ppt-audio-btn--active': ttsPlaying && !ttsPlayAllActive,
+              'ppt-audio-btn--loading': ttsLoading,
+            }"
+            :disabled="ttsLoading || !canPlaySlideAudio"
+            :aria-label="slideAudioButtonTitle"
+            @click="toggleSlideAudio"
           >
-            <path d="M12 2v4" />
-            <path d="M12 18v4" />
-            <path d="m4.93 4.93 2.83 2.83" />
-            <path d="m16.24 16.24 2.83 2.83" />
-            <path d="M2 12h4" />
-            <path d="M18 12h4" />
-            <path d="m4.93 19.07 2.83-2.83" />
-            <path d="m16.24 7.76 2.83-2.83" />
-          </svg>
-          <svg
-            v-else-if="ttsPlaying"
-            class="ppt-audio-btn-icon"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden="true"
+            <span class="ppt-audio-btn-tooltip" role="tooltip">{{
+              slideAudioButtonTitle
+            }}</span>
+            <svg
+              v-if="ttsLoading"
+              class="ppt-audio-btn-icon ppt-audio-btn-icon--spin"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path d="M12 2v4" />
+              <path d="M12 18v4" />
+              <path d="m4.93 4.93 2.83 2.83" />
+              <path d="m16.24 16.24 2.83 2.83" />
+              <path d="M2 12h4" />
+              <path d="M18 12h4" />
+              <path d="m4.93 19.07 2.83-2.83" />
+              <path d="m16.24 7.76 2.83-2.83" />
+            </svg>
+            <svg
+              v-else-if="ttsPlaying && !ttsPlayAllActive"
+              class="ppt-audio-btn-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <rect x="6" y="5" width="4" height="14" rx="1" />
+              <rect x="14" y="5" width="4" height="14" rx="1" />
+            </svg>
+            <svg
+              v-else
+              class="ppt-audio-btn-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M11 4.5a.75.75 0 0 1 1.19-.61l7.5 5.5a.75.75 0 0 1 0 1.22l-7.5 5.5A.75.75 0 0 1 11 15.5v-11Z" />
+              <path d="M5 7.25A1.75 1.75 0 0 0 3.25 9v6A1.75 1.75 0 0 0 5 16.75h1.5a.75.75 0 0 0 .75-.75V8a.75.75 0 0 0-.75-.75H5Z" />
+            </svg>
+            <span class="ppt-audio-btn-label">{{ t("agent.pptAudioLabel") }}</span>
+          </button>
+          <button
+            type="button"
+            class="ppt-audio-btn ppt-audio-btn--all"
+            :class="{
+              'ppt-audio-btn--active': ttsPlayAllActive,
+              'ppt-audio-btn--loading': ttsLoading,
+            }"
+            :disabled="ttsLoading || !canPlaySlideAudio"
+            :aria-label="slideAudioPlayAllButtonTitle"
+            @click="togglePlayAllSlideAudio"
           >
-            <rect x="6" y="5" width="4" height="14" rx="1" />
-            <rect x="14" y="5" width="4" height="14" rx="1" />
-          </svg>
-          <svg
-            v-else
-            class="ppt-audio-btn-icon"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path d="M11 4.5a.75.75 0 0 1 1.19-.61l7.5 5.5a.75.75 0 0 1 0 1.22l-7.5 5.5A.75.75 0 0 1 11 15.5v-11Z" />
-            <path d="M5 7.25A1.75 1.75 0 0 0 3.25 9v6A1.75 1.75 0 0 0 5 16.75h1.5a.75.75 0 0 0 .75-.75V8a.75.75 0 0 0-.75-.75H5Z" />
-          </svg>
-          <span class="ppt-audio-btn-label">{{ t("agent.pptAudioLabel") }}</span>
-        </button>
+            <span class="ppt-audio-btn-tooltip" role="tooltip">{{
+              slideAudioPlayAllButtonTitle
+            }}</span>
+            <svg
+              v-if="ttsPlayAllActive"
+              class="ppt-audio-btn-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <rect x="6" y="5" width="4" height="14" rx="1" />
+              <rect x="14" y="5" width="4" height="14" rx="1" />
+            </svg>
+            <svg
+              v-else
+              class="ppt-audio-btn-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M6 6.5a1 1 0 0 1 1.55-.83l8 5.5a1 1 0 0 1 0 1.66l-8 5.5A1 1 0 0 1 6 17.5v-11Z" />
+              <path d="M17 6.5h1.75a1 1 0 0 1 1 1v8.75a1 1 0 0 1-1 1H17V6.5Z" />
+              <path d="M20.75 9.25h1.5a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-1.5v-5.5Z" />
+            </svg>
+            <span class="ppt-audio-btn-label">{{ t("agent.pptAudioPlayAllLabel") }}</span>
+          </button>
+        </div>
       </div>
 
       <div class="ppt-actions">
@@ -1979,9 +2021,15 @@ const slide = computed(() => slideForExport.value);
 const ttsUserId = ref<number | null>(null);
 const ttsLoading = ref(false);
 const ttsPlaying = ref(false);
+const ttsPlayAllActive = ref(false);
+const ttsAutoAdvancing = ref(false);
 const ttsItemsByPage = ref<Record<number, string>>({});
 const ttsDeckKey = ref("");
 let slideAudioEl: HTMLAudioElement | null = null;
+let slideBgmEl: HTMLAudioElement | null = null;
+
+const PPT_PLAY_ALL_BGM_URL = "/resources/track1.mp3";
+const PPT_PLAY_ALL_BGM_VOLUME = 0.22;
 
 const canPlaySlideAudio = computed(
   () =>
@@ -1994,7 +2042,16 @@ const slideAudioButtonTitle = computed(() => {
   if (ttsLoading.value) return t("agent.pptAudioGenerating");
   if (!props.projectId?.trim()) return t("agent.pptAudioNoProject");
   if (!ttsUserId.value) return t("agent.pptAudioLoginRequired");
-  return ttsPlaying.value ? t("agent.pptAudioPause") : t("agent.pptAudioPlay");
+  if (ttsPlaying.value && !ttsPlayAllActive.value) return t("agent.pptAudioPause");
+  return t("agent.pptAudioPlay");
+});
+
+const slideAudioPlayAllButtonTitle = computed(() => {
+  if (ttsLoading.value) return t("agent.pptAudioGenerating");
+  if (!props.projectId?.trim()) return t("agent.pptAudioNoProject");
+  if (!ttsUserId.value) return t("agent.pptAudioLoginRequired");
+  if (ttsPlayAllActive.value) return t("agent.pptAudioPlayAllStop");
+  return t("agent.pptAudioPlayAll");
 });
 
 function resetSlideAudioCache() {
@@ -2002,7 +2059,7 @@ function resetSlideAudioCache() {
   ttsDeckKey.value = "";
 }
 
-function stopSlideAudio() {
+function releaseSlideAudioEl() {
   if (slideAudioEl) {
     slideAudioEl.pause();
     slideAudioEl.onended = null;
@@ -2010,6 +2067,57 @@ function stopSlideAudio() {
     slideAudioEl = null;
   }
   ttsPlaying.value = false;
+}
+
+function stopSlideBgm() {
+  if (slideBgmEl) {
+    slideBgmEl.pause();
+    slideBgmEl.onerror = null;
+    slideBgmEl = null;
+  }
+}
+
+async function startSlideBgm() {
+  stopSlideBgm();
+  slideBgmEl = new Audio(PPT_PLAY_ALL_BGM_URL);
+  slideBgmEl.loop = true;
+  slideBgmEl.volume = PPT_PLAY_ALL_BGM_VOLUME;
+  slideBgmEl.onerror = () => {
+    stopSlideBgm();
+  };
+  try {
+    await slideBgmEl.play();
+  } catch {
+    stopSlideBgm();
+  }
+}
+
+function finishPlayAll() {
+  ttsPlayAllActive.value = false;
+  stopSlideBgm();
+}
+
+function stopSlideAudio() {
+  releaseSlideAudioEl();
+  finishPlayAll();
+}
+
+function findNextPlayableSlideIndex(
+  fromIndex: number,
+  items: Record<number, string>,
+): number {
+  const total = pptSource.value.slides.length;
+  for (let i = fromIndex; i < total; i++) {
+    if (items[i + 1]) return i;
+  }
+  return -1;
+}
+
+async function goToSlideForAudio(index: number) {
+  ttsAutoAdvancing.value = true;
+  currentSlide.value = index;
+  await nextTick();
+  ttsAutoAdvancing.value = false;
 }
 
 function currentTtsDeckKey(): string {
@@ -2072,28 +2180,80 @@ async function ensureSlideAudioItems(): Promise<Record<number, string>> {
   }
 }
 
+async function playSlideAudioAt(
+  slideIndex: number,
+  items: Record<number, string>,
+  playAll: boolean,
+) {
+  const url = items[slideIndex + 1];
+  if (!url) {
+    if (playAll) {
+      const nextIndex = findNextPlayableSlideIndex(slideIndex + 1, items);
+      if (nextIndex >= 0) {
+        await goToSlideForAudio(nextIndex);
+        await playSlideAudioAt(nextIndex, items, true);
+      } else {
+        finishPlayAll();
+      }
+      return;
+    }
+    ElMessage.warning(t("agent.pptAudioNoSlide"));
+    return;
+  }
+
+  releaseSlideAudioEl();
+  if (playAll) ttsPlayAllActive.value = true;
+
+  slideAudioEl = new Audio(url);
+  slideAudioEl.onended = () => {
+    releaseSlideAudioEl();
+    if (!ttsPlayAllActive.value) return;
+
+    const nextIndex = findNextPlayableSlideIndex(slideIndex + 1, items);
+    if (nextIndex >= 0) {
+      void (async () => {
+        await goToSlideForAudio(nextIndex);
+        if (!ttsPlayAllActive.value) return;
+        await playSlideAudioAt(nextIndex, items, true);
+      })();
+      return;
+    }
+    finishPlayAll();
+  };
+  slideAudioEl.onerror = () => {
+    stopSlideAudio();
+    ElMessage.error(t("agent.pptAudioFailed"));
+  };
+  await slideAudioEl.play();
+  ttsPlaying.value = true;
+}
+
 async function playSlideAudio(slideIndex = currentSlide.value) {
   try {
     const items = await ensureSlideAudioItems();
-    const url = items[slideIndex + 1];
-    if (!url) {
-      ElMessage.warning(t("agent.pptAudioNoSlide"));
-      return;
-    }
-
+    await playSlideAudioAt(slideIndex, items, false);
+  } catch (error) {
     stopSlideAudio();
-    slideAudioEl = new Audio(url);
-    slideAudioEl.onended = () => {
-      ttsPlaying.value = false;
-      slideAudioEl = null;
-    };
-    slideAudioEl.onerror = () => {
-      ttsPlaying.value = false;
-      slideAudioEl = null;
-      ElMessage.error(t("agent.pptAudioFailed"));
-    };
-    await slideAudioEl.play();
-    ttsPlaying.value = true;
+    ElMessage.error(error instanceof Error ? error.message : t("agent.pptAudioFailed"));
+  }
+}
+
+async function playAllSlideAudio(fromIndex = currentSlide.value) {
+  try {
+    const items = await ensureSlideAudioItems();
+    let startIndex = fromIndex;
+    if (!items[startIndex + 1]) {
+      const nextIndex = findNextPlayableSlideIndex(startIndex, items);
+      if (nextIndex < 0) {
+        ElMessage.warning(t("agent.pptAudioNoSlide"));
+        return;
+      }
+      startIndex = nextIndex;
+      await goToSlideForAudio(startIndex);
+    }
+    ttsPlayAllActive.value = true;
+    await startSlideBgm();
+    await playSlideAudioAt(startIndex, items, true);
   } catch (error) {
     stopSlideAudio();
     ElMessage.error(error instanceof Error ? error.message : t("agent.pptAudioFailed"));
@@ -2108,8 +2268,18 @@ async function toggleSlideAudio() {
   await playSlideAudio(currentSlide.value);
 }
 
-watch(currentSlide, () => {
+async function togglePlayAllSlideAudio() {
+  if (ttsPlayAllActive.value) {
+    stopSlideAudio();
+    return;
+  }
   if (ttsPlaying.value) stopSlideAudio();
+  await playAllSlideAudio(currentSlide.value);
+}
+
+watch(currentSlide, () => {
+  if (ttsAutoAdvancing.value) return;
+  if (ttsPlaying.value || ttsPlayAllActive.value) stopSlideAudio();
 });
 
 watch(
@@ -7291,6 +7461,13 @@ defineExpose({
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
+}
+
+.ppt-audio-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .ppt-audio-btn {

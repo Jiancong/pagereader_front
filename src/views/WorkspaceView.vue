@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-screen overflow-hidden bg-background">
+    <div class="flex h-[100dvh] min-h-0 overflow-hidden bg-background">
     <div
       v-if="mobileSidebarOpen"
       class="fixed inset-0 z-40 bg-black/50 md:hidden"
@@ -39,7 +39,7 @@
         <span class="text-base font-bold text-foreground">{{ t('app.brand') }}</span>
       </div>
 
-      <main class="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+      <main class="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-6 lg:p-8">
       <!-- v-show：切换探索/历史时保持生成状态与 SSE 连接 -->
       <WorkspaceGenerator
         ref="generatorRef"
@@ -70,7 +70,7 @@
 <script setup>
 defineOptions({ name: 'WorkspaceView' })
 
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -101,6 +101,15 @@ const genPrompt = ref('')
 const genKey = ref(0)
 const projectRefreshKey = ref(0)
 const generatorRef = ref(null)
+
+watch(mobileSidebarOpen, (open) => {
+  if (typeof document === 'undefined') return
+  document.body.style.overflow = open ? 'hidden' : ''
+})
+
+onBeforeUnmount(() => {
+  if (typeof document !== 'undefined') document.body.style.overflow = ''
+})
 
 /** 移动端：点击侧栏导航项后执行动作并关闭抽屉 */
 const onSidebarNav = (action) => {
