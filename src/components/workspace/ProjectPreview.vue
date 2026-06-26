@@ -1,5 +1,5 @@
 <template>
-  <div :class="pptData ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)]' : 'mx-auto w-full min-w-0 max-w-5xl'">
+  <div :class="pptData ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)] overflow-x-hidden' : 'mx-auto w-full min-w-0 max-w-5xl overflow-x-hidden'">
     <button
       class="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       @click="$emit('back')"
@@ -15,8 +15,8 @@
     <template v-if="project">
       <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0">
-          <h2 class="text-xl font-bold text-foreground sm:text-2xl">{{ previewTitle }}</h2>
-          <p v-if="project.description" class="mt-1 text-sm text-muted-foreground">{{ project.description }}</p>
+          <h2 class="break-words text-xl font-bold text-foreground sm:text-2xl">{{ previewTitle }}</h2>
+          <p v-if="project.description" class="mt-1 break-words text-sm text-muted-foreground">{{ project.description }}</p>
         </div>
         <div class="flex w-full flex-shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
           <button

@@ -1740,3 +1740,58 @@
 .ppt-modern-card-typography .ppt-modern-triple-portrait-list {
   gap: var(--ppt-card-typo-gap);
 }
+
+@media (max-width: 767px) {
+  .ppt-modern-literary {
+    padding: clamp(14px, 5cqi, 42px) clamp(16px, 6cqi, 56px);
+  }
+
+  .ppt-modern-literary--quote {
+    align-content: center;
+    padding: clamp(14px, 5cqi, 42px) clamp(16px, 6cqi, 56px);
+  }
+
+  .ppt-modern-quote-card,
+  .ppt-modern-inline-quote {
+    border-left-width: clamp(4px, 1.4cqi, 10px);
+  }
+
+  .ppt-modern-quote-card {
+    min-height: 0;
+    padding: clamp(16px, 5cqi, 40px) clamp(18px, 6cqi, 56px);
+  }
+
+  .ppt-modern-quote-card--compact {
+    padding: clamp(10px, 3.2cqi, 28px) clamp(14px, 4.6cqi, 42px);
+  }
+
+  .ppt-modern-quote-mark,
+  .ppt-modern-quote-card--compact .ppt-modern-quote-mark {
+    top: clamp(2px, 1.2cqi, 8px);
+    left: clamp(10px, 3.2cqi, 28px);
+    font-size: clamp(42px, 14cqi, 88px);
+  }
+
+  .ppt-modern-quote-text {
+    font-size: clamp(18px, 6cqi, 34px);
+    line-height: 1.12;
+  }
+
+  .ppt-modern-quote-text--long {
+    font-size: clamp(8px, 2.35cqi, 14px);
+    line-height: 1.38;
+  }
+
+  .ppt-modern-quote-author {
+    margin-top: clamp(6px, 2cqi, 18px);
+    font-size: clamp(7px, 2cqi, 12px);
+    letter-spacing: 0.08em;
+  }
+
+  .ppt-modern-literary--quote .ppt-modern-quote-card--compact + .ppt-modern-insight,
+  .ppt-modern-insight {
+    margin-top: clamp(6px, 2cqi, 16px);
+    font-size: clamp(10px, 3cqi, 18px);
+    line-height: 1.18;
+  }
+}

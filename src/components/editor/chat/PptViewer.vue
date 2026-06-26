@@ -8002,32 +8002,35 @@ defineExpose({
     flex-direction: column;
     margin: 0;
     border-radius: 8px;
-    overflow: visible;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) {
-    overflow: visible;
+    overflow: hidden;
     touch-action: pan-y;
   }
 
   .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-stage {
     flex: 0 1 auto;
     min-height: auto;
-    overflow: visible;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-slide-wrapper {
-    aspect-ratio: auto;
+    aspect-ratio: 16 / 9;
     height: auto;
-    min-height: calc(100cqw * 9 / 16);
-    overflow: visible;
+    min-height: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-slide {
-    height: auto;
-    min-height: calc(100cqw * 9 / 16);
+    height: 100%;
+    min-height: 0;
     justify-content: flex-start;
-    overflow: visible;
+    overflow: hidden;
   }
 
   .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-content-split,
@@ -8161,6 +8164,7 @@ defineExpose({
     grid-template-columns: 1fr;
     gap: 6px;
     padding: 6px 8px;
+    min-width: 0;
   }
 
   .ppt-nav {
@@ -8178,6 +8182,28 @@ defineExpose({
     flex-wrap: wrap;
     justify-content: center;
     gap: 6px;
+    min-width: 0;
+  }
+
+  .ppt-view-tabs-row {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .ppt-view-tabs {
+    max-width: 100%;
+  }
+
+  .ppt-audio-btn {
+    height: 32px;
+    padding: 0 10px 0 9px;
+  }
+
+  .ppt-audio-btn-tooltip {
+    display: none;
   }
 
   .ppt-title-label {
@@ -8221,11 +8247,18 @@ defineExpose({
 
   .ppt-thumbs {
     padding: 6px 8px;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .ppt-thumb {
     min-width: 40px;
     padding: 4px 6px;
+  }
+
+  .ppt-speaker-notes-pane {
+    max-height: min(132px, 28vh);
   }
 }
 </style>
