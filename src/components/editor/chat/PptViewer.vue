@@ -8000,13 +8000,17 @@ defineExpose({
 @media (max-width: 767px) {
   .ppt-viewer-shell {
     flex-direction: column;
-    margin: 0;
-    border-radius: 8px;
-    max-width: 100%;
+    width: 100vw;
+    max-width: 100vw;
+    margin: 0 calc(50% - 50vw);
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
     overflow: hidden;
   }
 
   .ppt-viewer:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) {
+    background: #0a0c12;
     overflow: hidden;
     touch-action: pan-y;
   }
@@ -8015,6 +8019,8 @@ defineExpose({
     flex: 0 1 auto;
     min-height: auto;
     max-width: 100%;
+    padding: 6px 0 8px;
+    background: #0a0c12;
     overflow: hidden;
   }
 
@@ -8161,45 +8167,77 @@ defineExpose({
 
   .ppt-toolbar {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 6px;
-    padding: 6px 8px;
+    grid-template-columns: auto 1fr auto;
+    gap: 6px 8px;
+    align-items: center;
+    padding: 7px 8px;
     min-width: 0;
   }
 
   .ppt-nav {
-    justify-content: center;
+    grid-column: 1;
+    grid-row: 1;
+    justify-content: flex-start;
     gap: 8px;
   }
 
   .ppt-nav-btn {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .ppt-page-info {
+    min-width: 44px;
+    font-size: 11px;
   }
 
   .ppt-actions {
-    width: 100%;
+    grid-column: 3;
+    grid-row: 1;
+    width: auto;
     flex-wrap: wrap;
-    justify-content: center;
-    gap: 6px;
+    justify-content: flex-end;
+    justify-self: end;
+    gap: 5px;
     min-width: 0;
   }
 
   .ppt-view-tabs-row {
+    grid-column: 1 / -1;
+    grid-row: 2;
     width: 100%;
     min-width: 0;
     margin: 0;
-    justify-content: center;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 6px;
   }
 
   .ppt-view-tabs {
+    flex: 0 1 auto;
     max-width: 100%;
+    min-width: 0;
+    padding: 2px;
+  }
+
+  .ppt-view-tab {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .ppt-audio-actions {
+    gap: 5px;
+    min-width: 0;
   }
 
   .ppt-audio-btn {
-    height: 32px;
-    padding: 0 10px 0 9px;
+    height: 30px;
+    gap: 4px;
+    padding: 0 9px 0 8px;
+  }
+
+  .ppt-audio-btn-label {
+    font-size: 11px;
   }
 
   .ppt-audio-btn-tooltip {
@@ -8215,7 +8253,10 @@ defineExpose({
   }
 
   .ppt-share-trigger {
-    padding: 6px 10px;
+    min-width: 32px;
+    min-height: 32px;
+    justify-content: center;
+    padding: 6px 8px;
   }
 
   .ppt-fullscreen-btn > span {
@@ -8224,15 +8265,47 @@ defineExpose({
 
   .ppt-fullscreen-btn,
   .ppt-close-btn {
-    min-width: 36px;
-    min-height: 36px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  .ppt-fullscreen-btn {
+    justify-content: center;
+    padding: 6px 8px;
   }
 
   .ppt-share-menu {
-    min-width: min(280px, calc(100vw - 24px));
-    max-width: calc(100vw - 16px);
-    right: 0;
-    left: auto;
+    position: fixed;
+    top: auto;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    left: 8px;
+    z-index: 12060;
+    min-width: 0;
+    max-width: none;
+    max-height: min(420px, 68dvh);
+    overflow-y: auto;
+    border-radius: 16px;
+    padding: 8px;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 18px 54px rgba(0, 0, 0, 0.34), 0 4px 16px rgba(0, 0, 0, 0.18);
+  }
+
+  .ppt-share-item {
+    grid-template-columns: 44px minmax(0, 1fr) 28px;
+    min-height: 46px;
+  }
+
+  .ppt-share-item-brand {
+    min-width: 44px;
+  }
+
+  .ppt-share-item-label {
+    min-width: 0;
+    padding: 0 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .ppt-slide-wrapper {
@@ -8246,10 +8319,7 @@ defineExpose({
   }
 
   .ppt-thumbs {
-    padding: 6px 8px;
-    max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    display: none;
   }
 
   .ppt-thumb {
@@ -8258,7 +8328,7 @@ defineExpose({
   }
 
   .ppt-speaker-notes-pane {
-    max-height: min(132px, 28vh);
+    display: none;
   }
 }
 </style>

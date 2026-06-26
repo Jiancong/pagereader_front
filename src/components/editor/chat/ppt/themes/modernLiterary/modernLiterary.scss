@@ -1746,6 +1746,33 @@
     padding: clamp(14px, 5cqi, 42px) clamp(16px, 6cqi, 56px);
   }
 
+  .ppt-modern-cover-grid {
+    grid-template-columns: 1fr;
+    gap: clamp(8px, 3cqi, 20px);
+    padding-bottom: clamp(26px, 8cqi, 58px);
+  }
+
+  .ppt-modern-cover-main {
+    max-width: 100%;
+  }
+
+  .ppt-modern-cover-title {
+    max-width: 100%;
+    font-size: clamp(22px, 8cqi, 42px);
+  }
+
+  .ppt-modern-cover-subtitle {
+    max-width: 100%;
+    font-size: clamp(10px, 3cqi, 18px);
+  }
+
+  .ppt-modern-cover-footer {
+    right: clamp(16px, 6cqi, 56px);
+    bottom: clamp(12px, 4cqi, 34px);
+    left: clamp(16px, 6cqi, 56px);
+    max-width: none;
+  }
+
   .ppt-modern-literary--quote {
     align-content: center;
     padding: clamp(14px, 5cqi, 42px) clamp(16px, 6cqi, 56px);
