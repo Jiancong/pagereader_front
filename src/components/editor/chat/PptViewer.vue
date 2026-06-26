@@ -78,15 +78,17 @@
             'ppt-audio-btn--loading': ttsLoading,
           }"
           :disabled="ttsLoading || !canPlaySlideAudio"
-          :title="slideAudioButtonTitle"
           :aria-label="slideAudioButtonTitle"
           @click="toggleSlideAudio"
         >
+          <span class="ppt-audio-btn-tooltip" role="tooltip">{{
+            slideAudioButtonTitle
+          }}</span>
           <svg
             v-if="ttsLoading"
             class="ppt-audio-btn-icon ppt-audio-btn-icon--spin"
-            width="14"
-            height="14"
+            width="16"
+            height="16"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -105,8 +107,8 @@
           <svg
             v-else-if="ttsPlaying"
             class="ppt-audio-btn-icon"
-            width="14"
-            height="14"
+            width="16"
+            height="16"
             viewBox="0 0 24 24"
             fill="currentColor"
             aria-hidden="true"
@@ -117,8 +119,8 @@
           <svg
             v-else
             class="ppt-audio-btn-icon"
-            width="14"
-            height="14"
+            width="16"
+            height="16"
             viewBox="0 0 24 24"
             fill="currentColor"
             aria-hidden="true"
@@ -126,6 +128,7 @@
             <path d="M11 4.5a.75.75 0 0 1 1.19-.61l7.5 5.5a.75.75 0 0 1 0 1.22l-7.5 5.5A.75.75 0 0 1 11 15.5v-11Z" />
             <path d="M5 7.25A1.75 1.75 0 0 0 3.25 9v6A1.75 1.75 0 0 0 5 16.75h1.5a.75.75 0 0 0 .75-.75V8a.75.75 0 0 0-.75-.75H5Z" />
           </svg>
+          <span class="ppt-audio-btn-label">{{ t("agent.pptAudioLabel") }}</span>
         </button>
       </div>
 
@@ -7291,21 +7294,32 @@ defineExpose({
 }
 
 .ppt-audio-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
+  gap: 6px;
   height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0 12px 0 10px;
+  border: 1px solid rgba(126, 210, 164, 0.55);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.72);
+  background: rgba(126, 210, 164, 0.16);
+  color: #d8f5e4;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-shadow: 0 0 0 1px rgba(126, 210, 164, 0.08);
 
-  &:hover:not(:disabled) {
-    color: rgba(255, 255, 255, 0.95);
-    background: rgba(255, 255, 255, 0.1);
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
+    color: #fff;
+    background: rgba(126, 210, 164, 0.28);
+    border-color: rgba(158, 230, 188, 0.85);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(158, 230, 188, 0.65);
+    outline-offset: 2px;
   }
 
   &:disabled {
@@ -7315,13 +7329,63 @@ defineExpose({
 }
 
 .ppt-audio-btn--active {
-  background: #f5f7f3;
-  color: #27332b;
+  background: #eef8f1;
+  border-color: rgba(126, 210, 164, 0.75);
+  color: #1f3d2d;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.ppt-audio-btn-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ppt-audio-btn-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  padding: 6px 10px;
+  border: 1px solid rgba(126, 210, 164, 0.35);
+  border-radius: 8px;
+  background: rgba(18, 28, 22, 0.96);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(4px);
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease,
+    transform 0.15s ease;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(18, 28, 22, 0.96);
+  }
+}
+
+.ppt-audio-btn:hover .ppt-audio-btn-tooltip,
+.ppt-audio-btn:focus-visible .ppt-audio-btn-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
 }
 
 .ppt-audio-btn-icon {
   display: block;
+  flex-shrink: 0;
 }
 
 .ppt-audio-btn-icon--spin {
