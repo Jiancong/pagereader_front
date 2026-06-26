@@ -8,6 +8,11 @@ import {
 } from "@/components/editor/chat/ppt/shared/contentHelpers";
 import { resolveSlideSpeakerNotes } from "@/components/editor/chat/ppt/shared/normalizePptSlide";
 import { getTocEntries } from "@/components/editor/chat/ppt/shared/slideLayoutHelpers";
+import {
+  modernLiteraryCompareTitleDuplicatesSlide,
+  modernLiteraryRightItems,
+  modernLiteraryTwoColumnFooter,
+} from "@/components/editor/chat/ppt/themes/modernLiterary/modernLiteraryHelpers";
 import { TTS_VOICE_EN, TTS_VOICE_ZH, type TtsPageInput } from "@/api/agent";
 
 function cleanTtsText(value: string | undefined): string {
@@ -78,8 +83,40 @@ function buildModernQuadCardTexts(slide: PptSlide): string[] {
   return cardTexts;
 }
 
+function buildTwoColumnCompareTexts(slide: PptSlide): string[] {
+  if (slide.layout !== "two_column") return [];
+
+  const texts: string[] = [];
+  const leftTitle = cleanTtsText(slide.left_title);
+  const rightTitle = cleanTtsText(slide.right_title);
+
+  if (
+    leftTitle &&
+    !modernLiteraryCompareTitleDuplicatesSlide(slide.left_title, slide.title)
+  ) {
+    pushUniqueText(texts, leftTitle);
+  }
+
+  for (const item of slide.left_content ?? []) {
+    pushUniqueText(texts, displayText(item));
+  }
+
+  pushUniqueText(texts, rightTitle);
+
+  for (const item of modernLiteraryRightItems(slide)) {
+    pushUniqueText(texts, item);
+  }
+
+  pushUniqueText(texts, modernLiteraryTwoColumnFooter(slide));
+  return texts;
+}
+
 function buildStructuredTexts(slide: PptSlide): string[] {
-  return [...buildTocCardTexts(slide), ...buildModernQuadCardTexts(slide)];
+  return [
+    ...buildTocCardTexts(slide),
+    ...buildModernQuadCardTexts(slide),
+    ...buildTwoColumnCompareTexts(slide),
+  ];
 }
 
 function resolveTtsVoiceForTitle(title: string): string {
@@ -103,9 +140,11 @@ function buildSlideTtsText(
   if (notes) return [...parts, notes].join("\n");
   pushUniqueText(parts, slide.subtitle_en);
 
-  for (const item of slide.content ?? []) {
-    const text = displayText(item).trim();
-    if (text) parts.push(text);
+  if (!structuredTexts.length) {
+    for (const item of slide.content ?? []) {
+      const text = displayText(item).trim();
+      if (text) parts.push(text);
+    }
   }
 
   return parts.join("\n");
