@@ -1,7 +1,7 @@
 // Agent 对话流（SSE）模块
 // @author hc @date 2026-06-03
 
-import { buildUrl, ApiError } from "./client"
+import { buildUrl, ApiError, postJson } from "./client"
 import { getToken } from "./token"
 import { getSavedLocale } from "@/composables/useAppLocale"
 import { getApiContextHeaders } from "@/utils/apiRequestContext"
@@ -320,4 +320,39 @@ export async function chatStream(
   })
 
   await readSseResponse(res, cb)
+}
+
+export interface TtsPageInput {
+  index?: number
+  title?: string
+  text?: string
+  content?: string | string[]
+}
+
+export interface TtsPageItem {
+  page: number
+  filename?: string
+  url?: string
+  localPath?: string
+  textLength?: number
+  error?: string
+}
+
+export interface TtsPagesResult {
+  provider?: string
+  items: TtsPageItem[]
+}
+
+export async function generatePageTts(params: {
+  projectId: string
+  userId: number
+  pages: Array<string | TtsPageInput>
+  voice?: string
+}): Promise<TtsPagesResult> {
+  return postJson<TtsPagesResult>("/agent/audio/tts/pages", {
+    projectId: params.projectId,
+    userId: params.userId,
+    voice: params.voice ?? "zh-CN-XiaoxiaoNeural",
+    pages: params.pages,
+  })
 }

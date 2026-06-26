@@ -43,26 +43,89 @@
         </button>
       </div>
 
-      <div v-if="hasMarkdownDocument" class="ppt-view-tabs" role="tablist">
+      <div
+        v-if="hasMarkdownDocument || activeDocumentView === 'ppt'"
+        class="ppt-view-tabs-row"
+      >
+        <div v-if="hasMarkdownDocument" class="ppt-view-tabs" role="tablist">
+          <button
+            type="button"
+            class="ppt-view-tab"
+            :class="{ 'ppt-view-tab--active': activeDocumentView === 'ppt' }"
+            role="tab"
+            :aria-selected="activeDocumentView === 'ppt'"
+            @click="activeDocumentView = 'ppt'"
+          >
+            {{ t("agent.pptViewDeck") }}
+          </button>
+          <button
+            type="button"
+            class="ppt-view-tab"
+            :class="{ 'ppt-view-tab--active': activeDocumentView === 'markmap' }"
+            role="tab"
+            :aria-selected="activeDocumentView === 'markmap'"
+            @click="activeDocumentView = 'markmap'"
+          >
+            {{ t("agent.pptViewMarkmap") }}
+          </button>
+        </div>
         <button
+          v-if="activeDocumentView === 'ppt'"
           type="button"
-          class="ppt-view-tab"
-          :class="{ 'ppt-view-tab--active': activeDocumentView === 'ppt' }"
-          role="tab"
-          :aria-selected="activeDocumentView === 'ppt'"
-          @click="activeDocumentView = 'ppt'"
+          class="ppt-audio-btn"
+          :class="{
+            'ppt-audio-btn--active': ttsPlaying,
+            'ppt-audio-btn--loading': ttsLoading,
+          }"
+          :disabled="ttsLoading || !canPlaySlideAudio"
+          :title="slideAudioButtonTitle"
+          :aria-label="slideAudioButtonTitle"
+          @click="toggleSlideAudio"
         >
-          {{ t("agent.pptViewDeck") }}
-        </button>
-        <button
-          type="button"
-          class="ppt-view-tab"
-          :class="{ 'ppt-view-tab--active': activeDocumentView === 'markmap' }"
-          role="tab"
-          :aria-selected="activeDocumentView === 'markmap'"
-          @click="activeDocumentView = 'markmap'"
-        >
-          {{ t("agent.pptViewMarkmap") }}
+          <svg
+            v-if="ttsLoading"
+            class="ppt-audio-btn-icon ppt-audio-btn-icon--spin"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path d="M12 2v4" />
+            <path d="M12 18v4" />
+            <path d="m4.93 4.93 2.83 2.83" />
+            <path d="m16.24 16.24 2.83 2.83" />
+            <path d="M2 12h4" />
+            <path d="M18 12h4" />
+            <path d="m4.93 19.07 2.83-2.83" />
+            <path d="m16.24 7.76 2.83-2.83" />
+          </svg>
+          <svg
+            v-else-if="ttsPlaying"
+            class="ppt-audio-btn-icon"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <rect x="6" y="5" width="4" height="14" rx="1" />
+            <rect x="14" y="5" width="4" height="14" rx="1" />
+          </svg>
+          <svg
+            v-else
+            class="ppt-audio-btn-icon"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M11 4.5a.75.75 0 0 1 1.19-.61l7.5 5.5a.75.75 0 0 1 0 1.22l-7.5 5.5A.75.75 0 0 1 11 15.5v-11Z" />
+            <path d="M5 7.25A1.75 1.75 0 0 0 3.25 9v6A1.75 1.75 0 0 0 5 16.75h1.5a.75.75 0 0 0 .75-.75V8a.75.75 0 0 0-.75-.75H5Z" />
+          </svg>
         </button>
       </div>
 
@@ -494,6 +557,8 @@
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount, provide } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
+import { authApi } from "@/api/auth";
+import { generatePageTts } from "@/api/agent";
 import {
   buildFontFamilyCss,
   ensureExportFontsReady,
@@ -629,6 +694,7 @@ import {
   normalizeSlideData,
   resolveSlideSpeakerNotes,
 } from "@/components/editor/chat/ppt/shared/normalizePptSlide";
+import { buildTtsPagesFromPptData } from "@/utils/pptTtsPages";
 
 
 const props = defineProps<{
@@ -984,6 +1050,7 @@ onMounted(() => {
   window.addEventListener("resize", updatePresentationScale);
   window.addEventListener("resize", syncMobileChrome);
   syncMobileChrome();
+  void resolveTtsUserId();
   nextTick(() => {
     viewerRef.value?.focus();
     observeSlideWrapperSize();
@@ -993,6 +1060,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   syncPptGoogleFontLinks([]);
+  stopSlideAudio();
   document.removeEventListener("fullscreenchange", syncPresentationFullscreenState);
   document.removeEventListener(
     "webkitfullscreenchange",
@@ -1904,6 +1972,151 @@ const slideForExport = computed<PptSlide | null>(() => {
 });
 
 const slide = computed(() => slideForExport.value);
+
+const ttsUserId = ref<number | null>(null);
+const ttsLoading = ref(false);
+const ttsPlaying = ref(false);
+const ttsItemsByPage = ref<Record<number, string>>({});
+const ttsDeckKey = ref("");
+let slideAudioEl: HTMLAudioElement | null = null;
+
+const canPlaySlideAudio = computed(
+  () =>
+    Boolean(props.projectId?.trim()) &&
+    ttsUserId.value != null &&
+    pptSource.value.slides.length > 0,
+);
+
+const slideAudioButtonTitle = computed(() => {
+  if (ttsLoading.value) return t("agent.pptAudioGenerating");
+  if (!props.projectId?.trim()) return t("agent.pptAudioNoProject");
+  if (!ttsUserId.value) return t("agent.pptAudioLoginRequired");
+  return ttsPlaying.value ? t("agent.pptAudioPause") : t("agent.pptAudioPlay");
+});
+
+function resetSlideAudioCache() {
+  ttsItemsByPage.value = {};
+  ttsDeckKey.value = "";
+}
+
+function stopSlideAudio() {
+  if (slideAudioEl) {
+    slideAudioEl.pause();
+    slideAudioEl.onended = null;
+    slideAudioEl.onerror = null;
+    slideAudioEl = null;
+  }
+  ttsPlaying.value = false;
+}
+
+function currentTtsDeckKey(): string {
+  return [
+    props.projectId?.trim() ?? "",
+    pptSource.value.total_slides,
+    pptSource.value.title,
+  ].join("|");
+}
+
+async function resolveTtsUserId(): Promise<number | null> {
+  if (ttsUserId.value != null) return ttsUserId.value;
+  try {
+    const detail = await authApi.getCurrentDetail();
+    const id = detail?.id != null ? Number(detail.id) : NaN;
+    ttsUserId.value = Number.isFinite(id) ? id : null;
+  } catch {
+    ttsUserId.value = null;
+  }
+  return ttsUserId.value;
+}
+
+async function ensureSlideAudioItems(): Promise<Record<number, string>> {
+  const projectId = props.projectId?.trim();
+  if (!projectId) throw new Error(t("agent.pptAudioNoProject"));
+
+  const userId = await resolveTtsUserId();
+  if (!userId) throw new Error(t("agent.pptAudioLoginRequired"));
+
+  const deckKey = currentTtsDeckKey();
+  if (ttsDeckKey.value !== deckKey) {
+    resetSlideAudioCache();
+    ttsDeckKey.value = deckKey;
+  }
+
+  if (Object.keys(ttsItemsByPage.value).length > 0) {
+    return ttsItemsByPage.value;
+  }
+
+  ttsLoading.value = true;
+  try {
+    const result = await generatePageTts({
+      projectId,
+      userId,
+      pages: buildTtsPagesFromPptData(pptSource.value),
+    });
+    const playable = (result?.items ?? []).filter((item) => item.url);
+    if (!playable.length) {
+      throw new Error(t("agent.pptAudioNoSlide"));
+    }
+
+    const map: Record<number, string> = {};
+    for (const item of playable) {
+      if (item.url) map[item.page] = item.url;
+    }
+    ttsItemsByPage.value = map;
+    return map;
+  } finally {
+    ttsLoading.value = false;
+  }
+}
+
+async function playSlideAudio(slideIndex = currentSlide.value) {
+  try {
+    const items = await ensureSlideAudioItems();
+    const url = items[slideIndex + 1];
+    if (!url) {
+      ElMessage.warning(t("agent.pptAudioNoSlide"));
+      return;
+    }
+
+    stopSlideAudio();
+    slideAudioEl = new Audio(url);
+    slideAudioEl.onended = () => {
+      ttsPlaying.value = false;
+      slideAudioEl = null;
+    };
+    slideAudioEl.onerror = () => {
+      ttsPlaying.value = false;
+      slideAudioEl = null;
+      ElMessage.error(t("agent.pptAudioFailed"));
+    };
+    await slideAudioEl.play();
+    ttsPlaying.value = true;
+  } catch (error) {
+    stopSlideAudio();
+    ElMessage.error(error instanceof Error ? error.message : t("agent.pptAudioFailed"));
+  }
+}
+
+async function toggleSlideAudio() {
+  if (ttsPlaying.value) {
+    stopSlideAudio();
+    return;
+  }
+  await playSlideAudio(currentSlide.value);
+}
+
+watch(currentSlide, () => {
+  if (ttsPlaying.value) stopSlideAudio();
+});
+
+watch(
+  () => props.pptData,
+  () => {
+    resetSlideAudioCache();
+    stopSlideAudio();
+  },
+  { deep: true },
+);
 
 const EDITORIAL_BRUTALIST_DEFAULT_GOOGLE_FONTS =
   "https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;900&display=swap";
@@ -7059,16 +7272,69 @@ defineExpose({
   text-align: center;
 }
 
+.ppt-view-tabs-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  margin-left: 14px;
+}
+
 .ppt-view-tabs {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-right: auto;
-  margin-left: 14px;
   padding: 3px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
+}
+
+.ppt-audio-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    color: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+}
+
+.ppt-audio-btn--active {
+  background: #f5f7f3;
+  color: #27332b;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.ppt-audio-btn-icon {
+  display: block;
+}
+
+.ppt-audio-btn-icon--spin {
+  animation: ppt-audio-spin 0.9s linear infinite;
+}
+
+@keyframes ppt-audio-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .ppt-view-tab {
