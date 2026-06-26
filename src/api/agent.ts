@@ -325,6 +325,7 @@ export async function chatStream(
 export interface TtsPageInput {
   index?: number
   title?: string
+  subtitle?: string
   text?: string
   content?: string | string[]
 }

@@ -1,16 +1,102 @@
 import type { PptData, PptSlide } from "@/components/editor/chat/ppt/types";
-import { displayText } from "@/components/editor/chat/ppt/shared/contentHelpers";
+import {
+  contentPointBodyForDisplay,
+  contentPointTitle,
+  displayText,
+  modernLiteraryCleanText,
+} from "@/components/editor/chat/ppt/shared/contentHelpers";
 import { resolveSlideSpeakerNotes } from "@/components/editor/chat/ppt/shared/normalizePptSlide";
+import { getTocEntries } from "@/components/editor/chat/ppt/shared/slideLayoutHelpers";
 import type { TtsPageInput } from "@/api/agent";
 
-function buildSlideTtsText(slide: PptSlide): string {
+function cleanTtsText(value: string | undefined): string {
+  return (value ?? "").trim();
+}
+
+function pushUniqueText(parts: string[], value: string | undefined): void {
+  const text = cleanTtsText(value);
+  if (text && !parts.includes(text)) parts.push(text);
+}
+
+function resolvePageTitleAndSubtitle(
+  pptData: PptData,
+  slide: PptSlide,
+  index: number
+): { title: string; subtitle: string } {
+  const isCover = slide.layout === "cover" || index === 0;
+
+  if (isCover) {
+    return {
+      title: cleanTtsText(slide.title) || cleanTtsText(pptData.title),
+      subtitle:
+        cleanTtsText(slide.subtitle) ||
+        cleanTtsText(pptData.subtitle) ||
+        cleanTtsText(slide.subtitle_en),
+    };
+  }
+
+  return {
+    title: cleanTtsText(slide.title),
+    subtitle: cleanTtsText(slide.subtitle) || cleanTtsText(slide.subtitle_en),
+  };
+}
+
+function buildTocCardTexts(slide: PptSlide): string[] {
+  if (slide.layout !== "toc") return [];
+
+  return getTocEntries(slide)
+    .map((entry) => {
+      const heading = [entry.number, entry.title]
+        .map((value) => cleanTtsText(value))
+        .filter(Boolean)
+        .join(" ");
+      const description = cleanTtsText(entry.description);
+      return [heading, description].filter(Boolean).join(": ");
+    })
+    .filter(Boolean);
+}
+
+function buildModernQuadCardTexts(slide: PptSlide): string[] {
+  if (slide.layout !== "content") return [];
+
+  const cardTexts = (slide.content ?? [])
+    .filter((item) => !!modernLiteraryCleanText(item))
+    .slice(0, 4)
+    .map((item, index) => {
+      const number = String(index + 1).padStart(2, "0");
+      const title = cleanTtsText(contentPointTitle(item));
+      const body = cleanTtsText(contentPointBodyForDisplay(item));
+      const heading = [number, title].filter(Boolean).join(" ");
+      return [heading, body].filter(Boolean).join(": ");
+    })
+    .filter(Boolean);
+
+  if (cardTexts.length < 4) return [];
+
+  pushUniqueText(cardTexts, slide.key_insight);
+  return cardTexts;
+}
+
+function buildStructuredTexts(slide: PptSlide): string[] {
+  return [...buildTocCardTexts(slide), ...buildModernQuadCardTexts(slide)];
+}
+
+function buildSlideTtsText(
+  slide: PptSlide,
+  title: string,
+  subtitle: string,
+  structuredTexts: string[],
+  includeStructuredTextBeforeNotes: boolean
+): string {
   const notes = resolveSlideSpeakerNotes(slide);
-  if (notes) return notes;
+  if (notes && !includeStructuredTextBeforeNotes) return notes;
 
   const parts: string[] = [];
-  if (slide.title?.trim()) parts.push(slide.title.trim());
-  if (slide.subtitle?.trim()) parts.push(slide.subtitle.trim());
-  if (slide.subtitle_en?.trim()) parts.push(slide.subtitle_en.trim());
+  pushUniqueText(parts, title);
+  pushUniqueText(parts, subtitle);
+  structuredTexts.forEach((item) => pushUniqueText(parts, item));
+  if (notes) return [...parts, notes].join("\n");
+  pushUniqueText(parts, slide.subtitle_en);
 
   for (const item of slide.content ?? []) {
     const text = displayText(item).trim();
@@ -22,15 +108,25 @@ function buildSlideTtsText(slide: PptSlide): string {
 
 export function buildTtsPagesFromPptData(pptData: PptData): TtsPageInput[] {
   return pptData.slides.map((slide, index) => {
-    const text = buildSlideTtsText(slide);
-    const content = (slide.content ?? [])
+    const { title, subtitle } = resolvePageTitleAndSubtitle(pptData, slide, index);
+    const isCover = slide.layout === "cover" || index === 0;
+    const structuredTexts = buildStructuredTexts(slide);
+    const content = (structuredTexts.length ? structuredTexts : slide.content ?? [])
       .map((item) => displayText(item).trim())
       .filter(Boolean);
+    const text = buildSlideTtsText(
+      slide,
+      title,
+      subtitle,
+      structuredTexts,
+      isCover || structuredTexts.length > 0
+    );
 
     return {
       index: index + 1,
-      title: slide.title,
-      text: text || slide.title || "",
+      title,
+      ...(subtitle ? { subtitle } : {}),
+      text: text || title || "",
       ...(content.length ? { content } : {}),
     };
   });
