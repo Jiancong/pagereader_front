@@ -50,7 +50,7 @@
       </div>
       <p v-else-if="listError" class="px-1 py-6 text-center text-xs text-red-400">{{ listError }}</p>
       <p v-else-if="!items.length" class="px-1 py-10 text-center text-xs text-muted-foreground">{{ t('workspace.assets.noAssets') }}</p>
-      <div v-else class="grid grid-cols-2 gap-2">
+      <div v-else class="grid grid-cols-2 gap-2 min-[480px]:grid-cols-3 md:grid-cols-2">
         <div
           v-for="asset in items"
           :key="asset.fileKey"
@@ -59,7 +59,7 @@
           <button
             type="button"
             :title="t('workspace.assets.deleteAsset')"
-            class="absolute right-1 top-1 z-10 rounded-md bg-background/90 p-1 text-muted-foreground opacity-0 shadow-sm backdrop-blur transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+            class="absolute right-1 top-1 z-10 rounded-md bg-background/90 p-1 text-muted-foreground opacity-100 shadow-sm backdrop-blur transition-all hover:bg-red-500/10 hover:text-red-400 md:opacity-0 md:group-hover:opacity-100"
             :disabled="deletingKey === asset.fileKey"
             @click.stop="onDelete(asset)"
           >

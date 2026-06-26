@@ -11,7 +11,7 @@
       <aside
         :class="[
           'relative flex h-full flex-col border-r border-border bg-card shadow-xl transition-[margin,width] duration-300 ease-in-out',
-          'ml-0 w-full max-w-sm',
+          'ml-0 w-full max-w-none',
           sidebarCollapsed
             ? 'md:ml-16 md:w-[min(24rem,calc(100vw-4rem))]'
             : 'md:ml-64 md:w-[min(24rem,calc(100vw-16rem))]',
