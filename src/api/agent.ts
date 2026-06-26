@@ -323,7 +323,7 @@ export async function chatStream(
 }
 
 export const TTS_VOICE_ZH = "zh-CN-XiaoxiaoNeural"
-export const TTS_VOICE_EN = "en-US-AlloyMultilingualNeural"
+export const TTS_VOICE_EN = "en-US-AvaMultilingualNeural"
 
 export interface TtsPageInput {
   index?: number

@@ -3,7 +3,6 @@ import {
   contentPointBodyForDisplay,
   contentPointTitle,
   displayText,
-  isPredominantlyLatin,
   modernLiteraryCleanText,
 } from "@/components/editor/chat/ppt/shared/contentHelpers";
 import { resolveSlideSpeakerNotes } from "@/components/editor/chat/ppt/shared/normalizePptSlide";
@@ -119,8 +118,10 @@ function buildStructuredTexts(slide: PptSlide): string[] {
   ];
 }
 
+const CJK_CHAR_RE = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/;
+
 function resolveTtsVoiceForTitle(title: string): string {
-  return isPredominantlyLatin(title) ? TTS_VOICE_EN : TTS_VOICE_ZH;
+  return CJK_CHAR_RE.test(title) ? TTS_VOICE_ZH : TTS_VOICE_EN;
 }
 
 function buildSlideTtsText(
