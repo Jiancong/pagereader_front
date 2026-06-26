@@ -109,7 +109,7 @@
           ]"
         >
           <button
-            :title="p.name || p.title || p.id"
+            :title="projectDisplayTitle(p)"
             :class="[
               'flex items-center rounded-lg text-sm transition-colors',
               collapsed
@@ -132,7 +132,7 @@
               loading="lazy"
             />
             <FileText v-else :class="['flex-shrink-0', collapsed ? 'h-5 w-5' : 'h-4 w-4']" />
-            <span v-if="!collapsed" class="truncate">{{ p.name || p.title || t('workspace.unnamedProject') }}</span>
+            <span v-if="!collapsed" class="truncate">{{ projectDisplayTitle(p) }}</span>
           </button>
           <button
             v-if="!collapsed"
@@ -228,13 +228,14 @@ import WorkspaceAssetsDrawer from './WorkspaceAssetsDrawer.vue'
 
 const SIDEBAR_COLLAPSED_KEY = 'workspace-sidebar-collapsed'
 
-defineProps({
+const props = defineProps({
   view: { type: String, default: 'new' },
   userId: { type: [String, Number], default: null },
   activeProjectId: { type: String, default: null },
   nickName: { type: String, default: '' },
   avatar: { type: String, default: '' },
   myProjects: { type: Array, default: () => [] },
+  projectTitleMap: { type: Object, default: () => ({}) },
   loadingProjects: { type: Boolean, default: false },
   deletingProjectId: { type: String, default: null },
   mobileOpen: { type: Boolean, default: false },
@@ -260,6 +261,11 @@ const navBtnClass = (active) => [
   collapsed.value ? 'justify-center p-2.5' : 'gap-2 px-3 py-2.5',
   active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
 ]
+
+function projectDisplayTitle(project) {
+  const titleFromDeck = props.projectTitleMap?.[project?.id]
+  return titleFromDeck || project?.name || project?.title || project?.id || t('workspace.unnamedProject')
+}
 
 function onSelectDocument(payload) {
   emit('select-document', payload)

@@ -15,7 +15,7 @@
     <template v-if="project">
       <div class="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h2 class="text-2xl font-bold text-foreground">{{ project.name || project.title || t('workspace.unnamedProject') }}</h2>
+          <h2 class="text-2xl font-bold text-foreground">{{ previewTitle }}</h2>
           <p v-if="project.description" class="mt-1 text-sm text-muted-foreground">{{ project.description }}</p>
         </div>
         <div class="flex flex-shrink-0 items-center gap-2">
@@ -89,6 +89,11 @@ import {
   isSharedToCommunity,
 } from '@/utils/projectCommunity'
 import { buildPptChatHistoryDisplay } from '@/utils/pptChatHistoryDisplay'
+import {
+  pickGeneratedDeckTitleFromContent,
+  pickProjectFallbackTitle,
+  pickPptDataTitle,
+} from '@/utils/projectTitle'
 
 const props = defineProps({
   projectId: { type: String, required: true },
@@ -131,6 +136,25 @@ const images = computed(() => {
 })
 
 const firstUserMsg = computed(() => history.value.find((h) => h.role === 'user')?.content || '')
+
+const generatedDeckTitle = computed(() => {
+  const deckTitle = pickPptDataTitle(pptData.value)
+  if (deckTitle) return deckTitle
+
+  const assistantRows = [...history.value].reverse().filter((h) => h.role === 'assistant')
+  for (const row of assistantRows) {
+    const title = pickGeneratedDeckTitleFromContent(row.content)
+    if (title) return title
+  }
+  return ''
+})
+
+const previewTitle = computed(
+  () =>
+    generatedDeckTitle.value ||
+    pickProjectFallbackTitle(project.value) ||
+    t('workspace.unnamedProject'),
+)
 
 const displayChatHistory = computed(() =>
   buildPptChatHistoryDisplay(history.value, pptData.value, {

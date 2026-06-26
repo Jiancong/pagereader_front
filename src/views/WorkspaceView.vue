@@ -13,6 +13,7 @@
       :nick-name="nickName"
       :avatar="avatar"
       :my-projects="myProjects"
+      :project-title-map="projectTitleMap"
       :loading-projects="loadingProjects"
       :deleting-project-id="deletingProjectId"
       :mobile-open="mobileSidebarOpen"
@@ -80,6 +81,8 @@ import ExploreGrid from '../components/ExploreGrid.vue'
 import ProjectPreview from '../components/workspace/ProjectPreview.vue'
 import { authApi, feedApi, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
+import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
+import { pickPptDataTitle } from '@/utils/projectTitle'
 
 const route = useRoute()
 const router = useRouter()
@@ -91,6 +94,7 @@ const userId = ref(null)
 const nickName = ref('')
 const avatar = ref(getLocalAvatar())
 const myProjects = ref([])
+const projectTitleMap = ref({})
 const loadingProjects = ref(false)
 const deletingProjectId = ref(null)
 const genPrompt = ref('')
@@ -108,12 +112,38 @@ const loadProjects = async () => {
   loadingProjects.value = true
   try {
     const page = await feedApi.getMyProjects(0, 30)
-    myProjects.value = page.content ?? []
+    const projects = page.content ?? []
+    myProjects.value = projects
+    void loadProjectDeckTitles(projects)
   } catch {
     myProjects.value = []
   } finally {
     loadingProjects.value = false
   }
+}
+
+async function loadProjectDeckTitles(projects) {
+  const candidates = projects.filter(
+    (p) => p?.id && p?.configFilePath && !projectTitleMap.value[p.id],
+  )
+  await Promise.all(
+    candidates.map(async (project) => {
+      try {
+        const resolved = await resolvePptDataFromStreamComplete({
+          projectId: project.id,
+          ppt_data_url: project.configFilePath,
+        })
+        const title = pickPptDataTitle(resolved?.pptData)
+        if (!title) return
+        projectTitleMap.value = {
+          ...projectTitleMap.value,
+          [project.id]: title,
+        }
+      } catch {
+        /* keep project name/prompt when deck title cannot be loaded */
+      }
+    }),
+  )
 }
 
 onMounted(async () => {
