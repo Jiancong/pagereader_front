@@ -208,6 +208,22 @@ export interface ProjectPromptHistoryVo {
   createTime?: string
 }
 
+/** conversation/history 新结构：消息列表在 messages 内 */
+export interface ProjectConversationHistoryBundleVo {
+  projectId?: string
+  sessionId?: string
+  thumbnailUrl?: string
+  coverImageUrl?: string
+  messages?: ConversationHistoryVo[]
+}
+
+export interface ProjectCoverUploadResult {
+  projectId: string
+  sessionId?: string
+  thumbnailUrl?: string
+  coverImageUrl?: string
+}
+
 // ===== 文件 =====
 export interface UserStorageQuota {
   planType?: string

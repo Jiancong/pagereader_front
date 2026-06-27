@@ -4,6 +4,8 @@
 export {
   getProject,
   getProjectConversationHistory,
+  normalizeProjectConversationHistory,
+  uploadProjectCover,
   getProjectPromptHistory,
   incrementProjectView,
   getMyProjects,

@@ -43,7 +43,9 @@
           :project-id="projectId"
           :markdown="projectMarkdown"
           :chat-history="displayChatHistory"
+          can-upload-cover
           @update:ppt-data="(d) => (pptData = d)"
+          @cover-uploaded="onCoverUploaded"
         />
       </div>
 
@@ -252,5 +254,11 @@ const fork = () => {
   const base = project.value?.name || project.value?.title || ''
   const prompt = firstUserMsg.value || (base ? t('workspace.forkPrompt', { name: base }) : '')
   emit('fork', prompt)
+}
+
+function onCoverUploaded(payload) {
+  const url = String(payload?.thumbnailUrl || payload?.coverImageUrl || '').trim()
+  if (!url || !project.value) return
+  project.value = { ...project.value, thumbnailUrl: url }
 }
 </script>

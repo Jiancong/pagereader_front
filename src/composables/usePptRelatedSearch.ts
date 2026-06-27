@@ -46,6 +46,8 @@ export interface PptRelatedSearchOptions {
   source?: PptRelatedSearchSource;
   uploadedDocuments?: UploadedDocument[];
   buildMessage: (term: string, pptTitle?: string) => string;
+  /** When false, stream runs without opening the floating result panel */
+  showPanel?: boolean;
 }
 
 function extractKnowledgeText(data: Record<string, unknown> | null | undefined): string {
@@ -170,11 +172,13 @@ export function usePptRelatedSearch() {
     const term = String(options.term || "").trim();
     if (!term) return state.value;
 
+    const showPanel = options.showPanel !== false;
+
     closeStream();
     resetStreamFlags();
 
     state.value = {
-      visible: true,
+      visible: showPanel,
       term,
       content: "",
       imageResults: [],

@@ -55,6 +55,7 @@
         :ppt-data="activeTask.pptData"
         :project-id="activeTask.projectId"
         :markdown="activeTask.markdown"
+        can-upload-cover
         @close="resetActiveTask"
         @update:ppt-data="(d) => (activeTask.pptData = d)"
       />

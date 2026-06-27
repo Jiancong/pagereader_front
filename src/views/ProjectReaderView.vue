@@ -39,7 +39,7 @@
         <template v-if="project">
           <div class="mb-4">
             <h1 class="break-words text-xl font-bold text-foreground sm:text-2xl">
-              {{ project.name || project.title || t('workspace.unnamedProject') }}
+              {{ displayTitle }}
             </h1>
             <p v-if="project.description" class="mt-1 break-words text-sm text-muted-foreground">
               {{ project.description }}
@@ -109,6 +109,11 @@ import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
 import { pickMarkdownFromHistory, pickMarkdownFromPayload } from '@/utils/pptMarkdownSource'
 import { looksLikeDeckJson } from '@/utils/projectCommunity'
 import { buildPptChatHistoryDisplay } from '@/utils/pptChatHistoryDisplay'
+import {
+  pickGeneratedDeckTitleFromContent,
+  pickPptDataTitle,
+  pickProjectFallbackTitle,
+} from '@/utils/projectTitle'
 import { gtmForkProject } from '@/composables/useGtmDataLayer'
 
 const route = useRoute()
@@ -130,6 +135,25 @@ const dialogOpen = ref(false)
 const forking = ref(false)
 const sessionEntries = ref([])
 const pendingForkAfterLogin = ref(false)
+
+const generatedDeckTitle = computed(() => {
+  const deckTitle = pickPptDataTitle(pptData.value)
+  if (deckTitle) return deckTitle
+
+  const assistantRows = [...history.value].reverse().filter((h) => h.role === 'assistant')
+  for (const row of assistantRows) {
+    const title = pickGeneratedDeckTitleFromContent(row.content)
+    if (title) return title
+  }
+  return ''
+})
+
+const displayTitle = computed(
+  () =>
+    generatedDeckTitle.value ||
+    pickProjectFallbackTitle(project.value) ||
+    t('workspace.unnamedProject'),
+)
 
 const displayChatHistory = computed(() =>
   buildPptChatHistoryDisplay(history.value, pptData.value, {

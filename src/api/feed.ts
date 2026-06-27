@@ -1,7 +1,7 @@
 // 读书 / 探索 Feed 模块
 // @author hc @date 2026-06-03
 
-import { del, get, postJson } from "./client"
+import { del, get, postForm, postJson } from "./client"
 import type {
   FeedStreamRequest,
   FeedStreamPageDto,
@@ -12,6 +12,8 @@ import type {
   Page,
   ProjectVo,
   ConversationHistoryVo,
+  ProjectConversationHistoryBundleVo,
+  ProjectCoverUploadResult,
   ProjectPromptHistoryVo,
   ShareToCommunityResult,
   ProjectCommentVo,
@@ -56,11 +58,36 @@ export async function getProject(id: string): Promise<ProjectVo> {
   return get<ProjectVo>(`/project/${encodeURIComponent(id)}`)
 }
 
+export function normalizeProjectConversationHistory(
+  data: ConversationHistoryVo[] | ProjectConversationHistoryBundleVo | unknown,
+): ConversationHistoryVo[] {
+  if (Array.isArray(data)) return data
+  if (data && typeof data === "object") {
+    const bundle = data as ProjectConversationHistoryBundleVo
+    if (Array.isArray(bundle.messages)) return bundle.messages
+  }
+  return []
+}
+
 export async function getProjectConversationHistory(
   id: string,
 ): Promise<ConversationHistoryVo[]> {
-  return get<ConversationHistoryVo[]>(
+  const data = await get<ConversationHistoryVo[] | ProjectConversationHistoryBundleVo>(
     `/project/${encodeURIComponent(id)}/conversation/history`,
+  )
+  return normalizeProjectConversationHistory(data)
+}
+
+/** 上传项目封面（需登录且为 owner） */
+export async function uploadProjectCover(
+  projectId: string,
+  file: File,
+): Promise<ProjectCoverUploadResult> {
+  const form = new FormData()
+  form.append("file", file)
+  return postForm<ProjectCoverUploadResult>(
+    `/project/${encodeURIComponent(projectId)}/cover`,
+    form,
   )
 }
 

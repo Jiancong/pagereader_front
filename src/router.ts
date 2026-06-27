@@ -80,6 +80,15 @@ const routes = [
   },
 ];
 
+const CHUNK_RELOAD_STORAGE_KEY = "page2top:chunk-reload-target";
+const DYNAMIC_IMPORT_ERROR_PATTERN =
+  /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|ChunkLoadError|Loading chunk \d+ failed/i;
+
+function isDynamicImportError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return DYNAMIC_IMPORT_ERROR_PATTERN.test(message);
+}
+
 export const router = createRouter({
   history: createWebHistory(),
   routes,
@@ -87,6 +96,21 @@ export const router = createRouter({
     if (to.hash) return { el: to.hash, top: 80, behavior: "smooth" };
     return { top: 0 };
   },
+});
+
+router.onError((error, to) => {
+  if (!isDynamicImportError(error) || typeof window === "undefined") return;
+
+  const target = to.fullPath || `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+  try {
+    if (window.sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) === target) return;
+    window.sessionStorage.setItem(CHUNK_RELOAD_STORAGE_KEY, target);
+  } catch {
+    // Storage can be unavailable in restricted browsing modes; a single reload is still useful.
+  }
+
+  window.location.assign(target);
 });
 
 router.beforeEach((to) => {
@@ -98,6 +122,16 @@ router.beforeEach((to) => {
 });
 
 router.afterEach((to) => {
+  if (typeof window !== "undefined") {
+    try {
+      if (window.sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) === to.fullPath) {
+        window.sessionStorage.removeItem(CHUNK_RELOAD_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore unavailable sessionStorage; it is only used to avoid repeated reloads.
+    }
+  }
+
   if (to.name !== "not-found") {
     applyDocumentI18n(normalizeLocale(i18n.global.locale.value));
   }

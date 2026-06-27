@@ -175,13 +175,36 @@
       </div>
 
       <div class="ppt-actions">
-        <span class="ppt-title-label">{{ pptSource.title }}</span>
-        <!-- <span
-          v-if="pptTemplateLabel"
-          class="ppt-template-label"
-          :title="pptTemplateTagline"
-          >{{ pptTemplateLabel }}</span
-        > -->
+        <!-- 上传封面 -->
+        <input
+          v-if="canUploadCover && projectId?.trim()"
+          ref="coverInputRef"
+          type="file"
+          class="ppt-cover-input-hidden"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          @change="onCoverFileSelected"
+        />
+        <button
+          v-if="canUploadCover && projectId?.trim()"
+          type="button"
+          class="ppt-cover-upload-btn"
+          :disabled="coverUploading || exporting"
+          :title="t('agent.pptUploadCover')"
+          @click="triggerCoverUpload"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M.5 13a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V3a1.5 1.5 0 0 0-1.5-1.5h-12A1.5 1.5 0 0 0 .5 3v10zm1.5.5A.5.5 0 0 1 1 13V3a.5.5 0 0 1 .5-.5h12a.5.5 0 0 1 .5.5v10a.5.5 0 0 1-.5.5h-12z" />
+            <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" />
+            <path d="M14.002 13l-4-4-3 3-2-2-3 3V13h12z" />
+          </svg>
+          <span>{{ coverUploading ? t("agent.pptUploadCoverUploading") : t("agent.pptUploadCover") }}</span>
+        </button>
         <!-- 分享 / 导出 -->
         <div ref="shareMenuRef" class="ppt-share-wrap">
           <button
@@ -593,7 +616,11 @@
       v-if="showChatHistoryRail && !isPresentationFullscreen"
       v-model:collapsed="chatHistoryRailCollapsed"
       :items="chatHistoryRailItems"
+      :loading="relatedSearchState.loading"
+      :pending-term="relatedSearchState.term"
+      :streaming-content="relatedSearchState.content"
       @open-detail="openChatHistoryDetail"
+      @submit-question="onChatRailSubmitQuestion"
     />
   </div>
 </template>
@@ -604,6 +631,7 @@ import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
 import { authApi } from "@/api";
 import { generatePageTts } from "@/api/agent";
+import { projectApi } from "@/api/project";
 import {
   buildFontFamilyCss,
   ensureExportFontsReady,
@@ -751,12 +779,15 @@ const props = defineProps<{
   markdown?: string;
   /** 右侧栏展示项（由 ProjectPreview 经 buildPptChatHistoryDisplay 整理） */
   chatHistory?: ChatHistoryDisplayItem[];
+  /** 是否显示上传封面按钮（workspace owner 场景） */
+  canUploadCover?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "update:pptData", data: PptData): void;
   (e: "related-search-recorded", entries: RelatedSearchSessionEntry[]): void;
+  (e: "cover-uploaded", payload: { thumbnailUrl?: string; coverImageUrl?: string }): void;
 }>();
 
 const chatHistoryRailCollapsed = ref(false);
@@ -798,6 +829,8 @@ const exporting = ref(false);
 const exportMessage = ref("");
 const shareMenuOpen = ref(false);
 const shareMenuRef = ref<HTMLElement | null>(null);
+const coverInputRef = ref<HTMLInputElement | null>(null);
+const coverUploading = ref(false);
 const isPresentationFullscreen = ref(false);
 const presentationScale = ref(1);
 let slideWrapperResizeObserver: ResizeObserver | null = null;
@@ -892,13 +925,14 @@ function recordRelatedSearchSession(term: string) {
   emit("related-search-recorded", [...relatedSearchSessionEntries.value]);
 }
 
-async function runPptRelatedSearch(term: string) {
+async function runPptRelatedSearch(term: string, options?: { showPanel?: boolean }) {
   const q = term.trim();
   if (!q) {
     ElMessage.warning(t("agent.pptRelatedSearchSelectText"));
     return;
   }
   closePptContextMenu();
+  chatHistoryRailCollapsed.value = false;
   await runRelatedSearch({
     term: q,
     pptTitle: props.pptData.title,
@@ -906,8 +940,13 @@ async function runPptRelatedSearch(term: string) {
     slideIndex: currentSlide.value,
     uploadedDocuments: uploadedDocumentsFromPptData(props.pptData),
     buildMessage: buildPptRelatedSearchMessage,
+    showPanel: options?.showPanel,
   });
   recordRelatedSearchSession(q);
+}
+
+async function onChatRailSubmitQuestion(term: string) {
+  await runPptRelatedSearch(term, { showPanel: false });
 }
 
 async function onPptRelatedSearch() {
@@ -5053,6 +5092,53 @@ function buildShareUrl(): string | null {
   return null;
 }
 
+const COVER_IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
+
+function triggerCoverUpload() {
+  if (coverUploading.value || !props.canUploadCover) return;
+  coverInputRef.value?.click();
+}
+
+async function onCoverFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+
+  const projectId = props.projectId?.trim();
+  if (!projectId) {
+    ElMessage.warning(t("agent.pptShareNoProject"));
+    return;
+  }
+
+  const mime = (file.type || "").toLowerCase();
+  if (mime && !COVER_IMAGE_TYPES.has(mime)) {
+    ElMessage.warning(t("agent.pptUploadCoverInvalidType"));
+    return;
+  }
+
+  coverUploading.value = true;
+  try {
+    const result = await projectApi.uploadProjectCover(projectId, file);
+    const thumbnailUrl =
+      String(result?.thumbnailUrl || result?.coverImageUrl || "").trim() || undefined;
+    emit("cover-uploaded", {
+      thumbnailUrl,
+      coverImageUrl: String(result?.coverImageUrl || thumbnailUrl || "").trim() || undefined,
+    });
+    ElMessage.success(t("agent.pptUploadCoverSuccess"));
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t("agent.pptUploadCoverFailed"));
+  } finally {
+    coverUploading.value = false;
+  }
+}
+
 function toggleShareMenu() {
   shareMenuOpen.value = !shareMenuOpen.value;
 }
@@ -7612,13 +7698,38 @@ defineExpose({
   gap: 12px;
 }
 
-.ppt-title-label {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.ppt-cover-input-hidden {
+  display: none;
+}
+
+.ppt-cover-upload-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.12);
+  color: #bbf7d0;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
   white-space: nowrap;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.22);
+    border-color: rgba(74, 222, 128, 0.55);
+    color: #ecfdf5;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 }
 
 .ppt-template-label {
@@ -8244,10 +8355,6 @@ defineExpose({
     display: none;
   }
 
-  .ppt-title-label {
-    display: none;
-  }
-
   .ppt-share-trigger > span:not(.ppt-share-chevron) {
     display: none;
   }
@@ -8263,12 +8370,18 @@ defineExpose({
     display: none;
   }
 
+  .ppt-cover-upload-btn > span {
+    display: none;
+  }
+
+  .ppt-cover-upload-btn,
   .ppt-fullscreen-btn,
   .ppt-close-btn {
     min-width: 32px;
     min-height: 32px;
   }
 
+  .ppt-cover-upload-btn,
   .ppt-fullscreen-btn {
     justify-content: center;
     padding: 6px 8px;

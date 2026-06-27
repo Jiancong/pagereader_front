@@ -92,7 +92,9 @@ export async function fetchProject(projectId) {
 
 export async function fetchProjectConversationHistory(projectId) {
   const data = await fetchApiJson(`/project/${encodeURIComponent(projectId)}/conversation/history`)
-  return Array.isArray(data) ? data : []
+  if (Array.isArray(data)) return data
+  if (data && typeof data === "object" && Array.isArray(data.messages)) return data.messages
+  return []
 }
 
 function asRecord(v) {
