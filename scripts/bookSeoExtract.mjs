@@ -44,7 +44,11 @@ function slideTextLines(slide) {
 
 export function extractBookSeoContent(project, deck) {
   const bookTitle = clean(
-    project?.sourceBookTitle || project?.name || project?.title || deck?.title || "",
+    (typeof deck?.title === "string" ? deck.title.trim() : "") ||
+      project?.sourceBookTitle ||
+      project?.name ||
+      project?.title ||
+      "",
   )
   const author = clean(project?.sourceBookAuthor || "")
   const overview = clean(deck?.subtitle || project?.description || "")

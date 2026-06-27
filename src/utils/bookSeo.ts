@@ -4,6 +4,7 @@
 
 import type { ProjectVo } from "@/api/types"
 import { stripPptInlineMarkdown } from "@/utils/pptInlineMarkdown"
+import { pickPptDataTitle, pickProjectFallbackTitle } from "@/utils/projectTitle"
 
 /** deck 的最小结构（PptViewer 内部类型未导出，这里只取所需字段） */
 interface DeckSlideLike {
@@ -89,7 +90,10 @@ export function extractBookSeoContent(
   deck: DeckLike | null | undefined,
 ): BookSeoContent {
   const bookTitle = clean(
-    project?.sourceBookTitle || project?.name || project?.title || deck?.title || "",
+    pickPptDataTitle(deck) ||
+      project?.sourceBookTitle ||
+      pickProjectFallbackTitle(project) ||
+      "",
   )
   const author = clean(project?.sourceBookAuthor || "")
   const overview = clean(deck?.subtitle || project?.description || "")
