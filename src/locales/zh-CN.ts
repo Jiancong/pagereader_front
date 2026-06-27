@@ -614,7 +614,7 @@ export default {
     pptAudioFailed: "语音生成失败",
     pptFullscreenExit: "退出全屏",
     pptFullscreenPlay: "全屏演示",
-    pptUploadCover: "上传封面",
+    pptUploadCover: "封面",
     pptUploadCoverUploading: "上传中…",
     pptUploadCoverSuccess: "封面已更新",
     pptUploadCoverFailed: "封面上传失败",

@@ -55,6 +55,7 @@
               :chat-history="displayChatHistory"
               @update:ppt-data="(d) => (pptData = d)"
               @related-search-recorded="(e) => (sessionEntries = e)"
+              @cover-uploaded="onCoverUploaded"
             />
           </div>
           <div
@@ -310,5 +311,11 @@ const onLoginSuccess = async () => {
     pendingForkAfterLogin.value = false
     if (logged.value) onFork()
   }
+}
+
+function onCoverUploaded(payload) {
+  const url = String(payload?.thumbnailUrl || payload?.coverImageUrl || '').trim()
+  if (!url || !project.value) return
+  project.value = { ...project.value, thumbnailUrl: url }
 }
 </script>

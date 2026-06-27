@@ -175,36 +175,6 @@
       </div>
 
       <div class="ppt-actions">
-        <!-- 上传封面 -->
-        <input
-          v-if="canUploadCover && projectId?.trim()"
-          ref="coverInputRef"
-          type="file"
-          class="ppt-cover-input-hidden"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          @change="onCoverFileSelected"
-        />
-        <button
-          v-if="canUploadCover && projectId?.trim()"
-          type="button"
-          class="ppt-cover-upload-btn"
-          :disabled="coverUploading || exporting"
-          :title="t('agent.pptUploadCover')"
-          @click="triggerCoverUpload"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 16 16"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path d="M.5 13a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V3a1.5 1.5 0 0 0-1.5-1.5h-12A1.5 1.5 0 0 0 .5 3v10zm1.5.5A.5.5 0 0 1 1 13V3a.5.5 0 0 1 .5-.5h12a.5.5 0 0 1 .5.5v10a.5.5 0 0 1-.5.5h-12z" />
-            <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" />
-            <path d="M14.002 13l-4-4-3 3-2-2-3 3V13h12z" />
-          </svg>
-          <span>{{ coverUploading ? t("agent.pptUploadCoverUploading") : t("agent.pptUploadCover") }}</span>
-        </button>
         <!-- 分享 / 导出 -->
         <div ref="shareMenuRef" class="ppt-share-wrap">
           <button
@@ -460,6 +430,35 @@
             </button>
           </div>
         </div>
+        <input
+          v-if="showCoverUpload"
+          ref="coverInputRef"
+          type="file"
+          class="ppt-cover-input-hidden"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          @change="onCoverFileSelected"
+        />
+        <button
+          v-if="showCoverUpload"
+          type="button"
+          class="ppt-cover-upload-btn"
+          :disabled="coverUploading || exporting"
+          :title="t('agent.pptUploadCover')"
+          @click="triggerCoverUpload"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M.5 13a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V3a1.5 1.5 0 0 0-1.5-1.5h-12A1.5 1.5 0 0 0 .5 3v10zm1.5.5A.5.5 0 0 1 1 13V3a.5.5 0 0 1 .5-.5h12a.5.5 0 0 1 .5.5v10a.5.5 0 0 1-.5.5h-12z" />
+            <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" />
+            <path d="M14.002 13l-4-4-3 3-2-2-3 3V13h12z" />
+          </svg>
+          <span>{{ coverUploading ? t("agent.pptUploadCoverUploading") : t("agent.pptUploadCover") }}</span>
+        </button>
         <button
           type="button"
           class="ppt-fullscreen-btn"
@@ -626,10 +625,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount, provide } from "vue";
+import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount, provide, withDefaults } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
 import { authApi, projectApi } from "@/api";
+import { isLoggedIn } from "@/api/token";
 import { generatePageTts } from "@/api/agent";
 import {
   buildFontFamilyCss,
@@ -769,7 +769,8 @@ import {
 import { buildTtsPagesFromPptData } from "@/utils/pptTtsPages";
 
 
-const props = defineProps<{
+const props = withDefaults(
+  defineProps<{
   pptData: PptData;
   initialSlide?: number;
   /** 项目 ID，用于生成 /explore/project/{id} 分享链接 */
@@ -778,9 +779,13 @@ const props = defineProps<{
   markdown?: string;
   /** 右侧栏展示项（由 ProjectPreview 经 buildPptChatHistoryDisplay 整理） */
   chatHistory?: ChatHistoryDisplayItem[];
-  /** 是否显示上传封面按钮（workspace owner 场景） */
+  /** 是否显示上传封面按钮（需 projectId + 已登录） */
   canUploadCover?: boolean;
-}>();
+}>(),
+  {
+    canUploadCover: true,
+  },
+);
 
 const emit = defineEmits<{
   (e: "close"): void;
@@ -802,6 +807,13 @@ watch(hasMarkdownDocument, (available) => {
 });
 
 const MOBILE_LAYOUT_MAX = 767;
+
+const showCoverUpload = computed(
+  () =>
+    props.canUploadCover &&
+    Boolean(props.projectId?.trim()) &&
+    isLoggedIn(),
+);
 
 const chatHistoryRailItems = computed(() => {
   const base = Array.isArray(props.chatHistory) ? props.chatHistory : [];
@@ -5099,7 +5111,7 @@ const COVER_IMAGE_TYPES = new Set([
 ]);
 
 function triggerCoverUpload() {
-  if (coverUploading.value || !props.canUploadCover) return;
+  if (coverUploading.value || !showCoverUpload.value) return;
   coverInputRef.value?.click();
 }
 
@@ -7705,12 +7717,13 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(34, 197, 94, 0.45);
-  background: rgba(34, 197, 94, 0.12);
-  color: #bbf7d0;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.14);
+  color: #fde68a;
   font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
@@ -7720,9 +7733,9 @@ defineExpose({
   }
 
   &:hover:not(:disabled) {
-    background: rgba(34, 197, 94, 0.22);
-    border-color: rgba(74, 222, 128, 0.55);
-    color: #ecfdf5;
+    background: rgba(251, 191, 36, 0.24);
+    border-color: rgba(252, 211, 77, 0.55);
+    color: #fffbeb;
   }
 
   &:disabled {

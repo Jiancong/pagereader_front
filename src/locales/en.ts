@@ -632,7 +632,7 @@ export default {
     pptAudioFailed: "Audio generation failed",
     pptFullscreenExit: "Exit fullscreen",
     pptFullscreenPlay: "Present",
-    pptUploadCover: "Upload cover",
+    pptUploadCover: "Cover",
     pptUploadCoverUploading: "Uploading…",
     pptUploadCoverSuccess: "Cover updated",
     pptUploadCoverFailed: "Cover upload failed",
