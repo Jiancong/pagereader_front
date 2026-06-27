@@ -55,6 +55,9 @@ export default {
     heroTitleHighlight: "Pro slides.",
     heroSubtitle:
       "Upload books, papers, or notes and let AI structure them into a deck—or describe your topic in one sentence and get polished slides in seconds.",
+    heroAudioTitle: "Books with audiobook playback",
+    heroAudioDesc:
+      "Turn generated book summaries into a listening experience, so readers can absorb the story, ideas, and key takeaways through an easier audio feast.",
     heroCta: "Get started",
     heroDemo: "Watch demo",
     demoVideoClose: "Close demo",

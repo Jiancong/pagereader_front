@@ -18,9 +18,19 @@
         </span>
       </h1>
 
-      <p class="mx-auto mb-10 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl">
+      <p class="mx-auto mb-5 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl">
         {{ t('landing.heroSubtitle') }}
       </p>
+
+      <div class="mx-auto mb-10 flex max-w-2xl items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left text-sm text-muted-foreground sm:items-center">
+        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Headphones class="h-5 w-5" />
+        </div>
+        <div>
+          <p class="font-semibold text-foreground">{{ t('landing.heroAudioTitle') }}</p>
+          <p class="mt-1 leading-relaxed">{{ t('landing.heroAudioDesc') }}</p>
+        </div>
+      </div>
 
       <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
         <button
@@ -45,7 +55,7 @@
 </template>
 
 <script setup>
-import { Sparkles, Zap, Play } from 'lucide-vue-next'
+import { Sparkles, Zap, Play, Headphones } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { gtmCtaClick, gtmDemoClick, LANDING_WATCH_DEMO_EVENT } from '@/composables/useGtmDataLayer'
 
