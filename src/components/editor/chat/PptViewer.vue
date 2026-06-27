@@ -629,9 +629,8 @@
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount, provide } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
-import { authApi } from "@/api";
+import { authApi, projectApi } from "@/api";
 import { generatePageTts } from "@/api/agent";
-import { projectApi } from "@/api/project";
 import {
   buildFontFamilyCss,
   ensureExportFontsReady,
