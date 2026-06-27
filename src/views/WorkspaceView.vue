@@ -81,8 +81,7 @@ import ExploreGrid from '../components/ExploreGrid.vue'
 import ProjectPreview from '../components/workspace/ProjectPreview.vue'
 import { authApi, feedApi, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
-import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
-import { pickPptDataTitle } from '@/utils/projectTitle'
+import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
 
 const route = useRoute()
 const router = useRouter()
@@ -132,24 +131,14 @@ const loadProjects = async () => {
 }
 
 async function loadProjectDeckTitles(projects) {
-  const candidates = projects.filter(
-    (p) => p?.id && p?.configFilePath && !projectTitleMap.value[p.id],
-  )
+  const candidates = projects.filter((p) => p?.id && !projectTitleMap.value[p.id])
   await Promise.all(
     candidates.map(async (project) => {
-      try {
-        const resolved = await resolvePptDataFromStreamComplete({
-          projectId: project.id,
-          ppt_data_url: project.configFilePath,
-        })
-        const title = pickPptDataTitle(resolved?.pptData)
-        if (!title) return
-        projectTitleMap.value = {
-          ...projectTitleMap.value,
-          [project.id]: title,
-        }
-      } catch {
-        /* keep project name/prompt when deck title cannot be loaded */
+      const title = await resolveProjectDisplayTitle(project.id)
+      if (!title) return
+      projectTitleMap.value = {
+        ...projectTitleMap.value,
+        [project.id]: title,
       }
     }),
   )

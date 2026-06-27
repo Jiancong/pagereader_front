@@ -37,13 +37,30 @@
               {{ seo.overview }}
             </p>
           </div>
-          <button
-            type="button"
-            class="flex w-full shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto"
-            @click="openReader"
-          >
-            <BookOpen class="h-4 w-4" /> {{ t('community.openToRead') }}
-          </button>
+          <div class="flex w-full shrink-0 flex-col gap-2 self-start sm:w-auto sm:flex-row">
+            <button
+              v-if="canPlayDeckAudio"
+              type="button"
+              class="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50"
+              :class="ttsPlayAllActive ? 'border-primary/50 bg-primary/10 text-primary' : ''"
+              :disabled="ttsLoading"
+              :title="playAllButtonTitle"
+              :aria-label="playAllButtonTitle"
+              @click="togglePlayAll"
+            >
+              <Loader2 v-if="ttsLoading" class="h-4 w-4 animate-spin" />
+              <Square v-else-if="ttsPlayAllActive" class="h-4 w-4" />
+              <ListVideo v-else class="h-4 w-4" />
+              {{ ttsPlayAllActive ? t('community.playAllStop') : t('community.playAll') }}
+            </button>
+            <button
+              type="button"
+              class="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              @click="openReader"
+            >
+              <BookOpen class="h-4 w-4" /> {{ t('community.openToRead') }}
+            </button>
+          </div>
         </div>
 
         <button
@@ -209,7 +226,7 @@ defineOptions({ name: 'ProjectCommunityView' })
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft, Loader2, BookOpen, Sparkles } from 'lucide-vue-next'
+import { ArrowLeft, Loader2, BookOpen, Sparkles, ListVideo, Square } from 'lucide-vue-next'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import AuthDialog from '@/components/AuthDialog.vue'
@@ -225,6 +242,7 @@ import {
   buildBookJsonLd,
 } from '@/utils/bookSeo'
 import { useSeoHead } from '@/composables/useSeoHead'
+import { usePptDeckPlayAll } from '@/composables/usePptDeckPlayAll'
 
 const route = useRoute()
 const router = useRouter()
@@ -242,6 +260,20 @@ const logged = ref(false)
 const nickName = ref('')
 const avatar = ref(getLocalAvatar())
 const dialogOpen = ref(false)
+
+const {
+  ttsLoading,
+  ttsPlayAllActive,
+  canPlayDeckAudio,
+  playAllButtonTitle,
+  togglePlayAll,
+} = usePptDeckPlayAll({
+  projectId,
+  pptData,
+  onLoginRequired: () => {
+    dialogOpen.value = true
+  },
+})
 
 const seo = computed(() => extractBookSeoContent(project.value, pptData.value))
 const hasSeoBody = computed(

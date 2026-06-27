@@ -22,14 +22,14 @@
             <img
               v-if="cover(item)"
               :src="cover(item)"
-              :alt="item.name || ''"
+              :alt="displayTitle(item)"
               loading="lazy"
               class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
             <div v-else class="flex h-full w-full items-center justify-center text-xs text-muted-foreground">{{ t('workspace.noCover') }}</div>
           </div>
           <div class="flex flex-1 flex-col p-2 sm:p-3">
-            <p class="line-clamp-2 text-xs font-medium text-foreground sm:text-sm">{{ item.name || item.nameEn || t('workspace.unnamed') }}</p>
+            <p class="line-clamp-2 text-xs font-medium text-foreground sm:text-sm">{{ displayTitle(item) }}</p>
             <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:mt-2 sm:gap-x-3 sm:text-xs">
               <span v-if="item.authorNickname" class="min-w-0 max-w-full truncate">{{ item.authorNickname }}</span>
               <span class="flex items-center gap-1 sm:ml-auto"><Eye class="h-3 w-3" />{{ item.viewCount ?? 0 }}</span>
@@ -99,6 +99,7 @@ import { Loader2, Eye, Heart, Trash2, Share2 } from 'lucide-vue-next'
 import { feedApi } from '@/api'
 import { canDeleteFeedItem, feedItemDeleteProjectId } from '@/utils/projectDelete'
 import { buildExploreProjectShareUrl, feedItemShareProjectId } from '@/utils/feedOpen'
+import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
 
 const props = defineProps({
   userId: { type: [String, Number], default: null },
@@ -117,9 +118,16 @@ const loading = ref(false)
 const error = ref(null)
 const deletingId = ref(null)
 const favoritingId = ref(null)
+const itemTitleMap = ref({})
 
 const hasMore = computed(() => items.value.length < total.value)
 const cover = (item) => item.imageUrl || item.imageUrls?.[0] || ''
+const projectIdForItem = (item) => feedItemShareProjectId(item) || String(item.projectId || '').trim() || ''
+const displayTitle = (item) => {
+  const projectId = projectIdForItem(item)
+  if (projectId && itemTitleMap.value[projectId]) return itemTitleMap.value[projectId]
+  return item.name || item.nameEn || t('workspace.unnamed')
+}
 const canDelete = (item) => canDeleteFeedItem(item, props.userId)
 const deleteKey = (item) => feedItemDeleteProjectId(item) || item.id
 const shareProjectId = (item) => feedItemShareProjectId(item)
@@ -171,6 +179,28 @@ const toggleFavorite = async (item) => {
   }
 }
 
+async function loadItemDeckTitles(feedItems) {
+  const projectIds = [
+    ...new Set(
+      feedItems
+        .map((item) => projectIdForItem(item))
+        .filter((id) => id && !itemTitleMap.value[id]),
+    ),
+  ]
+  if (!projectIds.length) return
+
+  await Promise.all(
+    projectIds.map(async (projectId) => {
+      const title = await resolveProjectDisplayTitle(projectId)
+      if (!title) return
+      itemTitleMap.value = {
+        ...itemTitleMap.value,
+        [projectId]: title,
+      }
+    }),
+  )
+}
+
 const load = async (p) => {
   loading.value = true
   error.value = null
@@ -181,9 +211,11 @@ const load = async (p) => {
       sort: 1,
       includeUserProjects: true,
     })
-    items.value = p === 1 ? res.data : [...items.value, ...res.data]
+    const nextItems = p === 1 ? res.data : [...items.value, ...res.data]
+    items.value = nextItems
     total.value = res.total
     page.value = p
+    void loadItemDeckTitles(res.data)
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')
   } finally {
