@@ -22,6 +22,7 @@
             loading="lazy"
             decoding="async"
             class="trusted-by-logo"
+            :style="logoStyle"
           >
         </div>
       </div>
@@ -35,6 +36,10 @@
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
+
+const logoStyle = {
+  filter: 'none',
+}
 
 const logos = [
   { src: '/resources/trusted-by/university-1.png', width: 120, height: 30 },
@@ -105,8 +110,8 @@ const logos = [
   width: auto;
   max-width: 10rem;
   object-fit: contain;
-  opacity: 0.82;
-  filter: brightness(0) invert(1);
+  opacity: 0.88;
+  filter: none !important;
   transition: opacity 0.2s ease;
 }
 

@@ -30,7 +30,7 @@
               <img
                 v-if="card.cover"
                 :src="card.cover"
-                :alt="t('landing.ebooks.cardAlt', { title: card.title })"
+                :alt="t('landing.ebooks.cardAlt', { title: displayTitle(card) })"
                 loading="lazy"
                 class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
@@ -38,12 +38,12 @@
                 v-else
                 class="flex h-full w-full items-center justify-center px-2 text-center text-xs text-muted-foreground"
               >
-                {{ card.title }}
+                {{ displayTitle(card) }}
               </div>
             </div>
             <div class="flex flex-1 flex-col p-3">
-              <h3 class="line-clamp-2 text-sm font-semibold text-foreground">{{ card.title }}</h3>
-              <p class="mt-1 line-clamp-2 text-xs text-muted-foreground">{{ card.tagline }}</p>
+              <h3 class="line-clamp-2 text-sm font-semibold text-foreground">{{ displayTitle(card) }}</h3>
+              <p class="mt-1 line-clamp-2 text-xs text-muted-foreground">{{ bookCardTagline(displayTitle(card)) }}</p>
             </div>
           </RouterLink>
         </li>
@@ -80,34 +80,68 @@ import { Loader2, Sparkles } from 'lucide-vue-next'
 import { feedApi, buildFeedStreamRequest } from '@/api'
 import { feedItemShareProjectId } from '@/utils/feedOpen'
 import { bookCardTagline } from '@/utils/bookSeo'
+import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
 
 defineEmits(['start'])
 
 const { t } = useI18n()
 
 const cards = ref([])
+const itemTitleMap = ref({})
 const loading = ref(false)
 const error = ref(null)
+
+const displayTitle = (card) => {
+  if (card.projectId && itemTitleMap.value[card.projectId]) {
+    return itemTitleMap.value[card.projectId]
+  }
+  return card.fallbackTitle || t('workspace.unnamed')
+}
 
 const buildCard = (item) => {
   const projectId = feedItemShareProjectId(item)
   if (!projectId) return null
-  const title = item.name || item.nameEn || ''
-  if (!title) return null
+  const fallbackTitle = item.name || item.nameEn || ''
+  const cover = item.imageUrl || item.imageUrls?.[0] || ''
+  if (!fallbackTitle && !cover) return null
   return {
     id: item.id,
+    projectId,
     to: { name: 'project-community', params: { projectId } },
-    cover: item.imageUrl || item.imageUrls?.[0] || '',
-    title,
-    tagline: bookCardTagline(title),
+    cover,
+    fallbackTitle,
   }
+}
+
+async function loadItemDeckTitles(feedItems) {
+  const projectIds = [
+    ...new Set(
+      feedItems
+        .map((item) => feedItemShareProjectId(item))
+        .filter((id) => id && !itemTitleMap.value[id]),
+    ),
+  ]
+  if (!projectIds.length) return
+
+  await Promise.all(
+    projectIds.map(async (projectId) => {
+      const title = await resolveProjectDisplayTitle(projectId)
+      if (!title) return
+      itemTitleMap.value = {
+        ...itemTitleMap.value,
+        [projectId]: title,
+      }
+    }),
+  )
 }
 
 onMounted(async () => {
   loading.value = true
   try {
     const res = await feedApi.getFeedStream(buildFeedStreamRequest(1))
-    cards.value = (res.data || []).map(buildCard).filter(Boolean)
+    const feedItems = res.data || []
+    cards.value = feedItems.map(buildCard).filter(Boolean)
+    void loadItemDeckTitles(feedItems)
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')
   } finally {
