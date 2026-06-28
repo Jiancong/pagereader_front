@@ -60,6 +60,9 @@ export default {
       "Turn generated book summaries into a listening experience, so readers can absorb the story, ideas, and key takeaways through an easier audio feast.",
     heroCta: "Get started",
     heroDemo: "Watch demo",
+    trustedBy: {
+      tag: "Trusted by researchers, analysts, creators, and deep thinkers around the world",
+    },
     demoVideoClose: "Close demo",
     featuresTitle: "Powerful features",
     featuresSubtitle: "AI-driven analysis makes creating presentations simple and fast",

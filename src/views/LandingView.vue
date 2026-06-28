@@ -9,6 +9,7 @@
     />
     <main class="pt-16">
       <HeroSection />
+      <TrustedByMarquee />
       <GeneratorSection @start="onStart" />
       <FeatureCards />
       <EbookShowcaseSection @start="onStart" />
@@ -31,6 +32,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import HeroSection from '../components/HeroSection.vue'
+import TrustedByMarquee from '../components/TrustedByMarquee.vue'
 import GeneratorSection from '../components/GeneratorSection.vue'
 import FeatureCards from '../components/FeatureCards.vue'
 import EbookShowcaseSection from '../components/EbookShowcaseSection.vue'

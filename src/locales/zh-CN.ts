@@ -60,6 +60,9 @@ export default {
       "把生成的图书摘要同步变成可连续播放的有声内容，用更轻松的听觉盛宴吸收故事、观点与关键启发。",
     heroCta: "立即开始",
     heroDemo: "观看演示",
+    trustedBy: {
+      tag: "受到全球研究者、分析师、创作者与深度思考者的信赖",
+    },
     demoVideoClose: "关闭演示",
     featuresTitle: "强大的功能特性",
     featuresSubtitle: "AI 驱动的智能分析，让演示文稿创建变得简单高效",
