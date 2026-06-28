@@ -5133,6 +5133,12 @@ const onDocumentFigureLeftItemBlur = classic.onDocumentFigureLeftItemBlur;
                       :value-style="metricCardValueStyle"
                       @ref-click="onPptTableRefClick($event, slide)"
                     />
+                    <PptTableBlock
+                      v-else-if="shouldShowHeroLeftTable(slide) && slide.table"
+                      :table="slide.table"
+                      :page-references="slide.page_references"
+                      @ref-click="onPptTableRefClick($event, slide)"
+                    />
                     <template v-if="shouldShowHeroLeftContentItems(slide)">
                       <div
                         v-for="(ri, idx) in heroLeftContentRightItems(slide)"
