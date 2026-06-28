@@ -96,7 +96,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Loader2, Eye, Heart, Trash2, Share2 } from 'lucide-vue-next'
-import { feedApi } from '@/api'
+import { feedApi, buildFeedStreamRequest, DEFAULT_FEED_STREAM_PAGE_SIZE } from '@/api'
 import { canDeleteFeedItem, feedItemDeleteProjectId } from '@/utils/projectDelete'
 import { buildExploreProjectShareUrl, feedItemShareProjectId } from '@/utils/feedOpen'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
@@ -110,7 +110,7 @@ const emit = defineEmits(['open', 'deleted'])
 
 const { t } = useI18n()
 
-const PAGE_SIZE = 24
+const PAGE_SIZE = DEFAULT_FEED_STREAM_PAGE_SIZE
 const items = ref([])
 const page = ref(1)
 const total = ref(0)
@@ -205,12 +205,7 @@ const load = async (p) => {
   loading.value = true
   error.value = null
   try {
-    const res = await feedApi.getFeedStream({
-      page: p,
-      pageSize: PAGE_SIZE,
-      sort: 1,
-      includeUserProjects: true,
-    })
+    const res = await feedApi.getFeedStream(buildFeedStreamRequest(p, PAGE_SIZE))
     const nextItems = p === 1 ? res.data : [...items.value, ...res.data]
     items.value = nextItems
     total.value = res.total

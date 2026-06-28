@@ -77,7 +77,7 @@ import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Loader2, Sparkles } from 'lucide-vue-next'
-import { feedApi } from '@/api'
+import { feedApi, buildFeedStreamRequest } from '@/api'
 import { feedItemShareProjectId } from '@/utils/feedOpen'
 import { bookCardTagline } from '@/utils/bookSeo'
 
@@ -106,7 +106,7 @@ const buildCard = (item) => {
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await feedApi.getFeedStream({ page: 1, pageSize: 12, sort: 1 })
+    const res = await feedApi.getFeedStream(buildFeedStreamRequest(1))
     cards.value = (res.data || []).map(buildCard).filter(Boolean)
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')

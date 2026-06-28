@@ -20,6 +20,21 @@ import type {
 } from "./types"
 
 // Feed 流分页（匿名可访问，登录后返回 likedByMe）
+export const DEFAULT_FEED_STREAM_PAGE_SIZE = 24
+
+/** 与 workspace ExploreGrid 一致的 feed/stream 查询参数 */
+export function buildFeedStreamRequest(
+  page: number,
+  pageSize = DEFAULT_FEED_STREAM_PAGE_SIZE,
+): FeedStreamRequest {
+  return {
+    page,
+    pageSize,
+    sort: 1,
+    includeUserProjects: true,
+  }
+}
+
 export async function getFeedStream(req: FeedStreamRequest): Promise<FeedStreamPageDto> {
   return postJson<FeedStreamPageDto>("/www/model/feed/stream", req)
 }
