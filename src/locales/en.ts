@@ -410,10 +410,10 @@ export default {
     fork: "Fork & generate",
     slideAlt: "Slide {n}",
     noPreviewImages: "No preview images for this project",
-    chatHistory: "Chat history",
+    chatHistory: "Chat With AI",
     chatHistoryPanel: {
-      collapse: "Collapse chat history",
-      expand: "Expand chat history",
+      collapse: "Collapse",
+      expand: "Expand",
       deckReady: "Deck ready: {title} ({slides} slides)",
       deckReadyNoSlides: "Deck ready: {title}",
       relatedAsk: 'About "{term}"',

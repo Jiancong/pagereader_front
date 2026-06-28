@@ -1,5 +1,5 @@
 <template>
-  <section class="trusted-by-section pb-16 pt-4">
+  <section class="trusted-by-section">
     <p class="trusted-by-tag">
       {{ t('landing.trustedBy.tag') }}
     </p>
@@ -55,6 +55,13 @@ const logos = [
 .trusted-by-section {
   width: 100%;
   overflow: hidden;
+  border-block: 1px solid #2f3336;
+  background: linear-gradient(
+    180deg,
+    rgb(22 32 42 / 0.45) 0%,
+    rgb(15 20 25 / 0.2) 100%
+  );
+  padding-block: 2.5rem;
 }
 
 .trusted-by-tag {
@@ -64,7 +71,7 @@ const logos = [
   text-align: center;
   font-size: 0.875rem;
   line-height: 1.5;
-  color: hsl(var(--muted-foreground));
+  color: #a8b0b8;
 }
 
 .trusted-by-marquee {
@@ -98,14 +105,13 @@ const logos = [
   width: auto;
   max-width: 10rem;
   object-fit: contain;
-  opacity: 0.55;
-  filter: grayscale(1);
-  transition: opacity 0.2s ease, filter 0.2s ease;
+  opacity: 0.82;
+  filter: brightness(0) invert(1);
+  transition: opacity 0.2s ease;
 }
 
 .trusted-by-logo:hover {
-  opacity: 0.85;
-  filter: grayscale(0);
+  opacity: 1;
 }
 
 .trusted-by-mask {
@@ -119,12 +125,12 @@ const logos = [
 
 .trusted-by-mask-left {
   left: 0;
-  background: linear-gradient(to right, hsl(var(--background)), transparent);
+  background: linear-gradient(to right, #0f1419, transparent);
 }
 
 .trusted-by-mask-right {
   right: 0;
-  background: linear-gradient(to left, hsl(var(--background)), transparent);
+  background: linear-gradient(to left, #0f1419, transparent);
 }
 
 @keyframes trusted-by-scroll {
