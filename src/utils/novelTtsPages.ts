@@ -22,17 +22,34 @@ function resolveTtsVoice(text: string): string {
   return CJK_CHAR_RE.test(text) ? TTS_VOICE_ZH : TTS_VOICE_EN
 }
 
+/** Remove nav label duplicated as the first line of section body. */
+function stripLeadingSectionLabel(body: string, label: string): string {
+  const text = body.trim()
+  const navLabel = label.trim()
+  if (!text || !navLabel) return text
+
+  if (text.startsWith(navLabel)) {
+    return text.slice(navLabel.length).replace(/^\s*\n+/, "").trim()
+  }
+
+  const [firstLine, ...rest] = text.split(/\r?\n/)
+  if (firstLine?.trim().toLowerCase() === navLabel.toLowerCase()) {
+    return rest.join("\n").trim()
+  }
+
+  return text
+}
+
 export function buildTtsPagesFromNovelSections(sections: NovelGuideSection[]): TtsPageInput[] {
   return sections.map((section, index) => {
-    const title = section.label.trim()
-    // 只朗读右侧正文；左侧导航 label 不参与 TTS（避免先读一遍提纲标题）
-    const body = stripMarkdownForTts(section.markdown)
-    const text = body || title
+    const label = section.label.trim()
+    const rawBody = stripMarkdownForTts(section.markdown)
+    const body = stripLeadingSectionLabel(rawBody, label)
+    const ttsText = body || label
     return {
       index: index + 1,
-      title,
-      text,
-      voice: resolveTtsVoice(text),
+      ttsText,
+      voice: resolveTtsVoice(ttsText),
     }
   })
 }

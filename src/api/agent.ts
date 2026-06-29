@@ -417,6 +417,8 @@ export interface TtsPageInput {
   title?: string
   subtitle?: string
   text?: string
+  /** When set, backend reads this verbatim and ignores title/content assembly. */
+  ttsText?: string
   content?: string | string[]
   voice?: string
 }
