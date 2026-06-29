@@ -48,7 +48,7 @@
         class="min-w-0 flex-1 overflow-y-auto bg-card px-4 py-5 sm:px-6 sm:py-7"
         :style="contentFontStyle"
       >
-        <h1 v-if="activeSection" class="mb-5 text-xl font-semibold leading-tight text-foreground sm:text-2xl">
+        <h1 v-if="activeSection" class="mb-6 text-2xl font-semibold leading-snug text-foreground sm:text-3xl">
           {{ activeSection.label }}
         </h1>
         <ChatMarkdownBody
@@ -141,8 +141,15 @@ onMounted(() => {
 <style scoped>
 :deep(.novel-guide-markdown.markdown-body) {
   color: inherit;
-  font-size: 1rem;
-  line-height: 1.75;
+  font-size: 1.125rem;
+  line-height: 1.85;
+}
+
+@media (min-width: 640px) {
+  :deep(.novel-guide-markdown.markdown-body) {
+    font-size: 1.3125rem;
+    line-height: 1.8;
+  }
 }
 
 :deep(.novel-guide-markdown.markdown-body h2),
@@ -155,18 +162,31 @@ onMounted(() => {
 :deep(.novel-guide-markdown.markdown-body h2) {
   margin-top: 1.75rem;
   margin-bottom: 0.75rem;
-  font-size: 1.2rem;
+  font-size: 1.375rem;
+}
+
+@media (min-width: 640px) {
+  :deep(.novel-guide-markdown.markdown-body h2) {
+    font-size: 1.5rem;
+  }
 }
 
 :deep(.novel-guide-markdown.markdown-body h3) {
   margin-top: 1.25rem;
   margin-bottom: 0.5rem;
-  font-size: 1.05rem;
+  font-size: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  :deep(.novel-guide-markdown.markdown-body h3) {
+    font-size: 1.375rem;
+  }
 }
 
 :deep(.novel-guide-markdown.markdown-body p),
 :deep(.novel-guide-markdown.markdown-body li) {
   font-family: inherit;
+  margin: 0.65em 0;
 }
 
 :deep(.novel-guide-markdown.markdown-body strong) {
@@ -178,7 +198,13 @@ onMounted(() => {
   width: 100%;
   border-collapse: collapse;
   margin: 0.75rem 0 1rem;
-  font-size: 0.9375rem;
+  font-size: 1.0625rem;
+}
+
+@media (min-width: 640px) {
+  :deep(.novel-guide-markdown.markdown-body table) {
+    font-size: 1.1875rem;
+  }
 }
 
 :deep(.novel-guide-markdown.markdown-body th),
