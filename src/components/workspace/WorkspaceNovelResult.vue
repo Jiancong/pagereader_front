@@ -1,5 +1,5 @@
 <template>
-  <div class="workspace-novel-result rounded-2xl border border-border bg-card">
+  <div class="workspace-novel-result rounded-2xl border border-border bg-card overflow-hidden">
     <header class="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
       <div class="min-w-0">
         <p class="text-xs font-medium uppercase tracking-wide text-primary">{{ t("workspace.novelResultBadge") }}</p>
@@ -18,21 +18,72 @@
       </button>
     </header>
 
-    <div class="p-4 sm:p-6">
-      <ChatMarkdownBody :content="result.markdown" root-class="workspace-novel-result-markdown" />
+    <div v-if="outline.sections.length" class="novel-guide-layout">
+      <nav class="novel-guide-nav" aria-label="Novel guide sections">
+        <p v-if="outline.title" class="novel-guide-nav-book">{{ outline.title }}</p>
+        <button
+          v-for="section in outline.sections"
+          :key="section.id"
+          type="button"
+          class="novel-guide-nav-item"
+          :class="{ 'is-active': section.id === activeSectionId }"
+          @click="activeSectionId = section.id"
+        >
+          {{ section.label }}
+        </button>
+      </nav>
+
+      <article class="novel-guide-content" :style="contentFontStyle">
+        <h1 v-if="activeSection" class="novel-guide-article-title">
+          {{ activeSection.label }}
+        </h1>
+        <ChatMarkdownBody
+          v-if="activeSection"
+          :content="activeSection.markdown"
+          root-class="novel-guide-markdown"
+        />
+      </article>
+    </div>
+
+    <div v-else class="p-4 sm:p-6">
+      <ChatMarkdownBody :content="result.markdown" root-class="novel-guide-markdown" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import ChatMarkdownBody from "@/components/editor/chat/ChatMarkdownBody.vue"
+import { buildFontFamilyCss, ensureExportFontsReady } from "@/composables/useFontLoader"
+import { buildNovelGuideOutline } from "@/utils/novelGuideSections"
 import type { NovelResult } from "@/utils/novelStream"
 
 const props = defineProps<{ result: NovelResult }>()
 const emit = defineEmits<{ close: [] }>()
 const { t } = useI18n()
+
+const NOVEL_SERIF_FONT = buildFontFamilyCss("SimSun, Songti SC, STSong")
+
+const activeSectionId = ref("")
+
+const outline = computed(() =>
+  buildNovelGuideOutline({
+    markdown: props.result.markdown,
+    novelNodes: props.result.novelNodes,
+    title: props.result.title,
+  }),
+)
+
+const activeSection = computed(() =>
+  outline.value.sections.find((section) => section.id === activeSectionId.value) ??
+  outline.value.sections[0] ??
+  null,
+)
+
+const contentFontStyle = computed(() => ({
+  fontFamily: NOVEL_SERIF_FONT,
+}))
 
 const statsLine = computed(() => {
   const parts: string[] = []
@@ -47,39 +98,151 @@ const statsLine = computed(() => {
   }
   return parts.join(" · ")
 })
+
+watch(
+  () => outline.value.sections,
+  (sections) => {
+    if (!sections.length) {
+      activeSectionId.value = ""
+      return
+    }
+    if (!sections.some((section) => section.id === activeSectionId.value)) {
+      activeSectionId.value = sections[0].id
+    }
+  },
+  { immediate: true },
+)
+
+onMounted(() => {
+  void ensureExportFontsReady("SimSun")
+})
 </script>
 
 <style scoped>
-:deep(.workspace-novel-result-markdown.markdown-body) {
-  font-size: 0.9375rem;
-  line-height: 1.65;
+.novel-guide-layout {
+  display: flex;
+  min-height: min(72vh, 880px);
 }
 
-:deep(.workspace-novel-result-markdown.markdown-body h2) {
-  margin-top: 1.75rem;
-  margin-bottom: 0.75rem;
-  font-size: 1.125rem;
-  font-weight: 700;
+.novel-guide-nav {
+  flex: 0 0 min(100%, 15.5rem);
+  width: min(100%, 15.5rem);
+  background: hsl(0 0% 90%);
+  border-right: 1px solid hsl(var(--border, 220 13% 82%));
+  overflow-y: auto;
 }
 
-:deep(.workspace-novel-result-markdown.markdown-body h3) {
-  margin-top: 1.25rem;
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
+.novel-guide-nav-book {
+  margin: 0;
+  padding: 1rem 1rem 0.75rem;
+  font-size: 0.875rem;
+  font-style: italic;
+  line-height: 1.45;
+  color: hsl(0 0% 28%);
+  border-bottom: 1px solid hsl(0 0% 100%);
+}
+
+.novel-guide-nav-item {
+  display: block;
+  width: 100%;
+  padding: 0.72rem 1rem;
+  border: 0;
+  border-bottom: 1px solid hsl(0 0% 100%);
+  background: transparent;
+  text-align: left;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: hsl(0 0% 24%);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.novel-guide-nav-item:hover:not(.is-active) {
+  background: hsl(0 0% 86%);
+}
+
+.novel-guide-nav-item.is-active {
+  background: hsl(0 0% 8%);
+  color: hsl(52 100% 50%);
   font-weight: 600;
 }
 
-:deep(.workspace-novel-result-markdown.markdown-body table) {
+.novel-guide-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+  background: hsl(var(--card, 0 0% 100%));
+  padding: 1.75rem 1.5rem 2rem;
+}
+
+.novel-guide-article-title {
+  margin: 0 0 1.25rem;
+  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: hsl(var(--foreground, 0 0% 12%));
+}
+
+:deep(.novel-guide-markdown.markdown-body) {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: hsl(var(--foreground, 0 0% 16%));
+}
+
+:deep(.novel-guide-markdown.markdown-body h2),
+:deep(.novel-guide-markdown.markdown-body h3) {
+  font-family: inherit;
+  font-weight: 700;
+  color: hsl(var(--foreground, 0 0% 12%));
+}
+
+:deep(.novel-guide-markdown.markdown-body h2) {
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.2rem;
+}
+
+:deep(.novel-guide-markdown.markdown-body h3) {
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.05rem;
+}
+
+:deep(.novel-guide-markdown.markdown-body p),
+:deep(.novel-guide-markdown.markdown-body li) {
+  font-family: inherit;
+}
+
+:deep(.novel-guide-markdown.markdown-body table) {
   width: 100%;
   border-collapse: collapse;
   margin: 0.75rem 0 1rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
 }
 
-:deep(.workspace-novel-result-markdown.markdown-body th),
-:deep(.workspace-novel-result-markdown.markdown-body td) {
+:deep(.novel-guide-markdown.markdown-body th),
+:deep(.novel-guide-markdown.markdown-body td) {
   border: 1px solid hsl(var(--border, 220 13% 22%));
   padding: 0.5rem 0.65rem;
   text-align: left;
+}
+
+@media (max-width: 768px) {
+  .novel-guide-layout {
+    flex-direction: column;
+    min-height: auto;
+  }
+
+  .novel-guide-nav {
+    flex: none;
+    width: 100%;
+    max-height: 14rem;
+    border-right: 0;
+    border-bottom: 1px solid hsl(var(--border, 220 13% 82%));
+  }
+
+  .novel-guide-content {
+    padding: 1.25rem 1rem 1.5rem;
+  }
 }
 </style>

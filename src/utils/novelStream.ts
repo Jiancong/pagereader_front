@@ -40,6 +40,7 @@ export type NovelResult = {
   markdown: string
   message?: string
   novelDataUrl?: string
+  novelNodes?: NovelNode[]
   chapterCount?: number
   qaCount?: number
   characterCount?: number
@@ -569,6 +570,7 @@ export async function resolveNovelFromStreamComplete(
       pickString(root.message) ||
       undefined,
     novelDataUrl: pickNovelDataUrl(root) || undefined,
+    novelNodes: nodes ?? undefined,
     chapterCount: stats.chapterCount,
     qaCount: stats.qaCount,
     characterCount: stats.characterCount,
