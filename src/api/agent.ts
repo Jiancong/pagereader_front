@@ -13,8 +13,47 @@ import type {
   YoutubeTranscriptReq,
   YoutubeTranscriptResult,
 } from "./types"
+import { isNovelStreamPayload } from "@/utils/novelStream"
 
 const SESSION_KEY = "pr_session_id"
+
+/** 工作区 queue → 后端 chat_stream mode */
+export function mapQueueToGenerationMode(queue?: PptQueue): string | undefined {
+  if (queue === "NOVEL") return "novel"
+  if (queue === "CARD") return "card"
+  if (queue === "DOCUMENT") return "document"
+  return undefined
+}
+
+export function buildChatStreamBody(req: ChatStreamReq): Record<string, unknown> {
+  const mode =
+    req.mode ||
+    req.generationMode ||
+    req.generation_mode ||
+    req.outputMode ||
+    req.output_mode ||
+    mapQueueToGenerationMode(req.queue)
+
+  const body: Record<string, unknown> = {
+    message: req.message,
+    userId: req.userId,
+  }
+
+  if (req.projectId) body.projectId = req.projectId
+  if (req.sessionId) body.sessionId = req.sessionId
+  if (req.isAgent != null) body.isAgent = req.isAgent
+  if (req.uploaded_documents?.length) body.uploaded_documents = req.uploaded_documents
+  if (req.projectName) body.projectName = req.projectName
+  if (req.queue) body.queue = req.queue
+  if (mode) {
+    body.mode = mode
+    body.generationMode = mode
+    body.generation_mode = mode
+  }
+  if (req.enable_search != null) body.enable_search = req.enable_search
+
+  return body
+}
 
 export function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return ""
@@ -67,9 +106,11 @@ function resolveEffectiveEvent(wire: string, payload: unknown): string {
   if (status === "complete" || status === "ppt_complete" || status === "design_complete") {
     return status
   }
+  if (status === "novel_complete" || isNovelStreamPayload(p)) return "novel_complete"
   const state = normalizeEventName(String(p.state ?? ""))
   if (state === "ppt_complete") return "ppt_complete"
   if (state === "book_card_complete") return "design_complete"
+  if (state === "novel_complete") return "novel_complete"
   if (status === "error") return "error"
   if (status === "in_progress" || p.phase != null) return "progress"
 
@@ -78,7 +119,9 @@ function resolveEffectiveEvent(wire: string, payload: unknown): string {
 
 function isProgressEvent(event: string, data: unknown): boolean {
   const e = normalizeEventName(event)
-  if (e === "progress" || e === "ppt_progress" || e === "ppt_ping") return true
+  if (e === "progress" || e === "ppt_progress" || e === "ppt_ping" || e === "novel_progress" || e === "novel_ping") {
+    return true
+  }
   if (data && typeof data === "object") {
     const p = data as Record<string, unknown>
     const st = normalizeEventName(String(p.status ?? ""))
@@ -139,7 +182,7 @@ async function readSseResponse(res: Response, cb: ChatStreamCallbacks = {}): Pro
     const event = resolveEffectiveEvent(parsed.event, data)
     cb.onEvent?.(event, data, parsed.data)
 
-    if (event === "complete" || event === "ppt_complete" || event === "design_complete") {
+    if (event === "complete" || event === "ppt_complete" || event === "design_complete" || event === "novel_complete") {
       await cb.onComplete?.(data)
     } else if (event === "error") {
       const msg =
@@ -315,11 +358,54 @@ export async function chatStream(
   const res = await fetch(buildUrl("/agent/chat-stream"), {
     method: "POST",
     headers: authStreamHeaders(),
-    body: JSON.stringify(body),
+    body: JSON.stringify(buildChatStreamBody(body)),
     signal,
   })
 
   await readSseResponse(res, cb)
+}
+
+export interface RefineGenerationQueryReq {
+  query: string
+  mode?: string
+}
+
+export interface RefineGenerationQueryResult {
+  query: string
+  mode?: string
+  outputFormat?: string
+  type?: string
+}
+
+/** 可选：用户 query 未说明产物类型时，后端补全为小说导读等指令 */
+export async function refineGenerationQuery(
+  req: RefineGenerationQueryReq,
+  signal?: AbortSignal,
+): Promise<RefineGenerationQueryResult> {
+  const headers = authStreamHeaders()
+  headers.set("Accept", "application/json")
+
+  const res = await fetch(buildUrl("/generation/refine_query"), {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      query: req.query,
+      mode: req.mode ?? "novel",
+    }),
+    signal,
+  })
+
+  const json = (await res.json().catch(() => ({}))) as {
+    code?: number
+    data?: RefineGenerationQueryResult
+    message?: string
+  }
+
+  if (!res.ok || (json.code != null && json.code !== 0)) {
+    throw new ApiError(res.status, json.message || `请求失败：${res.status}`)
+  }
+
+  return json.data ?? { query: req.query, mode: req.mode }
 }
 
 export const TTS_VOICE_ZH = "zh-CN-XiaoxiaoNeural"

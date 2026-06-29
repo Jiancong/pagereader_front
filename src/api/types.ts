@@ -308,7 +308,9 @@ export interface UploadedDocument {
 }
 
 // ===== Agent 对话流 =====
-export type PptQueue = "CARD" | "DOCUMENT"
+export type PptQueue = "CARD" | "DOCUMENT" | "NOVEL"
+
+export type GenerationMode = "card" | "document" | "markdown" | "novel"
 
 export interface ChatStreamReq {
   message: string
@@ -319,8 +321,14 @@ export interface ChatStreamReq {
   uploaded_documents?: UploadedDocument[]
   /** 显式项目标题；上传 PDF 时建议传去后缀书名 */
   projectName?: string
-  /** CARD 60 credits/run (package only); DOCUMENT 30 credits/run (daily free first) */
+  /** CARD 60 credits/run (package only); DOCUMENT/NOVEL 30 credits/run (daily free first) */
   queue?: PptQueue
+  /** 后端 generation mode：novel / document / card / markdown（与 queue 二选一或同时传） */
+  mode?: string
+  generationMode?: string
+  generation_mode?: string
+  outputMode?: string
+  output_mode?: string
   /** 一句话生成：是否启用联网搜索；上传文档时不传 */
   enable_search?: boolean
 }

@@ -8,6 +8,7 @@ import { CREDITS_INSUFFICIENT, type PptQueue, type SubscribeMyStatus } from "./t
 export const QUEUE_CREDIT_COST: Record<PptQueue, number> = {
   CARD: 60,
   DOCUMENT: 30,
+  NOVEL: 30,
 }
 
 function parseCredits(v: unknown): number {
@@ -32,7 +33,7 @@ export function getPackageCreditsRemaining(status: SubscribeMyStatus | null | un
   )
 }
 
-/** CARD：仅套餐；DOCUMENT：每日免费 + 套餐 */
+/** CARD：仅套餐；DOCUMENT / NOVEL：每日免费 + 套餐 */
 export function canAffordQueue(status: SubscribeMyStatus | null | undefined, queue: PptQueue): boolean {
   const cost = QUEUE_CREDIT_COST[queue]
   const daily = getDailyCreditsRemaining(status)

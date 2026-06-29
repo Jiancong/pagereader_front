@@ -49,6 +49,10 @@
         />
       </div>
 
+      <div v-else-if="novelResult" class="mb-8 min-w-0">
+        <WorkspaceNovelResult :result="novelResult" @close="() => {}" />
+      </div>
+
       <div v-else-if="images.length" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <img
           v-for="(src, i) in images"
@@ -96,6 +100,8 @@ import {
   pickProjectFallbackTitle,
   pickPptDataTitle,
 } from '@/utils/projectTitle'
+import { resolveNovelFromHistory } from '@/utils/novelStream'
+import WorkspaceNovelResult from '@/components/workspace/WorkspaceNovelResult.vue'
 
 const props = defineProps({
   projectId: { type: String, required: true },
@@ -108,6 +114,7 @@ const { t } = useI18n()
 const project = ref(null)
 const history = ref([])
 const pptData = ref(null)
+const novelResult = ref(null)
 const deckMarkdown = ref('')
 const loading = ref(false)
 const loadingDeck = ref(false)
@@ -119,6 +126,7 @@ const sharedToCommunity = computed(() => isSharedToCommunity(project.value))
 /** 内容已就绪：PPT deck 或书籍卡片预览图 */
 const canShare = computed(() => {
   if (pptData.value) return true
+  if (novelResult.value?.markdown) return true
   return hasShareableContent(project.value, history.value)
 })
 
@@ -153,6 +161,7 @@ const generatedDeckTitle = computed(() => {
 
 const previewTitle = computed(
   () =>
+    novelResult.value?.title ||
     generatedDeckTitle.value ||
     pickProjectFallbackTitle(project.value) ||
     t('workspace.unnamedProject'),
@@ -176,6 +185,15 @@ const projectMarkdown = computed(() =>
   pickMarkdownFromHistory(history.value) ||
   '',
 )
+
+async function loadNovelGuide(id, hist) {
+  const resolved = await resolveNovelFromHistory(hist)
+  if (resolved?.markdown) {
+    novelResult.value = resolved
+    return true
+  }
+  return false
+}
 
 async function loadPptDeck(id, proj, hist) {
   const urls = collectDeckUrls(proj, hist)
@@ -204,6 +222,7 @@ const run = async (id) => {
   project.value = null
   history.value = []
   pptData.value = null
+  novelResult.value = null
   deckMarkdown.value = ''
   try {
     const [proj, hist] = await Promise.all([
@@ -212,7 +231,10 @@ const run = async (id) => {
     ])
     project.value = proj
     history.value = hist
-    await loadPptDeck(id, proj, hist)
+    const loadedNovel = await loadNovelGuide(id, hist)
+    if (!loadedNovel) {
+      await loadPptDeck(id, proj, hist)
+    }
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')
   } finally {

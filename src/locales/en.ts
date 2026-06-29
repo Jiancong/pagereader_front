@@ -219,6 +219,7 @@ export default {
       "Each mode is charged per run; follow-ups in the same project are not charged again. Daily free credits apply to document generation only (no rollover).",
     usageDocument: "Document generation · Presentations",
     usageDocumentCredits: "30 credits / run",
+    usageNovelCredits: "30 credits / run",
     usageDocumentDesc:
       "Structure books and documents into PPT-style decks—great for sharing, teaching, and reports. Daily free credits are used first, then package credits.",
     usageCard: "Card generation · Visual summaries",
@@ -451,8 +452,11 @@ export default {
     uploadTitle: "Upload a document",
     uploadHint: "PDF, Word, TXT, etc.—AI extracts key content for your deck",
     uploadTitleCard: "Upload a book for card distillation",
+    uploadTitleNovel: "Upload a novel or book for a reading guide",
     uploadHintCard:
       "PDF, Word, TXT, etc.—AI distills the book's core ideas into easy-to-review knowledge cards",
+    uploadHintNovel:
+      "PDF, Word, TXT, etc.—AI generates a Markdown guide with summary, characters, chapter notes, and Q&A",
     pickFile: "Choose file",
     uploadFormatsShort: "PDF, Word, TXT, Markdown",
     uploadPromptLabel: "Your analysis request",
@@ -464,11 +468,14 @@ export default {
       "Extract the book's core ideas into a 12-slide reading share deck; focus on character relationships and thematic shifts…",
     uploadPromptDefaultCard:
       "Distill the book's key ideas and quotes into review-friendly knowledge cards—cover characters, themes, and actionable insights…",
+    uploadPromptDefaultNovel:
+      "Analyze this novel and generate a Markdown reading guide with summary, character table, chapter notes, and Q&A",
     uploadPromptPlaceholder: "Edit the default request as needed…",
     uploadPromptPlaceholderCard: "Edit the default distillation request as needed…",
     analyzingDoc: "Analyzing document…",
     analyzeAndGenerate: "Analyze & generate",
     analyzeAndGenerateCard: "Analyze & generate cards",
+    analyzeAndGenerateNovel: "Analyze & generate guide",
     progressTitle: "Progress",
     elapsedTime: "Elapsed {time}",
     preparing: "Preparing…",
@@ -501,8 +508,9 @@ export default {
     queueLabel: "Generation mode",
     queueCard: "Card Mode",
     queueDocument: "Document Mode",
+    queueNovel: "Novel Guide",
     queueHint:
-      "Card mode distills core ideas into easy-to-review theme cards; Document mode generates a full, structured presentation.",
+      "Card mode distills core ideas into theme cards; Document mode builds a full deck; Novel Guide mode produces a Markdown reading guide from uploaded books.",
     creditsInsufficient: "Not enough credits to generate a deck",
     creditsInsufficientCta: "Subscribe or upgrade",
     cardResultTitle: "Theme cards",
@@ -512,6 +520,16 @@ export default {
     cardResultClose: "Close",
     cardResultReady: "Cards are ready",
     cardResultEmpty: "Generation finished, but no card content could be parsed",
+    loadingNovel: "Generating novel guide…",
+    loadNovelFailed: "Could not load the novel guide. Check your network and try again.",
+    novelResultTitle: "Novel reading guide",
+    novelResultBadge: "Novel Guide",
+    novelResultClose: "Close",
+    novelResultReady: "Novel guide is ready",
+    novelResultEmpty: "Generation finished, but no novel guide content was found",
+    novelResultChapters: "{n} chapter notes",
+    novelResultCharacters: "{n} characters",
+    novelResultQa: "{n} Q&A pairs",
     assets: {
       nav: "Assets",
       title: "Assets",

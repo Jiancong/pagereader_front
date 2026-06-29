@@ -1,4 +1,5 @@
 import { isPptStreamPayload } from "@/utils/pptCompletePayload"
+import { isNovelStreamPayload } from "@/utils/novelStream"
 
 export type BookCardResult = {
   content: string
@@ -25,6 +26,7 @@ export function stripMarkdownImages(markdown: string): string {
 
 export function isBookCardStreamPayload(data: unknown): boolean {
   if (!data || typeof data !== "object") return false
+  if (isNovelStreamPayload(data)) return false
   if (isPptStreamPayload(data)) return false
   const o = data as Record<string, unknown>
   const status = String(o.status ?? "").toLowerCase()

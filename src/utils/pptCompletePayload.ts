@@ -3,6 +3,7 @@
 
 import { enrichPptDataChapterImages } from "./pptChapterImages"
 import { pickMarkdownFromPayload } from "./pptMarkdownSource"
+import { isNovelStreamPayload } from "./novelStream"
 
 export type PptStreamCompleteResult = {
   pptData: Record<string, unknown>
@@ -18,6 +19,7 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 export function isPptStreamPayload(payload: unknown): boolean {
   const root = asRecord(payload)
   if (!root) return false
+  if (isNovelStreamPayload(payload)) return false
   const state = String(root.state ?? "").toLowerCase()
   const status = String(root.status ?? "").toLowerCase()
   if (state === "ppt_complete" || status === "ppt_complete") return true

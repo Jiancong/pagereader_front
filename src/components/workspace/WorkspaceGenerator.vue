@@ -1,5 +1,5 @@
 <template>
-  <div :class="(activeTask.pptData || activeTask.cardResult) ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)]' : 'mx-auto w-full min-w-0 max-w-3xl'">
+  <div :class="(activeTask.pptData || activeTask.cardResult || activeTask.novelResult) ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)]' : 'mx-auto w-full min-w-0 max-w-3xl'">
     <!-- Tab 切换：两套任务状态独立，可并行生成 -->
     <div class="mb-4 flex w-full justify-center sm:mb-8">
         <div class="inline-flex max-w-full flex-wrap justify-center gap-1 rounded-xl border border-border bg-secondary/30 p-1 sm:flex-nowrap sm:gap-0 sm:p-1.5">
@@ -42,9 +42,16 @@
         </div>
     </div>
 
+    <!-- 已生成：小说导读 -->
+    <WorkspaceNovelResult
+      v-if="activeTask.novelResult"
+      :result="activeTask.novelResult"
+      @close="resetActiveTask"
+    />
+
     <!-- 已生成：卡片模式结果 -->
     <WorkspaceCardResult
-      v-if="activeTask.cardResult"
+      v-else-if="activeTask.cardResult"
       :result="activeTask.cardResult"
       @close="resetActiveTask"
     />
@@ -74,6 +81,11 @@
             <input v-model="activeTask.queue" type="radio" value="DOCUMENT" class="accent-primary" />
             <span>{{ t('workspace.queueDocument') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageDocumentCredits') }})</span>
+          </label>
+          <label class="flex cursor-pointer items-center gap-2 text-sm">
+            <input v-model="activeTask.queue" type="radio" value="NOVEL" class="accent-primary" />
+            <span>{{ t('workspace.queueNovel') }}</span>
+            <span class="text-muted-foreground">({{ t('pricing.usageNovelCredits') }})</span>
           </label>
         </div>
         <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.queueHint') }}</p>
@@ -302,11 +314,17 @@ import { useI18n } from "vue-i18n"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube } from "lucide-vue-next"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
+import WorkspaceNovelResult from "@/components/workspace/WorkspaceNovelResult.vue"
 import {
   isBookCardStreamPayload,
   parseBookCardStreamPayload,
   type BookCardResult,
 } from "@/utils/bookCardStream"
+import {
+  isNovelStreamPayload,
+  resolveNovelFromStreamComplete,
+  type NovelResult,
+} from "@/utils/novelStream"
 import {
   authApi,
   fileApi,
@@ -347,6 +365,7 @@ type GeneratorTask = {
   pptData: any
   markdown: string
   cardResult: BookCardResult | null
+  novelResult: NovelResult | null
   projectId: string
   queue: PptQueue
   showCreditsCta: boolean
@@ -364,6 +383,7 @@ function createTask(defaultQueue: PptQueue): GeneratorTask {
     pptData: null,
     markdown: "",
     cardResult: null,
+    novelResult: null,
     projectId: "",
     queue: defaultQueue,
     showCreditsCta: false,
@@ -410,9 +430,11 @@ const activeTask = computed(() => {
 })
 const isYoutubeUrlValid = computed(() => agentApi.isLikelyYoutubeUrl(youtubeUrl.value))
 const isCardMode = computed(() => activeTask.value.queue === "CARD")
+const isNovelMode = computed(() => activeTask.value.queue === "NOVEL")
 const activeLastLogs = computed(() => activeTask.value.logs.slice(-3))
 
 function workspaceCopyKey(suffix: string): string {
+  if (isNovelMode.value) return `workspace.${suffix}Novel`
   return isCardMode.value ? `workspace.${suffix}Card` : `workspace.${suffix}`
 }
 
@@ -466,6 +488,32 @@ const tabClass = (tab: "prompt" | "upload" | "youtube") => [
 ]
 
 const appendLog = (task: GeneratorTask, line: string) => task.logs.push(line)
+
+async function handleNovelStreamComplete(
+  task: GeneratorTask,
+  data: unknown,
+  mode: "prompt" | "upload",
+) {
+  stopTaskTimer(task)
+  appendLog(task, t("workspace.loadingNovel"))
+  try {
+    const resolved = await resolveNovelFromStreamComplete(data)
+    if (resolved?.markdown) {
+      task.novelResult = resolved
+      appendLog(task, resolved.message || t("workspace.novelResultReady"))
+      gtmGenerateComplete(mode, task.queue, task.projectId)
+      emit("project-complete", task.projectId)
+    } else {
+      task.errorMsg = t("workspace.novelResultEmpty")
+      gtmGenerateFail(mode, "other")
+    }
+  } catch {
+    task.errorMsg = t("workspace.loadNovelFailed")
+    gtmGenerateFail(mode, "network")
+  } finally {
+    await refreshCreditsBar()
+  }
+}
 
 async function handlePptStreamComplete(
   task: GeneratorTask,
@@ -553,9 +601,13 @@ function docBaseName(filename: string): string {
 /** 按当前 RAG 任务 queue，填充上传分析默认诉求（随 Card / Document 模式切换） */
 function applyDefaultUploadPrompt() {
   if (!hasAttachedDoc.value) return
-  uploadPrompt.value = t(
-    ragTask.queue === "CARD" ? "workspace.uploadPromptDefaultCard" : "workspace.uploadPromptDefault",
-  )
+  const key =
+    ragTask.queue === "CARD"
+      ? "workspace.uploadPromptDefaultCard"
+      : ragTask.queue === "NOVEL"
+        ? "workspace.uploadPromptDefaultNovel"
+        : "workspace.uploadPromptDefault"
+  uploadPrompt.value = t(key)
 }
 
 watch(
@@ -709,7 +761,11 @@ const runStream = async (
         if (line) appendLog(task, line)
       },
       onEvent: async (event, data) => {
-        if (task.cardResult || task.pptData) return
+        if (task.cardResult || task.pptData || task.novelResult) return
+        if (event === "novel_complete" || (event === "complete" && isNovelStreamPayload(data))) {
+          await handleNovelStreamComplete(task, data, mode)
+          return
+        }
         if (event === "ppt_complete" || (event === "design_complete" && isPptStreamPayload(data))) {
           await handlePptStreamComplete(task, data, mode)
           return
@@ -719,8 +775,12 @@ const runStream = async (
         }
       },
       onComplete: async (data: unknown) => {
-        if (task.pptData || task.cardResult) return
+        if (task.pptData || task.cardResult || task.novelResult) return
         const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+        if (isNovelStreamPayload(o)) {
+          await handleNovelStreamComplete(task, data, mode)
+          return
+        }
         if (isPptStreamPayload(o)) {
           await handlePptStreamComplete(task, data, mode)
           return
@@ -749,6 +809,7 @@ const startTask = (task: GeneratorTask) => {
   task.pptData = null
   task.markdown = ""
   task.cardResult = null
+  task.novelResult = null
   task.projectId = newProjectId()
   task.streamRequestId = null
   task.logs = []
@@ -912,6 +973,7 @@ const resetActiveTask = () => {
   activeTask.value.pptData = null
   activeTask.value.markdown = ""
   activeTask.value.cardResult = null
+  activeTask.value.novelResult = null
   activeTask.value.projectId = ""
 }
 
