@@ -7,6 +7,8 @@ import {
   getProjectConversationHistory,
 } from "@/api/feed"
 
+const NOVEL_LOCAL_CACHE_PREFIX = "pr_novel_cache_v1:"
+
 export type NovelNode = {
   node_key?: string
   title?: string
@@ -45,6 +47,21 @@ export type NovelResult = {
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null
+}
+
+function parseMetadataRecord(metadata: unknown): Record<string, unknown> | null {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    return metadata as Record<string, unknown>
+  }
+  if (typeof metadata === "string") {
+    try {
+      const parsed = JSON.parse(metadata)
+      return asRecord(parsed)
+    } catch {
+      return null
+    }
+  }
+  return null
 }
 
 function pickString(v: unknown): string {
@@ -239,7 +256,7 @@ function pickNovelSummaryContent(response: string): string {
 }
 
 function isNovelHistoryRow(rec: Record<string, unknown>): boolean {
-  const meta = asRecord(rec.metadata)
+  const meta = parseMetadataRecord(rec.metadata)
   if (meta && isNovelMetadata(meta)) return true
   if (isNovelStreamPayload(rec)) return true
   if (isNovelStreamPayload(meta)) return true
@@ -258,7 +275,7 @@ function isNovelHistoryRow(rec: Record<string, unknown>): boolean {
 }
 
 function mergeNovelPayloadFromHistoryRow(rec: Record<string, unknown>): Record<string, unknown> {
-  const meta = asRecord(rec.metadata) ?? {}
+  const meta = parseMetadataRecord(rec.metadata) ?? {}
   const response = pickString(rec.content) || pickString(meta.response)
   const url = pickNovelDataUrl(rec) || pickNovelDataUrl(meta)
   const imageUrls = Array.isArray(rec.imageUrls) ? rec.imageUrls : []
@@ -303,7 +320,7 @@ export function collectNovelUrls(
   for (const row of assistantRows) {
     const rec = asRecord(row)
     if (!rec) continue
-    const meta = asRecord(rec.metadata)
+    const meta = parseMetadataRecord(rec.metadata)
     const fromMeta = pickNovelDataUrl(meta ?? {})
     if (fromMeta) urls.push(fromMeta)
     const fromRow = pickNovelDataUrl(rec)
@@ -385,7 +402,7 @@ function historyAlreadyHasNovelGuide(history: unknown[]): boolean {
 
     if (pickNovelNodes(rec)?.length) return true
 
-    const meta = asRecord(rec.metadata)
+    const meta = parseMetadataRecord(rec.metadata)
     if (meta && pickNovelNodes(meta)?.length) return true
 
     if (pickNovelDataUrl(rec) || pickNovelDataUrl(meta ?? {})) return true
@@ -396,24 +413,65 @@ function historyAlreadyHasNovelGuide(history: unknown[]): boolean {
   return false
 }
 
+/** 本地缓存 novel_complete（后端 history 未落库时的兜底，同浏览器可恢复） */
+export function cacheNovelResultLocally(projectId: string, payload: unknown): void {
+  if (typeof window === "undefined") return
+  const id = String(projectId || "").trim()
+  const root = asRecord(payload)
+  if (!id || !root || !isNovelStreamPayload(root)) return
+
+  try {
+    const record = buildNovelHistoryAssistantRecord(payload)
+    window.localStorage.setItem(
+      `${NOVEL_LOCAL_CACHE_PREFIX}${id}`,
+      JSON.stringify({
+        payload: root,
+        record,
+        savedAt: Date.now(),
+      }),
+    )
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function readNovelPayloadFromLocalCache(projectId: string): Record<string, unknown> | null {
+  if (typeof window === "undefined") return null
+  const id = String(projectId || "").trim()
+  if (!id) return null
+  try {
+    const raw = window.localStorage.getItem(`${NOVEL_LOCAL_CACHE_PREFIX}${id}`)
+    if (!raw) return null
+    const parsed = asRecord(JSON.parse(raw))
+    if (!parsed) return null
+    return asRecord(parsed.payload) ?? asRecord(parsed.record)
+  } catch {
+    return null
+  }
+}
+
 /** novel_complete 完成后写入 conversation/history（后端未落库时的兜底） */
 export async function persistNovelCompleteToHistory(
   projectId: string,
   payload: unknown,
-): Promise<void> {
+): Promise<boolean> {
   const id = String(projectId || "").trim()
-  if (!id || !isNovelStreamPayload(payload)) return
+  if (!id || !isNovelStreamPayload(payload)) return false
+
+  cacheNovelResultLocally(id, payload)
 
   try {
     const hist = await getProjectConversationHistory(id).catch(() => [])
-    if (historyAlreadyHasNovelGuide(hist)) return
+    if (historyAlreadyHasNovelGuide(hist)) return true
 
     const record = buildNovelHistoryAssistantRecord(payload)
-    if (!record) return
+    if (!record) return false
 
     await appendProjectConversationMessage(id, record)
-  } catch {
-    /* chat-stream 可能已由后端写入；忽略重复或接口未就绪 */
+    return true
+  } catch (error) {
+    console.warn("[novel] failed to persist assistant message to conversation/history", error)
+    return false
   }
 }
 
@@ -522,7 +580,7 @@ export function pickNovelMetadataFromHistory(history: unknown[]): Record<string,
     const row = history[i]
     const rec = asRecord(row)
     if (!rec) continue
-    if (rec.role !== "assistant" && !asRecord(rec.metadata)) continue
+    if (rec.role !== "assistant" && !parseMetadataRecord(rec.metadata)) continue
     if (!isNovelHistoryRow(rec)) continue
     return mergeNovelPayloadFromHistoryRow(rec)
   }
@@ -548,6 +606,17 @@ export async function resolveNovelFromHistory(
       remote_url: url,
     })
     if (resolved) return resolved
+  }
+
+  const projectId = String(
+    project?.id ?? asRecord(history[0])?.projectId ?? "",
+  ).trim()
+  if (projectId) {
+    const cached = readNovelPayloadFromLocalCache(projectId)
+    if (cached) {
+      const resolved = await resolveNovelFromStreamComplete(cached)
+      if (resolved) return resolved
+    }
   }
 
   return null

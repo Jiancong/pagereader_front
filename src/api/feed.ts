@@ -1,7 +1,7 @@
 // 读书 / 探索 Feed 模块
 // @author hc @date 2026-06-03
 
-import { del, get, postForm, postJson } from "./client"
+import { ApiError, del, get, postForm, postJson } from "./client"
 import type {
   FeedStreamRequest,
   FeedStreamPageDto,
@@ -76,12 +76,49 @@ export async function getProject(id: string): Promise<ProjectVo> {
 export function normalizeProjectConversationHistory(
   data: ConversationHistoryVo[] | ProjectConversationHistoryBundleVo | unknown,
 ): ConversationHistoryVo[] {
-  if (Array.isArray(data)) return data
+  if (Array.isArray(data)) return data.map(normalizeConversationHistoryRow)
   if (data && typeof data === "object") {
     const bundle = data as ProjectConversationHistoryBundleVo
-    if (Array.isArray(bundle.messages)) return bundle.messages
+    if (Array.isArray(bundle.messages)) {
+      return bundle.messages.map(normalizeConversationHistoryRow)
+    }
   }
   return []
+}
+
+/** 后端 history 的 metadata 常为 JSON 字符串，统一解析为对象 */
+export function normalizeConversationHistoryRow(
+  row: ConversationHistoryVo,
+): ConversationHistoryVo {
+  const metadata = row.metadata
+  if (typeof metadata !== "string") return row
+  try {
+    return { ...row, metadata: JSON.parse(metadata) as unknown }
+  } catch {
+    return row
+  }
+}
+
+function serializeConversationMessageForApi(
+  projectId: string,
+  message: Omit<ConversationHistoryVo, "id" | "projectId">,
+): Record<string, unknown> {
+  const metadata = message.metadata
+  return {
+    projectId,
+    sessionId: projectId,
+    role: message.role,
+    content: message.content,
+    imageUrls: message.imageUrls,
+    markdown: message.markdown,
+    markdow: message.markdown,
+    metadata:
+      metadata == null
+        ? undefined
+        : typeof metadata === "string"
+          ? metadata
+          : JSON.stringify(metadata),
+  }
 }
 
 export async function getProjectConversationHistory(
@@ -93,15 +130,32 @@ export async function getProjectConversationHistory(
   return normalizeProjectConversationHistory(data)
 }
 
-/** 追加一条对话记录（novel_complete 等产物落库） */
+const CONVERSATION_APPEND_PATHS = [
+  (projectId: string) => `/project/${encodeURIComponent(projectId)}/conversation/history`,
+  (projectId: string) => `/project/${encodeURIComponent(projectId)}/conversation/history/append`,
+  (projectId: string) => `/project/${encodeURIComponent(projectId)}/conversation/messages`,
+] as const
+
+/** 追加一条对话记录（novel_complete 等产物落库；依次尝试后端可能的路径） */
 export async function appendProjectConversationMessage(
   projectId: string,
   message: Omit<ConversationHistoryVo, "id" | "projectId">,
 ): Promise<void> {
-  await postJson<unknown>(
-    `/project/${encodeURIComponent(projectId)}/conversation/history/append`,
-    message,
-  )
+  const body = serializeConversationMessageForApi(projectId, message)
+  let lastError: unknown
+
+  for (const buildPath of CONVERSATION_APPEND_PATHS) {
+    try {
+      await postJson<unknown>(buildPath(projectId), body)
+      return
+    } catch (error) {
+      lastError = error
+      const code = error instanceof ApiError ? error.code : 0
+      if (code !== 404 && code !== 405) throw error
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("conversation append failed")
 }
 
 /** 上传项目封面（需登录且为 owner） */
