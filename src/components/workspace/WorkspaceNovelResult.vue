@@ -414,4 +414,13 @@ onMounted(() => {
 :deep(.novel-guide-markdown.markdown-body th) {
   @apply bg-secondary text-foreground;
 }
+
+:deep(.novel-guide-markdown.markdown-body img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+  border-radius: 8px;
+  border: 1px solid hsl(var(--border) / 0.6);
+}
 </style>
