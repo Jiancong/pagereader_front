@@ -72,6 +72,21 @@ function splitH3Blocks(body: string): Array<{ label: string; markdown: string }>
   return blocks
 }
 
+function buildQaListMarkdown(items: NovelNode["items"]): string {
+  if (!Array.isArray(items) || !items.length) return ""
+
+  const parts: string[] = []
+  for (const item of items) {
+    const q = pickString(item?.question)
+    const a = pickString(item?.answer)
+    if (!q && !a) continue
+    const prefix = item?.index != null ? `${item.index}. ` : ""
+    if (q) parts.push(`### ${prefix}${q}`, "")
+    if (a) parts.push(a, "")
+  }
+  return parts.join("\n").trim()
+}
+
 function buildCharacterTableMarkdown(node: NovelNode): string {
   const table = pickString(node.table_markdown)
   if (table) return table
@@ -130,19 +145,13 @@ function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
     }
 
     if (contentType === "qa_list" || nodeKey === "qa") {
-      const items = Array.isArray(node.items) ? node.items : []
-      items.forEach((item, index) => {
-        const q = pickString(item.question)
-        const a = pickString(item.answer)
-        if (!q && !a) return
-        const prefix = item.index != null ? `${item.index}. ` : ""
-        const label = q ? truncateLabel(`${prefix}${q}`) : `问答 ${index + 1}`
-        sections.push({
-          id: `qa-${item.index ?? index + 1}`,
-          kind: "qa",
-          label,
-          markdown: a || q,
-        })
+      const markdown = buildQaListMarkdown(node.items)
+      if (!markdown) continue
+      sections.push({
+        id: "qa",
+        kind: "qa",
+        label: heading || "问答",
+        markdown,
       })
       continue
     }
@@ -188,17 +197,26 @@ function parseMarkdownSections(markdown: string): NovelGuideSection[] {
     const sectionBody = body.slice(start, end).trim()
     const inferred = inferSectionKind(heading)
 
-    if (inferred === "chapter_group" || inferred === "qa_group") {
-      const kind: NovelGuideSectionKind = inferred === "chapter_group" ? "chapter" : "qa"
+    if (inferred === "chapter_group") {
       const blocks = splitH3Blocks(sectionBody)
       blocks.forEach((block, index) => {
         const label = block.label || `${heading} ${index + 1}`
         sections.push({
-          id: `${kind}-${slugify(label) || index + 1}`,
-          kind,
+          id: `chapter-${slugify(label) || index + 1}`,
+          kind: "chapter",
           label: truncateLabel(label),
           markdown: block.markdown,
         })
+      })
+      continue
+    }
+
+    if (inferred === "qa_group") {
+      sections.push({
+        id: "qa",
+        kind: "qa",
+        label: heading,
+        markdown: sectionBody,
       })
       continue
     }
