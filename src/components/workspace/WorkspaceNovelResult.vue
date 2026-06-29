@@ -1,5 +1,5 @@
 <template>
-  <div class="workspace-novel-result rounded-2xl border border-border bg-card overflow-hidden">
+  <div class="workspace-novel-result overflow-hidden rounded-2xl border border-border bg-card">
     <header class="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
       <div class="min-w-0">
         <p class="text-xs font-medium uppercase tracking-wide text-primary">{{ t("workspace.novelResultBadge") }}</p>
@@ -18,23 +18,37 @@
       </button>
     </header>
 
-    <div v-if="outline.sections.length" class="novel-guide-layout">
-      <nav class="novel-guide-nav" aria-label="Novel guide sections">
-        <p v-if="outline.title" class="novel-guide-nav-book">{{ outline.title }}</p>
+    <div
+      v-if="outline.sections.length"
+      class="flex min-h-[min(72vh,880px)] flex-col md:flex-row"
+    >
+      <nav
+        class="max-h-56 shrink-0 overflow-y-auto border-border bg-secondary/20 md:max-h-none md:w-64 md:border-b-0 md:border-r"
+        aria-label="Novel guide sections"
+      >
+        <p
+          v-if="outline.title"
+          class="border-b border-border px-4 py-3 text-sm italic leading-snug text-muted-foreground"
+        >
+          {{ outline.title }}
+        </p>
         <button
           v-for="section in outline.sections"
           :key="section.id"
           type="button"
-          class="novel-guide-nav-item"
-          :class="{ 'is-active': section.id === activeSectionId }"
+          class="block w-full border-b border-border/60 px-4 py-2.5 text-left text-sm leading-snug transition-colors last:border-b-0"
+          :class="navItemClass(section.id)"
           @click="activeSectionId = section.id"
         >
           {{ section.label }}
         </button>
       </nav>
 
-      <article class="novel-guide-content" :style="contentFontStyle">
-        <h1 v-if="activeSection" class="novel-guide-article-title">
+      <article
+        class="min-w-0 flex-1 overflow-y-auto bg-card px-4 py-5 sm:px-6 sm:py-7"
+        :style="contentFontStyle"
+      >
+        <h1 v-if="activeSection" class="mb-5 text-xl font-semibold leading-tight text-foreground sm:text-2xl">
           {{ activeSection.label }}
         </h1>
         <ChatMarkdownBody
@@ -85,6 +99,12 @@ const contentFontStyle = computed(() => ({
   fontFamily: NOVEL_SERIF_FONT,
 }))
 
+function navItemClass(sectionId: string) {
+  return sectionId === activeSectionId.value
+    ? "bg-primary font-medium text-primary-foreground"
+    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+}
+
 const statsLine = computed(() => {
   const parts: string[] = []
   if (props.result.chapterCount != null) {
@@ -119,81 +139,17 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.novel-guide-layout {
-  display: flex;
-  min-height: min(72vh, 880px);
-}
-
-.novel-guide-nav {
-  flex: 0 0 min(100%, 15.5rem);
-  width: min(100%, 15.5rem);
-  background: hsl(0 0% 90%);
-  border-right: 1px solid hsl(var(--border, 220 13% 82%));
-  overflow-y: auto;
-}
-
-.novel-guide-nav-book {
-  margin: 0;
-  padding: 1rem 1rem 0.75rem;
-  font-size: 0.875rem;
-  font-style: italic;
-  line-height: 1.45;
-  color: hsl(0 0% 28%);
-  border-bottom: 1px solid hsl(0 0% 100%);
-}
-
-.novel-guide-nav-item {
-  display: block;
-  width: 100%;
-  padding: 0.72rem 1rem;
-  border: 0;
-  border-bottom: 1px solid hsl(0 0% 100%);
-  background: transparent;
-  text-align: left;
-  font-size: 0.875rem;
-  line-height: 1.4;
-  color: hsl(0 0% 24%);
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.novel-guide-nav-item:hover:not(.is-active) {
-  background: hsl(0 0% 86%);
-}
-
-.novel-guide-nav-item.is-active {
-  background: hsl(0 0% 8%);
-  color: hsl(52 100% 50%);
-  font-weight: 600;
-}
-
-.novel-guide-content {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-y: auto;
-  background: hsl(var(--card, 0 0% 100%));
-  padding: 1.75rem 1.5rem 2rem;
-}
-
-.novel-guide-article-title {
-  margin: 0 0 1.25rem;
-  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
-  font-weight: 700;
-  line-height: 1.25;
-  color: hsl(var(--foreground, 0 0% 12%));
-}
-
 :deep(.novel-guide-markdown.markdown-body) {
+  color: inherit;
   font-size: 1rem;
   line-height: 1.75;
-  color: hsl(var(--foreground, 0 0% 16%));
 }
 
 :deep(.novel-guide-markdown.markdown-body h2),
 :deep(.novel-guide-markdown.markdown-body h3) {
   font-family: inherit;
   font-weight: 700;
-  color: hsl(var(--foreground, 0 0% 12%));
+  color: inherit;
 }
 
 :deep(.novel-guide-markdown.markdown-body h2) {
@@ -213,6 +169,11 @@ onMounted(() => {
   font-family: inherit;
 }
 
+:deep(.novel-guide-markdown.markdown-body strong) {
+  color: inherit;
+  font-weight: 700;
+}
+
 :deep(.novel-guide-markdown.markdown-body table) {
   width: 100%;
   border-collapse: collapse;
@@ -222,27 +183,10 @@ onMounted(() => {
 
 :deep(.novel-guide-markdown.markdown-body th),
 :deep(.novel-guide-markdown.markdown-body td) {
-  border: 1px solid hsl(var(--border, 220 13% 22%));
-  padding: 0.5rem 0.65rem;
-  text-align: left;
+  @apply border border-border px-2.5 py-2 text-left;
 }
 
-@media (max-width: 768px) {
-  .novel-guide-layout {
-    flex-direction: column;
-    min-height: auto;
-  }
-
-  .novel-guide-nav {
-    flex: none;
-    width: 100%;
-    max-height: 14rem;
-    border-right: 0;
-    border-bottom: 1px solid hsl(var(--border, 220 13% 82%));
-  }
-
-  .novel-guide-content {
-    padding: 1.25rem 1rem 1.5rem;
-  }
+:deep(.novel-guide-markdown.markdown-body th) {
+  @apply bg-secondary text-foreground;
 }
 </style>
