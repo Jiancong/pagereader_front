@@ -110,10 +110,10 @@
 
     <div
       v-if="outline.sections.length"
-      class="flex min-h-[min(72vh,880px)] flex-col md:flex-row"
+      class="flex h-[min(72vh,880px)] min-h-0 flex-col md:flex-row"
     >
       <nav
-        class="max-h-56 shrink-0 overflow-y-auto border-border bg-secondary/20 md:max-h-none md:w-64 md:border-b-0 md:border-r"
+        class="novel-guide-nav max-h-56 shrink-0 overflow-y-auto border-border bg-secondary/20 md:max-h-full md:min-h-0 md:w-64 md:border-b-0 md:border-r"
         aria-label="Novel guide sections"
       >
         <p
@@ -135,7 +135,7 @@
       </nav>
 
       <article
-        class="min-w-0 flex-1 overflow-y-auto bg-card px-4 py-5 sm:px-6 sm:py-7"
+        class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-card px-4 py-5 sm:px-6 sm:py-7"
         :style="contentFontStyle"
       >
         <h1 v-if="activeSection" class="mb-6 text-2xl font-semibold leading-snug text-foreground sm:text-3xl">
@@ -332,6 +332,11 @@ onMounted(() => {
 
 <style scoped lang="scss">
 @import "./novelGuideToolbar.scss";
+
+.novel-guide-nav {
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
 
 :deep(.novel-guide-markdown.markdown-body) {
   color: inherit;
