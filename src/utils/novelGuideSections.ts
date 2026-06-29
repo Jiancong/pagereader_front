@@ -3,7 +3,7 @@
 
 import type { NovelNode } from "@/utils/novelStream"
 
-export type NovelGuideSectionKind = "summary" | "characters" | "chapter" | "qa" | "generic"
+export type NovelGuideSectionKind = "summary" | "characters" | "relations" | "chapter" | "qa" | "generic"
 
 export type NovelGuideSection = {
   id: string
@@ -42,6 +42,8 @@ function truncateLabel(text: string, max = 42): string {
 function inferSectionKind(heading: string): NovelGuideSectionKind | "chapter_group" | "qa_group" {
   const h = heading.trim()
   if (/全书摘要|book\s*summary|summary/i.test(h)) return "summary"
+  if (/人物关系|关系图|character\s*relation|relationship/i.test(h)) return "relations"
+  if (/人物表|主要人物|characters?\s*table/i.test(h)) return "characters"
   if (/人物|character/i.test(h)) return "characters"
   if (/章节|chapter/i.test(h)) return "chapter_group"
   if (/问答|q\s*&\s*a|faq/i.test(h)) return "qa_group"
@@ -99,6 +101,27 @@ function buildCharacterTableMarkdown(node: NovelNode): string {
   return rows.join("\n")
 }
 
+function buildCharacterGraphMarkdown(node: NovelNode): string {
+  const parts: string[] = []
+  const mermaid = pickString(node.mermaid)
+  if (mermaid) {
+    parts.push("```mermaid", mermaid, "```", "")
+  }
+  const table = pickString(node.table_markdown)
+  if (table) {
+    parts.push(table)
+  } else if (Array.isArray(node.graph?.edges) && node.graph.edges.length) {
+    parts.push("| 人物 A | 关系 | 人物 B |", "| --- | --- | --- |")
+    for (const edge of node.graph.edges) {
+      const a = pickString(edge.from_name || edge.from)
+      const b = pickString(edge.to_name || edge.to)
+      const rel = pickString(edge.label) || "—"
+      if (a && b) parts.push(`| ${a} | ${rel} | ${b} |`)
+    }
+  }
+  return parts.join("\n").trim()
+}
+
 function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
   const sections: NovelGuideSection[] = []
 
@@ -125,6 +148,18 @@ function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
         kind: "characters",
         label: heading || "人物表",
         markdown: table,
+      })
+      continue
+    }
+
+    if (contentType === "character_graph" || nodeKey === "character_relations") {
+      const markdown = buildCharacterGraphMarkdown(node)
+      if (!markdown) continue
+      sections.push({
+        id: "character_relations",
+        kind: "relations",
+        label: heading || "人物关系",
+        markdown,
       })
       continue
     }

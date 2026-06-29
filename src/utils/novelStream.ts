@@ -17,6 +17,20 @@ export type NovelNode = {
   text?: string
   table_markdown?: string
   characters?: Array<{ name?: string; role?: string }>
+  graph?: {
+    nodes?: Array<{ id?: string; name?: string }>
+    edges?: Array<{
+      from?: string
+      to?: string
+      from_name?: string
+      to_name?: string
+      label?: string
+      directed?: boolean
+    }>
+  }
+  relations?: Array<{ from?: string; to?: string; label?: string; directed?: boolean }>
+  mermaid?: string
+  relation_count?: number
   chapters?: Array<{ index?: number; title?: string; text?: string; content_type?: string }>
   chapter_count?: number
   items?: Array<{ index?: number; question?: string; answer?: string }>
@@ -138,7 +152,7 @@ export function buildMarkdownFromNovelNodes(
       continue
     }
 
-    if (contentType === "character_table") {
+    if (contentType === "character_table" || nodeKey === "characters") {
       const table = pickString(node.table_markdown)
       if (table) {
         parts.push(table, "")
@@ -149,6 +163,16 @@ export function buildMarkdownFromNovelNodes(
         }
         parts.push("")
       }
+      continue
+    }
+
+    if (contentType === "character_graph" || nodeKey === "character_relations") {
+      const mermaid = pickString(node.mermaid)
+      if (mermaid) {
+        parts.push("```mermaid", mermaid, "```", "")
+      }
+      const table = pickString(node.table_markdown)
+      if (table) parts.push(table, "")
       continue
     }
 
