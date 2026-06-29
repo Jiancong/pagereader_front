@@ -103,6 +103,7 @@ function resolveEffectiveEvent(wire: string, payload: unknown): string {
   }
 
   const status = normalizeEventName(String(p.status ?? ""))
+  if (status === "complete" && isNovelStreamPayload(p)) return "novel_complete"
   if (status === "complete" || status === "ppt_complete" || status === "design_complete") {
     return status
   }

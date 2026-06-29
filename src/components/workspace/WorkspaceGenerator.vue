@@ -323,6 +323,7 @@ import {
 import {
   isNovelStreamPayload,
   resolveNovelFromStreamComplete,
+  persistNovelCompleteToHistory,
   type NovelResult,
 } from "@/utils/novelStream"
 import {
@@ -501,6 +502,7 @@ async function handleNovelStreamComplete(
     if (resolved?.markdown) {
       task.novelResult = resolved
       appendLog(task, resolved.message || t("workspace.novelResultReady"))
+      await persistNovelCompleteToHistory(task.projectId, data)
       gtmGenerateComplete(mode, task.queue, task.projectId)
       emit("project-complete", task.projectId)
     } else {

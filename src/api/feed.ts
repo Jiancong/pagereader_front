@@ -93,6 +93,17 @@ export async function getProjectConversationHistory(
   return normalizeProjectConversationHistory(data)
 }
 
+/** 追加一条对话记录（novel_complete 等产物落库） */
+export async function appendProjectConversationMessage(
+  projectId: string,
+  message: Omit<ConversationHistoryVo, "id" | "projectId">,
+): Promise<void> {
+  await postJson<unknown>(
+    `/project/${encodeURIComponent(projectId)}/conversation/history/append`,
+    message,
+  )
+}
+
 /** 上传项目封面（需登录且为 owner） */
 export async function uploadProjectCover(
   projectId: string,

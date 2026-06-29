@@ -4,6 +4,7 @@
 export {
   getProject,
   getProjectConversationHistory,
+  appendProjectConversationMessage,
   normalizeProjectConversationHistory,
   uploadProjectCover,
   getProjectPromptHistory,

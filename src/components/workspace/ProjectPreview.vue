@@ -186,8 +186,8 @@ const projectMarkdown = computed(() =>
   '',
 )
 
-async function loadNovelGuide(id, hist) {
-  const resolved = await resolveNovelFromHistory(hist)
+async function loadNovelGuide(id, hist, proj) {
+  const resolved = await resolveNovelFromHistory(hist, proj)
   if (resolved?.markdown) {
     novelResult.value = resolved
     return true
@@ -231,7 +231,7 @@ const run = async (id) => {
     ])
     project.value = proj
     history.value = hist
-    const loadedNovel = await loadNovelGuide(id, hist)
+    const loadedNovel = await loadNovelGuide(id, hist, proj)
     if (!loadedNovel) {
       await loadPptDeck(id, proj, hist)
     }
