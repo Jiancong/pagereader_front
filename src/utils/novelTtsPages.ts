@@ -13,6 +13,7 @@ function stripMarkdownForTts(markdown: string): string {
     .replace(/^\s*[-*+]\s+/gm, "")
     .replace(/^\s*\d+\.\s+/gm, "")
     .replace(/\|/g, " ")
+    .replace(/^>\s?/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim()
 }
@@ -24,13 +25,14 @@ function resolveTtsVoice(text: string): string {
 export function buildTtsPagesFromNovelSections(sections: NovelGuideSection[]): TtsPageInput[] {
   return sections.map((section, index) => {
     const title = section.label.trim()
+    // 只朗读右侧正文；左侧导航 label 不参与 TTS（避免先读一遍提纲标题）
     const body = stripMarkdownForTts(section.markdown)
-    const text = [title, body].filter(Boolean).join("\n\n")
+    const text = body || title
     return {
       index: index + 1,
       title,
-      text: text || title,
-      voice: resolveTtsVoice(`${title}\n${body}`),
+      text,
+      voice: resolveTtsVoice(text),
     }
   })
 }

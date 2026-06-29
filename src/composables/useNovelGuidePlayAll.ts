@@ -8,6 +8,8 @@ import { buildTtsPagesFromNovelSections } from "@/utils/novelTtsPages"
 
 const NOVEL_PLAY_ALL_BGM_URL = "/resources/track1.mp3"
 const NOVEL_PLAY_ALL_BGM_VOLUME = 0.22
+/** Bump when TTS page text assembly changes (e.g. skip nav labels). */
+const NOVEL_TTS_DECK_VERSION = 2
 
 function findNextPlayablePage(fromPage: number, items: Record<number, string>): number {
   const pages = Object.keys(items)
@@ -101,6 +103,7 @@ export function useNovelGuidePlayAll(options: {
   function currentTtsDeckKey(): string {
     const sections = sectionList.value
     return [
+      String(NOVEL_TTS_DECK_VERSION),
       String(toValue(options.projectId) || "").trim(),
       sections.length,
       sections.map((section) => section.id).join("|"),
@@ -209,7 +212,9 @@ export function useNovelGuidePlayAll(options: {
   async function playAllGuideAudio(fromPage?: number) {
     try {
       const items = await ensureSlideAudioItems()
-      let startPage = fromPage ?? toValue(options.activeSectionIndex) + 1
+      // 从右侧当前选中页起播，向后逐页朗读（不从头重读左侧已看过的提纲项）
+      const activeIndex = Math.max(0, toValue(options.activeSectionIndex))
+      let startPage = fromPage ?? activeIndex + 1
       if (!items[startPage]) {
         const nextPage = findNextPlayablePage(startPage - 1, items)
         if (nextPage < 0) {
