@@ -146,6 +146,7 @@ export function buildMarkdownFromNovelNodes(
     if (heading) parts.push(`## ${heading}`, "")
 
     const contentType = pickString(node.content_type).toLowerCase()
+    const nodeKey = pickString(node.node_key).toLowerCase()
 
     if (contentType === "markdown" && pickString(node.text)) {
       parts.push(pickString(node.text), "")
