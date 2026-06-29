@@ -46,6 +46,8 @@
     <WorkspaceNovelResult
       v-if="activeTask.novelResult"
       :result="activeTask.novelResult"
+      :project-id="activeTask.projectId"
+      can-upload-cover
       @close="resetActiveTask"
     />
 

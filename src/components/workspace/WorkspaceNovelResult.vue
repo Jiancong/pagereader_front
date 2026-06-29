@@ -1,21 +1,111 @@
 <template>
   <div class="workspace-novel-result overflow-hidden rounded-2xl border border-border bg-card">
-    <header class="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
-      <div class="min-w-0">
-        <p class="text-xs font-medium uppercase tracking-wide text-primary">{{ t("workspace.novelResultBadge") }}</p>
-        <h2 class="mt-1 break-words text-lg font-semibold text-foreground">
-          {{ result.title || t("workspace.novelResultTitle") }}
-        </h2>
-        <p v-if="statsLine" class="mt-1 text-sm text-muted-foreground">{{ statsLine }}</p>
-        <p v-if="result.message" class="mt-1 text-sm text-muted-foreground">{{ result.message }}</p>
+    <header class="border-b border-border">
+      <div class="flex items-start justify-between gap-4 px-4 py-4 sm:px-6">
+        <div class="min-w-0">
+          <p class="text-xs font-medium uppercase tracking-wide text-primary">{{ t("workspace.novelResultBadge") }}</p>
+          <h2 class="mt-1 break-words text-lg font-semibold text-foreground">
+            {{ result.title || t("workspace.novelResultTitle") }}
+          </h2>
+          <p v-if="statsLine" class="mt-1 text-sm text-muted-foreground">{{ statsLine }}</p>
+          <p v-if="result.message" class="mt-1 text-sm text-muted-foreground">{{ result.message }}</p>
+        </div>
       </div>
-      <button
-        type="button"
-        class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-        @click="emit('close')"
-      >
-        {{ t("workspace.novelResultClose") }}
-      </button>
+
+      <div class="novel-guide-toolbar">
+        <div class="novel-guide-actions">
+          <button
+            type="button"
+            class="novel-guide-export-btn"
+            :disabled="!result.markdown"
+            :title="t('workspace.novelExportMarkdown')"
+            @click="exportMarkdown"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path
+                d="M13.5 1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM2 6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm11.5 7.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM5.27 4.677l5.46 2.692a1.5 1.5 0 0 0 0 2.262l-5.46 2.692A1.5 1.5 0 0 1 3.5 11.19V4.81a1.5 1.5 0 0 1 1.77-1.133z"
+              />
+            </svg>
+            <span>{{ t("agent.pptShare") }}</span>
+          </button>
+
+          <input
+            v-if="showCoverUpload"
+            ref="coverInputRef"
+            type="file"
+            class="novel-guide-cover-input-hidden"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            @change="onCoverFileSelected"
+          />
+          <button
+            v-if="showCoverUpload"
+            type="button"
+            class="novel-guide-cover-btn"
+            :disabled="coverUploading"
+            :title="t('agent.pptUploadCover')"
+            @click="triggerCoverUpload"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M.5 13a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V3a1.5 1.5 0 0 0-1.5-1.5h-12A1.5 1.5 0 0 0 .5 3v10zm1.5.5A.5.5 0 0 1 1 13V3a.5.5 0 0 1 .5-.5h12a.5.5 0 0 1 .5.5v10a.5.5 0 0 1-.5.5h-12z" />
+              <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" />
+              <path d="M14.002 13l-4-4-3 3-2-2-3 3V13h12z" />
+            </svg>
+            <span>{{ coverUploading ? t("agent.pptUploadCoverUploading") : t("agent.pptUploadCover") }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="novel-guide-audio-btn novel-guide-audio-btn--all"
+            :class="{
+              'novel-guide-audio-btn--active': ttsPlayAllActive,
+            }"
+            :disabled="ttsLoading || !canPlayGuideAudio"
+            :aria-label="playAllButtonTitle"
+            @click="togglePlayAll"
+          >
+            <span class="novel-guide-audio-btn-tooltip" role="tooltip">{{ playAllButtonTitle }}</span>
+            <svg
+              v-if="ttsPlayAllActive"
+              class="novel-guide-audio-btn-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <rect x="6" y="5" width="4" height="14" rx="1" />
+              <rect x="14" y="5" width="4" height="14" rx="1" />
+            </svg>
+            <svg
+              v-else
+              class="novel-guide-audio-btn-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M6 6.5a1 1 0 0 1 1.55-.83l8 5.5a1 1 0 0 1 0 1.66l-8 5.5A1 1 0 0 1 6 17.5v-11Z" />
+              <path d="M17 6.5h1.75a1 1 0 0 1 1 1v8.75a1 1 0 0 1-1 1H17V6.5Z" />
+              <path d="M20.75 9.25h1.5a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-1.5v-5.5Z" />
+            </svg>
+            <span class="novel-guide-audio-btn-label">{{ t("agent.pptAudioPlayAllLabel") }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="novel-guide-close-btn"
+            :title="t('workspace.novelResultClose')"
+            @click="emit('close')"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path
+                d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854z"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
     </header>
 
     <div
@@ -38,7 +128,7 @@
           type="button"
           class="block w-full border-b border-border/60 px-4 py-2.5 text-left text-sm leading-snug transition-colors last:border-b-0"
           :class="navItemClass(section.id)"
-          @click="activeSectionId = section.id"
+          @click="selectSection(section.id)"
         >
           {{ section.label }}
         </button>
@@ -68,18 +158,40 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import { ElMessage } from "element-plus"
 import ChatMarkdownBody from "@/components/editor/chat/ChatMarkdownBody.vue"
+import { projectApi } from "@/api"
 import { buildFontFamilyCss, ensureExportFontsReady } from "@/composables/useFontLoader"
+import { useNovelGuidePlayAll } from "@/composables/useNovelGuidePlayAll"
+import { downloadMarkdownFile, sanitizeDownloadBasename } from "@/utils/downloadMarkdownFile"
 import { buildNovelGuideOutline } from "@/utils/novelGuideSections"
 import type { NovelResult } from "@/utils/novelStream"
 
-const props = defineProps<{ result: NovelResult }>()
-const emit = defineEmits<{ close: [] }>()
+const props = withDefaults(
+  defineProps<{
+    result: NovelResult
+    projectId?: string
+    canUploadCover?: boolean
+  }>(),
+  {
+    projectId: "",
+    canUploadCover: true,
+  },
+)
+
+const emit = defineEmits<{
+  close: []
+  "cover-uploaded": [payload: { thumbnailUrl?: string; coverImageUrl?: string }]
+}>()
+
 const { t } = useI18n()
 
 const NOVEL_SERIF_FONT = buildFontFamilyCss("SimSun, Songti SC, STSong")
+const COVER_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"])
 
 const activeSectionId = ref("")
+const coverInputRef = ref<HTMLInputElement | null>(null)
+const coverUploading = ref(false)
 
 const outline = computed(() =>
   buildNovelGuideOutline({
@@ -95,14 +207,94 @@ const activeSection = computed(() =>
   null,
 )
 
+const activeSectionIndex = computed(() =>
+  outline.value.sections.findIndex((section) => section.id === activeSectionId.value),
+)
+
+const showCoverUpload = computed(
+  () => props.canUploadCover && Boolean(String(props.projectId || "").trim()),
+)
+
 const contentFontStyle = computed(() => ({
   fontFamily: NOVEL_SERIF_FONT,
 }))
+
+const {
+  ttsLoading,
+  ttsPlayAllActive,
+  canPlayGuideAudio,
+  playAllButtonTitle,
+  togglePlayAll,
+  stopPlayback,
+} = useNovelGuidePlayAll({
+  projectId: () => props.projectId,
+  sections: () => outline.value.sections,
+  activeSectionIndex: () => Math.max(activeSectionIndex.value, 0),
+  onActiveSectionIndexChange: (index) => {
+    const section = outline.value.sections[index]
+    if (section) activeSectionId.value = section.id
+  },
+})
 
 function navItemClass(sectionId: string) {
   return sectionId === activeSectionId.value
     ? "bg-primary font-medium text-primary-foreground"
     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+}
+
+function selectSection(sectionId: string) {
+  activeSectionId.value = sectionId
+  stopPlayback()
+}
+
+function exportMarkdown() {
+  const markdown = props.result.markdown?.trim()
+  if (!markdown) return
+  const basename = sanitizeDownloadBasename(
+    props.result.title || t("workspace.novelResultTitle"),
+  )
+  downloadMarkdownFile(basename, markdown)
+  ElMessage.success(t("workspace.novelExportMarkdownSuccess"))
+}
+
+function triggerCoverUpload() {
+  if (coverUploading.value || !showCoverUpload.value) return
+  coverInputRef.value?.click()
+}
+
+async function onCoverFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ""
+  if (!file) return
+
+  const projectId = String(props.projectId || "").trim()
+  if (!projectId) {
+    ElMessage.warning(t("agent.pptShareNoProject"))
+    return
+  }
+
+  const mime = (file.type || "").toLowerCase()
+  if (mime && !COVER_IMAGE_TYPES.has(mime)) {
+    ElMessage.warning(t("agent.pptUploadCoverInvalidType"))
+    return
+  }
+
+  coverUploading.value = true
+  try {
+    const result = await projectApi.uploadProjectCover(projectId, file)
+    const thumbnailUrl =
+      String(result?.thumbnailUrl || result?.coverImageUrl || "").trim() || undefined
+    emit("cover-uploaded", {
+      thumbnailUrl,
+      coverImageUrl: String(result?.coverImageUrl || thumbnailUrl || "").trim() || undefined,
+    })
+    ElMessage.success(t("agent.pptUploadCoverSuccess"))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t("agent.pptUploadCoverFailed"))
+  } finally {
+    coverUploading.value = false
+  }
 }
 
 const statsLine = computed(() => {
@@ -138,7 +330,9 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@import "./novelGuideToolbar.scss";
+
 :deep(.novel-guide-markdown.markdown-body) {
   color: inherit;
   font-size: 1.125rem;

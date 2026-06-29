@@ -510,6 +510,8 @@ export default {
     novelResultChapters: "{n} 章导读",
     novelResultCharacters: "{n} 位人物",
     novelResultQa: "{n} 组问答",
+    novelExportMarkdown: "导出完整导读 Markdown",
+    novelExportMarkdownSuccess: "Markdown 文件已下载",
     assets: {
       nav: "我的资源",
       title: "资源管理",

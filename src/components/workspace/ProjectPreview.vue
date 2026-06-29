@@ -50,7 +50,13 @@
       </div>
 
       <div v-else-if="novelResult" class="mb-8 min-w-0">
-        <WorkspaceNovelResult :result="novelResult" @close="() => {}" />
+        <WorkspaceNovelResult
+          :result="novelResult"
+          :project-id="projectId"
+          can-upload-cover
+          @close="() => {}"
+          @cover-uploaded="onCoverUploaded"
+        />
       </div>
 
       <div v-else-if="images.length" class="grid grid-cols-1 gap-4 sm:grid-cols-2">

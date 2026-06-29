@@ -530,6 +530,8 @@ export default {
     novelResultChapters: "{n} chapter notes",
     novelResultCharacters: "{n} characters",
     novelResultQa: "{n} Q&A pairs",
+    novelExportMarkdown: "Export full guide as Markdown",
+    novelExportMarkdownSuccess: "Markdown file downloaded",
     assets: {
       nav: "Assets",
       title: "Assets",

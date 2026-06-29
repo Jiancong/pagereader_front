@@ -1,0 +1,190 @@
+.novel-guide-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 1rem 0.85rem;
+
+  @media (min-width: 640px) {
+    padding: 0 1.5rem 0.85rem;
+  }
+}
+
+.novel-guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.novel-guide-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(138, 92, 246, 0.45);
+  background: rgba(138, 92, 246, 0.18);
+  color: #e9e4ff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(138, 92, 246, 0.28);
+    border-color: rgba(167, 139, 250, 0.55);
+    color: #fff;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.novel-guide-cover-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.14);
+  color: #fde68a;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(251, 191, 36, 0.24);
+    border-color: rgba(252, 211, 77, 0.55);
+    color: #fffbeb;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.novel-guide-audio-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px 0 10px;
+  border: 1px solid rgba(126, 210, 164, 0.55);
+  border-radius: 999px;
+  background: rgba(126, 210, 164, 0.16);
+  color: #d8f5e4;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 0 0 1px rgba(126, 210, 164, 0.08);
+
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
+    color: #fff;
+    background: rgba(126, 210, 164, 0.28);
+    border-color: rgba(158, 230, 188, 0.85);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+}
+
+.novel-guide-audio-btn--active {
+  background: #eef8f1;
+  border-color: rgba(126, 210, 164, 0.75);
+  color: #1f3d2d;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.novel-guide-audio-btn-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.novel-guide-audio-btn-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  padding: 6px 10px;
+  border: 1px solid rgba(126, 210, 164, 0.35);
+  border-radius: 8px;
+  background: rgba(18, 28, 22, 0.96);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(4px);
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease,
+    transform 0.15s ease;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(18, 28, 22, 0.96);
+  }
+}
+
+.novel-guide-audio-btn:hover .novel-guide-audio-btn-tooltip,
+.novel-guide-audio-btn:focus-visible .novel-guide-audio-btn-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.novel-guide-cover-input-hidden {
+  display: none;
+}
+
+.novel-guide-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+}
