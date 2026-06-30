@@ -451,7 +451,7 @@ export default {
     uploadPromptHintCard: "说明希望从书中提炼哪些核心要点，可按需修改下方默认文案。",
     uploadPromptDefault: "提取全书核心观点，做 12 页读书分享 PPT，重点讲人物关系与主题变化…",
     uploadPromptDefaultCard: "提炼全书核心观点与金句，做成便于回顾的知识卡片，重点覆盖人物、主题与可执行建议…",
-    uploadPromptDefaultNovel: "请分析这本小说，生成包含全书摘要、人物表、章节导读与问答的 Markdown 导读",
+    uploadPromptDefaultNovel: "请分析",
     uploadPromptPlaceholder: "可按需修改默认诉求…",
     uploadPromptPlaceholderCard: "可按需修改默认提炼诉求…",
     analyzingDoc: "正在分析文档...",

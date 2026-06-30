@@ -468,8 +468,7 @@ export default {
       "Extract the book's core ideas into a 12-slide reading share deck; focus on character relationships and thematic shifts…",
     uploadPromptDefaultCard:
       "Distill the book's key ideas and quotes into review-friendly knowledge cards—cover characters, themes, and actionable insights…",
-    uploadPromptDefaultNovel:
-      "Analyze this novel and generate a Markdown reading guide with summary, character table, chapter notes, and Q&A",
+    uploadPromptDefaultNovel: "Please analyze",
     uploadPromptPlaceholder: "Edit the default request as needed…",
     uploadPromptPlaceholderCard: "Edit the default distillation request as needed…",
     analyzingDoc: "Analyzing document…",

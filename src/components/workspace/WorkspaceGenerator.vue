@@ -866,7 +866,7 @@ const onPromptSubmit = async () => {
 const onAnalyze = async () => {
   if (!hasAttachedDoc.value || ragTask.isGenerating) return
   const message = isNovelMode.value
-    ? uploadPrompt.value.trim() || t("workspace.uploadPromptDefaultNovel")
+    ? t("workspace.uploadPromptDefaultNovel")
     : uploadPrompt.value.trim()
   if (!message) return
   startTask(ragTask)
