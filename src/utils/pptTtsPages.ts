@@ -13,9 +13,10 @@ import {
   modernLiteraryTwoColumnFooter,
 } from "@/components/editor/chat/ppt/themes/modernLiterary/modernLiteraryHelpers";
 import { TTS_VOICE_EN, TTS_VOICE_ZH, type TtsPageInput } from "@/api/agent";
+import { stripUrlsForTts } from "@/utils/ttsTextSanitize";
 
 function cleanTtsText(value: string | undefined): string {
-  return (value ?? "").trim();
+  return stripUrlsForTts((value ?? "").trim());
 }
 
 function pushUniqueText(parts: string[], value: string | undefined): void {

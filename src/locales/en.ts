@@ -653,7 +653,7 @@ export default {
     pptAudioPlayAllStop: "Audiobook · Stop sequential playback",
     pptAudioGenerating: "Audiobook · Generating audio…",
     pptAudioNoProject: "Save the deck to a project before generating audio",
-    pptAudioLoginRequired: "Sign in to generate slide audio",
+    pptAudioLoginRequired: "Sign in to hear audio",
     pptAudioNoSlide: "No audio available for this slide",
     pptAudioFailed: "Audio generation failed",
     pptFullscreenExit: "Exit fullscreen",

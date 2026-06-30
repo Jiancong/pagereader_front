@@ -9,7 +9,7 @@ import { buildTtsPagesFromNovelSections } from "@/utils/novelTtsPages"
 const NOVEL_PLAY_ALL_BGM_URL = "/resources/track1.mp3"
 const NOVEL_PLAY_ALL_BGM_VOLUME = 0.22
 /** Bump when TTS page text assembly changes (e.g. skip nav labels). */
-const NOVEL_TTS_DECK_VERSION = 3
+const NOVEL_TTS_DECK_VERSION = 4
 
 function findNextPlayablePage(fromPage: number, items: Record<number, string>): number {
   const pages = Object.keys(items)
