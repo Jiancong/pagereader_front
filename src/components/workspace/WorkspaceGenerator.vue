@@ -71,7 +71,7 @@
     </div>
 
     <template v-else>
-      <div class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
+      <div v-if="activeTab !== 'youtube'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
           <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
@@ -86,7 +86,10 @@
             <span class="text-muted-foreground">({{ t('pricing.usageDocumentCredits') }})</span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueDocumentHint') }}</span>
           </label>
-          <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
+          <label
+            v-if="activeTab === 'upload'"
+            class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
+          >
             <input v-model="activeTask.queue" type="radio" value="NOVEL" class="accent-primary" />
             <span>{{ t('workspace.queueNovel') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageNovelCredits') }})</span>
@@ -128,7 +131,7 @@
               <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.uploadFormatsShort') }}</p>
             </template>
           </div>
-          <div v-if="hasAttachedDoc" class="mt-6">
+          <div v-if="hasAttachedDoc && !isNovelMode" class="mt-6">
             <label class="mb-2 block text-sm font-medium text-foreground">{{ t(workspaceCopyKey('uploadPromptLabel')) }}</label>
             <p class="mb-2 text-xs text-muted-foreground">{{ t(workspaceCopyKey('uploadPromptHint')) }}</p>
             <textarea
@@ -139,7 +142,7 @@
             />
           </div>
           <button
-            :disabled="!hasAttachedDoc || !uploadPrompt.trim() || ragTask.isGenerating"
+            :disabled="!hasAttachedDoc || (!isNovelMode && !uploadPrompt.trim()) || ragTask.isGenerating"
             class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             @click="onAnalyze"
           >
@@ -862,7 +865,9 @@ const onPromptSubmit = async () => {
 
 const onAnalyze = async () => {
   if (!hasAttachedDoc.value || ragTask.isGenerating) return
-  const message = uploadPrompt.value.trim()
+  const message = isNovelMode.value
+    ? uploadPrompt.value.trim() || t("workspace.uploadPromptDefaultNovel")
+    : uploadPrompt.value.trim()
   if (!message) return
   startTask(ragTask)
   if (!(await ensureCreditsForTask(ragTask))) {
@@ -902,7 +907,13 @@ function applyDefaultYoutubePrompt() {
 }
 
 watch(activeTab, (tab) => {
-  if (tab === "youtube") applyDefaultYoutubePrompt()
+  if (tab === "youtube") {
+    youtubeTask.queue = "DOCUMENT"
+    applyDefaultYoutubePrompt()
+  }
+  if (tab === "prompt" && promptTask.queue === "NOVEL") {
+    promptTask.queue = "CARD"
+  }
 })
 
 const onPreviewYoutubeTranscript = async () => {

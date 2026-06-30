@@ -432,7 +432,7 @@ export default {
     roleUser: "You",
     roleAi: "AI",
     forkPrompt: 'Please create a professional presentation inspired by "{name}"',
-    tabQuick: "Quick prompt",
+    tabQuick: "Generate directly",
     tabUpload: "Upload & analyze",
     tabYoutube: "YouTube video",
     taskRunning: "Generation running in background",

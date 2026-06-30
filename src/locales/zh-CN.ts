@@ -422,7 +422,7 @@ export default {
     roleUser: "用户",
     roleAi: "AI",
     forkPrompt: "请参考《{name}》生成一份专业的演示文稿",
-    tabQuick: "一句话生成",
+    tabQuick: "直接生成",
     tabUpload: "上传资料分析",
     tabYoutube: "YouTube 视频",
     taskRunning: "该模式正在后台生成",
