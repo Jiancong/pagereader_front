@@ -509,6 +509,9 @@ export default {
     queueCard: "Card Mode",
     queueDocument: "Document Mode",
     queueNovel: "Novel Guide",
+    queueCardHint: "Distills core ideas into theme cards for quick review.",
+    queueDocumentHint: "Builds a full presentation deck with slides and visuals.",
+    queueNovelHint: "Produces a Markdown reading guide from uploaded books.",
     queueHint:
       "Card mode distills core ideas into theme cards; Document mode builds a full deck; Novel Guide mode produces a Markdown reading guide from uploaded books.",
     creditsInsufficient: "Not enough credits to generate a deck",

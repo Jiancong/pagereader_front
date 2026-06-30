@@ -74,20 +74,23 @@
       <div class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
-          <label class="flex cursor-pointer items-center gap-2 text-sm">
+          <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
             <input v-model="activeTask.queue" type="radio" value="CARD" class="accent-primary" />
             <span>{{ t('workspace.queueCard') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageCardCredits') }})</span>
+            <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueCardHint') }}</span>
           </label>
-          <label class="flex cursor-pointer items-center gap-2 text-sm">
+          <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
             <input v-model="activeTask.queue" type="radio" value="DOCUMENT" class="accent-primary" />
             <span>{{ t('workspace.queueDocument') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageDocumentCredits') }})</span>
+            <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueDocumentHint') }}</span>
           </label>
-          <label class="flex cursor-pointer items-center gap-2 text-sm">
+          <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
             <input v-model="activeTask.queue" type="radio" value="NOVEL" class="accent-primary" />
             <span>{{ t('workspace.queueNovel') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageNovelCredits') }})</span>
+            <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueNovelHint') }}</span>
           </label>
         </div>
         <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.queueHint') }}</p>
@@ -997,5 +1000,52 @@ defineExpose({ attachCloudDocument })
   border-radius: 9999px;
   background: linear-gradient(90deg, transparent, #1d9bf0, #1d9bf0, transparent);
   animation: ppt-indeterminate 1.4s ease-in-out infinite;
+}
+
+.queue-mode-option {
+  position: relative;
+}
+
+.queue-mode-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: min(280px, 70vw);
+  padding: 8px 12px;
+  border: 1px solid rgba(138, 92, 246, 0.35);
+  border-radius: 8px;
+  background: rgba(18, 22, 32, 0.96);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(4px);
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease,
+    transform 0.15s ease;
+}
+
+.queue-mode-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(18, 22, 32, 0.96);
+}
+
+.queue-mode-option:hover .queue-mode-tooltip,
+.queue-mode-option:focus-within .queue-mode-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
 }
 </style>
