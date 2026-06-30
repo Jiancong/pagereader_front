@@ -92,6 +92,24 @@
             <span class="novel-guide-audio-btn-label">{{ t("agent.pptAudioPlayAllLabel") }}</span>
           </button>
 
+          <a
+            v-if="showPlayerLink"
+            :href="playerHref"
+            target="_blank"
+            rel="noopener"
+            class="novel-guide-player-link-btn"
+            :title="t('workspace.openInPlayer')"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path
+                d="M6.75 1h-3A2.75 2.75 0 0 0 1 3.75v8.5A2.75 2.75 0 0 0 3.75 15h6.5A2.75 2.75 0 0 0 13 12.25v-3a.75.75 0 0 0-1.5 0v3c0 .69-.56 1.25-1.25 1.25h-6.5C3.56 13.5 3 12.94 3 12.25v-8.5c0-.69.56-1.25 1.25-1.25h2.5a.75.75 0 0 0 0-1.5Z"
+              />
+              <path
+                d="M9.5 1.75A.75.75 0 0 1 10.25 1h4a.75.75 0 0 1 .75.75v4a.75.75 0 0 1-1.28.53l-1.22-1.22-3.97 3.97a.75.75 0 0 1-1.06-1.06l3.97-3.97-1.22-1.22A.75.75 0 0 1 9.5 1.75Z"
+              />
+            </svg>
+          </a>
+
           <button
             type="button"
             class="novel-guide-close-btn"
@@ -156,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
 import ChatMarkdownBody from "@/components/editor/chat/ChatMarkdownBody.vue"
@@ -172,10 +190,12 @@ const props = withDefaults(
     result: NovelResult
     projectId?: string
     canUploadCover?: boolean
+    autoPlay?: boolean
   }>(),
   {
     projectId: "",
     canUploadCover: true,
+    autoPlay: false,
   },
 )
 
@@ -214,6 +234,9 @@ const activeSectionIndex = computed(() =>
 const showCoverUpload = computed(
   () => props.canUploadCover && Boolean(String(props.projectId || "").trim()),
 )
+
+const showPlayerLink = computed(() => Boolean(String(props.projectId || "").trim()))
+const playerHref = computed(() => `/play/${encodeURIComponent(String(props.projectId || "").trim())}`)
 
 const contentFontStyle = computed(() => ({
   fontFamily: NOVEL_SERIF_FONT,
@@ -325,8 +348,12 @@ watch(
   { immediate: true },
 )
 
-onMounted(() => {
+onMounted(async () => {
   void ensureExportFontsReady("SimSun")
+  if (props.autoPlay) {
+    await nextTick()
+    void togglePlayAll()
+  }
 })
 </script>
 

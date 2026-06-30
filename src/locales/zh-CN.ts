@@ -512,6 +512,7 @@ export default {
     novelResultQa: "{n} 组问答",
     novelExportMarkdown: "导出完整导读 Markdown",
     novelExportMarkdownSuccess: "Markdown 文件已下载",
+    openInPlayer: "在播放页打开",
     assets: {
       nav: "我的资源",
       title: "资源管理",

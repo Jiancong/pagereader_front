@@ -532,6 +532,7 @@ export default {
     novelResultQa: "{n} Q&A pairs",
     novelExportMarkdown: "Export full guide as Markdown",
     novelExportMarkdownSuccess: "Markdown file downloaded",
+    openInPlayer: "Open in player",
     assets: {
       nav: "Assets",
       title: "Assets",

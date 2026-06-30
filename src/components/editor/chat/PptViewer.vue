@@ -171,6 +171,23 @@
             </svg>
             <span class="ppt-audio-btn-label">{{ t("agent.pptAudioPlayAllLabel") }}</span>
           </button>
+          <a
+            v-if="projectId"
+            :href="`/play/${projectId}`"
+            target="_blank"
+            rel="noopener"
+            class="ppt-audio-btn ppt-player-link-btn"
+            :title="t('workspace.openInPlayer')"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path
+                d="M6.75 1h-3A2.75 2.75 0 0 0 1 3.75v8.5A2.75 2.75 0 0 0 3.75 15h6.5A2.75 2.75 0 0 0 13 12.25v-3a.75.75 0 0 0-1.5 0v3c0 .69-.56 1.25-1.25 1.25h-6.5C3.56 13.5 3 12.94 3 12.25v-8.5c0-.69.56-1.25 1.25-1.25h2.5a.75.75 0 0 0 0-1.5Z"
+              />
+              <path
+                d="M9.5 1.75A.75.75 0 0 1 10.25 1h4a.75.75 0 0 1 .75.75v4a.75.75 0 0 1-1.28.53l-1.22-1.22-3.97 3.97a.75.75 0 0 1-1.06-1.06l3.97-3.97-1.22-1.22A.75.75 0 0 1 9.5 1.75Z"
+              />
+            </svg>
+          </a>
         </div>
       </div>
 
@@ -781,9 +798,12 @@ const props = withDefaults(
   chatHistory?: ChatHistoryDisplayItem[];
   /** 是否显示上传封面按钮（需 projectId + 已登录） */
   canUploadCover?: boolean;
+  /** 是否在内容就绪后自动开始 PlayAll（独立播放页使用） */
+  autoPlay?: boolean;
 }>(),
   {
     canUploadCover: true,
+    autoPlay: false,
   },
 );
 
@@ -1152,6 +1172,18 @@ onMounted(() => {
     updatePresentationScale();
   });
 });
+
+let autoPlayTriggered = false;
+watch(
+  () => [props.autoPlay, pptSource.value.slides.length > 0] as const,
+  async ([shouldAutoPlay, hasSlides]) => {
+    if (!shouldAutoPlay || !hasSlides || autoPlayTriggered) return;
+    autoPlayTriggered = true;
+    await nextTick();
+    void togglePlayAllSlideAudio();
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
   syncPptGoogleFontLinks([]);
@@ -7607,6 +7639,26 @@ defineExpose({
   border-color: rgba(126, 210, 164, 0.75);
   color: #1f3d2d;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.ppt-player-link-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.55);
+  background: rgba(96, 165, 250, 0.16);
+  color: #bfdbfe;
+  text-decoration: none;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.08);
+
+  &:hover,
+  &:focus-visible {
+    color: #fff;
+    background: rgba(96, 165, 250, 0.28);
+    border-color: rgba(147, 197, 253, 0.85);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  }
 }
 
 .ppt-audio-btn-label {

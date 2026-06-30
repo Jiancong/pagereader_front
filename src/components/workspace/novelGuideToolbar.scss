@@ -170,6 +170,31 @@
   display: none;
 }
 
+.novel-guide-player-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  background: rgba(96, 165, 250, 0.14);
+  color: #bfdbfe;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: rgba(96, 165, 250, 0.24);
+    border-color: rgba(147, 197, 253, 0.65);
+    color: #fff;
+  }
+}
+
 .novel-guide-close-btn {
   display: inline-flex;
   align-items: center;
