@@ -2,6 +2,7 @@
 // @author hc
 
 import type { NovelNode } from "@/utils/novelStream"
+import { demoteH2ToH3InSectionBody } from "@/utils/novelMarkdownHeadings"
 
 export type NovelGuideSectionKind = "summary" | "characters" | "relations" | "chapter" | "qa" | "generic"
 
@@ -265,6 +266,20 @@ function parseMarkdownSections(markdown: string): NovelGuideSection[] {
   }
 
   return sections
+}
+
+/** Export markdown with ## section titles and ### subsections (摘要 / 分析). */
+export function buildNovelGuideExportMarkdown(outline: NovelGuideOutline): string {
+  const parts: string[] = []
+  if (outline.title) parts.push(`# ${outline.title}`, "")
+
+  for (const section of outline.sections) {
+    parts.push(`## ${section.label}`, "")
+    const body = demoteH2ToH3InSectionBody(section.markdown.trim())
+    if (body) parts.push(body, "")
+  }
+
+  return parts.join("\n").trim()
 }
 
 /** 从 novel_nodes 或 Markdown 正文构建左侧导航与右侧展示分段 */

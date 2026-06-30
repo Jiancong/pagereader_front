@@ -182,7 +182,7 @@ import { projectApi } from "@/api"
 import { buildFontFamilyCss, ensureExportFontsReady } from "@/composables/useFontLoader"
 import { useNovelGuidePlayAll } from "@/composables/useNovelGuidePlayAll"
 import { downloadMarkdownFile, sanitizeDownloadBasename } from "@/utils/downloadMarkdownFile"
-import { buildNovelGuideOutline } from "@/utils/novelGuideSections"
+import { buildNovelGuideOutline, buildNovelGuideExportMarkdown } from "@/utils/novelGuideSections"
 import type { NovelResult } from "@/utils/novelStream"
 
 const props = withDefaults(
@@ -271,7 +271,10 @@ function selectSection(sectionId: string) {
 }
 
 function exportMarkdown() {
-  const markdown = props.result.markdown?.trim()
+  const markdown =
+    outline.value.sections.length > 0
+      ? buildNovelGuideExportMarkdown(outline.value)
+      : props.result.markdown?.trim()
   if (!markdown) return
   const basename = sanitizeDownloadBasename(
     props.result.title || t("workspace.novelResultTitle"),

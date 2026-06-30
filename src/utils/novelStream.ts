@@ -6,6 +6,7 @@ import {
   appendProjectConversationMessage,
   getProjectConversationHistory,
 } from "@/api/feed"
+import { demoteH2ToH3InSectionBody } from "@/utils/novelMarkdownHeadings"
 
 const NOVEL_LOCAL_CACHE_PREFIX = "pr_novel_cache_v1:"
 
@@ -180,8 +181,8 @@ export function buildMarkdownFromNovelNodes(
     if (contentType === "chapter_list" && Array.isArray(node.chapters)) {
       for (const chapter of node.chapters) {
         const chapterTitle = pickString(chapter.title)
-        if (chapterTitle) parts.push(`### ${chapterTitle}`, "")
-        const text = pickString(chapter.text)
+        if (chapterTitle) parts.push(`## ${chapterTitle}`, "")
+        const text = demoteH2ToH3InSectionBody(pickString(chapter.text))
         if (text) parts.push(text, "")
       }
       continue
