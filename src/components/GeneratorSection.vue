@@ -1,6 +1,36 @@
 <template>
   <section id="generator" class="py-20">
     <div class="mx-auto w-full max-w-3xl px-6">
+      <!-- 演示视频 -->
+      <div v-if="showDemoVideo" class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        <div class="p-6">
+          <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-foreground">{{ t('landing.heroDemo') }}</h3>
+            <button
+              type="button"
+              class="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              :aria-label="t('landing.demoVideoClose')"
+              @click="closeDemoVideo"
+            >
+              <X class="h-4 w-4" />
+            </button>
+          </div>
+          <div class="relative w-full overflow-hidden rounded-xl bg-black">
+            <div class="relative w-full pt-[54.14%]">
+              <iframe
+                src="https://player.vimeo.com/video/1199420193?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1"
+                class="absolute inset-0 h-full w-full"
+                frameborder="0"
+                allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                referrerpolicy="strict-origin-when-cross-origin"
+                title="page2.top demo video"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template v-else>
       <!-- Tab 切换：胶囊样式 -->
       <div class="mb-4 flex w-full justify-center sm:mb-8">
         <div class="inline-flex max-w-full flex-wrap justify-center gap-1 rounded-xl border border-border bg-secondary/30 p-1 sm:flex-nowrap sm:gap-0 sm:p-1.5">
@@ -201,12 +231,13 @@
           </div>
         </div>
       </div>
+      </template>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, markRaw } from 'vue'
+import { ref, computed, watch, markRaw, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube } from 'lucide-vue-next'
 import {
@@ -233,6 +264,7 @@ const youtubePrompt = ref('')
 const isDragging = ref(false)
 const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const showDemoVideo = ref(false)
 
 const tabs = computed(() => [
   { id: 'upload' as TabId, label: t('landing.tabUpload'), icon: markRaw(Upload) },
@@ -374,6 +406,22 @@ watch(activeTab, (tab) => {
     if (!youtubePrompt.value.trim()) youtubePrompt.value = t('landing.youtubePromptDefault')
   }
   if (tab === 'quick' && queue.value === 'NOVEL') queue.value = 'CARD'
+})
+
+const closeDemoVideo = () => {
+  showDemoVideo.value = false
+}
+
+function onLandingWatchDemo() {
+  showDemoVideo.value = true
+}
+
+onMounted(() => {
+  window.addEventListener(LANDING_WATCH_DEMO_EVENT, onLandingWatchDemo)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener(LANDING_WATCH_DEMO_EVENT, onLandingWatchDemo)
 })
 </script>
 
