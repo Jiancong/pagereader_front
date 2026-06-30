@@ -58,6 +58,14 @@
               @cover-uploaded="onCoverUploaded"
             />
           </div>
+          <div v-else-if="novelResult" class="mb-2 min-w-0">
+            <WorkspaceNovelResult
+              :result="novelResult"
+              :project-id="projectId"
+              @close="() => {}"
+              @cover-uploaded="onCoverUploaded"
+            />
+          </div>
           <div
             v-else-if="project.thumbnailUrl"
             class="overflow-hidden rounded-xl border border-border"
@@ -105,8 +113,10 @@ import { ArrowLeft, Loader2, GitFork } from 'lucide-vue-next'
 import AppHeader from '@/components/AppHeader.vue'
 import AuthDialog from '@/components/AuthDialog.vue'
 import PptViewer from '@/components/editor/chat/PptViewer.vue'
+import WorkspaceNovelResult from '@/components/workspace/WorkspaceNovelResult.vue'
 import { authApi, projectApi, isLoggedIn, getLocalAvatar } from '@/api'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
+import { resolveNovelFromHistory } from '@/utils/novelStream'
 import { pickMarkdownFromHistory, pickMarkdownFromPayload } from '@/utils/pptMarkdownSource'
 import { looksLikeDeckJson } from '@/utils/projectCommunity'
 import { buildPptChatHistoryDisplay } from '@/utils/pptChatHistoryDisplay'
@@ -125,6 +135,7 @@ const projectId = computed(() => String(route.params.projectId || ''))
 const project = ref(null)
 const history = ref([])
 const pptData = ref(null)
+const novelResult = ref(null)
 const deckMarkdown = ref('')
 const loading = ref(false)
 const loadingDeck = ref(false)
@@ -151,6 +162,7 @@ const generatedDeckTitle = computed(() => {
 
 const displayTitle = computed(
   () =>
+    novelResult.value?.title ||
     generatedDeckTitle.value ||
     pickProjectFallbackTitle(project.value) ||
     t('workspace.unnamedProject'),
@@ -185,6 +197,15 @@ function collectDeckUrls(proj, hist) {
     }
   }
   return [...new Set(urls)]
+}
+
+async function loadNovelGuide(id, hist, proj) {
+  const resolved = await resolveNovelFromHistory(hist, proj)
+  if (resolved?.markdown) {
+    novelResult.value = resolved
+    return true
+  }
+  return false
 }
 
 async function loadPptDeck(id, proj, hist) {
@@ -230,6 +251,7 @@ const load = async (id) => {
   project.value = null
   history.value = []
   pptData.value = null
+  novelResult.value = null
   deckMarkdown.value = ''
   sessionEntries.value = []
   try {
@@ -240,7 +262,10 @@ const load = async (id) => {
     project.value = proj
     history.value = hist
     projectApi.incrementProjectView(id).catch(() => {})
-    await loadPptDeck(id, proj, hist)
+    const loadedNovel = await loadNovelGuide(id, hist, proj)
+    if (!loadedNovel) {
+      await loadPptDeck(id, proj, hist)
+    }
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')
   } finally {
