@@ -160,6 +160,8 @@ export interface AgentChatRequestDto {
   uploaded_documents?: UploadedDocument[];
   /** 业务意图，如 ppt_related_search（区分主生成与知识点追问） */
   intent?: string;
+  /** UI 语言（zh-CN / en），用于服务端决定回答语言 */
+  locale?: string;
 }
 
 /**
@@ -1245,6 +1247,9 @@ export const sendAgentChatWithStream = async (
 
     if (requestDto.intent) {
       requestBody.intent = requestDto.intent;
+    }
+    if (requestDto.locale) {
+      requestBody.locale = requestDto.locale;
     }
 
     // 添加可选参数

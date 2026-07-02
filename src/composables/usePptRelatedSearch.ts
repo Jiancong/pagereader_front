@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { authApi, isLoggedIn } from "@/api";
+import { resolveApiLocale } from "@/composables/useAppLocale";
 import { sendAgentChatWithStream } from "@/request/agent";
 import type { UploadedDocument } from "@/utils/pptDocumentRag";
 
@@ -233,6 +234,7 @@ export function usePptRelatedSearch() {
           sessionId: `ppt-related-${Date.now()}`,
           isAgent: true,
           intent: PPT_RELATED_SEARCH_INTENT,
+          locale: resolveApiLocale(),
           extra_body: extraBody,
           uploaded_documents: uploadedDocs.length ? uploadedDocs : undefined,
         },

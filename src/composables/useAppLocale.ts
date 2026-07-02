@@ -17,6 +17,11 @@ export function getSavedLocale(): AppLocale {
   return normalizeLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY))
 }
 
+/** BFF / agent chat-stream 使用的 locale（与 UI 语言一致，勿依赖 Accept-Language）。 */
+export function resolveApiLocale(): string {
+  return getSavedLocale() === "en" ? "en" : "zh-CN"
+}
+
 function setMetaDescription(content: string) {
   if (typeof document === "undefined") return
   let el = document.querySelector('meta[name="description"]')
