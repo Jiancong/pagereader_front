@@ -1,10 +1,5 @@
 <template>
-  <header
-    :class="[
-      'fixed left-0 right-0 z-50 overflow-x-hidden border-b border-border/50 bg-background/80 backdrop-blur-xl',
-      withTopBanner ? 'top-11' : 'top-0',
-    ]"
-  >
+  <header class="fixed top-0 left-0 right-0 z-50 overflow-x-hidden border-b border-border/50 bg-background/80 backdrop-blur-xl">
     <div class="mx-auto flex h-14 max-w-7xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-4 sm:px-6">
       <RouterLink to="/" class="flex min-w-0 shrink items-center gap-1.5 sm:gap-2">
         <AppBrandMark class="shrink-0" />
@@ -159,7 +154,6 @@ defineProps({
   logged: { type: Boolean, default: false },
   nickName: { type: String, default: '' },
   avatar: { type: String, default: '' },
-  withTopBanner: { type: Boolean, default: false },
 })
 const emit = defineEmits(['open-login', 'enter'])
 
