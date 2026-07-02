@@ -646,6 +646,7 @@ import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount, provide, wi
 import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
 import { authApi, projectApi } from "@/api";
+import { appendProjectConversationMessage } from "@/api/feed";
 import { isLoggedIn } from "@/api/token";
 import { generatePageTts } from "@/api/agent";
 import {
@@ -952,8 +953,34 @@ function recordRelatedSearchSession(term: string) {
   }
   if (content && props.projectId) {
     gtmRelatedSearch(String(props.projectId), q.length);
+    void persistRelatedSearchToHistory(props.projectId, q, content);
   }
   emit("related-search-recorded", [...relatedSearchSessionEntries.value]);
+}
+
+/** Persist a related-search Q&A to the project conversation history so it survives reloads. */
+async function persistRelatedSearchToHistory(projectId: string, term: string, answer: string) {
+  const pid = String(projectId || "").trim();
+  const q = String(term || "").trim();
+  const a = String(answer || "").trim();
+  if (!pid || !q || !a) return;
+  const userContent = t("workspace.chatHistoryPanel.relatedAsk", { term: q });
+  const metadata = { intent: "ppt_related_search", type: "ppt_related_search", term: q };
+  try {
+    await appendProjectConversationMessage(pid, {
+      role: "user",
+      content: userContent,
+      metadata,
+    });
+    await appendProjectConversationMessage(pid, {
+      role: "assistant",
+      content: a,
+      markdown: a,
+      metadata,
+    });
+  } catch (err) {
+    console.warn("[ppt related search] failed to persist to conversation/history", err);
+  }
 }
 
 async function runPptRelatedSearch(term: string, options?: { showPanel?: boolean }) {

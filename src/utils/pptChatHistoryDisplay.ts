@@ -57,6 +57,13 @@ function isRelatedSearchRow(row: ConversationHistoryVo): boolean {
   return RELATED_SEARCH_USER_RE.test(String(row.content || ""))
 }
 
+function extractRelatedSearchTermFromMeta(row: ConversationHistoryVo): string | null {
+  const meta = asMeta(row)
+  if (!meta) return null
+  const t = meta.term
+  return typeof t === "string" && t.trim() ? String(t).trim() : null
+}
+
 function extractRelatedSearchTerm(content: string): string | null {
   const text = String(content || "").trim()
   const en = text.match(/explain what\s+"([^"]+)"/i)
@@ -65,6 +72,8 @@ function extractRelatedSearchTerm(content: string): string | null {
   if (zh?.[1]) return zh[1].trim()
   const zh2 = text.match(/《[^》]+》[^「]*「([^」]+)」/)
   if (zh2?.[1]) return zh2[1].trim()
+  const enQuoted = text.match(/About\s+"([^"]+)"/i)
+  if (enQuoted?.[1]) return enQuoted[1].trim()
   return null
 }
 
@@ -174,7 +183,7 @@ export function buildPptChatHistoryDisplay(
     if (!raw || seenRelatedPrompts.has(raw)) continue
     seenRelatedPrompts.add(raw)
 
-    const term = extractRelatedSearchTerm(raw)
+    const term = extractRelatedSearchTermFromMeta(row) || extractRelatedSearchTerm(raw)
     const dedupeKey = (term || raw).toLowerCase()
     if (seenRelatedTerms.has(dedupeKey)) continue
     seenRelatedTerms.add(dedupeKey)
