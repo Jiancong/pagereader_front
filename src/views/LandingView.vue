@@ -1,13 +1,15 @@
 <template>
   <div class="min-h-screen bg-background">
+    <ProductHuntBanner />
     <AppHeader
       :logged="logged"
       :nick-name="nickName"
       :avatar="avatar"
+      :with-top-banner="showProductHuntBanner"
       @open-login="(mode) => openLogin(mode, 'header')"
       @enter="goWorkspace"
     />
-    <main class="pt-16">
+    <main :class="showProductHuntBanner ? 'pt-[calc(2.75rem+3.5rem)] sm:pt-[calc(2.75rem+4rem)]' : 'pt-16'">
       <HeroSection />
       <TrustedByMarquee />
       <GeneratorSection @start="onStart" />
@@ -30,6 +32,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
+import ProductHuntBanner from '../components/ProductHuntBanner.vue'
+import { PRODUCT_HUNT_BANNER_ENABLED } from '../config/productHunt'
 import HeroSection from '../components/HeroSection.vue'
 import TrustedByMarquee from '../components/TrustedByMarquee.vue'
 import GeneratorSection from '../components/GeneratorSection.vue'
@@ -47,6 +51,7 @@ const userId = ref(null)
 const dialogOpen = ref(false)
 const dialogMode = ref('login')
 const authSource = ref('header')
+const showProductHuntBanner = PRODUCT_HUNT_BANNER_ENABLED
 
 const refresh = async () => {
   logged.value = isLoggedIn()

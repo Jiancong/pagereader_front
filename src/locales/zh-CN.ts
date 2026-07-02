@@ -53,6 +53,9 @@ export default {
     langEn: "English",
   },
   landing: {
+    productHuntBannerShort: "🎉 我们上了 Product Hunt，欢迎来支持！",
+    productHuntBannerLong: "🎉 我们已在 Product Hunt 上线 — 你的支持对我们意义重大",
+    productHuntBadgeAlt: "{brand} | Product Hunt",
     heroBadge: "AI 驱动的智能演示文稿生成",
     heroTitle: "一句话生成",
     heroTitleHighlight: "专业PPT",

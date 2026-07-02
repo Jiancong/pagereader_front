@@ -1004,6 +1004,15 @@ const errorMessage = computed(() => {
 
 }
 
+:deep(.ppt-related-search-md .chat-md-math--display) {
+  margin: 14px 0;
+  overflow-x: auto;
+}
+
+:deep(.ppt-related-search-md .katex) {
+  color: #f3f3f3;
+}
+
 
 
 .ppt-related-search-images {

@@ -53,6 +53,9 @@ export default {
     langEn: "English",
   },
   landing: {
+    productHuntBannerShort: "🎉 We're on Product Hunt. Upvote us.",
+    productHuntBannerLong: "🎉 Now live on Product Hunt — your upvote makes our day.",
+    productHuntBadgeAlt: "{brand} on Product Hunt",
     heroBadge: "AI-powered presentation generation",
     heroTitle: "One prompt.",
     heroTitleHighlight: "Pro slides.",

@@ -15,6 +15,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import "katex/dist/katex.min.css";
 import MermaidBlock from "./MermaidBlock.vue";
 import {
   markdownFragmentToChatHtml,
@@ -48,5 +49,26 @@ function htmlForMarkdown(text: string): string {
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+:deep(.chat-md-math) {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+:deep(.chat-md-math--display) {
+  display: block;
+  margin: 12px 0;
+  overflow-x: auto;
+  text-align: center;
+}
+
+:deep(.chat-md-math .katex) {
+  font-size: 1.05em;
+}
+
+:deep(.chat-md-math--display .katex) {
+  font-size: 1.12em;
 }
 </style>

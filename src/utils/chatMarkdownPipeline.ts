@@ -1,4 +1,8 @@
 import { marked } from "marked";
+import {
+  preprocessChatMarkdownMath,
+  applyChatMarkdownMathSlots,
+} from "@/utils/chatMarkdownMath";
 
 /** 与 ChatPanel.renderMarkdown 一致：裸 URL → markdown 链接 */
 export function linkifyPlainUrlsForChat(rawText: string): string {
@@ -28,12 +32,13 @@ export function postprocessMarkdownAnchors(html: string): string {
 
 /** 单段 markdown（不含 mermaid 围栏）→ 与聊天一致的 HTML */
 export function markdownFragmentToChatHtml(mdFragment: string): string {
-  const linked = linkifyPlainUrlsForChat(mdFragment);
+  const { markdown: withMathSlots, slots } = preprocessChatMarkdownMath(mdFragment);
+  const linked = linkifyPlainUrlsForChat(withMathSlots);
   const html =
     typeof (marked as { parse?: (s: string) => string }).parse === "function"
       ? (marked as { parse: (s: string) => string }).parse(linked)
       : String((marked as (s: string) => string)(linked));
-  return postprocessMarkdownAnchors(html);
+  return applyChatMarkdownMathSlots(postprocessMarkdownAnchors(html), slots);
 }
 
 export function normalizeChatMessageContent(content: unknown): string {
