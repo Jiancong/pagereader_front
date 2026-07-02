@@ -3,6 +3,9 @@ export default {
   app: {
     brand: "Page2Top",
     company: "Bytelancers Limited",
+    documentTitle: "{brand} - AI-Powered Content Generator",
+    documentDescription:
+      "Upload books and documents for smart analysis, or generate presentations, theme cards, and reading guides from a single prompt.",
   },
   nav: {
     features: "Features",

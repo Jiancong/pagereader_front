@@ -3,6 +3,9 @@ export default {
   app: {
     brand: "Page2Top",
     company: "Bytelancers Limited",
+    documentTitle: "{brand} - AI驱动的内容生成器",
+    documentDescription:
+      "上传图书与文档智能分析，或一句话快速生成演示文稿、主题卡片、小说导读等 AI 内容",
   },
   nav: {
     features: "功能特性",
