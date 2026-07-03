@@ -196,7 +196,7 @@
               />
             </div>
 
-            <div>
+            <div v-if="!isNovelMode">
               <label class="mb-2 block text-sm font-medium text-foreground">{{ t('workspace.youtubePromptLabel') }}</label>
               <p class="mb-2 text-xs text-muted-foreground">{{ t('workspace.youtubePromptHint') }}</p>
               <textarea
@@ -247,7 +247,7 @@
 
             <button
               type="button"
-              :disabled="!isYoutubeUrlValid || !youtubePrompt.trim() || youtubeTask.isGenerating"
+              :disabled="!isYoutubeUrlValid || (!isNovelMode && !youtubePrompt.trim()) || youtubeTask.isGenerating"
               class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               @click="onYoutubeSubmit"
             >
@@ -983,7 +983,7 @@ const onCancelYoutube = async () => {
 }
 
 const onYoutubeSubmit = async () => {
-  if (!isYoutubeUrlValid.value || !youtubePrompt.value.trim() || youtubeTask.isGenerating) return
+  if (!isYoutubeUrlValid.value || (!isNovelMode.value && !youtubePrompt.value.trim()) || youtubeTask.isGenerating) return
   startTask(youtubeTask)
   if (!(await ensureCreditsForTask(youtubeTask))) {
     stopTaskTimer(youtubeTask)
