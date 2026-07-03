@@ -230,10 +230,11 @@ function resolveApiLocale(): string {
 }
 
 function buildYoutubeStreamBody(req: YoutubePptStreamReq): Record<string, unknown> {
+  const rawQueue = req.queue ?? "DOCUMENT"
   const queue =
-    req.queue === "FAST" || req.queue === "SLOW"
-      ? req.queue
-      : mapPptQueueToBffQueue(req.queue ?? "DOCUMENT")
+    rawQueue === "FAST" || rawQueue === "SLOW" || rawQueue === "NOVEL"
+      ? rawQueue
+      : mapPptQueueToBffQueue(rawQueue)
 
   return {
     youtube_url: req.youtube_url.trim(),
@@ -417,8 +418,6 @@ export interface TtsPageInput {
   title?: string
   subtitle?: string
   text?: string
-  /** When set, backend reads this verbatim and ignores title/content assembly. */
-  ttsText?: string
   content?: string | string[]
   voice?: string
 }

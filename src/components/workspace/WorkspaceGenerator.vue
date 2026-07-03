@@ -71,7 +71,7 @@
     </div>
 
     <template v-else>
-      <div v-if="activeTab !== 'youtube'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
+      <div class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
           <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
@@ -87,7 +87,7 @@
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueDocumentHint') }}</span>
           </label>
           <label
-            v-if="activeTab === 'upload'"
+            v-if="activeTab === 'upload' || activeTab === 'youtube'"
             class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
           >
             <input v-model="activeTask.queue" type="radio" value="NOVEL" class="accent-primary" />
@@ -179,8 +179,8 @@
         <!-- YouTube 视频生成 PPT -->
         <div v-else class="p-6 sm:p-8">
           <div class="mb-6">
-            <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.youtubeTitle') }}</h3>
-            <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.youtubeHint') }}</p>
+            <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('youtubeTitle')) }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('youtubeHint')) }}</p>
           </div>
 
           <div class="space-y-4">
@@ -253,7 +253,7 @@
             >
               <Loader2 v-if="youtubeTask.isGenerating" class="h-5 w-5 animate-spin" />
               <Sparkles v-else class="h-5 w-5" />
-              {{ youtubeTask.isGenerating ? t('workspace.generating') : t('workspace.youtubeGenerate') }}
+              {{ youtubeTask.isGenerating ? t('workspace.generating') : t(workspaceCopyKey('youtubeGenerate')) }}
             </button>
           </div>
         </div>
@@ -703,9 +703,13 @@ const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, me
         if (line) appendLog(task, line)
       },
       onEvent: async (event, data) => {
-        if (task.cardResult || task.pptData) return
+        if (task.cardResult || task.pptData || task.novelResult) return
         if (event === "ppt_ping") {
           appendLog(task, t("workspace.youtubeStillGenerating"))
+          return
+        }
+        if (event === "novel_complete" || (event === "complete" && isNovelStreamPayload(data))) {
+          await handleNovelStreamComplete(task, data, "upload")
           return
         }
         if (event === "ppt_complete" || (event === "design_complete" && isPptStreamPayload(data))) {
@@ -717,8 +721,12 @@ const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, me
         }
       },
       onComplete: async (data: unknown) => {
-        if (task.pptData || task.cardResult) return
+        if (task.pptData || task.cardResult || task.novelResult) return
         const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+        if (isNovelStreamPayload(o)) {
+          await handleNovelStreamComplete(task, data, "upload")
+          return
+        }
         if (isPptStreamPayload(o)) {
           await handlePptStreamComplete(task, data, "upload")
           return
@@ -900,21 +908,36 @@ const onAnalyze = async () => {
   }
 }
 
+const YOUTUBE_DECK_DEFAULT_KEY = "workspace.youtubePromptDefault"
+const YOUTUBE_NOVEL_DEFAULT_KEY = "workspace.youtubePromptDefaultNovel"
+
 function applyDefaultYoutubePrompt() {
-  if (!youtubePrompt.value.trim()) {
-    youtubePrompt.value = t("workspace.youtubePromptDefault")
+  const defaultKey =
+    youtubeTask.queue === "NOVEL" ? YOUTUBE_NOVEL_DEFAULT_KEY : YOUTUBE_DECK_DEFAULT_KEY
+  const currentValue = youtubePrompt.value.trim()
+  if (!currentValue || currentValue === t(YOUTUBE_DECK_DEFAULT_KEY) || currentValue === t(YOUTUBE_NOVEL_DEFAULT_KEY)) {
+    youtubePrompt.value = t(defaultKey)
   }
 }
 
 watch(activeTab, (tab) => {
   if (tab === "youtube") {
-    youtubeTask.queue = "DOCUMENT"
+    if (youtubeTask.queue !== "DOCUMENT" && youtubeTask.queue !== "NOVEL") {
+      youtubeTask.queue = "DOCUMENT"
+    }
     applyDefaultYoutubePrompt()
   }
   if (tab === "prompt" && promptTask.queue === "NOVEL") {
     promptTask.queue = "CARD"
   }
 })
+
+watch(
+  () => youtubeTask.queue,
+  () => {
+    if (activeTab.value === "youtube") applyDefaultYoutubePrompt()
+  },
+)
 
 const onPreviewYoutubeTranscript = async () => {
   if (!isYoutubeUrlValid.value || transcriptLoading.value || youtubeTask.isGenerating) return
