@@ -531,6 +531,7 @@ export default {
     youtubePromptPlaceholder: "Edit the default prompt if needed…",
     youtubeTranscriptPreview: "Preview transcript",
     youtubeTranscriptLoading: "Fetching transcript…",
+    youtubeTranscriptFailed: "Failed to fetch transcript, cannot generate the reading guide. Check the video URL or try again.",
     youtubeTranscriptMeta: "Language {language} · {sections} sections · {chars} chars",
     youtubeGenerate: "Generate deck",
     youtubeGenerateNovel: "Generate guide",

@@ -513,6 +513,7 @@ export default {
     youtubePromptPlaceholder: "可按需修改默认诉求…",
     youtubeTranscriptPreview: "预览字幕",
     youtubeTranscriptLoading: "正在拉取字幕…",
+    youtubeTranscriptFailed: "字幕获取失败，无法生成小说导读，请检查视频链接或稍后重试",
     youtubeTranscriptMeta: "语言 {language} · {sections} 段 · {chars} 字",
     youtubeGenerate: "生成演示文稿",
     youtubeGenerateNovel: "生成小说导读",

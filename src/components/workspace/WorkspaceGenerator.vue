@@ -993,7 +993,11 @@ const onYoutubeSubmit = async () => {
   }
   gtmGenerateStart("upload", youtubeTask.queue)
   try {
-    await runYoutubeStream(youtubeTask, youtubeUrl.value.trim(), youtubePrompt.value.trim())
+    if (isNovelMode.value) {
+      await runYoutubeNovelStream(youtubeTask, youtubeUrl.value.trim())
+    } else {
+      await runYoutubeStream(youtubeTask, youtubeUrl.value.trim(), youtubePrompt.value.trim())
+    }
   } catch (e: unknown) {
     if ((e as Error)?.name === "AbortError") return
     handleGenerateError(youtubeTask, e, "upload")
@@ -1003,6 +1007,38 @@ const onYoutubeSubmit = async () => {
     youtubeAbort = null
     await refreshCreditsBar()
   }
+}
+
+/**
+ * YouTube + Novel: the dedicated youtube-stream endpoint only produces decks.
+ * For Novel mode we fetch the transcript and route through the normal chat stream
+ * (queue=NOVEL), matching how uploaded-book novel generation works.
+ */
+const runYoutubeNovelStream = async (task: GeneratorTask, youtubeUrlValue: string) => {
+  youtubeAbort?.abort()
+  youtubeAbort = new AbortController()
+
+  appendLog(task, t("workspace.youtubeTranscriptLoading"))
+  let transcript: YoutubeTranscriptResult
+  try {
+    transcript = await agentApi.fetchYoutubeTranscript(
+      { youtube_url: youtubeUrlValue, project_id: task.projectId },
+      youtubeAbort.signal,
+    )
+  } catch (e) {
+    if ((e as Error)?.name === "AbortError") return
+    throw e
+  }
+  if (!transcript?.success || !transcript.script_preview?.trim()) {
+    throw new Error(t("workspace.youtubeTranscriptFailed"))
+  }
+
+  const script = transcript.script_preview.trim()
+  const prompt = t("workspace.youtubePromptDefaultNovel")
+  const videoTitle = transcript.title?.trim() || youtubeUrlValue
+  const message = `${prompt}\n\n视频标题：${videoTitle}\n\n视频字幕：\n${script}`
+
+  await runStream(task, message, undefined, videoTitle, "upload")
 }
 
 onBeforeUnmount(() => {
