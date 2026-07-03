@@ -7,6 +7,7 @@ import type { PptData } from "@/components/editor/chat/ppt/types";
 import { normalizePptData } from "@/components/editor/chat/ppt/shared/normalizePptSlide";
 import { buildTtsPagesFromPptData } from "@/utils/pptTtsPages";
 import { primeMediaPlayback, safeMediaPlay } from "@/utils/mediaPlayback";
+import { createTtsEnsureHelper } from "@/utils/ttsRequestDedupe";
 
 const PPT_PLAY_ALL_BGM_URL = "/resources/track1.mp3";
 const PPT_PLAY_ALL_BGM_VOLUME = 0.22;
@@ -32,6 +33,7 @@ export function usePptDeckPlayAll(options: {
   const ttsPlayAllActive = ref(false);
   const ttsItemsByPage = ref<Record<number, string>>({});
   const ttsDeckKey = ref("");
+  const ttsCache = createTtsEnsureHelper();
   let slideAudioEl: HTMLAudioElement | null = null;
   let slideBgmEl: HTMLAudioElement | null = null;
 
@@ -56,6 +58,7 @@ export function usePptDeckPlayAll(options: {
   });
 
   function resetSlideAudioCache() {
+    ttsCache.reset();
     ttsItemsByPage.value = {};
     ttsDeckKey.value = "";
   }
@@ -138,36 +141,30 @@ export function usePptDeckPlayAll(options: {
     }
 
     const deckKey = currentTtsDeckKey();
-    if (ttsDeckKey.value !== deckKey) {
-      resetSlideAudioCache();
-      ttsDeckKey.value = deckKey;
-    }
+    ttsDeckKey.value = deckKey;
 
-    if (Object.keys(ttsItemsByPage.value).length > 0) {
-      return ttsItemsByPage.value;
-    }
-
-    ttsLoading.value = true;
-    try {
-      const result = await generatePageTts({
-        projectId,
-        userId,
-        pages: buildTtsPagesFromPptData(deck),
-      });
-      const playable = (result?.items ?? []).filter((item) => item.url);
-      if (!playable.length) {
-        throw new Error(t("agent.pptAudioNoSlide"));
+    const map = await ttsCache.ensure(deckKey, async () => {
+      ttsLoading.value = true;
+      try {
+        const result = await generatePageTts({
+          projectId,
+          userId,
+          pages: buildTtsPagesFromPptData(deck),
+        });
+        const playable = (result?.items ?? []).filter((item) => item.url);
+        if (!playable.length) throw new Error(t("agent.pptAudioNoSlide"));
+        const out: Record<number, string> = {};
+        for (const item of playable) {
+          if (item.url) out[item.page] = item.url;
+        }
+        ttsItemsByPage.value = out;
+        return out;
+      } finally {
+        ttsLoading.value = false;
       }
-
-      const map: Record<number, string> = {};
-      for (const item of playable) {
-        if (item.url) map[item.page] = item.url;
-      }
-      ttsItemsByPage.value = map;
-      return map;
-    } finally {
-      ttsLoading.value = false;
-    }
+    });
+    ttsItemsByPage.value = map;
+    return map;
   }
 
   async function playPageAudio(page: number, items: Record<number, string>) {
@@ -236,6 +233,7 @@ export function usePptDeckPlayAll(options: {
       stopPlayback();
       return;
     }
+    if (ttsLoading.value) return;
     if (ttsPlaying.value) stopPlayback();
     primeMediaPlayback();
     await playAllDeckAudio();
