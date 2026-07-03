@@ -680,6 +680,7 @@ import { authApi, projectApi } from "@/api";
 import { appendProjectConversationMessage } from "@/api/feed";
 import { isLoggedIn } from "@/api/token";
 import { generatePageTts } from "@/api/agent";
+import { primeMediaPlayback, safeMediaPlay } from "@/utils/mediaPlayback";
 import {
   buildFontFamilyCss,
   ensureExportFontsReady,
@@ -832,12 +833,9 @@ const props = withDefaults(
   chatHistory?: ChatHistoryDisplayItem[];
   /** 是否显示上传封面按钮（需 projectId + 已登录） */
   canUploadCover?: boolean;
-  /** 是否在内容就绪后自动开始 PlayAll（独立播放页使用） */
-  autoPlay?: boolean;
 }>(),
   {
     canUploadCover: true,
-    autoPlay: false,
   },
 );
 
@@ -1232,18 +1230,6 @@ onMounted(() => {
     updatePresentationScale();
   });
 });
-
-let autoPlayTriggered = false;
-watch(
-  () => [props.autoPlay, pptSource.value.slides.length > 0] as const,
-  async ([shouldAutoPlay, hasSlides]) => {
-    if (!shouldAutoPlay || !hasSlides || autoPlayTriggered) return;
-    autoPlayTriggered = true;
-    await nextTick();
-    void togglePlayAllSlideAudio();
-  },
-  { immediate: true },
-);
 
 onBeforeUnmount(() => {
   syncPptGoogleFontLinks([]);
@@ -2228,7 +2214,7 @@ async function startSlideBgm() {
     stopSlideBgm();
   };
   try {
-    await slideBgmEl.play();
+    await safeMediaPlay(slideBgmEl);
   } catch {
     stopSlideBgm();
   }
@@ -2366,7 +2352,12 @@ async function playSlideAudioAt(
     stopSlideAudio();
     ElMessage.error(t("agent.pptAudioFailed"));
   };
-  await slideAudioEl.play();
+  const played = await safeMediaPlay(slideAudioEl);
+  if (!played) {
+    stopSlideAudio();
+    ElMessage.warning(t("agent.pptAudioAutoplayBlocked"));
+    return;
+  }
   ttsPlaying.value = true;
 }
 
@@ -2407,6 +2398,7 @@ async function toggleSlideAudio() {
     stopSlideAudio();
     return;
   }
+  primeMediaPlayback();
   await playSlideAudio(currentSlide.value);
 }
 
@@ -2416,6 +2408,7 @@ async function togglePlayAllSlideAudio() {
     return;
   }
   if (ttsPlaying.value) stopSlideAudio();
+  primeMediaPlayback();
   await playAllSlideAudio(currentSlide.value);
 }
 

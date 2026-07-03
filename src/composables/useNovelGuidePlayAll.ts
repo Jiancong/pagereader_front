@@ -5,6 +5,7 @@ import { authApi } from "@/api"
 import { generatePageTts } from "@/api/agent"
 import type { NovelGuideSection } from "@/utils/novelGuideSections"
 import { buildTtsPagesFromNovelSections } from "@/utils/novelTtsPages"
+import { primeMediaPlayback, safeMediaPlay } from "@/utils/mediaPlayback"
 
 const NOVEL_PLAY_ALL_BGM_URL = "/resources/track1.mp3"
 const NOVEL_PLAY_ALL_BGM_VOLUME = 0.22
@@ -84,7 +85,7 @@ export function useNovelGuidePlayAll(options: {
       stopSlideBgm()
     }
     try {
-      await slideBgmEl.play()
+      await safeMediaPlay(slideBgmEl)
     } catch {
       stopSlideBgm()
     }
@@ -205,7 +206,12 @@ export function useNovelGuidePlayAll(options: {
       stopPlayback()
       ElMessage.error(t("agent.pptAudioFailed"))
     }
-    await slideAudioEl.play()
+    const played = await safeMediaPlay(slideAudioEl)
+    if (!played) {
+      stopPlayback()
+      ElMessage.warning(t("agent.pptAudioAutoplayBlocked"))
+      return
+    }
     ttsPlaying.value = true
   }
 
@@ -238,6 +244,7 @@ export function useNovelGuidePlayAll(options: {
       return
     }
     if (ttsPlaying.value) stopPlayback()
+    primeMediaPlayback()
     await playAllGuideAudio()
   }
 

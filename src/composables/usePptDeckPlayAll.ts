@@ -6,6 +6,7 @@ import { generatePageTts } from "@/api/agent";
 import type { PptData } from "@/components/editor/chat/ppt/types";
 import { normalizePptData } from "@/components/editor/chat/ppt/shared/normalizePptSlide";
 import { buildTtsPagesFromPptData } from "@/utils/pptTtsPages";
+import { primeMediaPlayback, safeMediaPlay } from "@/utils/mediaPlayback";
 
 const PPT_PLAY_ALL_BGM_URL = "/resources/track1.mp3";
 const PPT_PLAY_ALL_BGM_VOLUME = 0.22;
@@ -86,7 +87,7 @@ export function usePptDeckPlayAll(options: {
       stopSlideBgm();
     };
     try {
-      await slideBgmEl.play();
+      await safeMediaPlay(slideBgmEl);
     } catch {
       stopSlideBgm();
     }
@@ -200,7 +201,12 @@ export function usePptDeckPlayAll(options: {
       stopPlayback();
       ElMessage.error(t("agent.pptAudioFailed"));
     };
-    await slideAudioEl.play();
+    const played = await safeMediaPlay(slideAudioEl);
+    if (!played) {
+      stopPlayback();
+      ElMessage.warning(t("agent.pptAudioAutoplayBlocked"));
+      return;
+    }
     ttsPlaying.value = true;
   }
 
@@ -231,6 +237,7 @@ export function usePptDeckPlayAll(options: {
       return;
     }
     if (ttsPlaying.value) stopPlayback();
+    primeMediaPlayback();
     await playAllDeckAudio();
   }
 

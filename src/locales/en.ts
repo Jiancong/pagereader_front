@@ -709,6 +709,7 @@ export default {
     pptAudioLoginRequired: "Sign in to hear audio",
     pptAudioNoSlide: "No audio available for this slide",
     pptAudioFailed: "Audio generation failed",
+    pptAudioAutoplayBlocked: "Playback was blocked by the browser. Click the play button on this page to start audio.",
     pptFullscreenExit: "Exit fullscreen",
     pptFullscreenPlay: "Present",
     pptUploadCover: "Cover",

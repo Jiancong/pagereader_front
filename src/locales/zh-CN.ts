@@ -690,6 +690,7 @@ export default {
     pptAudioLoginRequired: "登录后可收听语音",
     pptAudioNoSlide: "当前页没有可播放的语音",
     pptAudioFailed: "语音生成失败",
+    pptAudioAutoplayBlocked: "浏览器阻止自动播放，请先点击页面上的播放按钮后再试",
     pptFullscreenExit: "退出全屏",
     pptFullscreenPlay: "全屏演示",
     pptUploadCover: "封面",

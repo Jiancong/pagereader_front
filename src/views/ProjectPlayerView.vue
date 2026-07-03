@@ -118,7 +118,6 @@ const logged = ref(false)
 const nickName = ref('')
 const avatar = ref(getLocalAvatar())
 const dialogOpen = ref(false)
-const autoStarted = ref(false)
 
 const projectKind = computed(() => {
   if (novelResult.value?.markdown) return 'novel'
@@ -255,7 +254,6 @@ const load = async (id) => {
   pptData.value = null
   novelResult.value = null
   deckMarkdown.value = ''
-  autoStarted.value = false
   try {
     const [proj, hist] = await Promise.all([
       projectApi.getProject(id),
@@ -278,17 +276,6 @@ function onToggle() {
   if (projectKind.value === 'novel') return novelPlay.togglePlayAll()
   return pptPlay.togglePlayAll()
 }
-
-// Auto-start once content is ready and (preferably) logged in.
-watch(
-  () => [ready.value, ttsLoading.value, autoStarted.value],
-  (next) => {
-    const [isReady, isLoading, started] = next
-    if (!isReady || started) return
-    autoStarted.value = true
-    void onToggle()
-  },
-)
 
 onMounted(() => {
   refreshAuth()
