@@ -40,5 +40,8 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_GTM_ID': JSON.stringify(gtmId),
       'import.meta.env.VITE_PAYPAL_CLIENT_ID': JSON.stringify(paypalClientId),
     },
+    optimizeDeps: {
+      exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
+    },
   }
 })

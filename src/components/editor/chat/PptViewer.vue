@@ -445,6 +445,31 @@
                 </svg>
               </span>
             </button>
+            <button
+              type="button"
+              class="ppt-share-item"
+              role="menuitem"
+              :disabled="exporting"
+              @click="openVideoExport"
+            >
+              <span class="ppt-share-item-brand ppt-share-item-brand--video" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M2.5 3.5A1.5 1.5 0 0 0 1 5v6a1.5 1.5 0 0 0 1.5 1.5h6A1.5 1.5 0 0 0 10 11V5a1.5 1.5 0 0 0-1.5-1.5h-6z" />
+                  <path d="M10.5 6.6l3.2-2.1a.6.6 0 0 1 .93.5v6.0a.6.6 0 0 1-.93.5L10.5 9.4V6.6z" />
+                </svg>
+              </span>
+              <span class="ppt-share-item-label">{{ t("agent.pptShareExportVideo") }}</span>
+              <span class="ppt-share-item-action" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path
+                    d="M15.854 1.146a.5.5 0 0 1 0 .708L2.707 14.793a.5.5 0 0 1-.708-.708L15.146 1.146a.5.5 0 0 1 .708 0z"
+                  />
+                  <path
+                    d="M1 7.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm6-6a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H7.5a.5.5 0 0 1-.5-.5zm0 12a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5z"
+                  />
+                </svg>
+              </span>
+            </button>
           </div>
         </div>
         <input
@@ -538,6 +563,12 @@
       </svg>
       <span>{{ exportMessage }}</span>
     </div>
+
+    <PptVideoExportDialog
+      v-model="videoExportOpen"
+      :basename="videoExportBasename"
+      :capture="captureVideoSlides"
+    />
 
     <!-- 幻灯片主体 + 页下演讲备注（备注在 16:9 画布外） -->
     <div v-if="activeDocumentView === 'ppt'" class="ppt-stage">
@@ -665,6 +696,8 @@ import PptChartSourceLine from "@/components/editor/chat/PptChartSourceLine.vue"
 import PptContextMenu from "@/components/editor/chat/PptContextMenu.vue";
 import PptRelatedSearchPanel from "@/components/editor/chat/PptRelatedSearchPanel.vue";
 import PptChatHistoryRail from "@/components/editor/chat/PptChatHistoryRail.vue";
+import PptVideoExportDialog, { type VideoCaptureResult } from "@/components/editor/chat/PptVideoExportDialog.vue";
+import type { VideoOrientation } from "@/utils/pptVideoExport";
 import PptEditorialBrutalistSlide from "@/components/editor/chat/ppt/themes/editorialBrutalist/PptEditorialBrutalistSlide.vue";
 import PptModernLiterarySlide from "@/components/editor/chat/ppt/themes/modernLiterary/PptModernLiterarySlide.vue";
 import PptClassicSlide from "@/components/editor/chat/ppt/themes/classic/PptClassicSlide.vue";
@@ -5275,6 +5308,161 @@ async function runShareAction(action: PptShareAction) {
   else if (action === "pptx") await exportPPTX();
   else if (action === "png") await exportPNGs();
   else if (action === "png-long") await exportLongPNG();
+}
+
+// ── 视频导出（幻灯片图像 + TTS 音频 → MP4，前端 ffmpeg.wasm 合成） ──────────
+const videoExportOpen = ref(false);
+const videoExportBasename = ref("");
+
+/** Portrait fixed pixel size for slide reflow (9:16). Captured at scale 2 → 1440×2560. */
+const PORTRAIT_CAPTURE_W = 720;
+const PORTRAIT_CAPTURE_H = 1280;
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("canvas.toBlob returned null"))),
+      "image/jpeg",
+      0.92,
+    );
+  });
+}
+
+/** Inject a temporary style that forces the slide wrapper into a portrait box for reflow. */
+function injectPortraitCaptureStyle(): HTMLStyleElement {
+  const style = document.createElement("style");
+  style.id = "ppt-video-portrait-capture";
+  style.textContent = `
+    .ppt-viewer:not(.ppt-viewer--presentation) .ppt-slide-wrapper {
+      width: ${PORTRAIT_CAPTURE_W}px !important;
+      height: ${PORTRAIT_CAPTURE_H}px !important;
+      aspect-ratio: 9 / 16 !important;
+      max-width: ${PORTRAIT_CAPTURE_W}px !important;
+      max-height: ${PORTRAIT_CAPTURE_H}px !important;
+    }
+    .ppt-viewer:not(.ppt-viewer--presentation) .ppt-stage {
+      align-items: flex-start !important;
+      justify-content: center !important;
+    }
+  `;
+  document.head.appendChild(style);
+  return style;
+}
+
+/** Capture every slide to a canvas (handles references pagination like PNG export). */
+async function captureAllSlidesForVideo(
+  onProgress: (current: number, total: number) => void,
+): Promise<HTMLCanvasElement[]> {
+  const savedSlide = currentSlide.value;
+  const canvases: HTMLCanvasElement[] = [];
+  const slideCount = props.pptData.slides.length;
+  const captureTotal = countExportCaptureUnits();
+  let captureIndex = 0;
+
+  for (let i = 0; i < slideCount; i++) {
+    currentSlide.value = i;
+    const s = props.pptData.slides[i];
+
+    const captureOne = async () => {
+      await nextTick();
+      await new Promise((r) => requestAnimationFrame(r));
+      if (!slideWrapperRef.value) throw new Error("Slide wrapper missing during video capture");
+      const refList = slideWrapperRef.value.querySelector<HTMLElement>(".ppt-ref-list");
+      let origOverflow = "";
+      let origMaxHeight = "";
+      if (refList) {
+        origOverflow = refList.style.overflow;
+        origMaxHeight = refList.style.maxHeight;
+        refList.style.overflow = "visible";
+        refList.style.maxHeight = "none";
+      }
+      const canvas = await capturePptSlideToCanvas(slideWrapperRef.value, null);
+      if (refList) {
+        refList.style.overflow = origOverflow;
+        refList.style.maxHeight = origMaxHeight;
+      }
+      if (!canvas || canvas.width <= 0 || canvas.height <= 0) {
+        throw new Error("Slide capture produced empty canvas");
+      }
+      canvases.push(canvas);
+      captureIndex += 1;
+      onProgress(captureIndex, captureTotal);
+    };
+
+    if (s.layout === "references" && (s.content?.length ?? 0) > REFS_PER_PAGE) {
+      const items = s.content!;
+      for (let start = 0; start < items.length; start += REFS_PER_PAGE) {
+        overrideContent.value = items.slice(start, start + REFS_PER_PAGE);
+        await captureOne();
+      }
+      overrideContent.value = null;
+    } else {
+      overrideContent.value = null;
+      await captureOne();
+    }
+  }
+
+  currentSlide.value = savedSlide;
+  overrideContent.value = null;
+  return canvases;
+}
+
+/** Capture slides for the chosen orientation + load TTS audio. Driven by the export dialog. */
+async function captureVideoSlides(
+  orientation: VideoOrientation,
+  onProgress: (current: number, total: number) => void,
+): Promise<VideoCaptureResult> {
+  if (exporting.value) throw new Error("Another export is in progress");
+
+  exporting.value = true;
+  exportMessage.value = t("agent.pptVideoExportCapturing");
+  resetPptExportSession();
+  await preparePptExportFonts();
+  const fallbackStyle = injectPptExportStyles(pptBodyFontCss.value, pptHeadingFontCss.value);
+  const portraitStyle =
+    orientation === "portrait" ? injectPortraitCaptureStyle() : null;
+
+  try {
+    // Ensure TTS audio urls exist (reuses cache, regenerates if missing).
+    let audioByPage: Record<number, string> = {};
+    try {
+      audioByPage = await ensureSlideAudioItems();
+    } catch (err) {
+      // Audio is optional — continue without it (silent slides).
+      console.warn("Video export: audio unavailable, continuing silent.", err);
+    }
+
+    // Allow the portrait reflow to paint before capturing.
+    if (portraitStyle) {
+      await nextTick();
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+
+    const canvases = await captureAllSlidesForVideo((current, total) => {
+      exportMessage.value = t("agent.pptExportCapturing", { current, total });
+      onProgress(current, total);
+    });
+
+    const slides: Array<{ page: number; image: Blob }> = [];
+    for (let i = 0; i < canvases.length; i++) {
+      slides.push({ page: i + 1, image: await canvasToBlob(canvases[i]) });
+      disposeExportCanvas(canvases[i]);
+    }
+
+    return { slides, audioByPage };
+  } finally {
+    fallbackStyle.remove();
+    if (portraitStyle) portraitStyle.remove();
+    overrideContent.value = null;
+    exporting.value = false;
+    exportMessage.value = "";
+  }
+}
+
+function openVideoExport() {
+  closeShareMenu();
+  videoExportBasename.value = sanitizeExportBasename(props.pptData.title || "presentation");
+  videoExportOpen.value = true;
 }
 
 /** 导出时需截图的页数（references 分页按多张计） */
