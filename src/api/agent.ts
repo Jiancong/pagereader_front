@@ -216,10 +216,6 @@ async function readSseResponse(res: Response, cb: ChatStreamCallbacks = {}): Pro
   if (buffer.trim()) await dispatch(buffer)
 }
 
-export function mapPptQueueToBffQueue(queue: PptQueue): "FAST" | "SLOW" {
-  return queue === "CARD" ? "FAST" : "SLOW"
-}
-
 export function isLikelyYoutubeUrl(raw: string): boolean {
   const t = raw.trim()
   return /(?:youtube\.com\/(?:watch|shorts|live)|youtu\.be\/)/i.test(t)
@@ -230,11 +226,7 @@ function resolveApiLocale(): string {
 }
 
 function buildYoutubeStreamBody(req: YoutubePptStreamReq): Record<string, unknown> {
-  const rawQueue = req.queue ?? "DOCUMENT"
-  const queue =
-    rawQueue === "FAST" || rawQueue === "SLOW" || rawQueue === "NOVEL"
-      ? rawQueue
-      : mapPptQueueToBffQueue(rawQueue)
+  const queue = req.queue ?? "DOCUMENT"
 
   return {
     youtube_url: req.youtube_url.trim(),

@@ -321,7 +321,7 @@ export interface ChatStreamReq {
   uploaded_documents?: UploadedDocument[]
   /** 显式项目标题；上传 PDF 时建议传去后缀书名 */
   projectName?: string
-  /** CARD 60 credits/run (package only); DOCUMENT/NOVEL 30 credits/run (daily free first) */
+  /** CARD 60 credits/run (daily free first); DOCUMENT/NOVEL 30 credits/run (package only) */
   queue?: PptQueue
   /** 后端 generation mode：novel / document / card / markdown（与 queue 二选一或同时传） */
   mode?: string
@@ -338,8 +338,8 @@ export interface YoutubePptStreamReq {
   youtube_url: string
   project_id: string
   message?: string
-  /** BFF 队列：FAST / SLOW（与 CARD / DOCUMENT 计费对应） */
-  queue?: "FAST" | "SLOW" | PptQueue
+  /** DOCUMENT / CARD / NOVEL（后端不再接受 FAST/SLOW） */
+  queue?: PptQueue
   stream_request_id?: string
   locale?: string
   languages?: string[]

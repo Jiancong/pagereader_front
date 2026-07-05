@@ -343,6 +343,7 @@ import {
   ApiError,
   isCreditsInsufficient,
   isCreditsInsufficientMessage,
+  isInvalidQueueMessage,
   canAffordQueue,
 } from "../../api"
 import type { PptQueue, YoutubeTranscriptResult } from "@/api/types"
@@ -579,6 +580,9 @@ const applyStreamError = (task: GeneratorTask, msg: string, mode: "prompt" | "up
     task.showCreditsCta = true
     task.errorMsg = t("workspace.creditsInsufficient")
     gtmGenerateFail(mode, "credits")
+  } else if (isInvalidQueueMessage(msg)) {
+    task.errorMsg = t("workspace.invalidQueueError")
+    gtmGenerateFail(mode, "other")
   } else {
     task.errorMsg = msg
     gtmGenerateFail(mode, "other")
@@ -690,7 +694,7 @@ const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, me
       youtube_url: youtubeUrlValue,
       project_id: task.projectId,
       message,
-      queue: agentApi.mapPptQueueToBffQueue(task.queue),
+      queue: task.queue,
       stream_request_id: streamRequestId,
     },
     {
@@ -846,7 +850,13 @@ const handleGenerateError = (task: GeneratorTask, e: unknown, mode: "prompt" | "
     refreshCreditsBar()
     return
   }
-  task.errorMsg = e instanceof ApiError ? e.message : (e as Error)?.message || t("workspace.generateFailed")
+  const msg = e instanceof ApiError ? e.message : (e as Error)?.message || t("workspace.generateFailed")
+  if (isInvalidQueueMessage(msg)) {
+    task.errorMsg = t("workspace.invalidQueueError")
+    gtmGenerateFail(mode, "other")
+    return
+  }
+  task.errorMsg = msg
   gtmGenerateFail(mode, "other")
 }
 

@@ -21,6 +21,7 @@ export {
 export {
   isCreditsInsufficient,
   isCreditsInsufficientMessage,
+  isInvalidQueueMessage,
   canAffordQueue,
   getDailyCreditsRemaining,
   getPackageCreditsRemaining,

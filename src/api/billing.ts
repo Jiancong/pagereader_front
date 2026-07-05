@@ -33,18 +33,27 @@ export function getPackageCreditsRemaining(status: SubscribeMyStatus | null | un
   )
 }
 
-/** CARD：仅套餐；DOCUMENT / NOVEL：每日免费 + 套餐 */
+/** CARD：每日免费优先 + 套餐；DOCUMENT / NOVEL：仅套餐积分 */
 export function canAffordQueue(status: SubscribeMyStatus | null | undefined, queue: PptQueue): boolean {
   const cost = QUEUE_CREDIT_COST[queue]
   const daily = getDailyCreditsRemaining(status)
   const pkg = getPackageCreditsRemaining(status)
-  if (queue === "CARD") return pkg >= cost
-  return daily + pkg >= cost
+  if (queue === "CARD") return daily + pkg >= cost
+  return pkg >= cost
 }
 
 export function isCreditsInsufficientMessage(msg: string): boolean {
   const m = msg.toUpperCase()
   return m.includes("CREDITS_INSUFFICIENT") || msg.includes("积分不足")
+}
+
+/** 后端拒绝 FAST/SLOW 等非法 queue 值时的 400 提示 */
+export function isInvalidQueueMessage(msg: string): boolean {
+  return (
+    msg.includes("queue 已废弃") ||
+    msg.includes("queue 无效") ||
+    msg.includes("DOCUMENT / CARD / NOVEL")
+  )
 }
 
 /** 微信支付 totalFee（港分）→ 港币展示 */
