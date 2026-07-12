@@ -679,9 +679,14 @@ import { ElMessage } from "element-plus";
 import { authApi, projectApi } from "@/api";
 import { appendProjectConversationMessage } from "@/api/feed";
 import { isLoggedIn } from "@/api/token";
-import { generatePageTts } from "@/api/agent";
 import { primeMediaPlayback, safeMediaPlay } from "@/utils/mediaPlayback";
-import { createTtsEnsureHelper } from "@/utils/ttsRequestDedupe";
+import {
+  createTtsSequentialPlayer,
+  findNextPlayableTtsPage,
+  pickTtsPageInput,
+  sliceTtsPagesFrom,
+  type TtsItemsMap,
+} from "@/utils/ttsStreamPlayback";
 import {
   buildFontFamilyCss,
   ensureExportFontsReady,
@@ -2152,11 +2157,42 @@ const ttsLoading = ref(false);
 const ttsPlaying = ref(false);
 const ttsPlayAllActive = ref(false);
 const ttsAutoAdvancing = ref(false);
-const ttsItemsByPage = ref<Record<number, string>>({});
+const ttsItemsByPage = ref<TtsItemsMap>({});
+const ttsProgress = ref({ ready: 0, total: 0 });
 const ttsDeckKey = ref("");
-const ttsCache = createTtsEnsureHelper();
-let slideAudioEl: HTMLAudioElement | null = null;
 let slideBgmEl: HTMLAudioElement | null = null;
+
+const ttsPlayer = createTtsSequentialPlayer({
+  onItemsUpdate: (items) => {
+    ttsItemsByPage.value = items;
+  },
+  onLoadingChange: (loading) => {
+    ttsLoading.value = loading;
+  },
+  onProgressChange: (progress) => {
+    ttsProgress.value = progress;
+  },
+  onPlayingChange: (playing) => {
+    ttsPlaying.value = playing;
+  },
+  onPlayAllActiveChange: (active) => {
+    ttsPlayAllActive.value = active;
+  },
+  onBeforePlayPage: async (page) => {
+    await goToSlideForAudio(page - 1);
+  },
+  onFinished: () => {
+    finishPlayAll();
+  },
+  onError: (message) => {
+    stopSlideAudio();
+    ElMessage.error(message || t("agent.pptAudioFailed"));
+  },
+  onAutoplayBlocked: () => {
+    stopSlideAudio();
+    ElMessage.warning(t("agent.pptAudioAutoplayBlocked"));
+  },
+});
 
 const PPT_PLAY_ALL_BGM_URL = "/resources/track1.mp3";
 const PPT_PLAY_ALL_BGM_VOLUME = 0.22;
@@ -2169,6 +2205,9 @@ const canPlaySlideAudio = computed(
 );
 
 const slideAudioButtonTitle = computed(() => {
+  if (ttsLoading.value && ttsProgress.value.total > 0) {
+    return t("agent.pptAudioGeneratingProgress", ttsProgress.value);
+  }
   if (ttsLoading.value) return t("agent.pptAudioGenerating");
   if (!props.projectId?.trim()) return t("agent.pptAudioNoProject");
   if (!ttsUserId.value) return t("agent.pptAudioLoginRequired");
@@ -2177,6 +2216,9 @@ const slideAudioButtonTitle = computed(() => {
 });
 
 const slideAudioPlayAllButtonTitle = computed(() => {
+  if (ttsLoading.value && ttsProgress.value.total > 0) {
+    return t("agent.pptAudioGeneratingProgress", ttsProgress.value);
+  }
   if (ttsLoading.value) return t("agent.pptAudioGenerating");
   if (!props.projectId?.trim()) return t("agent.pptAudioNoProject");
   if (!ttsUserId.value) return t("agent.pptAudioLoginRequired");
@@ -2185,19 +2227,9 @@ const slideAudioPlayAllButtonTitle = computed(() => {
 });
 
 function resetSlideAudioCache() {
-  ttsCache.reset();
   ttsItemsByPage.value = {};
   ttsDeckKey.value = "";
-}
-
-function releaseSlideAudioEl() {
-  if (slideAudioEl) {
-    slideAudioEl.pause();
-    slideAudioEl.onended = null;
-    slideAudioEl.onerror = null;
-    slideAudioEl = null;
-  }
-  ttsPlaying.value = false;
+  ttsProgress.value = { ready: 0, total: 0 };
 }
 
 function stopSlideBgm() {
@@ -2229,19 +2261,8 @@ function finishPlayAll() {
 }
 
 function stopSlideAudio() {
-  releaseSlideAudioEl();
+  ttsPlayer.stop();
   finishPlayAll();
-}
-
-function findNextPlayableSlideIndex(
-  fromIndex: number,
-  items: Record<number, string>,
-): number {
-  const total = pptSource.value.slides.length;
-  for (let i = fromIndex; i < total; i++) {
-    if (items[i + 1]) return i;
-  }
-  return -1;
 }
 
 async function goToSlideForAudio(index: number) {
@@ -2271,97 +2292,52 @@ async function resolveTtsUserId(): Promise<number | null> {
   return ttsUserId.value;
 }
 
-async function ensureSlideAudioItems(): Promise<Record<number, string>> {
-  const projectId = props.projectId?.trim();
-  if (!projectId) throw new Error(t("agent.pptAudioNoProject"));
-
-  const userId = await resolveTtsUserId();
-  if (!userId) throw new Error(t("agent.pptAudioLoginRequired"));
-
-  const deckKey = currentTtsDeckKey();
-  ttsDeckKey.value = deckKey;
-
-  const map = await ttsCache.ensure(deckKey, async () => {
-    ttsLoading.value = true;
-    try {
-      const result = await generatePageTts({
-        projectId,
-        userId,
-        pages: buildTtsPagesFromPptData(pptSource.value),
-      });
-      const playable = (result?.items ?? []).filter((item) => item.url);
-      if (!playable.length) throw new Error(t("agent.pptAudioNoSlide"));
-      const out: Record<number, string> = {};
-      for (const item of playable) {
-        if (item.url) out[item.page] = item.url;
-      }
-      ttsItemsByPage.value = out;
-      return out;
-    } finally {
-      ttsLoading.value = false;
-    }
-  });
-  ttsItemsByPage.value = map;
-  return map;
+function buildDeckTtsPages() {
+  return buildTtsPagesFromPptData(pptSource.value);
 }
 
-async function playSlideAudioAt(
-  slideIndex: number,
-  items: Record<number, string>,
-  playAll: boolean,
-) {
-  const url = items[slideIndex + 1];
-  if (!url) {
-    if (playAll) {
-      const nextIndex = findNextPlayableSlideIndex(slideIndex + 1, items);
-      if (nextIndex >= 0) {
-        await goToSlideForAudio(nextIndex);
-        await playSlideAudioAt(nextIndex, items, true);
-      } else {
-        finishPlayAll();
-      }
-      return;
-    }
-    ElMessage.warning(t("agent.pptAudioNoSlide"));
-    return;
-  }
+function isRangeFullyCached(pages: ReturnType<typeof buildDeckTtsPages>): boolean {
+  const cached = ttsItemsByPage.value;
+  return pages.every((page) => {
+    if (typeof page === "string") return Boolean(cached[1]);
+    const index = Number(page.index);
+    return Number.isFinite(index) ? Boolean(cached[index]) : true;
+  });
+}
 
-  releaseSlideAudioEl();
-  if (playAll) ttsPlayAllActive.value = true;
-
-  slideAudioEl = new Audio(url);
-  slideAudioEl.onended = () => {
-    releaseSlideAudioEl();
-    if (!ttsPlayAllActive.value) return;
-
-    const nextIndex = findNextPlayableSlideIndex(slideIndex + 1, items);
-    if (nextIndex >= 0) {
-      void (async () => {
-        await goToSlideForAudio(nextIndex);
-        if (!ttsPlayAllActive.value) return;
-        await playSlideAudioAt(nextIndex, items, true);
-      })();
-      return;
-    }
-    finishPlayAll();
-  };
-  slideAudioEl.onerror = () => {
-    stopSlideAudio();
-    ElMessage.error(t("agent.pptAudioFailed"));
-  };
-  const played = await safeMediaPlay(slideAudioEl);
-  if (!played) {
-    stopSlideAudio();
-    ElMessage.warning(t("agent.pptAudioAutoplayBlocked"));
-    return;
-  }
-  ttsPlaying.value = true;
+async function resolveTtsContext() {
+  const projectId = props.projectId?.trim();
+  if (!projectId) throw new Error(t("agent.pptAudioNoProject"));
+  const userId = await resolveTtsUserId();
+  if (!userId) throw new Error(t("agent.pptAudioLoginRequired"));
+  ttsDeckKey.value = currentTtsDeckKey();
+  return { projectId, userId };
 }
 
 async function playSlideAudio(slideIndex = currentSlide.value) {
   try {
-    const items = await ensureSlideAudioItems();
-    await playSlideAudioAt(slideIndex, items, false);
+    const { projectId, userId } = await resolveTtsContext();
+    const pageNumber = slideIndex + 1;
+    const cachedUrl = ttsItemsByPage.value[pageNumber];
+    if (cachedUrl) {
+      await goToSlideForAudio(slideIndex);
+      await ttsPlayer.playFromCache(pageNumber, ttsItemsByPage.value, { singlePage: true });
+      return;
+    }
+
+    const pages = pickTtsPageInput(buildDeckTtsPages(), pageNumber);
+    if (!pages.length) {
+      ElMessage.warning(t("agent.pptAudioNoSlide"));
+      return;
+    }
+
+    await ttsPlayer.startStream({
+      projectId,
+      userId,
+      pages,
+      priorityPage: pageNumber,
+      singlePage: true,
+    });
   } catch (error) {
     stopSlideAudio();
     ElMessage.error(error instanceof Error ? error.message : t("agent.pptAudioFailed"));
@@ -2370,20 +2346,37 @@ async function playSlideAudio(slideIndex = currentSlide.value) {
 
 async function playAllSlideAudio(fromIndex = currentSlide.value) {
   try {
-    const items = await ensureSlideAudioItems();
-    let startIndex = fromIndex;
-    if (!items[startIndex + 1]) {
-      const nextIndex = findNextPlayableSlideIndex(startIndex, items);
-      if (nextIndex < 0) {
-        ElMessage.warning(t("agent.pptAudioNoSlide"));
-        return;
-      }
-      startIndex = nextIndex;
-      await goToSlideForAudio(startIndex);
+    const { projectId, userId } = await resolveTtsContext();
+    const allPages = buildDeckTtsPages();
+    const startPage = fromIndex + 1;
+    const pages = sliceTtsPagesFrom(allPages, startPage);
+    if (!pages.length) {
+      ElMessage.warning(t("agent.pptAudioNoSlide"));
+      return;
     }
+
+    let priorityPage = startPage;
+    if (!ttsItemsByPage.value[priorityPage]) {
+      const nextPage = findNextPlayableTtsPage(priorityPage - 1, ttsItemsByPage.value);
+      if (nextPage > 0) priorityPage = nextPage;
+    }
+
     ttsPlayAllActive.value = true;
     await startSlideBgm();
-    await playSlideAudioAt(startIndex, items, true);
+
+    if (isRangeFullyCached(pages)) {
+      await goToSlideForAudio(priorityPage - 1);
+      await ttsPlayer.playFromCache(priorityPage, ttsItemsByPage.value);
+      return;
+    }
+
+    await goToSlideForAudio(priorityPage - 1);
+    await ttsPlayer.startStream({
+      projectId,
+      userId,
+      pages,
+      priorityPage,
+    });
   } catch (error) {
     stopSlideAudio();
     ElMessage.error(error instanceof Error ? error.message : t("agent.pptAudioFailed"));

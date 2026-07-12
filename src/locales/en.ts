@@ -717,6 +717,7 @@ export default {
     pptAudioPlayAll: "Audiobook · Play from this slide to the end",
     pptAudioPlayAllStop: "Audiobook · Stop sequential playback",
     pptAudioGenerating: "Audiobook · Generating audio…",
+    pptAudioGeneratingProgress: "Audiobook · Generating narration {ready}/{total}…",
     pptAudioNoProject: "Save the deck to a project before generating audio",
     pptAudioLoginRequired: "Sign in to hear audio",
     pptAudioNoSlide: "No audio available for this slide",

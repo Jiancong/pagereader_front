@@ -428,6 +428,145 @@ export interface TtsPagesResult {
   items: TtsPageItem[]
 }
 
+export interface TtsStreamMeta {
+  requestId?: string
+  totalPages?: number
+  priorityPage?: number
+}
+
+export interface TtsPageReadyEvent {
+  status?: string
+  page: number
+  total?: number
+  cached?: boolean
+  item?: TtsPageItem
+}
+
+export interface TtsStreamCallbacks {
+  onConnected?: () => void
+  onMeta?: (meta: TtsStreamMeta) => void
+  onPageReady?: (data: TtsPageReadyEvent) => void
+  onPageError?: (data: { page?: number; error?: string; message?: string }) => void
+  onComplete?: (data: TtsPagesResult) => void
+  onError?: (message: string, data?: unknown) => void
+}
+
+function parseSseBlock(block: string): { event: string; data: string } | null {
+  let event = "message"
+  const dataLines: string[] = []
+  for (const line of block.split("\n")) {
+    if (!line || line.startsWith(":")) continue
+    if (line.startsWith("event:")) event = line.slice(6).trim()
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""))
+  }
+  if (dataLines.length === 0 && event === "message") return null
+  return { event, data: dataLines.join("\n") }
+}
+
+async function readTtsSseResponse(
+  res: Response,
+  cb: TtsStreamCallbacks = {},
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!res.ok || !res.body) {
+    const text = await res.text().catch(() => "")
+    try {
+      const body = JSON.parse(text) as {
+        code?: number | string
+        message?: string
+        msg?: string
+        error?: string
+      }
+      const code = body.code ?? res.status
+      const msg = body.message || body.msg || body.error || text || `请求失败：${res.status}`
+      throw new ApiError(Number(code) || res.status, msg)
+    } catch (error) {
+      if (error instanceof ApiError) throw error
+      throw new Error(text || `请求失败：${res.status}`)
+    }
+  }
+
+  cb.onConnected?.()
+
+  const dispatch = (block: string) => {
+    const parsed = parseSseBlock(block)
+    if (!parsed) return
+    const data = safeParse(parsed.data)
+    const event = normalizeEventName(parsed.event)
+
+    if (event === "tts_meta") {
+      const meta = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+      cb.onMeta?.({
+        requestId: typeof meta.requestId === "string" ? meta.requestId : undefined,
+        totalPages: Number(meta.totalPages ?? meta.total ?? meta.total_pages) || undefined,
+        priorityPage: Number(meta.priorityPage ?? meta.priority_page) || undefined,
+      })
+      return
+    }
+
+    if (event === "tts_page_ready") {
+      const payload = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+      const item = payload.item as TtsPageItem | undefined
+      cb.onPageReady?.({
+        status: typeof payload.status === "string" ? payload.status : undefined,
+        page: Number(payload.page ?? item?.page),
+        total: Number(payload.total) || undefined,
+        cached: payload.cached === true,
+        item,
+      })
+      return
+    }
+
+    if (event === "tts_page_error") {
+      const payload = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+      cb.onPageError?.({
+        page: Number(payload.page) || undefined,
+        error: typeof payload.error === "string" ? payload.error : undefined,
+        message: typeof payload.message === "string" ? payload.message : undefined,
+      })
+      return
+    }
+
+    if (event === "complete") {
+      const payload = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+      const items = Array.isArray(payload.items) ? (payload.items as TtsPageItem[]) : []
+      cb.onComplete?.({
+        provider: typeof payload.provider === "string" ? payload.provider : undefined,
+        items,
+      })
+      return
+    }
+
+    if (event === "error") {
+      const msg =
+        typeof data === "string"
+          ? data
+          : (data as { message?: string; error?: string })?.message ??
+            (data as { error?: string })?.error ??
+            "语音生成失败"
+      cb.onError?.(msg, data)
+    }
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+
+  while (true) {
+    if (signal?.aborted) break
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n")
+    let idx
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, idx)
+      buffer = buffer.slice(idx + 2)
+      if (block.trim()) dispatch(block)
+    }
+  }
+  if (buffer.trim()) dispatch(buffer)
+}
+
 function resolveTtsPageVoice(
   page: string | TtsPageInput,
   defaultVoice: string,
@@ -476,4 +615,48 @@ export async function generatePageTts(params: {
     provider: results.find((result) => result.provider)?.provider,
     items: results.flatMap((result) => result.items ?? []),
   }
+}
+
+/** SSE 流式生成 TTS（优先生成 priorityPage，逐页推送 tts_page_ready） */
+export async function generatePageTtsStream(
+  params: {
+    projectId: string
+    userId: number
+    pages: Array<string | TtsPageInput>
+    priorityPage: number
+    voice?: string
+  },
+  cb: TtsStreamCallbacks = {},
+  signal?: AbortSignal,
+): Promise<void> {
+  const projectId = String(params.projectId || "").trim()
+  if (!projectId) throw new Error("projectId is required")
+
+  const defaultVoice = params.voice ?? TTS_VOICE_ZH
+  const pagesByVoice = new Map<string, Array<string | TtsPageInput>>()
+
+  for (const page of params.pages) {
+    const voice = resolveTtsPageVoice(page, defaultVoice)
+    const group = pagesByVoice.get(voice)
+    if (group) group.push(page)
+    else pagesByVoice.set(voice, [page])
+  }
+
+  const [voice, pages] = [...pagesByVoice.entries()][0] ?? [defaultVoice, params.pages]
+
+  const res = await fetch(buildUrl("/agent/audio/tts/pages/stream"), {
+    method: "POST",
+    headers: authStreamHeaders(),
+    body: JSON.stringify({
+      sessionId: projectId,
+      projectId,
+      userId: params.userId,
+      voice,
+      priorityPage: params.priorityPage,
+      pages: pages.map(stripPageVoiceForRequest),
+    }),
+    signal,
+  })
+
+  await readTtsSseResponse(res, cb, signal)
 }

@@ -698,6 +698,7 @@ export default {
     pptAudioPlayAll: "有声读物 · 从当前页顺序播放至结尾",
     pptAudioPlayAllStop: "有声读物 · 停止顺序播放",
     pptAudioGenerating: "有声读物 · 正在生成语音…",
+    pptAudioGeneratingProgress: "有声读物 · 正在生成旁白 {ready}/{total}…",
     pptAudioNoProject: "请先将演示文稿保存到项目后再生成语音",
     pptAudioLoginRequired: "登录后可收听语音",
     pptAudioNoSlide: "当前页没有可播放的语音",
