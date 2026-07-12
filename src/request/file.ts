@@ -498,6 +498,15 @@ export const getUserImages = (params?: GetUserImagesParams) => {
   });
 };
 
+/** 用户 AI 生成图片（user_image 表），与 getUserImages 等价 */
+export const getUserGeneratedImages = (page = 0, size = 20, taskName?: string) => {
+  const qs = new URLSearchParams({ page: String(page), size: String(size) });
+  if (taskName) qs.set("taskName", taskName);
+  return request(`${BASE_FILE_API_URL}/get/user_image?${qs}`, {
+    method: "get",
+  });
+};
+
 /**
  * 获取用户任务列表
  */

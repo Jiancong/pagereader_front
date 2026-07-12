@@ -83,6 +83,8 @@ import { authApi, feedApi, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
 
+import { provideAssetsRefreshBus } from '@/composables/useAssetsRefreshBus'
+
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
@@ -100,6 +102,8 @@ const genPrompt = ref('')
 const genKey = ref(0)
 const projectRefreshKey = ref(0)
 const generatorRef = ref(null)
+
+const assetsRefreshBus = provideAssetsRefreshBus()
 
 watch(mobileSidebarOpen, (open) => {
   if (typeof document === 'undefined') return
@@ -225,6 +229,7 @@ const onProjectStarted = async (projectId) => {
 
 const onProjectComplete = async (projectId) => {
   await loadProjects()
+  assetsRefreshBus.trigger()
   if (projectId && activeProjectId.value === projectId) {
     projectRefreshKey.value++
   }

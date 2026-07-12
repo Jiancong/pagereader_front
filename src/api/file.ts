@@ -14,6 +14,8 @@ import type {
   DirectUploadCompleteReq,
   DirectUploadCompleteVo,
   UploadedDocument,
+  Page,
+  UserImage,
 } from "./types"
 import { normalizeUserAssetsPage } from "@/utils/userAssets"
 
@@ -59,7 +61,18 @@ export async function listUserUploadedFiles(params: {
   return normalizeUserAssetsPage(data)
 }
 
-// 用户生成素材列表（OSS user-private）
+// 用户 AI 生成图片列表（user_image 表）
+export async function getUserGeneratedImages(
+  page = 0,
+  size = 20,
+  taskName?: string,
+): Promise<Page<UserImage>> {
+  return get<Page<UserImage>>("/file/get/user_image", {
+    query: { page, size, taskName },
+  })
+}
+
+/** @deprecated 生成内容资产库请用 getUserGeneratedImages + project/user/list */
 export async function listUserGeneratedAssets(params: {
   userId: number | string
   pageSize?: number

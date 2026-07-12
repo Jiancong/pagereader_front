@@ -34,7 +34,9 @@
           <WorkspaceUserAssetsPanel
             ref="panelRef"
             :user-id="userId"
+            :project-id="projectId"
             @select-document="onSelectDocument"
+            @open-project="onOpenProject"
           />
         </div>
       </aside>
@@ -51,16 +53,22 @@ import WorkspaceUserAssetsPanel from './WorkspaceUserAssetsPanel.vue'
 const props = defineProps({
   open: { type: Boolean, default: false },
   userId: { type: [String, Number], default: null },
+  projectId: { type: String, default: '' },
   sidebarCollapsed: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['close', 'select-document'])
+const emit = defineEmits(['close', 'select-document', 'open-project'])
 
 const { t } = useI18n()
 const panelRef = ref(null)
 
 function onSelectDocument(payload) {
   emit('select-document', payload)
+  emit('close')
+}
+
+function onOpenProject(projectId) {
+  emit('open-project', projectId)
   emit('close')
 }
 

@@ -44,12 +44,73 @@
       </button>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-y-auto">
+    <!-- 已生成：PPT / 小说 / 图片 -->
+    <template v-if="source === 'generated'">
+      <div class="mb-2 flex gap-1 rounded-lg bg-secondary/30 p-0.5" role="tablist" :aria-label="t('workspace.assets.generated')">
+        <button
+          v-for="tab in generatedFilterTabs"
+          :key="tab.id"
+          type="button"
+          role="tab"
+          :aria-selected="generatedFilter === tab.id"
+          :class="[
+            'flex-1 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors',
+            generatedFilter === tab.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+          ]"
+          @click="generatedFilter = tab.id"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <div v-if="generatedLoading && !scopedGeneratedItems.length" class="flex items-center justify-center py-10 text-sm text-muted-foreground">
+          <Loader2 class="h-5 w-5 animate-spin" />
+        </div>
+        <p v-else-if="generatedError" class="px-1 py-6 text-center text-xs text-red-400">{{ generatedError }}</p>
+        <p v-else-if="!scopedGeneratedItems.length" class="px-1 py-10 text-center text-xs text-muted-foreground">{{ generatedEmptyLabel }}</p>
+        <div v-else class="grid grid-cols-2 gap-2 min-[480px]:grid-cols-3 md:grid-cols-2">
+          <button
+            v-for="item in scopedGeneratedItems"
+            :key="`${item.kind}-${item.id}`"
+            type="button"
+            class="group overflow-hidden rounded-lg border border-border bg-card text-left transition-colors hover:border-primary/40"
+            @click="onGeneratedClick(item)"
+          >
+            <div class="relative aspect-square overflow-hidden bg-secondary/40">
+              <img
+                v-if="item.thumbnailUrl"
+                :src="item.thumbnailUrl"
+                :alt="displayGeneratedTitle(item)"
+                loading="lazy"
+                class="h-full w-full object-cover"
+              />
+              <div v-else class="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground">
+                <span class="text-2xl" aria-hidden="true">{{ kindIcon(item.kind) }}</span>
+              </div>
+              <span
+                class="absolute left-1 top-1 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur"
+              >
+                {{ kindLabel(item.kind) }}
+              </span>
+            </div>
+            <div class="space-y-0.5 border-t border-border px-2 py-1.5">
+              <p class="truncate text-[11px] font-medium text-foreground" :title="displayGeneratedTitle(item)">
+                {{ displayGeneratedTitle(item) }}
+              </p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <!-- 已上传：OSS user-upload -->
+    <div v-else class="min-h-0 flex-1 overflow-y-auto">
       <div v-if="loadingList && !items.length" class="flex items-center justify-center py-10 text-sm text-muted-foreground">
         <Loader2 class="h-5 w-5 animate-spin" />
       </div>
       <p v-else-if="listError" class="px-1 py-6 text-center text-xs text-red-400">{{ listError }}</p>
-      <p v-else-if="!items.length" class="px-1 py-10 text-center text-xs text-muted-foreground">{{ t('workspace.assets.noAssets') }}</p>
+      <p v-else-if="!items.length" class="px-1 py-10 text-center text-xs text-muted-foreground">{{ t('workspace.assets.noUploaded') }}</p>
       <div v-else class="grid grid-cols-2 gap-2 min-[480px]:grid-cols-3 md:grid-cols-2">
         <div
           v-for="asset in items"
@@ -147,6 +208,23 @@
         </button>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="imagePreviewUrl"
+        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+        @click.self="imagePreviewUrl = null"
+      >
+        <button
+          type="button"
+          class="absolute right-4 top-4 rounded-lg bg-background/90 px-3 py-1.5 text-sm text-foreground shadow"
+          @click="imagePreviewUrl = null"
+        >
+          {{ t('workspace.assets.close') }}
+        </button>
+        <img :src="imagePreviewUrl" alt="" class="max-h-[90vh] max-w-full rounded-xl object-contain" />
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -162,19 +240,28 @@ import {
   resolveAssetPreviewCandidates,
 } from '@/utils/userAssets'
 import { isPptDocumentAsset, uploadedDocumentFromUserAsset } from '@/utils/pptDocumentRag'
+import { useGeneratedAssets } from '@/composables/useGeneratedAssets'
+import { useAssetsRefreshListener } from '@/composables/useAssetsRefreshBus'
 
 const props = defineProps({
   userId: { type: [String, Number], default: null },
   projectId: { type: String, default: '' },
 })
 
-const emit = defineEmits(['select-document'])
+const emit = defineEmits(['select-document', 'open-project'])
 
 const { t } = useI18n()
 
 const sourceTabs = computed(() => [
   { id: 'uploaded', label: t('workspace.assets.uploaded') },
   { id: 'generated', label: t('workspace.assets.generated') },
+])
+
+const generatedFilterTabs = computed(() => [
+  { id: 'all', label: t('workspace.assets.filterAll') },
+  { id: 'ppt', label: t('workspace.assets.filterPpt') },
+  { id: 'novel', label: t('workspace.assets.filterNovel') },
+  { id: 'image', label: t('workspace.assets.filterImage') },
 ])
 
 const source = ref('uploaded')
@@ -188,8 +275,63 @@ const listError = ref('')
 const quota = ref(null)
 const stats = ref(null)
 const deletingKey = ref(null)
-/** fileKey → 当前尝试的预览 URL 下标；-1 表示全部失败 */
 const previewIndexByKey = ref({})
+const imagePreviewUrl = ref(null)
+
+const {
+  filteredItems: generatedFilteredItems,
+  loading: generatedLoading,
+  error: generatedError,
+  filter: generatedFilter,
+  refresh: refreshGenerated,
+} = useGeneratedAssets()
+
+const scopedGeneratedItems = computed(() => {
+  const list = generatedFilteredItems.value
+  const pid = String(props.projectId || '').trim()
+  if (!pid) return list
+  return list.filter((i) => i.projectId === pid || i.kind === 'image')
+})
+
+const generatedEmptyLabel = computed(() => {
+  const keyMap = {
+    all: 'noGeneratedAll',
+    ppt: 'noGeneratedPpt',
+    novel: 'noGeneratedNovel',
+    image: 'noGeneratedImage',
+  }
+  const key = keyMap[generatedFilter.value] || 'noGeneratedAll'
+  return t(`workspace.assets.${key}`)
+})
+
+function kindIcon(kind) {
+  if (kind === 'ppt') return '📊'
+  if (kind === 'novel') return '📚'
+  return '🖼️'
+}
+
+function kindLabel(kind) {
+  if (kind === 'ppt') return t('workspace.assets.filterPpt')
+  if (kind === 'novel') return t('workspace.assets.filterNovel')
+  return t('workspace.assets.filterImage')
+}
+
+function displayGeneratedTitle(item) {
+  const title = String(item?.title || '').trim()
+  if (title) return title
+  if (item?.kind === 'image') return t('workspace.assets.generatedImageFallback')
+  return t('workspace.assets.untitled')
+}
+
+function onGeneratedClick(item) {
+  if (item.kind === 'image') {
+    if (item.imageUrl) imagePreviewUrl.value = item.imageUrl
+    return
+  }
+  if (item.projectId) {
+    emit('open-project', item.projectId)
+  }
+}
 
 function previewCandidatesFor(asset) {
   return resolveAssetPreviewCandidates(asset)
@@ -301,16 +443,12 @@ async function loadStats() {
 
 async function fetchPage(marker) {
   if (!props.userId) return { items: [], nextMarker: null, hasMore: false }
-  const base = {
+  return fileApi.listUserUploadedFiles({
     userId: props.userId,
     pageSize: 20,
     marker,
     projectId: props.projectId || undefined,
-  }
-  if (source.value === 'generated') {
-    return fileApi.listUserGeneratedAssets(base)
-  }
-  return fileApi.listUserUploadedFiles(base)
+  })
 }
 
 async function reloadList() {
@@ -356,6 +494,7 @@ async function loadMore() {
 function switchSource(next) {
   if (source.value === next) return
   source.value = next
+  if (next === 'generated') refreshGenerated()
 }
 
 async function onDelete(asset) {
@@ -375,13 +514,18 @@ async function onDelete(asset) {
 }
 
 async function refresh() {
-  await Promise.all([loadQuota(), loadStats(), reloadList()])
+  await Promise.all([loadQuota(), loadStats(), refreshGenerated(), reloadList()])
 }
+
+useAssetsRefreshListener(() => {
+  refreshGenerated()
+})
 
 watch(
   () => [props.userId, props.projectId, source.value],
   () => {
-    reloadList()
+    if (source.value === 'uploaded') reloadList()
+    else refreshGenerated()
   },
 )
 
@@ -397,7 +541,7 @@ watch(
 )
 
 onMounted(() => {
-  if (props.userId) reloadList()
+  if (props.userId && source.value === 'uploaded') reloadList()
 })
 
 defineExpose({ refresh })

@@ -246,6 +246,17 @@ export interface UserStorageQuota {
 export type UserPrivateAssetType = "ALL" | "IMAGE" | "VIDEO"
 export type UserPrivateAssetSort = "NEWEST" | "OLDEST" | "SIZE_DESC" | "SIZE_ASC"
 
+export interface UserImage {
+  id: number | string
+  fileLink: string
+  originalName?: string
+  createTime?: string
+  projectId?: string
+  taskId?: string | number
+  taskName?: string
+  [key: string]: unknown
+}
+
 export interface UserAssetItem {
   fileKey: string
   name: string

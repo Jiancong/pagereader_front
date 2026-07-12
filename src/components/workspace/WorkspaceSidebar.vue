@@ -198,9 +198,11 @@
     <WorkspaceAssetsDrawer
       :open="assetsOpen"
       :user-id="userId"
+      :project-id="activeProjectId || ''"
       :sidebar-collapsed="isCollapsed"
       @close="assetsOpen = false"
       @select-document="onSelectDocument"
+      @open-project="onOpenProject"
     />
   </aside>
 </template>
@@ -270,6 +272,10 @@ function projectDisplayTitle(project) {
 
 function onSelectDocument(payload) {
   emit('select-document', payload)
+}
+
+function onOpenProject(projectId) {
+  emit('open-project', projectId)
 }
 
 onMounted(() => {
