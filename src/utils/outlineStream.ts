@@ -87,6 +87,32 @@ export function isOutlineStreamPayload(payload: unknown): boolean {
   return false
 }
 
+/** YouTube 字幕常为逐行断句，合并为正常段落便于阅读与导出 */
+export function formatOutlineTranscriptText(text: string): string {
+  const raw = String(text || "").replace(/\r\n/g, "\n").trim()
+  if (!raw) return ""
+
+  return raw
+    .split(/\n{2,}/)
+    .map((block) =>
+      block
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s{2,}/g, " ")
+        .trim(),
+    )
+    .filter(Boolean)
+    .join("\n\n")
+}
+
+export function splitOutlineParagraphs(text: string): string[] {
+  const normalized = formatOutlineTranscriptText(text)
+  if (!normalized) return []
+  return normalized.split(/\n\n/).map((part) => part.trim()).filter(Boolean)
+}
+
 export function parseOutlineSection(data: unknown): OutlineSection | null {
   const root = asRecord(data)
   if (!root) return null
@@ -96,7 +122,7 @@ export function parseOutlineSection(data: unknown): OutlineSection | null {
 
   const title = pickString(root.title)
   const heading = pickString(root.heading) || title
-  const text = pickString(root.text)
+  const text = formatOutlineTranscriptText(pickString(root.text))
   if (!heading && !text) return null
 
   const startSeconds = Number(root.start_seconds)

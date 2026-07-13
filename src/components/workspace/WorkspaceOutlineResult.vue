@@ -84,8 +84,15 @@
               {{ t("workspace.outlineJumpToTime", { time: activeSection.time_hint || "0:00" }) }}
             </a>
           </div>
-          <div class="rounded-xl border border-border bg-secondary/20 p-4">
-            <p class="whitespace-pre-wrap text-sm leading-7 text-foreground">{{ activeSection.text }}</p>
+          <div class="rounded-xl border border-border bg-secondary/20 p-4 sm:p-5">
+            <p
+              v-for="(paragraph, paragraphIndex) in activeSectionParagraphs"
+              :key="paragraphIndex"
+              class="text-sm leading-7 text-foreground"
+              :class="paragraphIndex > 0 ? 'mt-4' : ''"
+            >
+              {{ paragraph }}
+            </p>
           </div>
         </div>
         <div v-else-if="result.markdown" class="outline-markdown">
@@ -108,6 +115,7 @@ import ChatMarkdownBody from "@/components/editor/chat/ChatMarkdownBody.vue"
 import { downloadMarkdownFile, sanitizeDownloadBasename } from "@/utils/downloadMarkdownFile"
 import {
   buildYoutubeSeekUrl,
+  splitOutlineParagraphs,
   type OutlineResult,
 } from "@/utils/outlineStream"
 
@@ -146,6 +154,10 @@ const seekUrl = computed(() => {
   if (!props.result.youtubeUrl || !activeSection.value?.start_seconds) return ""
   return buildYoutubeSeekUrl(props.result.youtubeUrl, activeSection.value.start_seconds)
 })
+
+const activeSectionParagraphs = computed(() =>
+  splitOutlineParagraphs(activeSection.value?.text || ""),
+)
 
 watch(
   () => props.result.sections,
