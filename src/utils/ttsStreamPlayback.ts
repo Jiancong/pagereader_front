@@ -192,7 +192,10 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
     options.onLoadingChange(true)
     updateProgress(totalPages)
 
-    abortController = new AbortController()
+    // 保留本次请求自己的 controller。stop() 会清空全局引用，因此 catch
+    // 不能再通过 abortController 判断，否则主动取消会被误报为网络错误。
+    const requestController = new AbortController()
+    abortController = requestController
 
     try {
       await generatePageTtsStream(
@@ -205,9 +208,11 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
         },
         {
           onMeta: (meta) => {
+            if (requestController.signal.aborted) return
             if (meta.totalPages != null) updateProgress(meta.totalPages)
           },
           onPageReady: (data) => {
+            if (requestController.signal.aborted) return
             const page = Number(data.page)
             const url = data.item?.url
             if (!Number.isFinite(page) || page <= 0 || !url) return
@@ -218,6 +223,7 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
             maybeResumeWaiting(page)
           },
           onComplete: (data) => {
+            if (requestController.signal.aborted) return
             const merged: TtsItemsMap = {}
             for (const item of data.items ?? []) {
               if (item.url) merged[item.page] = item.url
@@ -233,16 +239,20 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
             }
           },
           onError: (message) => {
+            if (requestController.signal.aborted) return
             stop()
             options.onError(message)
           },
         },
-        abortController.signal,
+        requestController.signal,
       )
+      if (requestController.signal.aborted) return
+      if (abortController === requestController) abortController = null
       streamDone = true
       options.onLoadingChange(false)
     } catch (error) {
-      if (abortController?.signal.aborted) return
+      if (requestController.signal.aborted) return
+      if (abortController === requestController) abortController = null
       stop()
       options.onError(error instanceof Error ? error.message : String(error))
     }

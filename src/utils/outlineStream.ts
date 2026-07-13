@@ -117,6 +117,17 @@ export function formatOutlineTranscriptMarkdown(text: string): string {
     .trim()
 }
 
+/** 按 Markdown 加粗的“说话人：”标签拆分，供 UI 强制逐轮对话换行。 */
+export function splitOutlineSpeakerTurns(text: string): string[] {
+  const markdown = formatOutlineTranscriptMarkdown(text)
+  if (!markdown) return []
+
+  return markdown
+    .split(/(?=\*\*[^*\n]{1,80}[：:]\*\*)/g)
+    .map((turn) => turn.trim())
+    .filter(Boolean)
+}
+
 export function parseOutlineSection(data: unknown): OutlineSection | null {
   const root = asRecord(data)
   if (!root) return null

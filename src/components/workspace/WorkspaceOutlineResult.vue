@@ -142,10 +142,16 @@
             </a>
           </div>
           <div class="rounded-xl border border-border bg-secondary/20 p-4 sm:p-5">
-            <ChatMarkdownBody
-              :content="activeSectionMarkdown"
-              root-class="outline-section-markdown"
-            />
+            <div
+              v-for="(turn, turnIndex) in activeSectionTurns"
+              :key="`${activeSection.index}-${turnIndex}`"
+              class="outline-speaker-turn"
+            >
+              <ChatMarkdownBody
+                :content="turn"
+                root-class="outline-section-markdown"
+              />
+            </div>
           </div>
         </div>
         <div v-else-if="result.markdown" class="outline-markdown">
@@ -183,6 +189,7 @@ import { buildExploreProjectShareUrl } from "@/utils/feedOpen"
 import {
   buildYoutubeSeekUrl,
   formatOutlineTranscriptMarkdown,
+  splitOutlineSpeakerTurns,
   type OutlineResult,
 } from "@/utils/outlineStream"
 
@@ -266,8 +273,8 @@ const seekUrl = computed(() => {
   return buildYoutubeSeekUrl(props.result.youtubeUrl, activeSection.value.start_seconds)
 })
 
-const activeSectionMarkdown = computed(() =>
-  formatOutlineTranscriptMarkdown(activeSection.value?.text || ""),
+const activeSectionTurns = computed(() =>
+  splitOutlineSpeakerTurns(activeSection.value?.text || ""),
 )
 
 const exportableMarkdown = computed(() => {
@@ -452,5 +459,18 @@ onBeforeUnmount(() => {
 :deep(.outline-section-markdown .markdown-body strong) {
   color: hsl(var(--primary));
   font-weight: 600;
+}
+
+.outline-speaker-turn {
+  display: block;
+}
+
+.outline-speaker-turn + .outline-speaker-turn {
+  margin-top: 1rem;
+}
+
+.outline-speaker-turn :deep(.markdown-body),
+.outline-speaker-turn :deep(.markdown-body p) {
+  display: block;
 }
 </style>
