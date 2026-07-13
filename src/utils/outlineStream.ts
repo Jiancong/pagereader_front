@@ -107,10 +107,14 @@ export function formatOutlineTranscriptText(text: string): string {
     .join("\n\n")
 }
 
-export function splitOutlineParagraphs(text: string): string[] {
+export function formatOutlineTranscriptMarkdown(text: string): string {
   const normalized = formatOutlineTranscriptText(text)
-  if (!normalized) return []
-  return normalized.split(/\n\n/).map((part) => part.trim()).filter(Boolean)
+  if (!normalized) return ""
+
+  return normalized
+    .replace(/(\*\*[^*\n]{1,80}[：:]\*\*)/g, "\n\n$1 ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
 }
 
 export function parseOutlineSection(data: unknown): OutlineSection | null {

@@ -579,6 +579,7 @@ export default {
     outlineStreaming: "Receiving sections…",
     outlineExportMarkdown: "Export Markdown",
     outlineExportMarkdownSuccess: "Markdown file downloaded",
+    outlineExportPdfPopupBlocked: "Could not open the PDF export window. Allow pop-ups and try again.",
     outlineOpenVideo: "Open video",
     outlineJumpToTime: "Jump to {time}",
     novelResultTitle: "Novel reading guide",

@@ -560,6 +560,7 @@ export default {
     outlineStreaming: "正在流式接收段落…",
     outlineExportMarkdown: "导出 Markdown",
     outlineExportMarkdownSuccess: "Markdown 文件已下载",
+    outlineExportPdfPopupBlocked: "无法打开 PDF 导出窗口，请允许浏览器弹出窗口后重试",
     outlineOpenVideo: "打开原视频",
     outlineJumpToTime: "跳转至 {time}",
     novelResultTitle: "小说导读",

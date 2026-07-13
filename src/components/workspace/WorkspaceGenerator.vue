@@ -46,6 +46,7 @@
     <WorkspaceOutlineResult
       v-if="activeTask.outlineResult"
       :result="activeTask.outlineResult"
+      :project-id="activeTask.projectId"
       :streaming="activeTask.isGenerating"
       @close="resetActiveTask"
     />

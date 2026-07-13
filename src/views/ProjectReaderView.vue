@@ -61,6 +61,7 @@
           <div v-else-if="outlineResult" class="mb-2 min-w-0">
             <WorkspaceOutlineResult
               :result="outlineResult"
+              :project-id="projectId"
               @close="() => {}"
             />
           </div>
