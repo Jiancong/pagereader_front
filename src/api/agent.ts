@@ -10,7 +10,6 @@ import type {
   ChatStreamReq,
   PptQueue,
   YoutubePptStreamReq,
-  YoutubeOutlineStreamReq,
   YoutubeTranscriptReq,
   YoutubeTranscriptResult,
 } from "./types"
@@ -42,18 +41,37 @@ export function buildChatStreamBody(req: ChatStreamReq): Record<string, unknown>
     userId: req.userId,
   }
 
-  if (req.projectId) body.projectId = req.projectId
-  if (req.sessionId) body.sessionId = req.sessionId
+  const projectId = req.projectId || req.sessionId
+  if (projectId) {
+    body.projectId = projectId
+    body.project_id = projectId
+    body.sessionId = req.sessionId || projectId
+    body.session_id = req.sessionId || projectId
+  }
   if (req.isAgent != null) body.isAgent = req.isAgent
   if (req.uploaded_documents?.length) body.uploaded_documents = req.uploaded_documents
   if (req.projectName) body.projectName = req.projectName
-  if (req.queue) body.queue = req.queue
+  // outline 走 generation_mode，不传 queue 避免后端 queue 校验失败
+  if (req.queue && req.queue !== "OUTLINE") body.queue = req.queue
   if (mode) {
     body.mode = mode
     body.generationMode = mode
     body.generation_mode = mode
+    body.outputMode = mode
+    body.output_mode = mode
   }
   if (req.enable_search != null) body.enable_search = req.enable_search
+
+  const streamRequestId = req.stream_request_id || req.streamRequestId
+  if (streamRequestId) {
+    body.stream_request_id = streamRequestId
+    body.streamRequestId = streamRequestId
+  }
+  if (req.locale) {
+    body.locale = req.locale
+  } else {
+    body.locale = getSavedLocale() === "en" ? "en" : "zh-CN"
+  }
 
   return body
 }
@@ -277,37 +295,6 @@ export async function youtubePptStream(
   const body = buildYoutubeStreamBody({ ...req, stream_request_id: streamRequestId })
 
   const res = await fetch(buildUrl("/agent/ppt/youtube-stream"), {
-    method: "POST",
-    headers: authStreamHeaders(),
-    body: JSON.stringify(body),
-    signal,
-  })
-
-  await readSseResponse(res, cb)
-  return { streamRequestId }
-}
-
-function buildYoutubeOutlineStreamBody(req: YoutubeOutlineStreamReq): Record<string, unknown> {
-  return {
-    youtube_url: req.youtube_url.trim(),
-    project_id: req.project_id,
-    ...(req.message?.trim() ? { message: req.message.trim() } : {}),
-    stream_request_id: req.stream_request_id ?? String(Date.now()),
-    locale: req.locale ?? resolveApiLocale(),
-    ...(req.user_id ? { user_id: req.user_id } : {}),
-    ...(req.languages?.length ? { languages: req.languages } : {}),
-  }
-}
-
-export async function youtubeOutlineStream(
-  req: YoutubeOutlineStreamReq,
-  cb: ChatStreamCallbacks = {},
-  signal?: AbortSignal,
-): Promise<{ streamRequestId: string }> {
-  const streamRequestId = req.stream_request_id ?? String(Date.now())
-  const body = buildYoutubeOutlineStreamBody({ ...req, stream_request_id: streamRequestId })
-
-  const res = await fetch(buildUrl("/agent/ppt/youtube-outline-stream"), {
     method: "POST",
     headers: authStreamHeaders(),
     body: JSON.stringify(body),

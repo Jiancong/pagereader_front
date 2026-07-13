@@ -332,6 +332,29 @@ export function mergeOutlineSection(
   return [...rest, next].sort((a, b) => a.index - b.index)
 }
 
+export function applyOutlineNodePayload(
+  current: OutlineResult | null,
+  data: unknown,
+  youtubeUrl?: string,
+): OutlineResult {
+  const root = asRecord(data)
+  if (!root) return ensureOutlineResult(current, youtubeUrl)
+
+  const node = asRecord(root.node) ?? root
+  const title = pickString(root.book_title) || pickString(root.title) || pickString(node.title)
+  const markdown = pickString(node.text)
+  const sections = normalizeOutlineSections(node.sections)
+
+  const base = ensureOutlineResult(current, youtubeUrl)
+  return {
+    ...base,
+    title: title || base.title,
+    markdown: markdown || base.markdown,
+    sections: sections.length ? sections : base.sections,
+    sectionCount: Number(node.section_count) || sections.length || base.sectionCount,
+  }
+}
+
 export function ensureOutlineResult(
   current: OutlineResult | null,
   youtubeUrl?: string,

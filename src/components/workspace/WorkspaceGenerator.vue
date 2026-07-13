@@ -353,6 +353,7 @@ import {
   parseOutlineSection,
   mergeOutlineSection,
   ensureOutlineResult,
+  applyOutlineNodePayload,
   type OutlineResult,
 } from "@/utils/outlineStream"
 import {
@@ -848,6 +849,23 @@ const runStream = async (
         if (line) appendLog(task, line)
       },
       onEvent: async (event, data) => {
+        if (task.queue === "OUTLINE") {
+          if (event === "outline_section") {
+            handleOutlineSection(task, data)
+            return
+          }
+          if (event === "outline_node") {
+            task.outlineResult = applyOutlineNodePayload(task.outlineResult, data)
+            return
+          }
+          if (
+            event === "outline_complete" ||
+            (event === "complete" && isOutlineStreamPayload(data))
+          ) {
+            await handleOutlineStreamComplete(task, data, mode)
+          }
+          return
+        }
         if (task.cardResult || task.pptData || task.novelResult || task.outlineResult) return
         if (event === "novel_complete" || (event === "complete" && isNovelStreamPayload(data))) {
           await handleNovelStreamComplete(task, data, mode)
@@ -862,6 +880,12 @@ const runStream = async (
         }
       },
       onComplete: async (data: unknown) => {
+        if (task.queue === "OUTLINE") {
+          if (isOutlineStreamPayload(data)) {
+            await handleOutlineStreamComplete(task, data, mode)
+          }
+          return
+        }
         if (task.pptData || task.cardResult || task.novelResult || task.outlineResult) return
         const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
         if (isOutlineStreamPayload(o)) {
@@ -1090,7 +1114,11 @@ const onYoutubeSubmit = async () => {
   }
 }
 
-function handleOutlineSection(task: GeneratorTask, data: unknown, youtubeUrlValue: string) {
+function handleOutlineSection(
+  task: GeneratorTask,
+  data: unknown,
+  youtubeUrlValue?: string,
+) {
   const section = parseOutlineSection(data)
   if (!section) return
   const current = ensureOutlineResult(task.outlineResult, youtubeUrlValue)
@@ -1103,6 +1131,13 @@ function handleOutlineSection(task: GeneratorTask, data: unknown, youtubeUrlValu
 }
 
 const runYoutubeOutlineStream = async (task: GeneratorTask, youtubeUrlValue: string) => {
+  const userId = await resolveUserId()
+  if (!userId) {
+    task.errorMsg = t("workspace.loginRequiredGenerate")
+    task.isGenerating = false
+    return
+  }
+
   const streamRequestId = String(Date.now())
   task.streamRequestId = streamRequestId
   youtubeAbort?.abort()
@@ -1115,10 +1150,15 @@ const runYoutubeOutlineStream = async (task: GeneratorTask, youtubeUrlValue: str
     await handleOutlineStreamComplete(task, data, "upload")
   }
 
-  await agentApi.youtubeOutlineStream(
+  await agentApi.chatStream(
     {
-      youtube_url: youtubeUrlValue,
-      project_id: task.projectId,
+      message: youtubeUrlValue,
+      userId,
+      projectId: task.projectId,
+      sessionId: task.projectId,
+      isAgent: true,
+      queue: "OUTLINE",
+      generation_mode: "outline",
       stream_request_id: streamRequestId,
     },
     {
@@ -1135,17 +1175,24 @@ const runYoutubeOutlineStream = async (task: GeneratorTask, youtubeUrlValue: str
           handleOutlineSection(task, data, youtubeUrlValue)
           return
         }
-        if (event === "outline_ping") {
-          appendLog(task, t("workspace.youtubeStillGenerating"))
+        if (event === "outline_node") {
+          task.outlineResult = applyOutlineNodePayload(
+            task.outlineResult,
+            data,
+            youtubeUrlValue,
+          )
           return
         }
-        if (event === "outline_complete" || (event === "complete" && isOutlineStreamPayload(data))) {
+        if (event === "outline_ping") return
+        if (
+          event === "outline_complete" ||
+          (event === "complete" && isOutlineStreamPayload(data))
+        ) {
           await finishOutline(data)
         }
       },
       onComplete: async (data: unknown) => {
-        const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
-        if (isOutlineStreamPayload(o)) {
+        if (isOutlineStreamPayload(data)) {
           await finishOutline(data)
         }
       },

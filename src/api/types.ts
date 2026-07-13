@@ -342,6 +342,9 @@ export interface ChatStreamReq {
   output_mode?: string
   /** 一句话生成：是否启用联网搜索；上传文档时不传 */
   enable_search?: boolean
+  stream_request_id?: string
+  streamRequestId?: string
+  locale?: string
 }
 
 /** BFF YouTube PPT：/api2/agent/ppt/youtube-stream | youtube-transcript */
@@ -352,17 +355,6 @@ export interface YoutubePptStreamReq {
   /** DOCUMENT / CARD / NOVEL / OUTLINE（后端不再接受 FAST/SLOW） */
   queue?: PptQueue
   stream_request_id?: string
-  locale?: string
-  languages?: string[]
-}
-
-/** BFF YouTube Outline：/api2/agent/ppt/youtube-outline-stream */
-export interface YoutubeOutlineStreamReq {
-  youtube_url: string
-  project_id: string
-  message?: string
-  stream_request_id?: string
-  user_id?: string
   locale?: string
   languages?: string[]
 }
