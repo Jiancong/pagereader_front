@@ -319,9 +319,9 @@ export interface UploadedDocument {
 }
 
 // ===== Agent 对话流 =====
-export type PptQueue = "CARD" | "DOCUMENT" | "NOVEL"
+export type PptQueue = "CARD" | "DOCUMENT" | "NOVEL" | "OUTLINE"
 
-export type GenerationMode = "card" | "document" | "markdown" | "novel"
+export type GenerationMode = "card" | "document" | "markdown" | "novel" | "outline"
 
 export interface ChatStreamReq {
   message: string
@@ -332,7 +332,7 @@ export interface ChatStreamReq {
   uploaded_documents?: UploadedDocument[]
   /** 显式项目标题；上传 PDF 时建议传去后缀书名 */
   projectName?: string
-  /** CARD 60 credits/run (daily free first); DOCUMENT/NOVEL 30 credits/run (package only) */
+  /** CARD 60 credits/run (daily free first); DOCUMENT/NOVEL/OUTLINE 30 credits/run (package only) */
   queue?: PptQueue
   /** 后端 generation mode：novel / document / card / markdown（与 queue 二选一或同时传） */
   mode?: string
@@ -349,9 +349,20 @@ export interface YoutubePptStreamReq {
   youtube_url: string
   project_id: string
   message?: string
-  /** DOCUMENT / CARD / NOVEL（后端不再接受 FAST/SLOW） */
+  /** DOCUMENT / CARD / NOVEL / OUTLINE（后端不再接受 FAST/SLOW） */
   queue?: PptQueue
   stream_request_id?: string
+  locale?: string
+  languages?: string[]
+}
+
+/** BFF YouTube Outline：/api2/agent/ppt/youtube-outline-stream */
+export interface YoutubeOutlineStreamReq {
+  youtube_url: string
+  project_id: string
+  message?: string
+  stream_request_id?: string
+  user_id?: string
   locale?: string
   languages?: string[]
 }

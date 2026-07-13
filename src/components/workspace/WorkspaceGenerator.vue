@@ -1,5 +1,5 @@
 <template>
-  <div :class="(activeTask.pptData || activeTask.cardResult || activeTask.novelResult) ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)]' : 'mx-auto w-full min-w-0 max-w-3xl'">
+  <div :class="(activeTask.pptData || activeTask.cardResult || activeTask.novelResult || activeTask.outlineResult) ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)]' : 'mx-auto w-full min-w-0 max-w-3xl'">
     <!-- Tab 切换：两套任务状态独立，可并行生成 -->
     <div class="mb-4 flex w-full justify-center sm:mb-8">
         <div class="inline-flex max-w-full flex-wrap justify-center gap-1 rounded-xl border border-border bg-secondary/30 p-1 sm:flex-nowrap sm:gap-0 sm:p-1.5">
@@ -42,9 +42,17 @@
         </div>
     </div>
 
+    <!-- 已生成：视频大纲 -->
+    <WorkspaceOutlineResult
+      v-if="activeTask.outlineResult"
+      :result="activeTask.outlineResult"
+      :streaming="activeTask.isGenerating"
+      @close="resetActiveTask"
+    />
+
     <!-- 已生成：小说导读 -->
     <WorkspaceNovelResult
-      v-if="activeTask.novelResult"
+      v-else-if="activeTask.novelResult"
       :result="activeTask.novelResult"
       :project-id="activeTask.projectId"
       can-upload-cover
@@ -87,13 +95,22 @@
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueDocumentHint') }}</span>
           </label>
           <label
-            v-if="activeTab === 'upload' || activeTab === 'youtube'"
+            v-if="activeTab === 'upload'"
             class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
           >
             <input v-model="activeTask.queue" type="radio" value="NOVEL" class="accent-primary" />
             <span>{{ t('workspace.queueNovel') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageNovelCredits') }})</span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueNovelHint') }}</span>
+          </label>
+          <label
+            v-if="activeTab === 'youtube'"
+            class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
+          >
+            <input v-model="activeTask.queue" type="radio" value="OUTLINE" class="accent-primary" />
+            <span>{{ t('workspace.queueOutline') }}</span>
+            <span class="text-muted-foreground">({{ t('pricing.usageOutlineCredits') }})</span>
+            <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueOutlineHint') }}</span>
           </label>
         </div>
         <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.queueHint') }}</p>
@@ -196,7 +213,7 @@
               />
             </div>
 
-            <div v-if="!isNovelMode">
+            <div v-if="!isNovelMode && !isOutlineMode">
               <label class="mb-2 block text-sm font-medium text-foreground">{{ t('workspace.youtubePromptLabel') }}</label>
               <p class="mb-2 text-xs text-muted-foreground">{{ t('workspace.youtubePromptHint') }}</p>
               <textarea
@@ -247,7 +264,7 @@
 
             <button
               type="button"
-              :disabled="!isYoutubeUrlValid || (!isNovelMode && !youtubePrompt.trim()) || youtubeTask.isGenerating"
+              :disabled="!isYoutubeUrlValid || (!isNovelMode && !isOutlineMode && !youtubePrompt.trim()) || youtubeTask.isGenerating"
               class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               @click="onYoutubeSubmit"
             >
@@ -323,11 +340,21 @@ import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube } from "
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
 import WorkspaceNovelResult from "@/components/workspace/WorkspaceNovelResult.vue"
+import WorkspaceOutlineResult from "@/components/workspace/WorkspaceOutlineResult.vue"
 import {
   isBookCardStreamPayload,
   parseBookCardStreamPayload,
   type BookCardResult,
 } from "@/utils/bookCardStream"
+import {
+  isOutlineStreamPayload,
+  resolveOutlineFromStreamComplete,
+  persistOutlineCompleteToHistory,
+  parseOutlineSection,
+  mergeOutlineSection,
+  ensureOutlineResult,
+  type OutlineResult,
+} from "@/utils/outlineStream"
 import {
   isNovelStreamPayload,
   resolveNovelFromStreamComplete,
@@ -376,6 +403,7 @@ type GeneratorTask = {
   markdown: string
   cardResult: BookCardResult | null
   novelResult: NovelResult | null
+  outlineResult: OutlineResult | null
   projectId: string
   queue: PptQueue
   showCreditsCta: boolean
@@ -394,6 +422,7 @@ function createTask(defaultQueue: PptQueue): GeneratorTask {
     markdown: "",
     cardResult: null,
     novelResult: null,
+    outlineResult: null,
     projectId: "",
     queue: defaultQueue,
     showCreditsCta: false,
@@ -441,9 +470,11 @@ const activeTask = computed(() => {
 const isYoutubeUrlValid = computed(() => agentApi.isLikelyYoutubeUrl(youtubeUrl.value))
 const isCardMode = computed(() => activeTask.value.queue === "CARD")
 const isNovelMode = computed(() => activeTask.value.queue === "NOVEL")
+const isOutlineMode = computed(() => activeTask.value.queue === "OUTLINE")
 const activeLastLogs = computed(() => activeTask.value.logs.slice(-3))
 
 function workspaceCopyKey(suffix: string): string {
+  if (isOutlineMode.value) return `workspace.${suffix}Outline`
   if (isNovelMode.value) return `workspace.${suffix}Novel`
   return isCardMode.value ? `workspace.${suffix}Card` : `workspace.${suffix}`
 }
@@ -498,6 +529,36 @@ const tabClass = (tab: "prompt" | "upload" | "youtube") => [
 ]
 
 const appendLog = (task: GeneratorTask, line: string) => task.logs.push(line)
+
+async function handleOutlineStreamComplete(
+  task: GeneratorTask,
+  data: unknown,
+  mode: "prompt" | "upload",
+) {
+  stopTaskTimer(task)
+  appendLog(task, t("workspace.loadingOutline"))
+  try {
+    const resolved = await resolveOutlineFromStreamComplete(data)
+    if (resolved?.markdown || resolved?.sections.length) {
+      task.outlineResult = {
+        ...resolved,
+        youtubeUrl: resolved.youtubeUrl || youtubeUrl.value.trim() || undefined,
+      }
+      appendLog(task, resolved.message || t("workspace.outlineResultReady"))
+      await persistOutlineCompleteToHistory(task.projectId, data)
+      gtmGenerateComplete(mode, task.queue, task.projectId)
+      emit("project-complete", task.projectId)
+    } else {
+      task.errorMsg = t("workspace.outlineResultEmpty")
+      gtmGenerateFail(mode, "other")
+    }
+  } catch {
+    task.errorMsg = t("workspace.loadOutlineFailed")
+    gtmGenerateFail(mode, "network")
+  } finally {
+    await refreshCreditsBar()
+  }
+}
 
 async function handleNovelStreamComplete(
   task: GeneratorTask,
@@ -707,7 +768,7 @@ const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, me
         if (line) appendLog(task, line)
       },
       onEvent: async (event, data) => {
-        if (task.cardResult || task.pptData || task.novelResult) return
+        if (task.cardResult || task.pptData || task.novelResult || task.outlineResult) return
         if (event === "ppt_ping") {
           appendLog(task, t("workspace.youtubeStillGenerating"))
           return
@@ -725,8 +786,12 @@ const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, me
         }
       },
       onComplete: async (data: unknown) => {
-        if (task.pptData || task.cardResult || task.novelResult) return
+        if (task.pptData || task.cardResult || task.novelResult || task.outlineResult) return
         const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+        if (isOutlineStreamPayload(o)) {
+          await handleOutlineStreamComplete(task, data, "upload")
+          return
+        }
         if (isNovelStreamPayload(o)) {
           await handleNovelStreamComplete(task, data, "upload")
           return
@@ -783,7 +848,7 @@ const runStream = async (
         if (line) appendLog(task, line)
       },
       onEvent: async (event, data) => {
-        if (task.cardResult || task.pptData || task.novelResult) return
+        if (task.cardResult || task.pptData || task.novelResult || task.outlineResult) return
         if (event === "novel_complete" || (event === "complete" && isNovelStreamPayload(data))) {
           await handleNovelStreamComplete(task, data, mode)
           return
@@ -797,8 +862,12 @@ const runStream = async (
         }
       },
       onComplete: async (data: unknown) => {
-        if (task.pptData || task.cardResult || task.novelResult) return
+        if (task.pptData || task.cardResult || task.novelResult || task.outlineResult) return
         const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+        if (isOutlineStreamPayload(o)) {
+          await handleOutlineStreamComplete(task, data, mode)
+          return
+        }
         if (isNovelStreamPayload(o)) {
           await handleNovelStreamComplete(task, data, mode)
           return
@@ -832,6 +901,7 @@ const startTask = (task: GeneratorTask) => {
   task.markdown = ""
   task.cardResult = null
   task.novelResult = null
+  task.outlineResult = null
   task.projectId = newProjectId()
   task.streamRequestId = null
   task.logs = []
@@ -932,7 +1002,8 @@ function applyDefaultYoutubePrompt() {
 
 watch(activeTab, (tab) => {
   if (tab === "youtube") {
-    if (youtubeTask.queue !== "DOCUMENT" && youtubeTask.queue !== "NOVEL") {
+    if (youtubeTask.queue === "NOVEL") youtubeTask.queue = "OUTLINE"
+    if (youtubeTask.queue !== "DOCUMENT" && youtubeTask.queue !== "OUTLINE") {
       youtubeTask.queue = "DOCUMENT"
     }
     applyDefaultYoutubePrompt()
@@ -993,7 +1064,7 @@ const onCancelYoutube = async () => {
 }
 
 const onYoutubeSubmit = async () => {
-  if (!isYoutubeUrlValid.value || (!isNovelMode.value && !youtubePrompt.value.trim()) || youtubeTask.isGenerating) return
+  if (!isYoutubeUrlValid.value || (!isOutlineMode.value && !youtubePrompt.value.trim()) || youtubeTask.isGenerating) return
   startTask(youtubeTask)
   if (!(await ensureCreditsForTask(youtubeTask))) {
     stopTaskTimer(youtubeTask)
@@ -1003,8 +1074,8 @@ const onYoutubeSubmit = async () => {
   }
   gtmGenerateStart("upload", youtubeTask.queue)
   try {
-    if (isNovelMode.value) {
-      await runYoutubeNovelStream(youtubeTask, youtubeUrl.value.trim())
+    if (isOutlineMode.value) {
+      await runYoutubeOutlineStream(youtubeTask, youtubeUrl.value.trim())
     } else {
       await runYoutubeStream(youtubeTask, youtubeUrl.value.trim(), youtubePrompt.value.trim())
     }
@@ -1019,36 +1090,73 @@ const onYoutubeSubmit = async () => {
   }
 }
 
-/**
- * YouTube + Novel: the dedicated youtube-stream endpoint only produces decks.
- * For Novel mode we fetch the transcript and route through the normal chat stream
- * (queue=NOVEL), matching how uploaded-book novel generation works.
- */
-const runYoutubeNovelStream = async (task: GeneratorTask, youtubeUrlValue: string) => {
+function handleOutlineSection(task: GeneratorTask, data: unknown, youtubeUrlValue: string) {
+  const section = parseOutlineSection(data)
+  if (!section) return
+  const current = ensureOutlineResult(task.outlineResult, youtubeUrlValue)
+  task.outlineResult = {
+    ...current,
+    sections: mergeOutlineSection(current.sections, section),
+    sectionCount: section.total || current.sectionCount,
+  }
+  appendLog(task, section.heading || section.title)
+}
+
+const runYoutubeOutlineStream = async (task: GeneratorTask, youtubeUrlValue: string) => {
+  const streamRequestId = String(Date.now())
+  task.streamRequestId = streamRequestId
   youtubeAbort?.abort()
   youtubeAbort = new AbortController()
+  let outlineFinished = false
 
-  appendLog(task, t("workspace.youtubeTranscriptLoading"))
-  let transcript: YoutubeTranscriptResult
-  try {
-    transcript = await agentApi.fetchYoutubeTranscript(
-      { youtube_url: youtubeUrlValue, project_id: task.projectId },
-      youtubeAbort.signal,
-    )
-  } catch (e) {
-    if ((e as Error)?.name === "AbortError") return
-    throw e
-  }
-  if (!transcript?.success || !transcript.script_preview?.trim()) {
-    throw new Error(t("workspace.youtubeTranscriptFailed"))
+  const finishOutline = async (data: unknown) => {
+    if (outlineFinished) return
+    outlineFinished = true
+    await handleOutlineStreamComplete(task, data, "upload")
   }
 
-  const script = transcript.script_preview.trim()
-  const prompt = t("workspace.youtubePromptDefaultNovel")
-  const videoTitle = transcript.title?.trim() || youtubeUrlValue
-  const message = `${prompt}\n\n视频标题：${videoTitle}\n\n视频字幕：\n${script}`
-
-  await runStream(task, message, undefined, videoTitle, "upload")
+  await agentApi.youtubeOutlineStream(
+    {
+      youtube_url: youtubeUrlValue,
+      project_id: task.projectId,
+      stream_request_id: streamRequestId,
+    },
+    {
+      onStarted: () => {
+        emit("project-started", task.projectId)
+        refreshCreditsBar()
+      },
+      onProgress: (data: unknown) => {
+        const line = toText(data)
+        if (line) appendLog(task, line)
+      },
+      onEvent: async (event, data) => {
+        if (event === "outline_section") {
+          handleOutlineSection(task, data, youtubeUrlValue)
+          return
+        }
+        if (event === "outline_ping") {
+          appendLog(task, t("workspace.youtubeStillGenerating"))
+          return
+        }
+        if (event === "outline_complete" || (event === "complete" && isOutlineStreamPayload(data))) {
+          await finishOutline(data)
+        }
+      },
+      onComplete: async (data: unknown) => {
+        const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
+        if (isOutlineStreamPayload(o)) {
+          await finishOutline(data)
+        }
+      },
+      onError: (msg: string) => {
+        stopTaskTimer(task)
+        applyStreamError(task, msg, "upload")
+        refreshCreditsBar()
+      },
+    },
+    youtubeAbort.signal,
+  )
 }
 
 onBeforeUnmount(() => {
@@ -1061,6 +1169,7 @@ const resetActiveTask = () => {
   activeTask.value.markdown = ""
   activeTask.value.cardResult = null
   activeTask.value.novelResult = null
+  activeTask.value.outlineResult = null
   activeTask.value.projectId = ""
 }
 

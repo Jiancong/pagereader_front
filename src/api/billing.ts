@@ -9,6 +9,7 @@ export const QUEUE_CREDIT_COST: Record<PptQueue, number> = {
   CARD: 60,
   DOCUMENT: 30,
   NOVEL: 30,
+  OUTLINE: 30,
 }
 
 function parseCredits(v: unknown): number {
@@ -33,7 +34,7 @@ export function getPackageCreditsRemaining(status: SubscribeMyStatus | null | un
   )
 }
 
-/** CARD：每日免费优先 + 套餐；DOCUMENT / NOVEL：仅套餐积分 */
+/** CARD：每日免费优先 + 套餐；DOCUMENT / NOVEL / OUTLINE：仅套餐积分 */
 export function canAffordQueue(status: SubscribeMyStatus | null | undefined, queue: PptQueue): boolean {
   const cost = QUEUE_CREDIT_COST[queue]
   const daily = getDailyCreditsRemaining(status)
@@ -52,7 +53,8 @@ export function isInvalidQueueMessage(msg: string): boolean {
   return (
     msg.includes("queue 已废弃") ||
     msg.includes("queue 无效") ||
-    msg.includes("DOCUMENT / CARD / NOVEL")
+    msg.includes("DOCUMENT / CARD / NOVEL") ||
+    msg.includes("OUTLINE")
   )
 }
 

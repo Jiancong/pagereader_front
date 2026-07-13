@@ -58,6 +58,12 @@
               @cover-uploaded="onCoverUploaded"
             />
           </div>
+          <div v-else-if="outlineResult" class="mb-2 min-w-0">
+            <WorkspaceOutlineResult
+              :result="outlineResult"
+              @close="() => {}"
+            />
+          </div>
           <div v-else-if="novelResult" class="mb-2 min-w-0">
             <WorkspaceNovelResult
               :result="novelResult"
@@ -114,9 +120,11 @@ import AppHeader from '@/components/AppHeader.vue'
 import AuthDialog from '@/components/AuthDialog.vue'
 import PptViewer from '@/components/editor/chat/PptViewer.vue'
 import WorkspaceNovelResult from '@/components/workspace/WorkspaceNovelResult.vue'
+import WorkspaceOutlineResult from '@/components/workspace/WorkspaceOutlineResult.vue'
 import { authApi, projectApi, isLoggedIn, getLocalAvatar } from '@/api'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
 import { resolveNovelFromHistory } from '@/utils/novelStream'
+import { resolveOutlineFromHistory } from '@/utils/outlineStream'
 import { pickMarkdownFromHistory, pickMarkdownFromPayload } from '@/utils/pptMarkdownSource'
 import { looksLikeDeckJson } from '@/utils/projectCommunity'
 import { buildPptChatHistoryDisplay } from '@/utils/pptChatHistoryDisplay'
@@ -136,6 +144,7 @@ const project = ref(null)
 const history = ref([])
 const pptData = ref(null)
 const novelResult = ref(null)
+const outlineResult = ref(null)
 const deckMarkdown = ref('')
 const loading = ref(false)
 const loadingDeck = ref(false)
@@ -162,6 +171,7 @@ const generatedDeckTitle = computed(() => {
 
 const displayTitle = computed(
   () =>
+    outlineResult.value?.title ||
     novelResult.value?.title ||
     generatedDeckTitle.value ||
     pickProjectFallbackTitle(project.value) ||
@@ -197,6 +207,15 @@ function collectDeckUrls(proj, hist) {
     }
   }
   return [...new Set(urls)]
+}
+
+async function loadOutlineGuide(hist, proj) {
+  const resolved = await resolveOutlineFromHistory(hist, proj)
+  if (resolved?.markdown || resolved?.sections?.length) {
+    outlineResult.value = resolved
+    return true
+  }
+  return false
 }
 
 async function loadNovelGuide(id, hist, proj) {
@@ -252,6 +271,7 @@ const load = async (id) => {
   history.value = []
   pptData.value = null
   novelResult.value = null
+  outlineResult.value = null
   deckMarkdown.value = ''
   sessionEntries.value = []
   try {
@@ -264,7 +284,10 @@ const load = async (id) => {
     projectApi.incrementProjectView(id).catch(() => {})
     const loadedNovel = await loadNovelGuide(id, hist, proj)
     if (!loadedNovel) {
-      await loadPptDeck(id, proj, hist)
+      const loadedOutline = await loadOutlineGuide(hist, proj)
+      if (!loadedOutline) {
+        await loadPptDeck(id, proj, hist)
+      }
     }
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')

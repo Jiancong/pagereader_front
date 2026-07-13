@@ -10,16 +10,19 @@ import type {
   ChatStreamReq,
   PptQueue,
   YoutubePptStreamReq,
+  YoutubeOutlineStreamReq,
   YoutubeTranscriptReq,
   YoutubeTranscriptResult,
 } from "./types"
 import { isNovelStreamPayload } from "@/utils/novelStream"
+import { isOutlineStreamPayload } from "@/utils/outlineStream"
 
 const SESSION_KEY = "pr_session_id"
 
 /** 工作区 queue → 后端 chat_stream mode */
 export function mapQueueToGenerationMode(queue?: PptQueue): string | undefined {
   if (queue === "NOVEL") return "novel"
+  if (queue === "OUTLINE") return "outline"
   if (queue === "CARD") return "card"
   if (queue === "DOCUMENT") return "document"
   return undefined
@@ -103,14 +106,17 @@ function resolveEffectiveEvent(wire: string, payload: unknown): string {
   }
 
   const status = normalizeEventName(String(p.status ?? ""))
+  if (status === "complete" && isOutlineStreamPayload(p)) return "outline_complete"
   if (status === "complete" && isNovelStreamPayload(p)) return "novel_complete"
   if (status === "complete" || status === "ppt_complete" || status === "design_complete") {
     return status
   }
+  if (status === "outline_complete" || isOutlineStreamPayload(p)) return "outline_complete"
   if (status === "novel_complete" || isNovelStreamPayload(p)) return "novel_complete"
   const state = normalizeEventName(String(p.state ?? ""))
   if (state === "ppt_complete") return "ppt_complete"
   if (state === "book_card_complete") return "design_complete"
+  if (state === "outline_complete") return "outline_complete"
   if (state === "novel_complete") return "novel_complete"
   if (status === "error") return "error"
   if (status === "in_progress" || p.phase != null) return "progress"
@@ -120,7 +126,15 @@ function resolveEffectiveEvent(wire: string, payload: unknown): string {
 
 function isProgressEvent(event: string, data: unknown): boolean {
   const e = normalizeEventName(event)
-  if (e === "progress" || e === "ppt_progress" || e === "ppt_ping" || e === "novel_progress" || e === "novel_ping") {
+  if (
+    e === "progress" ||
+    e === "ppt_progress" ||
+    e === "ppt_ping" ||
+    e === "novel_progress" ||
+    e === "novel_ping" ||
+    e === "outline_progress" ||
+    e === "outline_ping"
+  ) {
     return true
   }
   if (data && typeof data === "object") {
@@ -183,7 +197,13 @@ async function readSseResponse(res: Response, cb: ChatStreamCallbacks = {}): Pro
     const event = resolveEffectiveEvent(parsed.event, data)
     cb.onEvent?.(event, data, parsed.data)
 
-    if (event === "complete" || event === "ppt_complete" || event === "design_complete" || event === "novel_complete") {
+    if (
+      event === "complete" ||
+      event === "ppt_complete" ||
+      event === "design_complete" ||
+      event === "novel_complete" ||
+      event === "outline_complete"
+    ) {
       await cb.onComplete?.(data)
     } else if (event === "error") {
       const msg =
@@ -257,6 +277,37 @@ export async function youtubePptStream(
   const body = buildYoutubeStreamBody({ ...req, stream_request_id: streamRequestId })
 
   const res = await fetch(buildUrl("/agent/ppt/youtube-stream"), {
+    method: "POST",
+    headers: authStreamHeaders(),
+    body: JSON.stringify(body),
+    signal,
+  })
+
+  await readSseResponse(res, cb)
+  return { streamRequestId }
+}
+
+function buildYoutubeOutlineStreamBody(req: YoutubeOutlineStreamReq): Record<string, unknown> {
+  return {
+    youtube_url: req.youtube_url.trim(),
+    project_id: req.project_id,
+    ...(req.message?.trim() ? { message: req.message.trim() } : {}),
+    stream_request_id: req.stream_request_id ?? String(Date.now()),
+    locale: req.locale ?? resolveApiLocale(),
+    ...(req.user_id ? { user_id: req.user_id } : {}),
+    ...(req.languages?.length ? { languages: req.languages } : {}),
+  }
+}
+
+export async function youtubeOutlineStream(
+  req: YoutubeOutlineStreamReq,
+  cb: ChatStreamCallbacks = {},
+  signal?: AbortSignal,
+): Promise<{ streamRequestId: string }> {
+  const streamRequestId = req.stream_request_id ?? String(Date.now())
+  const body = buildYoutubeOutlineStreamBody({ ...req, stream_request_id: streamRequestId })
+
+  const res = await fetch(buildUrl("/agent/ppt/youtube-outline-stream"), {
     method: "POST",
     headers: authStreamHeaders(),
     body: JSON.stringify(body),
