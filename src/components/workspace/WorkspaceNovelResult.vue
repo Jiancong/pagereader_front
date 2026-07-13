@@ -141,16 +141,29 @@
         <h1 v-if="activeSection" class="mb-6 text-2xl font-semibold leading-snug text-foreground sm:text-3xl">
           {{ activeSection.label }}
         </h1>
-        <ChatMarkdownBody
-          v-if="activeSection"
-          :content="activeSection.markdown"
-          root-class="novel-guide-markdown"
-        />
+        <div v-if="activeSection" class="space-y-4">
+          <div
+            v-for="(turn, turnIndex) in activeSectionTurns"
+            :key="`${activeSection.id}-${turnIndex}`"
+            class="novel-speaker-turn"
+          >
+            <ChatMarkdownBody
+              :content="turn"
+              root-class="novel-guide-markdown"
+            />
+          </div>
+        </div>
       </article>
     </div>
 
-    <div v-else class="p-4 sm:p-6">
-      <ChatMarkdownBody :content="result.markdown" root-class="novel-guide-markdown" />
+    <div v-else class="space-y-4 p-4 sm:p-6">
+      <div
+        v-for="(turn, turnIndex) in fullMarkdownTurns"
+        :key="`full-${turnIndex}`"
+        class="novel-speaker-turn"
+      >
+        <ChatMarkdownBody :content="turn" root-class="novel-guide-markdown" />
+      </div>
     </div>
   </div>
 </template>
@@ -165,6 +178,7 @@ import { buildFontFamilyCss, ensureExportFontsReady } from "@/composables/useFon
 import { useNovelGuidePlayAll } from "@/composables/useNovelGuidePlayAll"
 import { downloadMarkdownFile, sanitizeDownloadBasename } from "@/utils/downloadMarkdownFile"
 import { buildNovelGuideOutline } from "@/utils/novelGuideSections"
+import { splitOutlineSpeakerTurns } from "@/utils/outlineStream"
 import type { NovelResult } from "@/utils/novelStream"
 
 const props = withDefaults(
@@ -206,6 +220,18 @@ const activeSection = computed(() =>
   outline.value.sections[0] ??
   null,
 )
+
+const activeSectionTurns = computed(() => {
+  const markdown = activeSection.value?.markdown || ""
+  const turns = splitOutlineSpeakerTurns(markdown)
+  return turns.length ? turns : markdown ? [markdown] : []
+})
+
+const fullMarkdownTurns = computed(() => {
+  const markdown = props.result.markdown || ""
+  const turns = splitOutlineSpeakerTurns(markdown)
+  return turns.length ? turns : markdown ? [markdown] : []
+})
 
 const activeSectionIndex = computed(() =>
   outline.value.sections.findIndex((section) => section.id === activeSectionId.value),
@@ -391,6 +417,16 @@ onMounted(() => {
 :deep(.novel-guide-markdown.markdown-body strong) {
   color: inherit;
   font-weight: 700;
+  font-size: 1.2em;
+}
+
+.novel-speaker-turn + .novel-speaker-turn {
+  margin-top: 1rem;
+}
+
+.novel-speaker-turn :deep(.markdown-body),
+.novel-speaker-turn :deep(.markdown-body p) {
+  display: block;
 }
 
 :deep(.novel-guide-markdown.markdown-body table) {

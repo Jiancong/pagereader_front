@@ -154,14 +154,26 @@
             </div>
           </div>
         </div>
-        <div v-else-if="result.markdown" class="outline-markdown">
-          <ChatMarkdownBody :content="result.markdown" />
+        <div v-else-if="result.markdown" class="outline-markdown space-y-4">
+          <div
+            v-for="(turn, turnIndex) in fullMarkdownTurns"
+            :key="`md-${turnIndex}`"
+            class="outline-speaker-turn"
+          >
+            <ChatMarkdownBody :content="turn" root-class="outline-section-markdown" />
+          </div>
         </div>
       </section>
     </div>
 
-    <div v-else-if="result.markdown" class="p-4 sm:p-6">
-      <ChatMarkdownBody :content="result.markdown" />
+    <div v-else-if="result.markdown" class="space-y-4 p-4 sm:p-6">
+      <div
+        v-for="(turn, turnIndex) in fullMarkdownTurns"
+        :key="`full-${turnIndex}`"
+        class="outline-speaker-turn"
+      >
+        <ChatMarkdownBody :content="turn" root-class="outline-section-markdown" />
+      </div>
     </div>
   </div>
 </template>
@@ -276,6 +288,12 @@ const seekUrl = computed(() => {
 const activeSectionTurns = computed(() =>
   splitOutlineSpeakerTurns(activeSection.value?.text || ""),
 )
+
+const fullMarkdownTurns = computed(() => {
+  const markdown = props.result.markdown || ""
+  const turns = splitOutlineSpeakerTurns(markdown)
+  return turns.length ? turns : markdown ? [markdown] : []
+})
 
 const exportableMarkdown = computed(() => {
   if (!props.result.sections.length) return props.result.markdown?.trim() || ""
@@ -458,7 +476,8 @@ onBeforeUnmount(() => {
 
 :deep(.outline-section-markdown .markdown-body strong) {
   color: hsl(var(--primary));
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 1.15em;
 }
 
 .outline-speaker-turn {

@@ -87,12 +87,32 @@ export function isOutlineStreamPayload(payload: unknown): boolean {
   return false
 }
 
-/** YouTube 字幕常为逐行断句，合并为正常段落便于阅读与导出 */
+/** Markdown 加粗的说话人标签，如 **Lex Fridman：** / **Nivi：** */
+const SPEAKER_LABEL_RE = /\*\*[^*\n]{1,80}[：:]\*\*/g
+const SPEAKER_LABEL_SPLIT_RE = /(?=\*\*[^*\n]{1,80}[：:]\*\*)/g
+
+/** 把 API/字幕里的字面量 \\n 还原成真正换行 */
+function unescapeTranscriptNewlines(text: string): string {
+  return String(text || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\\n/g, "\n")
+}
+
+/**
+ * YouTube 字幕常为逐行断句，合并为正常段落便于阅读与导出。
+ * 同时把 `\\n` 与 `**说话人：**` 当作轮次边界，避免两人内容粘在同一段。
+ */
 export function formatOutlineTranscriptText(text: string): string {
-  const raw = String(text || "").replace(/\r\n/g, "\n").trim()
+  const raw = unescapeTranscriptNewlines(text).trim()
   if (!raw) return ""
 
-  return raw
+  // `\\n**Speaker：**` / 行内 `**Speaker：**` 都强制成新段落，保留 Markdown 加粗
+  const withSpeakerBreaks = raw
+    .replace(SPEAKER_LABEL_RE, (label) => `\n\n${label}`)
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+
+  return withSpeakerBreaks
     .split(/\n{2,}/)
     .map((block) =>
       block
@@ -111,8 +131,9 @@ export function formatOutlineTranscriptMarkdown(text: string): string {
   const normalized = formatOutlineTranscriptText(text)
   if (!normalized) return ""
 
+  // 标签后补空格，避免 `**Lex：**你是` 粘连；换行已由 formatOutlineTranscriptText 处理
   return normalized
-    .replace(/(\*\*[^*\n]{1,80}[：:]\*\*)/g, "\n\n$1 ")
+    .replace(/(\*\*[^*\n]{1,80}[：:]\*\*)(?!\s)/g, "$1 ")
     .replace(/\n{3,}/g, "\n\n")
     .trim()
 }
@@ -123,7 +144,7 @@ export function splitOutlineSpeakerTurns(text: string): string[] {
   if (!markdown) return []
 
   return markdown
-    .split(/(?=\*\*[^*\n]{1,80}[：:]\*\*)/g)
+    .split(SPEAKER_LABEL_SPLIT_RE)
     .map((turn) => turn.trim())
     .filter(Boolean)
 }
