@@ -63,7 +63,7 @@
         </button>
       </div>
 
-      <div class="min-h-0 flex-1 overflow-y-auto">
+      <div class="min-h-0 flex-1 overflow-y-auto" @scroll.passive="onGeneratedScroll">
         <div v-if="generatedLoading && !scopedGeneratedItems.length" class="flex items-center justify-center py-10 text-sm text-muted-foreground">
           <Loader2 class="h-5 w-5 animate-spin" />
         </div>
@@ -101,11 +101,23 @@
             </div>
           </button>
         </div>
+
+        <div v-if="generatedHasMore && scopedGeneratedItems.length" class="mt-3 flex justify-center pb-2">
+          <button
+            type="button"
+            class="rounded-lg border border-border bg-secondary/50 px-4 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/50 disabled:opacity-50"
+            :disabled="generatedLoadingMore"
+            @click="loadMoreGenerated"
+          >
+            <Loader2 v-if="generatedLoadingMore" class="mr-1 inline h-3.5 w-3.5 animate-spin" />
+            {{ t('workspace.loadMore') }}
+          </button>
+        </div>
       </div>
     </template>
 
     <!-- 已上传：OSS user-upload -->
-    <div v-else class="min-h-0 flex-1 overflow-y-auto">
+    <div v-else class="min-h-0 flex-1 overflow-y-auto" @scroll.passive="onUploadedScroll">
       <div v-if="loadingList && !items.length" class="flex items-center justify-center py-10 text-sm text-muted-foreground">
         <Loader2 class="h-5 w-5 animate-spin" />
       </div>
@@ -281,10 +293,28 @@ const imagePreviewUrl = ref(null)
 const {
   filteredItems: generatedFilteredItems,
   loading: generatedLoading,
+  loadingMore: generatedLoadingMore,
+  hasMore: generatedHasMore,
   error: generatedError,
   filter: generatedFilter,
   refresh: refreshGenerated,
+  loadMore: loadMoreGenerated,
 } = useGeneratedAssets()
+
+/** 距底部 120px 内视为触底，自动加载下一页 */
+function isNearBottom(el) {
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - 120
+}
+
+function onGeneratedScroll(event) {
+  if (!generatedHasMore.value || generatedLoadingMore.value) return
+  if (isNearBottom(event.target)) loadMoreGenerated()
+}
+
+function onUploadedScroll(event) {
+  if (!hasMore.value || loadingMore.value) return
+  if (isNearBottom(event.target)) loadMore()
+}
 
 const scopedGeneratedItems = computed(() => {
   const list = generatedFilteredItems.value
