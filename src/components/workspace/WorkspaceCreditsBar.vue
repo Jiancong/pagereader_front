@@ -8,8 +8,12 @@
       <p v-if="paypalStatus" class="mt-0.5 text-[11px] text-muted-foreground">
         {{ t('billing.paypalStatus') }}: {{ paypalStatus }}
       </p>
-      <p class="mt-1">{{ t('billing.dailyFree') }}: {{ dailyRemaining }}</p>
-      <p>{{ t('billing.packageCredits') }}: {{ packageRemaining }}</p>
+      <p class="mt-1 font-medium text-foreground">
+        {{ t('billing.totalCredits') }}: {{ totalRemaining }}
+      </p>
+      <p class="text-[11px] text-muted-foreground">
+        {{ t('billing.creditsBreakdown', { daily: dailyRemaining, pkg: packageRemaining, total: totalRemaining }) }}
+      </p>
       <p class="mt-1 text-[11px] leading-snug">{{ t('billing.dailyHint') }}</p>
       <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1">
         <RouterLink to="/pricing" class="text-primary hover:underline">
@@ -38,7 +42,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
-import { subscribeApi, authApi } from '@/api'
+import { subscribeApi, creditsApi, authApi } from '@/api'
+import {
+  getDailyCreditsRemaining,
+  getPackageCreditsRemaining,
+  getTotalCreditsRemaining,
+} from '@/api/billing'
 import { registerCreditsRefresh } from '@/composables/useCreditsRefresh'
 
 const { t } = useI18n()
@@ -53,18 +62,19 @@ const num = (v) => (v == null || v === '' ? '—' : String(v))
 const dailyRemaining = computed(() => {
   const s = status.value
   if (!s) return '—'
-  return num(s.dailyFreeCreditsRemaining ?? s.dailyFreeCredits ?? s.freeDailyCredits)
+  return num(getDailyCreditsRemaining(s))
 })
 
 const packageRemaining = computed(() => {
   const s = status.value
   if (!s) return '—'
-  return num(
-    s.monthlyCreditsRemaining ??
-      s.packageCreditsRemaining ??
-      s.packageCredits ??
-      s.monthlyCredits,
-  )
+  return num(getPackageCreditsRemaining(s))
+})
+
+const totalRemaining = computed(() => {
+  const s = status.value
+  if (!s) return '—'
+  return num(getTotalCreditsRemaining(s))
 })
 
 const planLabel = computed(() => {
@@ -106,7 +116,7 @@ async function refresh(silent = false) {
   if (!silent) loading.value = true
   cancelError.value = null
   try {
-    status.value = await subscribeApi.getMyStatus()
+    status.value = await creditsApi.getCreditsStatus()
   } catch {
     if (!silent) status.value = null
   } finally {

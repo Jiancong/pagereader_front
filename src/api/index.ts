@@ -12,6 +12,7 @@ export * as fileApi from "./file"
 export * as agentApi from "./agent"
 export * as pricingApi from "./pricing"
 export * as subscribeApi from "./subscribe"
+export * as creditsApi from "./credits"
 export * as wechatSubscriptionApi from "./wechatSubscription"
 export {
   parseWechatPaymentStatus,
@@ -25,6 +26,7 @@ export {
   canAffordQueue,
   getDailyCreditsRemaining,
   getPackageCreditsRemaining,
+  getTotalCreditsRemaining,
   QUEUE_CREDIT_COST,
   formatHkdFromFen,
   formatHkd,

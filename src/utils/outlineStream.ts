@@ -87,6 +87,16 @@ export function isOutlineStreamPayload(payload: unknown): boolean {
   return false
 }
 
+/** outline_complete，或 Agent 补发的 design_complete / complete + outline 载荷 */
+export function isOutlineCompleteEvent(event: string, data: unknown): boolean {
+  const e = String(event || "").trim().toLowerCase()
+  return (
+    e === "outline_complete" ||
+    (e === "design_complete" && isOutlineStreamPayload(data)) ||
+    (e === "complete" && isOutlineStreamPayload(data))
+  )
+}
+
 /** Markdown 加粗的说话人标签，如 **Lex Fridman：** / **Nivi：** */
 const SPEAKER_LABEL_RE = /\*\*[^*\n]{1,80}[：:]\*\*/g
 const SPEAKER_LABEL_SPLIT_RE = /(?=\*\*[^*\n]{1,80}[：:]\*\*)/g

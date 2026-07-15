@@ -468,6 +468,31 @@ export interface SubscribeMyStatusRaw {
   subscription?: Record<string, unknown> | null
 }
 
+/** GET /credits/account 原始 data 结构 */
+export interface CreditsAccountRaw {
+  dailyFreeCredits?: number
+  dailyFreeCreditsRemaining?: number
+  currentDailyCredits?: number
+  packageCredits?: number
+  packageCreditsRemaining?: number
+  currentPlanCredits?: number
+  monthlyFastCredits?: number
+  totalCredits?: number
+  credits?: SubscribeMyStatusCredits
+}
+
+/** 供 UI 使用的扁平化积分账户（余额字段与 SubscribeMyStatus 对齐） */
+export type CreditsAccount = Pick<
+  SubscribeMyStatus,
+  | "dailyFreeCredits"
+  | "dailyFreeCreditsRemaining"
+  | "packageCredits"
+  | "monthlyCredits"
+  | "monthlyCreditsRemaining"
+  | "packageCreditsRemaining"
+  | "totalCredits"
+>
+
 /** 供 UI 使用的扁平化订阅/积分状态 */
 export interface SubscribeMyStatus {
   planType?: string

@@ -95,6 +95,8 @@ export interface ChatStreamCallbacks {
   onProgress?: (data: unknown) => void
   onComplete?: (data: unknown) => void | Promise<void>
   onError?: (message: string, data?: unknown) => void
+  /** Agent 扣费事件，用于即时刷新积分 */
+  onBillingDeduct?: (data: unknown) => void | Promise<void>
 }
 
 function safeParse(s: string): unknown {
@@ -214,6 +216,11 @@ async function readSseResponse(res: Response, cb: ChatStreamCallbacks = {}): Pro
     const data = safeParse(parsed.data)
     const event = resolveEffectiveEvent(parsed.event, data)
     cb.onEvent?.(event, data, parsed.data)
+
+    if (event === "agent_billing_deduct_event") {
+      await cb.onBillingDeduct?.(data)
+      return
+    }
 
     if (
       event === "complete" ||

@@ -373,6 +373,8 @@ export default {
     noPlan: "No subscription",
     dailyFree: "Daily free",
     packageCredits: "Package credits",
+    totalCredits: "Available credits",
+    creditsBreakdown: "Daily free {daily} + package {pkg} = total {total}",
     dailyHint: "Free credits apply to card generation only. Document/novel generation uses package credits or an upgraded plan.",
     managePlan: "Manage subscription",
     subscribeCta: "View plans",

@@ -34,6 +34,13 @@ export function getPackageCreditsRemaining(status: SubscribeMyStatus | null | un
   )
 }
 
+/** 优先用后端 totalCredits；缺失时回退为每日免费 + 套餐 */
+export function getTotalCreditsRemaining(status: SubscribeMyStatus | null | undefined): number {
+  if (!status) return 0
+  if (status.totalCredits != null) return parseCredits(status.totalCredits)
+  return getDailyCreditsRemaining(status) + getPackageCreditsRemaining(status)
+}
+
 /** CARD：每日免费优先 + 套餐；DOCUMENT / NOVEL / OUTLINE：仅套餐积分 */
 export function canAffordQueue(status: SubscribeMyStatus | null | undefined, queue: PptQueue): boolean {
   const cost = QUEUE_CREDIT_COST[queue]

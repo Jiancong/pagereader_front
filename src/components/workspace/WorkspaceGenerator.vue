@@ -349,6 +349,7 @@ import {
 } from "@/utils/bookCardStream"
 import {
   isOutlineStreamPayload,
+  isOutlineCompleteEvent,
   resolveOutlineFromStreamComplete,
   persistOutlineCompleteToHistory,
   parseOutlineSection,
@@ -367,7 +368,7 @@ import {
   authApi,
   fileApi,
   agentApi,
-  subscribeApi,
+  creditsApi,
   isLoggedIn,
   ApiError,
   isCreditsInsufficient,
@@ -652,10 +653,10 @@ const applyStreamError = (task: GeneratorTask, msg: string, mode: "prompt" | "up
   }
 }
 
-/** 生成前拉取最新余额并校验（GET /subscribe/my/status） */
+/** 生成前拉取最新余额并校验（/credits/account + /subscribe/my/status） */
 async function ensureCreditsForTask(task: GeneratorTask): Promise<boolean> {
   try {
-    const status = await subscribeApi.getMyStatus()
+    const status = await creditsApi.getCreditsStatus()
     if (!canAffordQueue(status, task.queue)) {
       task.showCreditsCta = true
       task.errorMsg = t("workspace.creditsInsufficient")
@@ -769,7 +770,14 @@ const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, me
         const line = toText(data)
         if (line) appendLog(task, line)
       },
+      onBillingDeduct: () => {
+        refreshCreditsBar()
+      },
       onEvent: async (event, data) => {
+        if (event === "agent_billing_deduct_event") {
+          refreshCreditsBar()
+          return
+        }
         if (task.cardResult || task.pptData || task.novelResult || task.outlineResult) return
         if (event === "ppt_ping") {
           appendLog(task, t("workspace.youtubeStillGenerating"))
@@ -849,7 +857,14 @@ const runStream = async (
         const line = toText(data)
         if (line) appendLog(task, line)
       },
+      onBillingDeduct: () => {
+        refreshCreditsBar()
+      },
       onEvent: async (event, data) => {
+        if (event === "agent_billing_deduct_event") {
+          refreshCreditsBar()
+          return
+        }
         if (task.queue === "OUTLINE") {
           if (event === "outline_section") {
             handleOutlineSection(task, data)
@@ -859,10 +874,7 @@ const runStream = async (
             task.outlineResult = applyOutlineNodePayload(task.outlineResult, data)
             return
           }
-          if (
-            event === "outline_complete" ||
-            (event === "complete" && isOutlineStreamPayload(data))
-          ) {
+          if (isOutlineCompleteEvent(event, data)) {
             await handleOutlineStreamComplete(task, data, mode)
           }
           return
@@ -1171,7 +1183,14 @@ const runYoutubeOutlineStream = async (task: GeneratorTask, youtubeUrlValue: str
         const line = toText(data)
         if (line) appendLog(task, line)
       },
+      onBillingDeduct: () => {
+        refreshCreditsBar()
+      },
       onEvent: async (event, data) => {
+        if (event === "agent_billing_deduct_event") {
+          refreshCreditsBar()
+          return
+        }
         if (event === "outline_section") {
           handleOutlineSection(task, data, youtubeUrlValue)
           return
@@ -1185,10 +1204,7 @@ const runYoutubeOutlineStream = async (task: GeneratorTask, youtubeUrlValue: str
           return
         }
         if (event === "outline_ping") return
-        if (
-          event === "outline_complete" ||
-          (event === "complete" && isOutlineStreamPayload(data))
-        ) {
+        if (isOutlineCompleteEvent(event, data)) {
           await finishOutline(data)
         }
       },

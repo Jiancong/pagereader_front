@@ -363,6 +363,8 @@ export default {
     noPlan: "未订阅",
     dailyFree: "今日免费",
     packageCredits: "套餐积分",
+    totalCredits: "可用积分",
+    creditsBreakdown: "今日免费 {daily} + 套餐 {pkg} = 合计 {total}",
     dailyHint: "免费额度仅可用于卡片生成；文档/小说导读需套餐积分或升级订阅。",
     managePlan: "管理订阅",
     subscribeCta: "查看订阅方案",
