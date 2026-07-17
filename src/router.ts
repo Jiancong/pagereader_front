@@ -1,11 +1,24 @@
 // 路由：/ 落地页（访客），/workspace 工作区（需登录）
 // @author hc @date 2026-06-04
 
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory, createWebHashHistory } from "vue-router";
 import { isLoggedIn } from "./api";
 import { pushGtmPageView, gtmPageTypeFromRoute } from "./composables/useGtmDataLayer";
 import { applyDocumentI18n, normalizeLocale } from "./composables/useAppLocale";
 import { i18n } from "./i18n";
+
+// 在 Capacitor 原生壳里，WebView 通过 file:// 或 https://localhost 加载本地资源，
+// HTML5 history 模式会导致刷新/深链 404；改用 hash history。
+// 仅在原生运行时切换，浏览器端保持原来的 history 行为（SEO 友好）。
+function isNativePlatform(): boolean {
+  if (typeof window === "undefined") return false;
+  // Capacitor 在 window 上注入 Capacitor 对象；同时 Android WebView 的 UA 含 wv
+  const w = window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } };
+  if (w.Capacitor && typeof w.Capacitor.isNativePlatform === "function") {
+    return w.Capacitor.isNativePlatform();
+  }
+  return false;
+}
 
 const routes = [
   {
@@ -95,7 +108,7 @@ function isDynamicImportError(error: unknown) {
 }
 
 export const router = createRouter({
-  history: createWebHistory(),
+  history: isNativePlatform() ? createWebHashHistory() : createWebHistory(),
   routes,
   scrollBehavior(to) {
     if (to.hash) return { el: to.hash, top: 80, behavior: "smooth" };

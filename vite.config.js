@@ -26,7 +26,12 @@ export default defineConfig(({ mode }) => {
   const paypalClientId =
     env.VITE_PAYPAL_CLIENT_ID || env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || ''
 
+  // 构建 Android APK（Capacitor）时使用相对 base，避免 `file://` 下绝对路径资源 404
+  const isCapacitorBuild = /^(1|true|yes)$/i.test(String(env.CAPACITOR || ''))
+  const base = isCapacitorBuild ? './' : '/'
+
   return {
+    base,
     plugins: [vue(), documentMetaBootstrapPlugin()],
     resolve: {
       alias: {

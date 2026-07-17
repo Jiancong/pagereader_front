@@ -1,0 +1,12 @@
+{
+  "appId": "top.page2.app",
+  "appName": "Page2Top",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
