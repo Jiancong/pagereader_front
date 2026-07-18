@@ -135,13 +135,14 @@
       </nav>
 
       <article
+        ref="articleRef"
         class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-card px-4 py-5 sm:px-6 sm:py-7"
         :style="contentFontStyle"
       >
         <h1 v-if="activeSection" class="mb-6 text-2xl font-semibold leading-snug text-foreground sm:text-3xl">
           {{ activeSection.label }}
         </h1>
-        <div v-if="activeSection" class="space-y-4">
+        <div v-if="activeSection" class="novel-guide-content space-y-4">
           <div
             v-for="(turn, turnIndex) in activeSectionTurns"
             :key="`${activeSection.id}-${turnIndex}`"
@@ -169,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
 import ChatMarkdownBody from "@/components/editor/chat/ChatMarkdownBody.vue"
@@ -178,6 +179,12 @@ import { buildFontFamilyCss, ensureExportFontsReady } from "@/composables/useFon
 import { useNovelGuidePlayAll } from "@/composables/useNovelGuidePlayAll"
 import { downloadMarkdownFile, sanitizeDownloadBasename } from "@/utils/downloadMarkdownFile"
 import { buildNovelGuideOutline } from "@/utils/novelGuideSections"
+import {
+  collectNovelGuideScrollTargets,
+  isNovelGuideMobileViewport,
+  pickScrollTargetByProgress,
+  scrollElementToContainerCenter,
+} from "@/utils/novelGuideScrollSync"
 import { splitOutlineSpeakerTurns } from "@/utils/outlineStream"
 import type { NovelResult } from "@/utils/novelStream"
 
@@ -204,8 +211,10 @@ const NOVEL_SERIF_FONT = buildFontFamilyCss("SimSun, Songti SC, STSong")
 const COVER_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"])
 
 const activeSectionId = ref("")
+const articleRef = ref<HTMLElement | null>(null)
 const coverInputRef = ref<HTMLInputElement | null>(null)
 const coverUploading = ref(false)
+let lastPlaybackScrollTarget: HTMLElement | null = null
 
 const outline = computed(() =>
   buildNovelGuideOutline({
@@ -245,6 +254,42 @@ const contentFontStyle = computed(() => ({
   fontFamily: NOVEL_SERIF_FONT,
 }))
 
+function resetPlaybackScrollSync() {
+  lastPlaybackScrollTarget = null
+}
+
+function scrollArticleToPlaybackProgress(currentTime: number, duration: number) {
+  if (!ttsPlayAllActive.value || !isNovelGuideMobileViewport()) return
+
+  const article = articleRef.value
+  if (!article) return
+
+  const targets = collectNovelGuideScrollTargets(article)
+  if (!targets.length) return
+
+  const target = pickScrollTargetByProgress(targets, currentTime / duration)
+  if (!target || target === lastPlaybackScrollTarget) return
+
+  lastPlaybackScrollTarget = target
+  scrollElementToContainerCenter(article, target)
+}
+
+async function scrollArticleToSectionStart() {
+  if (!ttsPlayAllActive.value || !isNovelGuideMobileViewport()) return
+
+  await nextTick()
+
+  const article = articleRef.value
+  if (!article) return
+
+  const targets = collectNovelGuideScrollTargets(article)
+  const target = targets[0]
+  if (!target) return
+
+  lastPlaybackScrollTarget = target
+  scrollElementToContainerCenter(article, target, "auto")
+}
+
 const {
   ttsLoading,
   ttsPlayAllActive,
@@ -260,6 +305,13 @@ const {
     const section = outline.value.sections[index]
     if (section) activeSectionId.value = section.id
   },
+  onBeforePlayPage: () => {
+    resetPlaybackScrollSync()
+    void scrollArticleToSectionStart()
+  },
+  onPageTimeUpdate: (_page, currentTime, duration) => {
+    scrollArticleToPlaybackProgress(currentTime, duration)
+  },
 })
 
 function navItemClass(sectionId: string) {
@@ -272,6 +324,10 @@ function selectSection(sectionId: string) {
   activeSectionId.value = sectionId
   stopPlayback()
 }
+
+watch(ttsPlayAllActive, (active) => {
+  if (!active) resetPlaybackScrollSync()
+})
 
 function exportMarkdown() {
   const markdown = props.result.markdown?.trim()

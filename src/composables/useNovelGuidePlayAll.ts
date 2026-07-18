@@ -22,6 +22,8 @@ export function useNovelGuidePlayAll(options: {
   sections: MaybeRefOrGetter<NovelGuideSection[]>
   activeSectionIndex: MaybeRefOrGetter<number>
   onActiveSectionIndexChange?: (index: number) => void
+  onBeforePlayPage?: (page: number) => void | Promise<void>
+  onPageTimeUpdate?: (page: number, currentTime: number, duration: number) => void
 }) {
   const { t } = useI18n()
 
@@ -50,9 +52,11 @@ export function useNovelGuidePlayAll(options: {
     onPlayAllActiveChange: (active) => {
       ttsPlayAllActive.value = active
     },
-    onBeforePlayPage: (page) => {
+    onBeforePlayPage: async (page) => {
       syncActiveSection(page)
+      await options.onBeforePlayPage?.(page)
     },
+    onPageTimeUpdate: options.onPageTimeUpdate,
     onFinished: () => {
       finishPlayAll()
     },

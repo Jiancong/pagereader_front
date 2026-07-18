@@ -69,6 +69,7 @@ export interface TtsSequentialPlayerOptions {
   onPlayingChange: (playing: boolean) => void
   onPlayAllActiveChange: (active: boolean) => void
   onBeforePlayPage?: (page: number) => void | Promise<void>
+  onPageTimeUpdate?: (page: number, currentTime: number, duration: number) => void
   onFinished?: () => void
   onError: (message: string) => void
   onAutoplayBlocked?: () => void
@@ -98,6 +99,8 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
       audioEl.pause()
       audioEl.onended = null
       audioEl.onerror = null
+      audioEl.ontimeupdate = null
+      audioEl.onloadedmetadata = null
       audioEl = null
     }
     if (playing) {
@@ -182,6 +185,16 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
     options.onPlayingChange(true)
 
     audioEl = new Audio(url)
+    const playingPage = page
+    const emitPageTimeUpdate = () => {
+      if (!audioEl || !playAllActive) return
+      const duration = audioEl.duration
+      const currentTime = audioEl.currentTime
+      if (!Number.isFinite(duration) || duration <= 0) return
+      options.onPageTimeUpdate?.(playingPage, currentTime, duration)
+    }
+    audioEl.onloadedmetadata = emitPageTimeUpdate
+    audioEl.ontimeupdate = emitPageTimeUpdate
     audioEl.onended = () => {
       releaseAudio()
       if (!playAllActive) return
