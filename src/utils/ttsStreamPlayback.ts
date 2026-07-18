@@ -7,6 +7,48 @@ import { safeMediaPlay } from "@/utils/mediaPlayback"
 
 export type TtsItemsMap = Record<number, string>
 
+/** 每批 SSE 请求的页数窗口（含当前页），例如 current..current+10 共 11 页 */
+export const TTS_PREFETCH_AHEAD = 10
+
+/** 播放到窗口末尾前 N 页时预取下一批 */
+export const TTS_PREFETCH_TRIGGER_BEFORE_END = 3
+
+function pageNumberOf(page: string | TtsPageInput, fallback: number): number {
+  if (typeof page === "object" && page.index != null) {
+    const index = Number(page.index)
+    if (Number.isFinite(index) && index > 0) return index
+  }
+  return fallback
+}
+
+/** 从 pages 列表解析全书末页（优先使用 index 字段，而非数组长度） */
+export function resolveTtsTotalPages(pages: Array<string | TtsPageInput>): number {
+  let max = 0
+  let fallback = 0
+  for (const page of pages) {
+    fallback += 1
+    const index = pageNumberOf(page, fallback)
+    if (index > max) max = index
+  }
+  return max > 0 ? max : pages.length
+}
+
+/** 按 1-based 页码区间切片 TTS 请求 payload */
+export function sliceTtsPagesInRange(
+  pages: Array<string | TtsPageInput>,
+  startInclusive: number,
+  endInclusive: number,
+): Array<string | TtsPageInput> {
+  const start = Math.max(1, Math.floor(startInclusive))
+  const end = Math.max(start, Math.floor(endInclusive))
+  let fallback = 0
+  return pages.filter((page) => {
+    fallback += 1
+    const index = pageNumberOf(page, fallback)
+    return index >= start && index <= end
+  })
+}
+
 export function findNextPlayableTtsPage(fromPage: number, items: TtsItemsMap): number {
   const pages = Object.keys(items)
     .map((key) => Number(key))
@@ -44,6 +86,7 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
   let waitingForPage: number | null = null
   let streamDone = false
   let singlePageMode = false
+  let schedulePrefetch: ((currentPage: number) => void) | null = null
 
   function abortStream() {
     abortController?.abort()
@@ -70,6 +113,7 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
     waitingForPage = null
     streamDone = false
     singlePageMode = false
+    schedulePrefetch = null
     options.onPlayAllActiveChange(false)
     options.onLoadingChange(false)
   }
@@ -130,6 +174,8 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
       return
     }
 
+    schedulePrefetch?.(page)
+
     await options.onBeforePlayPage?.(page)
     releaseAudio()
     playing = true
@@ -182,7 +228,7 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
     stop()
     items = {}
     priorityPage = params.priorityPage
-    totalPages = params.pages.length
+    totalPages = resolveTtsTotalPages(params.pages)
     readyCount = 0
     streamDone = false
     singlePageMode = Boolean(params.singlePage)
@@ -197,59 +243,117 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
     const requestController = new AbortController()
     abortController = requestController
 
-    try {
-      await generatePageTtsStream(
-        {
-          projectId: params.projectId,
-          userId: params.userId,
-          pages: params.pages,
-          priorityPage: params.priorityPage,
-          voice: params.voice,
-        },
-        {
-          onMeta: (meta) => {
-            if (requestController.signal.aborted) return
-            if (meta.totalPages != null) updateProgress(meta.totalPages)
-          },
-          onPageReady: (data) => {
-            if (requestController.signal.aborted) return
-            const page = Number(data.page)
-            const url = data.item?.url
-            if (!Number.isFinite(page) || page <= 0 || !url) return
-            items[page] = url
-            readyCount += 1
-            mergeItems({ [page]: url })
-            updateProgress(data.total ?? totalPages)
-            maybeResumeWaiting(page)
-          },
-          onComplete: (data) => {
-            if (requestController.signal.aborted) return
-            const merged: TtsItemsMap = {}
-            for (const item of data.items ?? []) {
-              if (item.url) merged[item.page] = item.url
-            }
-            if (Object.keys(merged).length) mergeItems(merged)
-            streamDone = true
-            options.onLoadingChange(false)
+    const endPage = totalPages
+    let requestedUntil = 0
+    let activeBatches = 0
+    const inflightRanges = new Set<string>()
 
-            if (waitingForPage != null && items[waitingForPage]) {
-              const target = waitingForPage
-              waitingForPage = null
-              void playPage(target)
-            }
+    function checkStreamDone() {
+      if (requestController.signal.aborted) return
+      if (requestedUntil >= endPage && activeBatches === 0) {
+        streamDone = true
+        options.onLoadingChange(false)
+
+        if (waitingForPage != null && items[waitingForPage]) {
+          const target = waitingForPage
+          waitingForPage = null
+          void playPage(target)
+        }
+      }
+    }
+
+    function scheduleNextIfNeeded(currentPage: number) {
+      if (singlePageMode || !playAllActive || requestController.signal.aborted) return
+      if (requestedUntil >= endPage) return
+      const triggerAt = requestedUntil - TTS_PREFETCH_TRIGGER_BEFORE_END
+      if (currentPage >= triggerAt) {
+        void runBatch(requestedUntil + 1, requestedUntil + 1)
+      }
+    }
+
+    schedulePrefetch = scheduleNextIfNeeded
+
+    async function runBatch(startPage: number, batchPriority: number): Promise<void> {
+      if (requestController.signal.aborted || !playAllActive) return
+
+      const start = Math.max(1, Math.floor(startPage))
+      if (start > endPage || start <= requestedUntil) return
+
+      const end = Math.min(start + TTS_PREFETCH_AHEAD, endPage)
+      const rangeKey = `${start}-${end}`
+      if (inflightRanges.has(rangeKey)) return
+
+      const batchPages = sliceTtsPagesInRange(params.pages, start, end)
+      if (!batchPages.length) return
+
+      requestedUntil = end
+      inflightRanges.add(rangeKey)
+      activeBatches += 1
+
+      try {
+        await generatePageTtsStream(
+          {
+            projectId: params.projectId,
+            userId: params.userId,
+            pages: batchPages,
+            priorityPage: batchPriority,
+            voice: params.voice,
           },
-          onError: (message) => {
-            if (requestController.signal.aborted) return
-            stop()
-            options.onError(message)
+          {
+            onMeta: (meta) => {
+              if (requestController.signal.aborted) return
+              if (meta.totalPages != null) {
+                updateProgress(Math.max(meta.totalPages, totalPages))
+              }
+            },
+            onPageReady: (data) => {
+              if (requestController.signal.aborted) return
+              const page = Number(data.page)
+              const url = data.item?.url
+              if (!Number.isFinite(page) || page <= 0 || !url) return
+
+              const alreadyReady = Boolean(items[page])
+              items[page] = url
+              if (!alreadyReady) readyCount += 1
+              mergeItems({ [page]: url })
+              updateProgress(data.total ?? totalPages)
+              maybeResumeWaiting(page)
+              scheduleNextIfNeeded(page)
+            },
+            onComplete: (data) => {
+              if (requestController.signal.aborted) return
+
+              const updates: TtsItemsMap = {}
+              for (const item of data.items ?? []) {
+                if (!item.url) continue
+                if (!items[item.page]) readyCount += 1
+                updates[item.page] = item.url
+              }
+              if (Object.keys(updates).length) mergeItems(updates)
+
+              options.onLoadingChange(false)
+              checkStreamDone()
+            },
+            onError: (message) => {
+              if (requestController.signal.aborted) return
+              stop()
+              options.onError(message)
+            },
           },
-        },
-        requestController.signal,
-      )
+          requestController.signal,
+        )
+      } finally {
+        inflightRanges.delete(rangeKey)
+        activeBatches -= 1
+        checkStreamDone()
+      }
+    }
+
+    try {
+      await runBatch(priorityPage, priorityPage)
       if (requestController.signal.aborted) return
       if (abortController === requestController) abortController = null
-      streamDone = true
-      options.onLoadingChange(false)
+      checkStreamDone()
     } catch (error) {
       if (requestController.signal.aborted) return
       if (abortController === requestController) abortController = null

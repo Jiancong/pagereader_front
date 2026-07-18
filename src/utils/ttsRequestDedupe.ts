@@ -36,9 +36,5 @@ export function createTtsEnsureHelper() {
     return inflight;
   }
 
-  return { ensure, reset, getCached: () => cachedItems, setCached: (nextDeckKey: string, items: TtsMap) => {
-    deckKey = nextDeckKey;
-    cachedItems = items;
-    inflight = null;
-  } };
+  return { ensure, reset, getCached: () => cachedItems };
 }
