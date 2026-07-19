@@ -101,6 +101,8 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
       audioEl.onerror = null
       audioEl.ontimeupdate = null
       audioEl.onloadedmetadata = null
+      audioEl.ondurationchange = null
+      audioEl.onplaying = null
       audioEl = null
     }
     if (playing) {
@@ -188,13 +190,12 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
     const playingPage = page
     const emitPageTimeUpdate = () => {
       if (!audioEl || !playAllActive) return
-      const duration = audioEl.duration
-      const currentTime = audioEl.currentTime
-      if (!Number.isFinite(duration) || duration <= 0) return
-      options.onPageTimeUpdate?.(playingPage, currentTime, duration)
+      options.onPageTimeUpdate?.(playingPage, audioEl.currentTime, audioEl.duration)
     }
     audioEl.onloadedmetadata = emitPageTimeUpdate
+    audioEl.ondurationchange = emitPageTimeUpdate
     audioEl.ontimeupdate = emitPageTimeUpdate
+    audioEl.onplaying = emitPageTimeUpdate
     audioEl.onended = () => {
       releaseAudio()
       if (!playAllActive) return
@@ -224,6 +225,7 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
     }
 
     const played = await safeMediaPlay(audioEl)
+    if (played) emitPageTimeUpdate()
     if (!played) {
       stop()
       options.onAutoplayBlocked?.()

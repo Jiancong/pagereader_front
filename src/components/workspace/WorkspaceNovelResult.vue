@@ -183,7 +183,8 @@ import {
   collectNovelGuideScrollTargets,
   isNovelGuideMobileViewport,
   pickScrollTargetByProgress,
-  scrollElementToContainerCenter,
+  scrollElementToViewportCenter,
+  waitForNovelGuideLayout,
 } from "@/utils/novelGuideScrollSync"
 import { splitOutlineSpeakerTurns } from "@/utils/outlineStream"
 import type { NovelResult } from "@/utils/novelStream"
@@ -215,6 +216,8 @@ const articleRef = ref<HTMLElement | null>(null)
 const coverInputRef = ref<HTMLInputElement | null>(null)
 const coverUploading = ref(false)
 let lastPlaybackScrollTarget: HTMLElement | null = null
+let playbackPageStartedAt = 0
+let playbackPageEstimateMs = 60_000
 
 const outline = computed(() =>
   buildNovelGuideOutline({
@@ -258,8 +261,13 @@ function resetPlaybackScrollSync() {
   lastPlaybackScrollTarget = null
 }
 
+function shouldAutoScrollDuringPlayback() {
+  // 移动版 stacked 布局；桌面端分栏时不自动滚，避免干扰阅读
+  return isNovelGuideMobileViewport()
+}
+
 function scrollArticleToPlaybackProgress(currentTime: number, duration: number) {
-  if (!ttsPlayAllActive.value || !isNovelGuideMobileViewport()) return
+  if (!shouldAutoScrollDuringPlayback()) return
 
   const article = articleRef.value
   if (!article) return
@@ -267,17 +275,30 @@ function scrollArticleToPlaybackProgress(currentTime: number, duration: number) 
   const targets = collectNovelGuideScrollTargets(article)
   if (!targets.length) return
 
-  const target = pickScrollTargetByProgress(targets, currentTime / duration)
-  if (!target || target === lastPlaybackScrollTarget) return
+  let progress = 0
+  if (Number.isFinite(duration) && duration > 0 && Number.isFinite(currentTime)) {
+    progress = Math.min(1, Math.max(0, currentTime / duration))
+  } else if (playbackPageStartedAt > 0 && playbackPageEstimateMs > 0) {
+    progress = Math.min(
+      1,
+      Math.max(0, (performance.now() - playbackPageStartedAt) / playbackPageEstimateMs),
+    )
+  }
 
-  lastPlaybackScrollTarget = target
-  scrollElementToContainerCenter(article, target)
+  const target = pickScrollTargetByProgress(targets, progress)
+  if (!target) return
+
+  if (target !== lastPlaybackScrollTarget) {
+    lastPlaybackScrollTarget = target
+    scrollElementToViewportCenter(target)
+  }
 }
 
 async function scrollArticleToSectionStart() {
-  if (!ttsPlayAllActive.value || !isNovelGuideMobileViewport()) return
+  if (!shouldAutoScrollDuringPlayback()) return
 
   await nextTick()
+  await waitForNovelGuideLayout()
 
   const article = articleRef.value
   if (!article) return
@@ -287,7 +308,7 @@ async function scrollArticleToSectionStart() {
   if (!target) return
 
   lastPlaybackScrollTarget = target
-  scrollElementToContainerCenter(article, target, "auto")
+  scrollElementToViewportCenter(target, "auto")
 }
 
 const {
@@ -305,8 +326,13 @@ const {
     const section = outline.value.sections[index]
     if (section) activeSectionId.value = section.id
   },
-  onBeforePlayPage: () => {
+  onBeforePlayPage: (page) => {
     resetPlaybackScrollSync()
+    playbackPageStartedAt = performance.now()
+    const section = outline.value.sections[page - 1]
+    const textLen = (section?.markdown?.length ?? 0) + (section?.label?.length ?? 0)
+    // 中文 TTS 粗估 ~5 字/秒，限制在 15s–3min
+    playbackPageEstimateMs = Math.max(15_000, Math.min(180_000, textLen * 200))
     void scrollArticleToSectionStart()
   },
   onPageTimeUpdate: (_page, currentTime, duration) => {
