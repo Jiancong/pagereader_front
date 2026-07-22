@@ -208,7 +208,7 @@
           @login="openLogin"
         />
 
-        <!-- 关联推荐：同主题 / 读者也在看 -->
+        <!-- 关联推荐：同主题 / 推荐 -->
         <RelatedProjects
           :sections="relatedSections"
           :current-project-id="projectId"

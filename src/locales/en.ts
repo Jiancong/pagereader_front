@@ -678,7 +678,7 @@ export default {
     },
     related: {
       sameCategory: "More in this topic",
-      alsoReading: "Readers also read",
+      recommended: "Recommended",
       default: "Related",
     },
     recommend: {

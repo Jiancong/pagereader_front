@@ -94,7 +94,7 @@ function sectionTitle(section) {
   if (title) return title
   const key = String(section.key || '').trim()
   if (key === 'SAME_CATEGORY') return t('community.related.sameCategory')
-  if (key === 'ALSO_READING') return t('community.related.alsoReading')
+  if (key === 'RECOMMENDED') return t('community.related.recommended')
   return t('community.related.default')
 }
 </script>

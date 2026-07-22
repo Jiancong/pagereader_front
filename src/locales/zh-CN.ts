@@ -659,7 +659,7 @@ export default {
     },
     related: {
       sameCategory: "同主题推荐",
-      alsoReading: "读者也在看",
+      recommended: "推荐",
       default: "相关推荐",
     },
     recommend: {

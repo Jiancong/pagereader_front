@@ -282,7 +282,7 @@ export interface ProjectCommunityStatsVo {
 
 /** GET /project/{id}/related → 单个推荐分组 */
 export interface ProjectRelatedSection {
-  /** 分组标识：SAME_CATEGORY / ALSO_READING（后端可扩展） */
+  /** 分组标识：SAME_CATEGORY / RECOMMENDED（后端可扩展） */
   key: string
   /** 分组展示标题（后端可返回，前端也保留 i18n 兜底） */
   title?: string

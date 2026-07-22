@@ -287,7 +287,7 @@ export async function getCommunityStats(
   )
 }
 
-// 关联推荐：同分类 + 读者也在看（后端按 readerCount / categoryId 聚合）
+// 关联推荐：同分类 + 高关联推荐（无同书/同作者/同分类时不返回 RECOMMENDED section）
 export async function getRelatedProjects(
   id: string,
   limit = 8,
