@@ -280,6 +280,22 @@ export interface ProjectCommunityStatsVo {
   recommend: ProjectRecommendStatsVo
 }
 
+/** GET /project/{id}/related → 单个推荐分组 */
+export interface ProjectRelatedSection {
+  /** 分组标识：SAME_CATEGORY / ALSO_READING（后端可扩展） */
+  key: string
+  /** 分组展示标题（后端可返回，前端也保留 i18n 兜底） */
+  title?: string
+  /** 该组推荐项（结构复用 FeedStreamItemDto） */
+  items: FeedStreamItemDto[]
+}
+
+/** GET /project/{id}/related 聚合响应 */
+export interface ProjectRelatedResult {
+  projectId: string
+  sections: ProjectRelatedSection[]
+}
+
 export interface ConversationHistoryVo {
   id: string | number
   projectId: string

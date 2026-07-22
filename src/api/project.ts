@@ -19,5 +19,6 @@ export {
   reportReadingProgress,
   getReadingStats,
   getCommunityStats,
+  getRelatedProjects,
   deleteProject,
 } from "./feed"

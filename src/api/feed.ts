@@ -25,6 +25,7 @@ import type {
   ReportReadingProgressDto,
   ProjectReadingStatsVo,
   ProjectCommunityStatsVo,
+  ProjectRelatedResult,
 } from "./types"
 
 // Feed 流分页（匿名可访问，登录后返回 likedByMe）
@@ -283,5 +284,16 @@ export async function getCommunityStats(
 ): Promise<ProjectCommunityStatsVo> {
   return get<ProjectCommunityStatsVo>(
     `/project/${encodeURIComponent(id)}/community-stats`,
+  )
+}
+
+// 关联推荐：同分类 + 读者也在看（后端按 readerCount / categoryId 聚合）
+export async function getRelatedProjects(
+  id: string,
+  limit = 8,
+): Promise<ProjectRelatedResult> {
+  return get<ProjectRelatedResult>(
+    `/project/${encodeURIComponent(id)}/related`,
+    { query: { limit } },
   )
 }

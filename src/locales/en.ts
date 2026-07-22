@@ -676,6 +676,11 @@ export default {
       click: "Like",
       unclick: "Unlike",
     },
+    related: {
+      sameCategory: "More in this topic",
+      alsoReading: "Readers also read",
+      default: "Related",
+    },
     recommend: {
       title: "Page2Top recommendation",
       pending: "Not enough data yet",

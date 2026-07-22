@@ -208,6 +208,13 @@
           @login="openLogin"
         />
 
+        <!-- 关联推荐：同主题 / 读者也在看 -->
+        <RelatedProjects
+          :sections="relatedSections"
+          :current-project-id="projectId"
+          @open="openRelatedItem"
+        />
+
         <p
           v-if="loadingDeck && !hasSeoBody"
           class="mt-6 flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground"
@@ -348,10 +355,12 @@ import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import AuthDialog from '@/components/AuthDialog.vue'
 import ProjectCommentBoard from '@/components/community/ProjectCommentBoard.vue'
+import RelatedProjects from '@/components/community/RelatedProjects.vue'
 import { authApi, projectApi, isLoggedIn, getLocalAvatar } from '@/api'
 import { gtmOpenReader } from '@/composables/useGtmDataLayer'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
 import { looksLikeDeckJson } from '@/utils/projectCommunity'
+import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 import {
   extractBookSeoContent,
   buildBookSeoTitle,
@@ -385,6 +394,7 @@ const avatar = ref(getLocalAvatar())
 const dialogOpen = ref(false)
 const commentFilter = ref('ALL')
 const commentBoardRef = ref(null)
+const relatedSections = ref([])
 
 const seo = computed(() => extractBookSeoContent(project.value, pptData.value))
 
@@ -587,17 +597,20 @@ const load = async (id) => {
   comments.value = []
   communityStats.value = null
   pptData.value = null
+  relatedSections.value = []
   commentFilter.value = 'ALL'
   try {
-    const [proj, list, stats, hist] = await Promise.all([
+    const [proj, list, stats, related, hist] = await Promise.all([
       projectApi.getProject(id),
       projectApi.listComments(id, 'ALL').catch(() => []),
       projectApi.getCommunityStats(id).catch(() => null),
+      projectApi.getRelatedProjects(id, 8).catch(() => null),
       projectApi.getProjectConversationHistory(id).catch(() => []),
     ])
     project.value = proj
     comments.value = list
     communityStats.value = stats
+    relatedSections.value = related?.sections ?? []
     projectApi.incrementProjectView(id).catch(() => {})
     loadPptDeck(id, proj, hist)
   } catch (e) {
@@ -619,6 +632,18 @@ const openReader = () => {
   if (!projectId.value) return
   gtmOpenReader(projectId.value)
   router.push({ name: 'project-reader', params: { projectId: projectId.value } })
+}
+
+const openRelatedItem = (item) => {
+  const target = resolveFeedOpenTarget(item)
+  if (!target) return
+  if (target.kind === 'community' || target.kind === 'project') {
+    if (target.projectId === projectId.value) return
+    router.push({ name: 'project-community', params: { projectId: target.projectId } })
+    return
+  }
+  // fork 类型无 projectId，跳到首页让用户生成
+  router.push(logged.value ? '/workspace' : '/')
 }
 
 const goCreate = () => {

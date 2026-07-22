@@ -657,6 +657,11 @@ export default {
       click: "点赞",
       unclick: "取消点赞",
     },
+    related: {
+      sameCategory: "同主题推荐",
+      alsoReading: "读者也在看",
+      default: "相关推荐",
+    },
     recommend: {
       title: "Page2Top 阅读推荐值",
       pending: "暂无足够数据",
