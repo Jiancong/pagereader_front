@@ -15,5 +15,9 @@ export {
   forkProject,
   listComments,
   postComment,
+  toggleCommentLike,
+  reportReadingProgress,
+  getReadingStats,
+  getCommunityStats,
   deleteProject,
 } from "./feed"

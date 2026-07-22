@@ -7453,6 +7453,10 @@ provide(pptClassicContextKey, {
 
 defineExpose({
   captureSlideScreenshot,
+  /** 当前页码（0-based），供阅读进度上报使用 */
+  currentSlideIndex: currentSlide,
+  /** 当前 deck 的总页数 */
+  totalSlides: () => pptSource.value?.slides?.length ?? 0,
 });
 </script>
 

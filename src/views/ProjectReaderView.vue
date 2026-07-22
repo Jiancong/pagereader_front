@@ -49,6 +49,7 @@
           <div v-if="pptData">
             <p class="mb-2 text-xs text-muted-foreground">{{ t('community.interactiveHint') }}</p>
             <PptViewer
+              ref="pptViewerRef"
               :ppt-data="pptData"
               :project-id="projectId"
               :markdown="projectMarkdown"
@@ -112,7 +113,7 @@
 <script setup>
 defineOptions({ name: 'ProjectReaderView' })
 
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -135,6 +136,7 @@ import {
   pickProjectFallbackTitle,
 } from '@/utils/projectTitle'
 import { gtmForkProject } from '@/composables/useGtmDataLayer'
+import { useReadingProgressReporter } from '@/composables/useReadingProgressReporter'
 
 const route = useRoute()
 const router = useRouter()
@@ -157,6 +159,17 @@ const dialogOpen = ref(false)
 const forking = ref(false)
 const sessionEntries = ref([])
 const pendingForkAfterLogin = ref(false)
+const pptViewerRef = ref(null)
+
+// 阅读进度上报（仅在 PptViewer 场景生效）
+const {
+  reportEnter,
+  reportSlideChange,
+  reportLeave,
+} = useReadingProgressReporter(() => projectId.value, {
+  getTotalSlides: () => pptViewerRef.value?.totalSlides?.() ?? 0,
+  getIsLoggedIn: () => logged.value,
+})
 
 const generatedDeckTitle = computed(() => {
   const deckTitle = pickPptDataTitle(pptData.value)
@@ -283,6 +296,7 @@ const load = async (id) => {
     project.value = proj
     history.value = hist
     projectApi.incrementProjectView(id).catch(() => {})
+    reportEnter(id)
     const loadedNovel = await loadNovelGuide(id, hist, proj)
     if (!loadedNovel) {
       const loadedOutline = await loadOutlineGuide(hist, proj)
@@ -296,6 +310,15 @@ const load = async (id) => {
     loading.value = false
   }
 }
+
+// 监听 PptViewer 当前页码变化（currentSlideIndex 是 expose 的 ref）
+watch(
+  () => pptViewerRef.value?.currentSlideIndex,
+  (idx, prev) => {
+    if (idx == null || idx === prev) return
+    reportSlideChange(idx)
+  },
+)
 
 function buildExtraConversations() {
   const out = []
@@ -342,7 +365,17 @@ const onFork = async () => {
 onMounted(() => {
   refreshAuth()
   load(projectId.value)
+  window.addEventListener('beforeunload', handleBeforeUnload)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  reportLeave()
+})
+
+function handleBeforeUnload() {
+  reportLeave()
+}
 
 watch(projectId, (id) => load(id))
 

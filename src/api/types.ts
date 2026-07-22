@@ -160,8 +160,22 @@ export interface ProjectVo {
   shareCount?: number
   createTime?: string
   updateTime?: string
+  // ===== P1 书籍元数据（V22） =====
+  wordCount?: number | null
+  sourceBookPublishDate?: string | null
+  copyrightHolder?: string | null
+  copyrightType?: CopyrightType | null
+  slideCount?: number | null
+  contentLanguage?: string | null
   [key: string]: unknown
 }
+
+// ===== 社区 P0/P1/P2 枚举 =====
+export type CopyrightType = "PUBLISHER" | "AUTHOR" | "COMMUNITY"
+export type CommentRating = "RECOMMEND" | "AVERAGE" | "POOR"
+export type RatingFilter = "ALL" | CommentRating
+export type ReadingStatus = "NONE" | "READING" | "FINISHED"
+export type CommentLikeAction = "click" | "unclick"
 
 export interface ShareToCommunityResult {
   projectId: string
@@ -184,7 +198,86 @@ export interface ProjectCommentVo {
   rootId?: number | null
   content: string
   createTime: string
+  // ===== P0 评论评分 / 点赞（V23/V24） =====
+  rating?: CommentRating | null
+  likeCount?: number
+  likedByMe?: boolean
   replies: ProjectCommentVo[]
+}
+
+/** POST /project/{id}/comments/{commentId}/like 返回 */
+export interface CommentLikeResultVo {
+  commentId: number
+  likeCount: number
+  likedByMe: boolean
+}
+
+/** POST /project/{id}/comments body（支持 rating） */
+export interface CreateProjectCommentDto {
+  content: string
+  parentId?: number | null
+  rating?: CommentRating | null
+}
+
+/** POST /project/{id}/comments/{commentId}/like body */
+export interface CommentLikeActionDto {
+  action: CommentLikeAction
+}
+
+/** POST /project/{id}/reading/progress body */
+export interface ReportReadingProgressDto {
+  progressPercent: number
+  status?: ReadingStatus
+  addMinutes?: number
+  deviceId?: string
+}
+
+/** GET /project/{id}/reading/stats 返回 */
+export interface ProjectReadingStatsVo {
+  projectId: string
+  readerCount: number
+  finishedCount: number
+  viewCount: number
+  likeCount: number
+  myReadingStatus: ReadingStatus
+  myReadingMinutes: number
+  myProgressPercent?: number | null
+  myFirstReadTime?: string | null
+  myFinishedAt?: string | null
+}
+
+/** GET /project/{id}/community-stats → recommend 块 */
+export interface ProjectRecommendStatsVo {
+  projectId: string
+  recommendScore: number | null
+  recommendCount: number
+  averageCount: number
+  poorCount: number
+  recommendPercent: number
+  averagePercent: number
+  poorPercent: number
+  totalReviewCount: number
+}
+
+/** GET /project/{id}/community-stats → book 块 */
+export interface ProjectBookMetaVo {
+  projectId: string
+  wordCount?: number | null
+  sourceBookPublishDate?: string | null
+  copyrightHolder?: string | null
+  copyrightType?: CopyrightType | null
+  slideCount?: number | null
+  sourceBookTitle?: string | null
+  sourceBookAuthor?: string | null
+  contentLanguage?: string | null
+}
+
+/** GET /project/{id}/community-stats 聚合响应 */
+export interface ProjectCommunityStatsVo {
+  projectId: string
+  reading: ProjectReadingStatsVo
+  book: ProjectBookMetaVo
+  recommend: ProjectRecommendStatsVo
 }
 
 export interface ConversationHistoryVo {

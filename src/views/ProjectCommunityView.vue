@@ -82,6 +82,132 @@
           </span>
         </button>
 
+        <!-- 阅读统计 / 字数 / 版权 -->
+        <section
+          v-if="bookStats"
+          class="mt-6 grid grid-cols-2 divide-x divide-y divide-border rounded-xl border border-border bg-card sm:grid-cols-4 sm:divide-y-0"
+        >
+          <div class="px-4 py-4 text-center sm:py-5">
+            <p class="text-xs text-muted-foreground">{{ t('community.stats.reading') }}</p>
+            <p class="mt-1 text-lg font-semibold tabular-nums text-foreground sm:text-xl">
+              {{ statsDisplay.readers }}
+            </p>
+            <p class="mt-0.5 text-[11px] text-muted-foreground">
+              {{ t('community.stats.finishedSub', { count: statsDisplay.finished }) }}
+            </p>
+          </div>
+          <div class="px-4 py-4 text-center sm:py-5">
+            <p class="text-xs text-muted-foreground">{{ t('community.stats.slides') }}</p>
+            <p class="mt-1 text-lg font-semibold tabular-nums text-foreground sm:text-xl">
+              {{ statsDisplay.slides }}
+            </p>
+            <p class="mt-0.5 text-[11px] text-muted-foreground">{{ t('community.stats.slidesSub') }}</p>
+          </div>
+          <div class="px-4 py-4 text-center sm:py-5">
+            <p class="text-xs text-muted-foreground">{{ t('community.stats.wordCount') }}</p>
+            <p class="mt-1 text-lg font-semibold tabular-nums text-foreground sm:text-xl">
+              {{ statsDisplay.words }}
+            </p>
+            <p v-if="bookStats.publishLabel" class="mt-0.5 text-[11px] text-muted-foreground">
+              {{ t('community.stats.publishedAt', { date: bookStats.publishLabel }) }}
+            </p>
+          </div>
+          <div class="px-4 py-4 text-center sm:py-5">
+            <p class="text-xs text-muted-foreground">{{ t('community.stats.copyright') }}</p>
+            <p class="mt-1 flex items-center justify-center gap-1 text-lg font-semibold text-foreground sm:text-xl">
+              <Copyright class="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span class="truncate">{{ bookStats.copyrightHolder }}</span>
+            </p>
+            <p class="mt-0.5 truncate text-[11px] text-muted-foreground">
+              {{ copyrightKindLabel }}
+            </p>
+          </div>
+        </section>
+
+        <!-- Page2Top 阅读推荐值 -->
+        <section
+          v-if="bookStats"
+          class="mt-4 rounded-xl border border-border bg-muted/30 p-4 sm:p-5"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-medium text-foreground">
+                {{ t('community.recommend.title') }}
+                <span
+                  v-if="bookStats.recommend.score != null"
+                  class="ml-1 font-semibold tabular-nums text-primary"
+                >
+                  {{ bookStats.recommend.score }}%
+                </span>
+                <span v-else class="ml-1 text-muted-foreground">{{ t('community.recommend.pending') }}</span>
+              </h2>
+              <p
+                v-if="bookStats.recommend.score != null"
+                class="mt-2 inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+              >
+                {{ t(`community.recommend.${bookStats.recommend.badgeKey}`) }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="shrink-0 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40"
+              @click="scrollToComments"
+            >
+              {{ t('community.recommend.writeReview') }}
+            </button>
+          </div>
+
+          <div
+            v-if="bookStats.recommend.score != null"
+            class="mt-4 space-y-2"
+          >
+            <div
+              v-for="bar in recommendBars"
+              :key="bar.key"
+              class="flex items-center gap-2 text-xs"
+            >
+              <span class="w-8 shrink-0 text-muted-foreground">{{ bar.label }}</span>
+              <div class="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  class="h-full rounded-full bg-foreground/70 transition-all"
+                  :style="{ width: `${bar.pct}%` }"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button
+              v-for="tab in commentFilterTabs"
+              :key="tab.id"
+              type="button"
+              class="rounded-full px-3 py-1 text-xs transition-colors"
+              :class="
+                commentFilter === tab.id
+                  ? 'bg-background font-medium text-foreground shadow-sm'
+                  : 'bg-muted/80 text-muted-foreground hover:text-foreground'
+              "
+              @click="onCommentFilterChange(tab.id)"
+            >
+              {{ tab.label }}({{ tab.count }})
+            </button>
+          </div>
+        </section>
+
+        <!-- 读者评论 -->
+        <ProjectCommentBoard
+          ref="commentBoardRef"
+          class="mt-4"
+          :project-id="projectId"
+          :comments="comments"
+          :is-logged-in="logged"
+          :loading="loadingComments"
+          :rating-filter="commentFilter"
+          @update:comments="(c) => (comments = c)"
+          @reload-comments="reloadComments"
+          @login="openLogin"
+        />
+
         <p
           v-if="loadingDeck && !hasSeoBody"
           class="mt-6 flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground"
@@ -198,15 +324,6 @@
           </p>
         </section>
 
-        <ProjectCommentBoard
-          class="mt-6"
-          :project-id="projectId"
-          :comments="comments"
-          :is-logged-in="logged"
-          :loading="loadingComments"
-          @update:comments="(c) => (comments = c)"
-          @login="openLogin"
-        />
       </template>
     </main>
     <AppFooter />
@@ -226,7 +343,7 @@ defineOptions({ name: 'ProjectCommunityView' })
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft, Loader2, BookOpen, Sparkles, ListVideo, Square } from 'lucide-vue-next'
+import { ArrowLeft, Loader2, BookOpen, Sparkles, ListVideo, Square, Copyright } from 'lucide-vue-next'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import AuthDialog from '@/components/AuthDialog.vue'
@@ -243,6 +360,11 @@ import {
 } from '@/utils/bookSeo'
 import { useSeoHead } from '@/composables/useSeoHead'
 import { usePptDeckPlayAll } from '@/composables/usePptDeckPlayAll'
+import {
+  buildBookCommunityStats,
+  formatCompactCount,
+  formatWordCount,
+} from '@/utils/bookCommunityStats'
 
 const route = useRoute()
 const router = useRouter()
@@ -251,6 +373,7 @@ const { t } = useI18n()
 const projectId = computed(() => String(route.params.projectId || ''))
 const project = ref(null)
 const comments = ref([])
+const communityStats = ref(null)
 const pptData = ref(null)
 const loading = ref(false)
 const loadingComments = ref(false)
@@ -260,6 +383,98 @@ const logged = ref(false)
 const nickName = ref('')
 const avatar = ref(getLocalAvatar())
 const dialogOpen = ref(false)
+const commentFilter = ref('ALL')
+const commentBoardRef = ref(null)
+
+const seo = computed(() => extractBookSeoContent(project.value, pptData.value))
+
+const bookStats = computed(() => {
+  if (!project.value) return null
+  return buildBookCommunityStats({
+    stats: communityStats.value,
+    project: project.value,
+    seo: seo.value,
+    deck: pptData.value,
+  })
+})
+
+const statsDisplay = computed(() => {
+  const s = bookStats.value
+  if (!s) return { readers: '—', finished: '0', slides: '—', words: '—' }
+  return {
+    readers:
+      s.readerCount > 0
+        ? t('community.stats.readersValue', { count: formatCompactCount(s.readerCount) })
+        : '—',
+    finished: formatCompactCount(s.finishedReadCount),
+    slides:
+      s.totalSlides > 0
+        ? t('community.stats.slidesValue', { count: s.totalSlides })
+        : '—',
+    words: s.wordCount != null && s.wordCount > 0 ? formatWordCount(s.wordCount) : '—',
+  }
+})
+
+const copyrightKindLabel = computed(() => {
+  const kind = bookStats.value?.copyrightKind
+  if (kind === 'publisher') return t('community.stats.copyrightPublisher')
+  if (kind === 'author') return t('community.stats.originalAuthor')
+  return t('community.stats.copyrightCommunity')
+})
+
+const recommendBars = computed(() => {
+  const r = bookStats.value?.recommend
+  if (!r || r.score == null) return []
+  return [
+    { key: 'recommend', label: t('community.recommend.barRecommend'), pct: r.recommendPct },
+    { key: 'average', label: t('community.recommend.barAverage'), pct: r.averagePct },
+    { key: 'poor', label: t('community.recommend.barPoor'), pct: r.poorPct },
+  ]
+})
+
+const commentFilterTabs = computed(() => {
+  const rec = communityStats.value?.recommend
+  const total = rec?.totalReviewCount ?? 0
+  const recommend = rec?.recommendCount ?? 0
+  const average = rec?.averageCount ?? 0
+  const poor = rec?.poorCount ?? 0
+  return [
+    { id: 'ALL', label: t('community.recommend.filterAll'), count: total },
+    { id: 'RECOMMEND', label: t('community.recommend.filterRecommend'), count: recommend },
+    { id: 'AVERAGE', label: t('community.recommend.filterAverage'), count: average },
+    { id: 'POOR', label: t('community.recommend.filterPoor'), count: poor },
+  ]
+})
+
+async function onCommentFilterChange(next) {
+  if (commentFilter.value === next) return
+  commentFilter.value = next
+  await reloadComments()
+}
+
+async function reloadComments() {
+  loadingComments.value = true
+  try {
+    const list = await projectApi.listComments(projectId.value, commentFilter.value)
+    comments.value = list ?? []
+  } catch {
+    // 筛选失败：回退到全量
+    try {
+      const list = await projectApi.listComments(projectId.value, 'ALL')
+      comments.value = list ?? []
+      commentFilter.value = 'ALL'
+    } catch {
+      /* ignore */
+    }
+  } finally {
+    loadingComments.value = false
+  }
+}
+
+function scrollToComments() {
+  document.getElementById('community-comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  commentBoardRef.value?.focusComposer?.()
+}
 
 const {
   ttsLoading,
@@ -275,16 +490,16 @@ const {
   },
 })
 
-const seo = computed(() => extractBookSeoContent(project.value, pptData.value))
+const seoReady = computed(
+  () => Boolean(project.value) && (hasSeoBody.value || !loadingDeck.value),
+)
+
 const hasSeoBody = computed(
   () =>
     seo.value.summaryPoints.length > 0 ||
     seo.value.takeaways.length > 0 ||
     seo.value.characters.length > 0 ||
     Boolean(seo.value.overview),
-)
-const seoReady = computed(
-  () => Boolean(project.value) && (hasSeoBody.value || !loadingDeck.value),
 )
 const pageHeading = computed(() => {
   const title = seo.value.bookTitle || project.value?.name || t('workspace.unnamedProject')
@@ -370,15 +585,19 @@ const load = async (id) => {
   error.value = null
   project.value = null
   comments.value = []
+  communityStats.value = null
   pptData.value = null
+  commentFilter.value = 'ALL'
   try {
-    const [proj, list, hist] = await Promise.all([
+    const [proj, list, stats, hist] = await Promise.all([
       projectApi.getProject(id),
-      projectApi.listComments(id).catch(() => []),
+      projectApi.listComments(id, 'ALL').catch(() => []),
+      projectApi.getCommunityStats(id).catch(() => null),
       projectApi.getProjectConversationHistory(id).catch(() => []),
     ])
     project.value = proj
     comments.value = list
+    communityStats.value = stats
     projectApi.incrementProjectView(id).catch(() => {})
     loadPptDeck(id, proj, hist)
   } catch (e) {

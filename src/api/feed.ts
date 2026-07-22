@@ -17,6 +17,14 @@ import type {
   ProjectPromptHistoryVo,
   ShareToCommunityResult,
   ProjectCommentVo,
+  CommentRating,
+  RatingFilter,
+  CreateProjectCommentDto,
+  CommentLikeAction,
+  CommentLikeResultVo,
+  ReportReadingProgressDto,
+  ProjectReadingStatsVo,
+  ProjectCommunityStatsVo,
 } from "./types"
 
 // Feed 流分页（匿名可访问，登录后返回 likedByMe）
@@ -217,19 +225,63 @@ export async function forkProject(
   return postJson<ProjectVo>(`/project/${encodeURIComponent(id)}/fork`, body)
 }
 
-// 留言列表（树形结构）
-export async function listComments(id: string): Promise<ProjectCommentVo[]> {
-  return get<ProjectCommentVo[]>(`/project/${encodeURIComponent(id)}/comments`)
+// 留言列表（树形结构）；rating 留空或 ALL 走原行为（向后兼容）
+export async function listComments(
+  id: string,
+  rating: RatingFilter = "ALL",
+): Promise<ProjectCommentVo[]> {
+  const query = rating && rating !== "ALL" ? { rating } : undefined
+  return get<ProjectCommentVo[]>(`/project/${encodeURIComponent(id)}/comments`, { query })
 }
 
-// 发表/回复留言（需登录）
+// 发表/回复留言（需登录）；根评论需传 rating，回复不传
 export async function postComment(
   id: string,
   content: string,
   parentId?: number | null,
+  rating?: CommentRating | null,
 ): Promise<ProjectCommentVo> {
-  return postJson<ProjectCommentVo>(`/project/${encodeURIComponent(id)}/comments`, {
+  const body: CreateProjectCommentDto = {
     content,
     parentId: parentId ?? null,
-  })
+    rating: rating ?? null,
+  }
+  return postJson<ProjectCommentVo>(`/project/${encodeURIComponent(id)}/comments`, body)
+}
+
+// 评论点赞 / 取消点赞（幂等）
+export async function toggleCommentLike(
+  id: string,
+  commentId: number,
+  action: CommentLikeAction,
+): Promise<CommentLikeResultVo> {
+  return postJson<CommentLikeResultVo>(
+    `/project/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}/like`,
+    { action },
+  )
+}
+
+// 上报阅读进度（需登录或匿名带 deviceId）
+export async function reportReadingProgress(
+  id: string,
+  payload: ReportReadingProgressDto,
+): Promise<ProjectReadingStatsVo> {
+  return postJson<ProjectReadingStatsVo>(
+    `/project/${encodeURIComponent(id)}/reading/progress`,
+    payload,
+  )
+}
+
+// 阅读统计（readerCount / finishedCount / viewCount / likeCount + myReading*）
+export async function getReadingStats(id: string): Promise<ProjectReadingStatsVo> {
+  return get<ProjectReadingStatsVo>(`/project/${encodeURIComponent(id)}/reading/stats`)
+}
+
+// 社区页聚合接口：一次拿齐 reading + book + recommend
+export async function getCommunityStats(
+  id: string,
+): Promise<ProjectCommunityStatsVo> {
+  return get<ProjectCommunityStatsVo>(
+    `/project/${encodeURIComponent(id)}/community-stats`,
+  )
 }
