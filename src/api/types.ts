@@ -620,3 +620,35 @@ export interface SubscribeMyStatus {
   totalCredits?: number
   [key: string]: unknown
 }
+
+// ===== Novel 划线 / 想法（私密批注） =====
+/** 单条划线 + 想法记录（仅本人可见） */
+export interface ProjectAnnotation {
+  id: string
+  projectId?: string
+  userId?: string
+  /** 章节 id，对应 buildNovelGuideOutline 生成的 section.id */
+  sectionId: string
+  /** 选区在章节纯文本中的起始字符偏移 */
+  startOffset: number
+  /** 选区结束偏移（不含） */
+  endOffset: number
+  /** 划线原文，用于校验与重排后的容错匹配 */
+  selectedText: string
+  /** 想法内容，可空（仅划线无想法） */
+  note?: string
+  /** 高亮色（预留） */
+  color?: string
+  createTime?: string
+  updateTime?: string
+}
+
+export type CreateProjectAnnotation = Pick<
+  ProjectAnnotation,
+  "sectionId" | "startOffset" | "endOffset" | "selectedText" | "note" | "color"
+>
+
+/** 仅允许编辑 note / color；offset 不允许变更 */
+export type UpdateProjectAnnotation = Partial<
+  Pick<ProjectAnnotation, "note" | "color">
+>

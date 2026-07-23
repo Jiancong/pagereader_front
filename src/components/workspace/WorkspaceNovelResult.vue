@@ -138,6 +138,8 @@
         ref="articleRef"
         class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-card px-4 py-5 sm:px-6 sm:py-7"
         :style="contentFontStyle"
+        @contextmenu.prevent="onNovelContextMenu"
+        @click="onNovelContentClick"
       >
         <h1 v-if="activeSection" class="mb-6 text-2xl font-semibold leading-snug text-foreground sm:text-3xl">
           {{ activeSection.label }}
@@ -166,19 +168,41 @@
         <ChatMarkdownBody :content="turn" root-class="novel-guide-markdown" />
       </div>
     </div>
+
+    <NovelAnnotationMenu
+      :show="annotMenuVisible"
+      :x="annotMenuX"
+      :y="annotMenuY"
+      :mode="annotMenuMode"
+      :selection-text="annotSelectionText"
+      :current-note="annotCurrentNote"
+      @highlight="onMenuHighlight"
+      @submit-note="onMenuSubmitNote"
+      @edit-note="onMenuEdit"
+      @delete="onMenuDelete"
+      @close="closeAnnotMenu"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
 import ChatMarkdownBody from "@/components/editor/chat/ChatMarkdownBody.vue"
-import { projectApi } from "@/api"
+import NovelAnnotationMenu from "@/components/workspace/NovelAnnotationMenu.vue"
+import { annotationApi, projectApi } from "@/api"
+import { getToken } from "@/api/token"
+import type { ProjectAnnotation } from "@/api/types"
 import { buildFontFamilyCss, ensureExportFontsReady } from "@/composables/useFontLoader"
 import { useNovelGuidePlayAll } from "@/composables/useNovelGuidePlayAll"
 import { downloadMarkdownFile, sanitizeDownloadBasename } from "@/utils/downloadMarkdownFile"
 import { buildNovelGuideOutline } from "@/utils/novelGuideSections"
+import {
+  restoreHighlights,
+  resolveAnnotationIdFromTarget,
+  selectionToCharOffset,
+} from "@/utils/novelAnnotationRange"
 import {
   collectNovelGuideScrollTargets,
   isNovelGuideMobileViewport,
@@ -218,6 +242,19 @@ const coverUploading = ref(false)
 let lastPlaybackScrollTarget: HTMLElement | null = null
 let playbackPageStartedAt = 0
 let playbackPageEstimateMs = 60_000
+
+// ===== 划线 / 想法 =====
+const annotMenuVisible = ref(false)
+const annotMenuX = ref(0)
+const annotMenuY = ref(0)
+const annotMenuMode = ref<"create" | "edit">("create")
+const annotSelectionText = ref("")
+const annotCurrentNote = ref("")
+const annotTargetId = ref<string>("")
+/** 当前章节缓存的 annotations，恢复高亮 + 点击 mark 时定位 */
+const sectionAnnotations = ref<ProjectAnnotation[]>([])
+/** create 模式下临时记录选区偏移（点击 mark 后选区已丢失，故不依赖 Range） */
+let pendingSelection: { start: number; end: number; text: string } | null = null
 
 const outline = computed(() =>
   buildNovelGuideOutline({
@@ -351,6 +388,160 @@ function selectSection(sectionId: string) {
   stopPlayback()
 }
 
+// ===== 划线 / 想法：菜单与持久化 =====
+function isAnnotationEnabled(): boolean {
+  return Boolean(String(props.projectId || "").trim()) && Boolean(getToken())
+}
+
+function onNovelContextMenu(event: MouseEvent) {
+  if (!isAnnotationEnabled()) return
+  const article = articleRef.value
+  if (!article) return
+  const selection = window.getSelection()
+  const range = selection ? selectionToCharOffset(selection, article) : null
+  if (!range) {
+    ElMessage.info(t("workspace.novelAnnotateSelectFirst"))
+    return
+  }
+  pendingSelection = range
+  annotSelectionText.value = range.text.slice(0, 200)
+  annotMenuMode.value = "create"
+  annotCurrentNote.value = ""
+  annotTargetId.value = ""
+  annotMenuX.value = clampMenuX(event.clientX)
+  annotMenuY.value = clampMenuY(event.clientY)
+  annotMenuVisible.value = true
+}
+
+function clampMenuX(x: number): number {
+  const max = window.innerWidth - 24
+  return Math.max(8, Math.min(x, max))
+}
+
+function clampMenuY(y: number): number {
+  const max = window.innerHeight - 24
+  return Math.max(8, Math.min(y, max))
+}
+
+function onNovelContentClick(event: MouseEvent) {
+  if (!isAnnotationEnabled()) return
+  const id = resolveAnnotationIdFromTarget(event.target)
+  if (!id) {
+    if (annotMenuVisible.value) closeAnnotMenu()
+    return
+  }
+  const ann = sectionAnnotations.value.find((a) => a.id === id)
+  if (!ann) return
+  annotTargetId.value = id
+  annotMenuMode.value = "edit"
+  annotCurrentNote.value = ann.note ?? ""
+  annotSelectionText.value = ann.selectedText.slice(0, 200)
+  annotMenuX.value = clampMenuX(event.clientX)
+  annotMenuY.value = clampMenuY(event.clientY)
+  annotMenuVisible.value = true
+}
+
+function closeAnnotMenu() {
+  annotMenuVisible.value = false
+  pendingSelection = null
+}
+
+function onAnnotMenuPointerDown(event: PointerEvent) {
+  if (!annotMenuVisible.value) return
+  const target = event.target as Element | null
+  if (target?.closest?.(".novel-annot-menu")) return
+  closeAnnotMenu()
+}
+
+async function onMenuHighlight() {
+  await createAnnotationFromSelection("")
+}
+
+async function onMenuSubmitNote(note: string) {
+  // edit 模式下「保存」即更新现有 note
+  if (annotMenuMode.value === "edit") {
+    await updateAnnotationNote(note)
+    return
+  }
+  await createAnnotationFromSelection(note)
+}
+
+async function createAnnotationFromSelection(note: string) {
+  const projectId = String(props.projectId || "").trim()
+  const sectionId = activeSectionId.value
+  const sel = pendingSelection
+  if (!projectId || !sectionId || !sel) return
+  try {
+    const created = await annotationApi.createAnnotation(projectId, {
+      sectionId,
+      startOffset: sel.start,
+      endOffset: sel.end,
+      selectedText: sel.text,
+      note: note || undefined,
+    })
+    sectionAnnotations.value = [...sectionAnnotations.value, created]
+    void nextTick(() => applySectionHighlights())
+    ElMessage.success(t("workspace.novelAnnotateSaved"))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t("workspace.novelAnnotateSaveFailed"))
+  }
+}
+
+async function updateAnnotationNote(note: string) {
+  const projectId = String(props.projectId || "").trim()
+  const id = annotTargetId.value
+  if (!projectId || !id) return
+  try {
+    const updated = await annotationApi.updateAnnotation(projectId, id, {
+      note: note || undefined,
+    })
+    sectionAnnotations.value = sectionAnnotations.value.map((a) =>
+      a.id === id ? { ...a, note: updated.note } : a,
+    )
+    void nextTick(() => applySectionHighlights())
+    ElMessage.success(t("workspace.novelAnnotateSaved"))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t("workspace.novelAnnotateSaveFailed"))
+  }
+}
+
+async function onMenuEdit() {
+  // 编辑入口走菜单内联输入框；提交时 submit-note 事件由 onMenuSubmitNote 处理。
+}
+
+async function onMenuDelete() {
+  const projectId = String(props.projectId || "").trim()
+  const id = annotTargetId.value
+  if (!projectId || !id) return
+  try {
+    await annotationApi.deleteAnnotation(projectId, id)
+    sectionAnnotations.value = sectionAnnotations.value.filter((a) => a.id !== id)
+    void nextTick(() => applySectionHighlights())
+    ElMessage.success(t("workspace.novelAnnotateDeleted"))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t("workspace.novelAnnotateDeleteFailed"))
+  }
+}
+
+async function loadSectionAnnotations(sectionId: string) {
+  const projectId = String(props.projectId || "").trim()
+  if (!projectId || !getToken()) {
+    sectionAnnotations.value = []
+    return
+  }
+  try {
+    sectionAnnotations.value = await annotationApi.listAnnotations(projectId, sectionId)
+  } catch {
+    sectionAnnotations.value = []
+  }
+}
+
+function applySectionHighlights() {
+  const article = articleRef.value
+  if (!article) return
+  restoreHighlights(article, sectionAnnotations.value)
+}
+
 watch(ttsPlayAllActive, (active) => {
   if (!active) resetPlaybackScrollSync()
 })
@@ -433,9 +624,38 @@ watch(
   { immediate: true },
 )
 
+// 切换章节时加载该章节的划线并恢复高亮（等 markdown 渲染完成）
+watch(
+  activeSectionId,
+  async (sectionId) => {
+    if (!sectionId) {
+      sectionAnnotations.value = []
+      return
+    }
+    await loadSectionAnnotations(sectionId)
+    await nextTick()
+    await waitForNovelGuideLayout()
+    applySectionHighlights()
+  },
+  { immediate: true },
+)
+
 onMounted(() => {
   void ensureExportFontsReady("SimSun")
+  window.addEventListener("pointerdown", onAnnotMenuPointerDown, true)
+  window.addEventListener("scroll", closeAnnotMenuOnScroll, true)
+  window.addEventListener("resize", closeAnnotMenu)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener("pointerdown", onAnnotMenuPointerDown, true)
+  window.removeEventListener("scroll", closeAnnotMenuOnScroll, true)
+  window.removeEventListener("resize", closeAnnotMenu)
+})
+
+function closeAnnotMenuOnScroll() {
+  if (annotMenuVisible.value) closeAnnotMenu()
+}
 </script>
 
 <style scoped lang="scss">
@@ -531,5 +751,24 @@ onMounted(() => {
 
 :deep(.novel-guide-markdown.markdown-body th) {
   @apply bg-secondary text-foreground;
+}
+
+/* 划线高亮 */
+:deep(mark.novel-annotation) {
+  background-color: rgba(255, 224, 130, 0.65);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background-color: rgba(255, 213, 79, 0.85);
+  }
+}
+
+:deep(mark.novel-annotation--noted) {
+  background-color: rgba(255, 183, 77, 0.55);
+  border-bottom: 2px solid rgba(255, 152, 0, 0.7);
 }
 </style>

@@ -116,6 +116,22 @@ export async function del<T>(path: string, opts?: RequestOptions): Promise<T> {
   return unwrap<T>(res)
 }
 
+export async function put<T>(
+  path: string,
+  body?: unknown,
+  opts?: RequestOptions,
+): Promise<T> {
+  const headers = authHeaders(opts?.headers)
+  headers.set("Content-Type", "application/json")
+  const res = await fetch(buildUrl(path, opts?.query), {
+    method: "PUT",
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: opts?.signal,
+  })
+  return unwrap<T>(res)
+}
+
 // 返回二进制（如下载、读图）
 export async function getBlob(path: string, opts?: RequestOptions): Promise<Blob> {
   const res = await fetch(buildUrl(path, opts?.query), {
