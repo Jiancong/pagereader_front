@@ -208,6 +208,13 @@
           @login="openLogin"
         />
 
+        <!-- 读者划线与想法（全用户，按时间） -->
+        <ProjectAnnotationFeed
+          :items="publicAnnotations"
+          :loading="loadingAnnotations"
+          :error="annotationError"
+        />
+
         <!-- 关联推荐：同主题 / 推荐 -->
         <RelatedProjects
           :sections="relatedSections"
@@ -355,8 +362,9 @@ import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import AuthDialog from '@/components/AuthDialog.vue'
 import ProjectCommentBoard from '@/components/community/ProjectCommentBoard.vue'
+import ProjectAnnotationFeed from '@/components/community/ProjectAnnotationFeed.vue'
 import RelatedProjects from '@/components/community/RelatedProjects.vue'
-import { authApi, projectApi, isLoggedIn, getLocalAvatar } from '@/api'
+import { authApi, projectApi, annotationApi, isLoggedIn, getLocalAvatar, ApiError } from '@/api'
 import { gtmOpenReader } from '@/composables/useGtmDataLayer'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
 import { looksLikeDeckJson } from '@/utils/projectCommunity'
@@ -395,6 +403,9 @@ const dialogOpen = ref(false)
 const commentFilter = ref('ALL')
 const commentBoardRef = ref(null)
 const relatedSections = ref([])
+const publicAnnotations = ref([])
+const loadingAnnotations = ref(false)
+const annotationError = ref('')
 
 const seo = computed(() => extractBookSeoContent(project.value, pptData.value))
 
@@ -478,6 +489,28 @@ async function reloadComments() {
     }
   } finally {
     loadingComments.value = false
+  }
+}
+
+async function loadPublicAnnotations(id) {
+  if (!id) {
+    publicAnnotations.value = []
+    annotationError.value = ''
+    return
+  }
+  loadingAnnotations.value = true
+  annotationError.value = ''
+  try {
+    publicAnnotations.value = await annotationApi.listPublicAnnotations(id)
+  } catch (e) {
+    publicAnnotations.value = []
+    const code = e instanceof ApiError ? e.code : 0
+    // 后端未上线时静默为空，其它错误才提示
+    if (code !== 404 && code !== 405) {
+      annotationError.value = e?.message || t('community.annotationFeed.loadFailed')
+    }
+  } finally {
+    loadingAnnotations.value = false
   }
 }
 
@@ -598,6 +631,8 @@ const load = async (id) => {
   communityStats.value = null
   pptData.value = null
   relatedSections.value = []
+  publicAnnotations.value = []
+  annotationError.value = ''
   commentFilter.value = 'ALL'
   try {
     const [proj, list, stats, related, hist] = await Promise.all([
@@ -613,6 +648,7 @@ const load = async (id) => {
     relatedSections.value = related?.sections ?? []
     projectApi.incrementProjectView(id).catch(() => {})
     loadPptDeck(id, proj, hist)
+    void loadPublicAnnotations(id)
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')
   } finally {

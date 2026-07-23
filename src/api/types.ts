@@ -621,14 +621,19 @@ export interface SubscribeMyStatus {
   [key: string]: unknown
 }
 
-// ===== Novel 划线 / 想法（私密批注） =====
-/** 单条划线 + 想法记录（仅本人可见） */
+// ===== Novel 划线 / 想法 =====
+/** 单条划线 + 想法记录 */
 export interface ProjectAnnotation {
   id: string
   projectId?: string
   userId?: string
+  /** 社区展示：用户昵称 / 头像（公开列表接口返回） */
+  userNickname?: string
+  userAvatarUrl?: string
   /** 章节 id，对应 buildNovelGuideOutline 生成的 section.id */
   sectionId: string
+  /** 章节标题（公开列表接口可选返回，便于社区页展示） */
+  sectionLabel?: string
   /** 选区在章节纯文本中的起始字符偏移 */
   startOffset: number
   /** 选区结束偏移（不含） */

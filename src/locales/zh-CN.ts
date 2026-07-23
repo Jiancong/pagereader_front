@@ -648,6 +648,15 @@ export default {
     loginToComment: "登录后可留言",
     noComments: "暂无留言，来抢沙发吧",
     userFallback: "用户{id}",
+    annotationFeed: {
+      title: "读者划线与想法",
+      subtitle: "所有读者在阅读时的划线与笔记，按时间顺序展示",
+      section: "章节：{label}",
+      highlightOnly: "（仅划线，未写想法）",
+      empty: "暂无划线或想法，打开阅读页选中文字即可记录",
+      loadFailed: "加载划线记录失败",
+      anonymous: "匿名读者",
+    },
     stats: {
       reading: "阅读",
       readersValue: "{count}人",

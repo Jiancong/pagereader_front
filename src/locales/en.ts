@@ -667,6 +667,15 @@ export default {
     loginToComment: "Log in to comment",
     noComments: "No comments yet—be the first",
     userFallback: "User {id}",
+    annotationFeed: {
+      title: "Reader highlights & notes",
+      subtitle: "Highlights and notes from all readers, shown in chronological order",
+      section: "Section: {label}",
+      highlightOnly: "(Highlighted only, no note)",
+      empty: "No highlights or notes yet—select text in the reader to add one",
+      loadFailed: "Failed to load highlights",
+      anonymous: "Anonymous reader",
+    },
     stats: {
       reading: "Readers",
       readersValue: "{count} readers",

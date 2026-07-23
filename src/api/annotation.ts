@@ -58,3 +58,15 @@ export async function deleteAnnotation(
     `/project/${encodeURIComponent(projectId)}/annotations/${encodeURIComponent(id)}`,
   )
 }
+
+/**
+ * 社区页：拉取该项目所有用户的划线与想法（按时间排序，后端默认 createTime ASC）。
+ * 匿名可访问；返回项含 userNickname / userAvatarUrl 等展示字段。
+ */
+export async function listPublicAnnotations(
+  projectId: string,
+): Promise<ProjectAnnotation[]> {
+  return get<ProjectAnnotation[]>(
+    `/project/${encodeURIComponent(projectId)}/annotations/public`,
+  )
+}
