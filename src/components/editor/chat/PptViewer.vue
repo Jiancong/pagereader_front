@@ -630,8 +630,11 @@
       :x="pptContextMenuX"
       :y="pptContextMenuY"
       :selection-text="pptContextSelection"
+      :annotate-enabled="pptAnnotateEnabled"
       @related-search="onPptRelatedSearch"
       @custom-search="onPptCustomSearch"
+      @highlight="onPptMenuHighlight"
+      @submit-note="onPptMenuSubmitNote"
       @close="closePptContextMenu"
     />
     <PptRelatedSearchPanel
@@ -678,7 +681,9 @@ import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
 import { authApi, projectApi } from "@/api";
 import { appendProjectConversationMessage } from "@/api/feed";
+import { annotationApi } from "@/api";
 import { isLoggedIn } from "@/api/token";
+import type { ProjectAnnotation } from "@/api/types";
 import { primeMediaPlayback, safeMediaPlay } from "@/utils/mediaPlayback";
 import {
   createTtsSequentialPlayer,
@@ -728,6 +733,10 @@ import { uploadedDocumentsFromPptData } from "@/utils/pptDocumentRag";
 import { buildExploreProjectShareUrl } from "@/utils/feedOpen";
 import { gtmRelatedSearch } from "@/composables/useGtmDataLayer";
 import { resolveContextSelectionText } from "@/utils/pptContextSelection";
+import {
+  restoreHighlights,
+  selectionToCharOffset,
+} from "@/utils/novelAnnotationRange";
 import {
   canvasToExportBlob,
   disposeExportCanvas,
@@ -908,6 +917,65 @@ const pptContextMenuVisible = ref(false);
 const pptContextMenuX = ref(0);
 const pptContextMenuY = ref(0);
 const pptContextSelection = ref("");
+const slideAnnotations = ref<ProjectAnnotation[]>([]);
+let pendingPptSelection: { start: number; end: number; text: string } | null = null;
+
+const pptAnnotateEnabled = computed(
+  () => Boolean(String(props.projectId || "").trim()) && isLoggedIn(),
+);
+
+function currentSlideSectionId(): string {
+  return `slide-${currentSlide.value}`;
+}
+
+async function loadSlideAnnotations() {
+  const projectId = String(props.projectId || "").trim();
+  const sectionId = currentSlideSectionId();
+  if (!projectId || !isLoggedIn()) {
+    slideAnnotations.value = [];
+    return;
+  }
+  try {
+    slideAnnotations.value = await annotationApi.listAnnotations(projectId, sectionId);
+  } catch {
+    slideAnnotations.value = [];
+  }
+}
+
+function applySlideHighlights() {
+  const root = slideWrapperRef.value;
+  if (!root) return;
+  restoreHighlights(root, slideAnnotations.value);
+}
+
+async function createPptAnnotation(note: string) {
+  const projectId = String(props.projectId || "").trim();
+  const sel = pendingPptSelection;
+  if (!projectId || !sel) return;
+  try {
+    const created = await annotationApi.createAnnotation(projectId, {
+      sectionId: currentSlideSectionId(),
+      startOffset: sel.start,
+      endOffset: sel.end,
+      selectedText: sel.text,
+      note: note || undefined,
+    });
+    slideAnnotations.value = [...slideAnnotations.value, created];
+    await nextTick();
+    applySlideHighlights();
+    ElMessage.success(t("workspace.novelAnnotateSaved"));
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t("workspace.novelAnnotateSaveFailed"));
+  }
+}
+
+async function onPptMenuHighlight() {
+  await createPptAnnotation("");
+}
+
+async function onPptMenuSubmitNote(note: string) {
+  await createPptAnnotation(note);
+}
 const {
   state: relatedSearchState,
   runRelatedSearch,
@@ -925,6 +993,12 @@ const pptRelatedSearchContext = computed((): PptRelatedSearchContext => ({
 
 function onPptSlideContextMenu(event: MouseEvent) {
   pptContextSelection.value = resolveContextSelectionText(event);
+  pendingPptSelection = null;
+  if (pptAnnotateEnabled.value && slideWrapperRef.value) {
+    const selection = window.getSelection();
+    const range = selection ? selectionToCharOffset(selection, slideWrapperRef.value) : null;
+    if (range) pendingPptSelection = range;
+  }
   pptContextMenuX.value = event.clientX;
   pptContextMenuY.value = event.clientY;
   pptContextMenuVisible.value = true;
@@ -1234,6 +1308,7 @@ onMounted(() => {
     viewerRef.value?.focus();
     observeSlideWrapperSize();
     updatePresentationScale();
+    void loadSlideAnnotations().then(() => applySlideHighlights());
   });
 });
 
@@ -2403,9 +2478,12 @@ async function togglePlayAllSlideAudio() {
   await playAllSlideAudio(currentSlide.value);
 }
 
-watch(currentSlide, () => {
+watch(currentSlide, async () => {
   if (ttsAutoAdvancing.value) return;
   if (ttsPlaying.value || ttsPlayAllActive.value) stopSlideAudio();
+  await loadSlideAnnotations();
+  await nextTick();
+  applySlideHighlights();
 });
 
 watch(
@@ -8710,5 +8788,13 @@ defineExpose({
   .ppt-speaker-notes-pane {
     display: none;
   }
+}
+
+.ppt-slide-wrapper mark.novel-annotation {
+  background-color: rgba(255, 224, 130, 0.65);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
 }
 </style>

@@ -1,10 +1,11 @@
 <template>
-  <section v-if="visibleSections.length" class="mt-10">
-    <div
-      v-for="section in visibleSections"
-      :key="section.key"
-      class="mb-6"
-    >
+  <section v-if="visibleSections.length || showEmpty" class="mt-10">
+    <template v-if="visibleSections.length">
+      <div
+        v-for="section in visibleSections"
+        :key="section.key"
+        class="mb-6"
+      >
       <h2 class="mb-3 text-base font-semibold text-foreground sm:text-lg">
         {{ sectionTitle(section) }}
       </h2>
@@ -42,7 +43,12 @@
           </div>
         </button>
       </div>
-    </div>
+      </div>
+    </template>
+    <p v-else class="rounded-xl border border-border bg-card px-4 py-5 text-sm text-muted-foreground">
+      <span class="mb-2 block text-base font-semibold text-foreground">{{ t('community.related.default') }}</span>
+      {{ t('community.related.empty') }}
+    </p>
   </section>
 </template>
 
@@ -57,6 +63,8 @@ const props = defineProps({
   sections: { type: Array, default: () => [] },
   /** 当前项目 id，用于排除（理论上后端已排除，前端再保险） */
   currentProjectId: { type: String, default: '' },
+  /** 无推荐项时也展示区块（PPT / novel 统一体验） */
+  showEmpty: { type: Boolean, default: false },
 })
 
 defineEmits(['open'])

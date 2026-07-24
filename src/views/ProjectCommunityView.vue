@@ -210,15 +210,19 @@
 
         <!-- 读者划线与想法（全用户，按时间） -->
         <ProjectAnnotationFeed
-          :items="publicAnnotations"
+          :items="displayAnnotations"
           :loading="loadingAnnotations"
           :error="annotationError"
         />
 
-        <!-- 关联推荐：同主题 / 推荐 -->
+        <!-- 读者对话（PPT 划词追问等，按时间） -->
+        <ProjectConversationFeed :items="conversationFeedItems" />
+
+        <!-- 关联推荐：同主题 / 推荐（PPT / novel 均展示） -->
         <RelatedProjects
           :sections="relatedSections"
           :current-project-id="projectId"
+          :show-empty="true"
           @open="openRelatedItem"
         />
 
@@ -363,8 +367,16 @@ import AppFooter from '@/components/AppFooter.vue'
 import AuthDialog from '@/components/AuthDialog.vue'
 import ProjectCommentBoard from '@/components/community/ProjectCommentBoard.vue'
 import ProjectAnnotationFeed from '@/components/community/ProjectAnnotationFeed.vue'
+import ProjectConversationFeed from '@/components/community/ProjectConversationFeed.vue'
 import RelatedProjects from '@/components/community/RelatedProjects.vue'
 import { authApi, projectApi, annotationApi, isLoggedIn, getLocalAvatar, ApiError } from '@/api'
+import { isNovelProject, isPptProject } from '@/types/generatedAsset'
+import { resolveNovelFromHistory } from '@/utils/novelStream'
+import {
+  buildNovelSectionLabelMap,
+  enrichAnnotationSectionLabels,
+} from '@/utils/annotationSectionLabels'
+import { extractConversationFeedItems } from '@/utils/projectConversationFeed'
 import { gtmOpenReader } from '@/composables/useGtmDataLayer'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
 import { looksLikeDeckJson } from '@/utils/projectCommunity'
@@ -406,6 +418,44 @@ const relatedSections = ref([])
 const publicAnnotations = ref([])
 const loadingAnnotations = ref(false)
 const annotationError = ref('')
+const conversationHistory = ref([])
+const novelResult = ref(null)
+
+const projectKind = computed(() => {
+  const p = project.value
+  if (!p) return 'unknown'
+  if (isNovelProject(p)) return 'novel'
+  if (isPptProject(p)) return 'ppt'
+  return 'other'
+})
+
+const annotationSectionLabelMap = computed(() => {
+  if (projectKind.value === 'novel') {
+    return buildNovelSectionLabelMap(novelResult.value)
+  }
+  if (projectKind.value === 'ppt') {
+    const map = new Map()
+    const slides = pptData.value?.slides ?? []
+    slides.forEach((slide, index) => {
+      const title = String(slide?.title || '').trim()
+      map.set(
+        `slide-${index}`,
+        t('community.annotationFeed.slideSection', {
+          page: index + 1,
+          title: title || t('community.annotationFeed.untitledSlide'),
+        }),
+      )
+    })
+    return map
+  }
+  return new Map()
+})
+
+const displayAnnotations = computed(() =>
+  enrichAnnotationSectionLabels(publicAnnotations.value, annotationSectionLabelMap.value),
+)
+
+const conversationFeedItems = computed(() => extractConversationFeedItems(conversationHistory.value))
 
 const seo = computed(() => extractBookSeoContent(project.value, pptData.value))
 
@@ -633,6 +683,8 @@ const load = async (id) => {
   relatedSections.value = []
   publicAnnotations.value = []
   annotationError.value = ''
+  conversationHistory.value = []
+  novelResult.value = null
   commentFilter.value = 'ALL'
   try {
     const [proj, list, stats, related, hist] = await Promise.all([
@@ -646,9 +698,14 @@ const load = async (id) => {
     comments.value = list
     communityStats.value = stats
     relatedSections.value = related?.sections ?? []
+    conversationHistory.value = hist ?? []
     projectApi.incrementProjectView(id).catch(() => {})
     loadPptDeck(id, proj, hist)
     void loadPublicAnnotations(id)
+    if (isNovelProject(proj)) {
+      const resolved = await resolveNovelFromHistory(hist, proj)
+      if (resolved) novelResult.value = resolved
+    }
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')
   } finally {

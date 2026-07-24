@@ -652,10 +652,19 @@ export default {
       title: "读者划线与想法",
       subtitle: "所有读者在阅读时的划线与笔记，按时间顺序展示",
       section: "章节：{label}",
+      slideSection: "第 {page} 页：{title}",
+      untitledSlide: "无标题",
       highlightOnly: "（仅划线，未写想法）",
       empty: "暂无划线或想法，打开阅读页选中文字即可记录",
       loadFailed: "加载划线记录失败",
       anonymous: "匿名读者",
+    },
+    conversationFeed: {
+      title: "读者对话",
+      subtitle: "阅读时的划词追问与 AI 解答，按时间顺序展示",
+      aboutTerm: "关于「{term}」",
+      noAnswer: "（暂无回答）",
+      empty: "暂无对话记录，在阅读页选中文字并追问即可生成",
     },
     stats: {
       reading: "阅读",
@@ -683,6 +692,7 @@ export default {
       sameCategory: "同主题推荐",
       recommended: "推荐",
       default: "相关推荐",
+      empty: "暂无相关推荐",
     },
     recommend: {
       title: "Page2Top 阅读推荐值",

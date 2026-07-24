@@ -671,10 +671,19 @@ export default {
       title: "Reader highlights & notes",
       subtitle: "Highlights and notes from all readers, shown in chronological order",
       section: "Section: {label}",
+      slideSection: "Slide {page}: {title}",
+      untitledSlide: "Untitled",
       highlightOnly: "(Highlighted only, no note)",
       empty: "No highlights or notes yet—select text in the reader to add one",
       loadFailed: "Failed to load highlights",
       anonymous: "Anonymous reader",
+    },
+    conversationFeed: {
+      title: "Reader conversations",
+      subtitle: "Selection Q&A from reading, shown in chronological order",
+      aboutTerm: 'About "{term}"',
+      noAnswer: "(No answer yet)",
+      empty: "No conversations yet—select text in the reader and ask a question",
     },
     stats: {
       reading: "Readers",
@@ -702,6 +711,7 @@ export default {
       sameCategory: "More in this topic",
       recommended: "Recommended",
       default: "Related",
+      empty: "No related projects yet",
     },
     recommend: {
       title: "Page2Top recommendation",

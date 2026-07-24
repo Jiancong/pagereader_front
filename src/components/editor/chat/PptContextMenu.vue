@@ -7,6 +7,24 @@
     @contextmenu.prevent
   >
     <div
+      v-if="annotateEnabled"
+      class="ppt-context-menu-item"
+      :class="{ 'ppt-context-menu-item--disabled': !selectionText }"
+      @click="onHighlight"
+    >
+      <span>{{ t("workspace.novelAnnotateHighlight") }}</span>
+    </div>
+    <div
+      v-if="annotateEnabled"
+      class="ppt-context-menu-item"
+      :class="{ 'ppt-context-menu-item--disabled': !selectionText }"
+      @click="onStartNote"
+    >
+      <span>{{ t("workspace.novelAnnotateNote") }}</span>
+    </div>
+    <div v-if="annotateEnabled && selectionText" class="ppt-context-menu-divider" />
+
+    <div
       class="ppt-context-menu-item"
       :class="{ 'ppt-context-menu-item--disabled': !selectionText }"
       @click="onRelatedSearch"
@@ -73,6 +91,28 @@
         <span>{{ t("agent.pptRelatedSearchSubmit") }}</span>
       </button>
     </div>
+
+    <div v-if="annotateEnabled && showNoteInput" class="ppt-context-menu-note">
+      <textarea
+        ref="noteInputRef"
+        v-model="noteText"
+        class="ppt-context-menu-note-input"
+        rows="3"
+        :placeholder="t('workspace.novelAnnotateNotePlaceholder')"
+        @keydown.enter.exact.prevent="onSubmitNote"
+        @keydown.stop
+        @keyup.stop
+        @click.stop
+      />
+      <div class="ppt-context-menu-note-actions">
+        <button type="button" class="ppt-context-menu-note-btn" @click="showNoteInput = false">
+          {{ t("workspace.novelAnnotateCancel") }}
+        </button>
+        <button type="button" class="ppt-context-menu-note-btn ppt-context-menu-note-btn--primary" @click="onSubmitNote">
+          {{ t("workspace.novelAnnotateSave") }}
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -87,21 +127,27 @@ const props = withDefaults(
     x: number;
     y: number;
     selectionText: string;
+    annotateEnabled?: boolean;
     zIndex?: number;
   }>(),
-  { zIndex: 12050 }
+  { annotateEnabled: false, zIndex: 12050 }
 );
 
 const emit = defineEmits<{
   (e: "related-search"): void;
   (e: "custom-search", term: string): void;
+  (e: "highlight"): void;
+  (e: "submit-note", note: string): void;
   (e: "close"): void;
 }>();
 
 const { t } = useI18n();
 
 const queryInputRef = ref<HTMLInputElement | null>(null);
+const noteInputRef = ref<HTMLTextAreaElement | null>(null);
 const queryText = ref("");
+const noteText = ref("");
+const showNoteInput = ref(false);
 
 const selectionPreview = computed(() => {
   const text = props.selectionText.trim();
@@ -114,12 +160,34 @@ watch(
   (visible) => {
     if (visible) {
       queryText.value = props.selectionText.trim();
+      noteText.value = "";
+      showNoteInput.value = false;
       nextTick(() => queryInputRef.value?.focus());
       return;
     }
     queryText.value = "";
+    noteText.value = "";
+    showNoteInput.value = false;
   }
 );
+
+function onHighlight() {
+  if (!props.selectionText.trim()) return;
+  emit("highlight");
+  emit("close");
+}
+
+function onStartNote() {
+  if (!props.selectionText.trim()) return;
+  showNoteInput.value = true;
+  nextTick(() => noteInputRef.value?.focus());
+}
+
+function onSubmitNote() {
+  emit("submit-note", noteText.value.trim());
+  showNoteInput.value = false;
+  emit("close");
+}
 
 function onRelatedSearch() {
   if (!props.selectionText.trim()) return;
@@ -247,5 +315,52 @@ function onCustomSearch() {
 
 .ppt-context-menu-submit-icon {
   flex-shrink: 0;
+}
+
+.ppt-context-menu-note {
+  padding: 0 8px 8px;
+}
+
+.ppt-context-menu-note-input {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 10px;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  background: #1f1f1f;
+  color: #e8e8e8;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+
+  &:focus {
+    border-color: #409eff;
+  }
+}
+
+.ppt-context-menu-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.ppt-context-menu-note-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  background: transparent;
+  color: #e8e8e8;
+  font-size: 12px;
+  cursor: pointer;
+
+  &--primary {
+    background: #409eff;
+    border-color: #409eff;
+    color: #fff;
+  }
 }
 </style>
