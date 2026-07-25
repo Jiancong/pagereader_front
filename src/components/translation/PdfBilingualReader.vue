@@ -36,6 +36,7 @@
           :style="{ height: p.placeholderHeight + 'px' }"
         >
           <div class="pdf-page__inner pdf-page__inner--trans">
+            <canvas class="pdf-page__translation-canvas"></canvas>
             <div class="pdf-page__translationlayer"></div>
             <div v-if="p.translating" class="pdf-page__badge">{{ t('translate.translating') }}</div>
             <div v-else-if="p.translateError" class="pdf-page__badge pdf-page__badge--error">{{ t('translate.error') }}</div>
@@ -270,7 +271,10 @@ async function renderPage(pageNum: number) {
   if (!container) return
   const canvas = container.querySelector<HTMLCanvasElement>('.pdf-page__canvas')
   const textLayer = container.querySelector<HTMLElement>('.pdf-page__textlayer')
-  if (!canvas || !textLayer) return
+  const transCanvas = transScrollRef.value?.querySelector<HTMLCanvasElement>(
+    `.pdf-page[data-page-num="${pageNum}"] .pdf-page__translation-canvas`,
+  )
+  if (!canvas || !textLayer || !transCanvas) return
 
   try {
     const page = await pdfDoc.getPage(pageNum)
@@ -296,6 +300,7 @@ async function renderPage(pageNum: number) {
     const lines = reconstructLines(items)
     const entry = pageMap.get(pageNum)!
     entry.lines = lines
+    copyPageArtworkToTranslationCanvas(canvas, transCanvas, lines, viewport, ratio)
 
     textLayer.style.width = viewport.width + 'px'
     textLayer.style.height = viewport.height + 'px'
@@ -331,6 +336,37 @@ function syncTransPageSize(pageNum: number, viewport: pdfjsLib.PageViewport) {
   if (!transInner) return
   transInner.style.width = viewport.width + 'px'
   transInner.style.height = viewport.height + 'px'
+}
+
+/**
+ * Keep all PDF artwork (images, charts, shapes) in the translation pane.
+ * Only text line boxes are painted white, then the translated text layer
+ * fills those positions.
+ */
+function copyPageArtworkToTranslationCanvas(
+  source: HTMLCanvasElement,
+  target: HTMLCanvasElement,
+  lines: PdfLine[],
+  viewport: pdfjsLib.PageViewport,
+  pixelRatio: number,
+) {
+  target.width = source.width
+  target.height = source.height
+  target.style.width = viewport.width + 'px'
+  target.style.height = viewport.height + 'px'
+
+  const context = target.getContext('2d')
+  if (!context) return
+  context.drawImage(source, 0, 0)
+  context.fillStyle = '#fff'
+
+  for (const line of lines) {
+    const x = line.x * props.scale * pixelRatio
+    const y = (viewport.height - line.y * props.scale) * pixelRatio
+    const width = Math.max(line.width * props.scale, 2) * pixelRatio
+    const height = Math.max(line.height * props.scale * 1.25, 2) * pixelRatio
+    context.fillRect(x - pixelRatio, y - pixelRatio, width + pixelRatio * 2, height)
+  }
 }
 
 function lineFontSize(line: PdfLine): number {
@@ -568,6 +604,11 @@ function cleanupPage(pageNum: number) {
   background: #fff;
 }
 .pdf-page__canvas {
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+.pdf-page__translation-canvas {
   display: block;
   position: relative;
   z-index: 1;
