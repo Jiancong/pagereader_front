@@ -304,8 +304,8 @@ async function renderPage(pageNum: number) {
       const span = document.createElement('span')
       span.textContent = line.text
       span.style.position = 'absolute'
-      span.style.left = line.x + 'px'
-      span.style.top = viewport.height - line.y + 'px'
+      span.style.left = line.x * props.scale + 'px'
+      span.style.top = viewport.height - line.y * props.scale + 'px'
       span.style.fontSize = Math.max(8, line.height * props.scale * 0.9) + 'px'
       span.style.whiteSpace = 'nowrap'
       span.style.color = 'transparent'
@@ -338,7 +338,7 @@ function lineFontSize(line: PdfLine): number {
 }
 
 function isLineCentered(line: PdfLine, pageWidth: number): boolean {
-  const mid = line.x + line.width / 2
+  const mid = (line.x + line.width / 2) * props.scale
   return Math.abs(mid - pageWidth / 2) < pageWidth * 0.1
 }
 
@@ -348,6 +348,16 @@ function fontFamilyForLang(lang: string): string {
   if (lang === 'ar') return '"Noto Naskh Arabic", "Noto Sans Arabic", serif'
   if (lang === 'hi') return '"Noto Serif Devanagari", "Noto Sans Devanagari", serif'
   return '"Noto Serif", "Times New Roman", Times, serif'
+}
+
+function fitFontSize(text: string, fontSize: number, maxWidth: number, fontFamily: string): number {
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d')
+  if (!context || maxWidth <= 0) return fontSize
+
+  context.font = `${fontSize}px ${fontFamily}`
+  const width = context.measureText(text).width
+  return width > maxWidth ? Math.max(6, fontSize * (maxWidth / width)) : fontSize
 }
 
 async function translateCurrentPage() {
@@ -439,14 +449,18 @@ function renderTranslations(
     const tr = translations[idx]
     if (!tr || !tr.trim()) return
 
-    const fontSize = lineFontSize(line)
+    const x = line.x * props.scale
+    const width = Math.max(line.width * props.scale, 40)
+    const top = viewport.height - line.y * props.scale
     const centered = isLineCentered(line, viewport.width)
+    const baseFontSize = lineFontSize(line)
+    const fontSize = fitFontSize(tr, baseFontSize, width, fontFamily)
     const span = document.createElement('span')
     span.textContent = tr
     span.style.position = 'absolute'
-    span.style.left = line.x + 'px'
-    span.style.top = (viewport.height - line.y) + 'px'
-    span.style.width = Math.max(line.width, 40) + 'px'
+    span.style.left = x + 'px'
+    span.style.top = top + 'px'
+    span.style.width = width + 'px'
     span.style.fontSize = fontSize + 'px'
     span.style.lineHeight = '1'
     span.style.fontFamily = fontFamily
@@ -456,12 +470,12 @@ function renderTranslations(
 
     if (centered) {
       span.style.textAlign = 'center'
-      span.style.whiteSpace = 'normal'
-      span.style.wordBreak = 'break-word'
     } else {
       span.style.textAlign = 'left'
-      span.style.whiteSpace = 'nowrap'
     }
+    // Preserve the source line box: long translations shrink instead of wrapping
+    // onto the next source line.
+    span.style.whiteSpace = 'nowrap'
 
     if (props.targetLang === 'ar') {
       span.style.direction = 'rtl'
