@@ -7,20 +7,39 @@
       {{ loadError }}
     </div>
 
-    <div v-show="!loading && !loadError" class="pdf-bilingual-reader__scroll" ref="scrollRef">
-      <div
-        v-for="p in pageSlots"
-        :key="p.pageNum"
-        class="pdf-page"
-        :data-page-num="p.pageNum"
-        :style="{ height: p.placeholderHeight + 'px' }"
-      >
-        <div class="pdf-page__inner">
-          <canvas class="pdf-page__canvas"></canvas>
-          <div class="pdf-page__textlayer"></div>
-          <div class="pdf-page__translationlayer" v-show="targetLang"></div>
-          <div v-if="p.translating" class="pdf-page__badge">{{ t('translate.translating') }}</div>
-          <div v-else-if="p.translateError" class="pdf-page__badge pdf-page__badge--error">{{ t('translate.error') }}</div>
+    <div v-show="!loading && !loadError" class="pdf-bilingual-reader__split">
+      <!-- 左：原文 -->
+      <div class="pdf-bilingual-reader__pane" ref="origScrollRef">
+        <div class="pdf-bilingual-reader__pane-label">{{ t('translate.original') }}</div>
+        <div
+          v-for="p in pageSlots"
+          :key="'o' + p.pageNum"
+          class="pdf-page"
+          :data-page-num="p.pageNum"
+          :style="{ height: p.placeholderHeight + 'px' }"
+        >
+          <div class="pdf-page__inner">
+            <canvas class="pdf-page__canvas"></canvas>
+            <div class="pdf-page__textlayer"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右：译文 -->
+      <div class="pdf-bilingual-reader__pane" ref="transScrollRef">
+        <div class="pdf-bilingual-reader__pane-label pdf-bilingual-reader__pane-label--trans">{{ t('translate.translation') }}</div>
+        <div
+          v-for="p in pageSlots"
+          :key="'t' + p.pageNum"
+          class="pdf-page pdf-page--trans"
+          :data-page-num="p.pageNum"
+          :style="{ height: p.placeholderHeight + 'px' }"
+        >
+          <div class="pdf-page__inner pdf-page__inner--trans">
+            <div class="pdf-page__translationlayer"></div>
+            <div v-if="p.translating" class="pdf-page__badge">{{ t('translate.translating') }}</div>
+            <div v-else-if="p.translateError" class="pdf-page__badge pdf-page__badge--error">{{ t('translate.error') }}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -54,7 +73,8 @@ const props = defineProps<{
 const { t } = useI18n()
 
 const rootRef = ref<HTMLElement | null>(null)
-const scrollRef = ref<HTMLElement | null>(null)
+const origScrollRef = ref<HTMLElement | null>(null)
+const transScrollRef = ref<HTMLElement | null>(null)
 const loading = ref(true)
 const loadError = ref('')
 const fileHash = ref('')
@@ -76,6 +96,7 @@ const renderedPages = new Set<number>()
 const pageVisibility = new Map<number, number>()
 let renderObserver: IntersectionObserver | null = null
 let pageTrackObserver: IntersectionObserver | null = null
+let syncingScroll = false
 
 onMounted(async () => {
   try {
@@ -84,7 +105,6 @@ onMounted(async () => {
     loadingTask = task
     pdfDoc = await task.promise
     const numPages = pdfDoc.numPages
-    // 先用默认 viewport 占位高度，避免滚动跳动
     const firstPage = await pdfDoc.getPage(1)
     const baseViewport = firstPage.getViewport({ scale: props.scale })
     const placeholderHeight = baseViewport.height
@@ -101,6 +121,7 @@ onMounted(async () => {
     loading.value = false
     await nextTick()
     setupObservers()
+    setupScrollSync()
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e)
     loading.value = false
@@ -132,19 +153,8 @@ watch(currentPageNum, (pageNum) => {
   void translateCurrentPage()
 })
 
-function clearNonCurrentTranslationLayers() {
-  if (!scrollRef.value) return
-  scrollRef.value.querySelectorAll<HTMLElement>('.pdf-page').forEach((container) => {
-    const pageNum = Number(container.dataset.pageNum)
-    if (pageNum === currentPageNum.value) return
-    const transLayer = container.querySelector<HTMLElement>('.pdf-page__translationlayer')
-    if (transLayer) transLayer.innerHTML = ''
-  })
-}
-
 watch(() => props.scale, async () => {
   if (!pdfDoc) return
-  // 重置已渲染页，触发重新渲染
   renderedPages.clear()
   pageMap.clear()
   pageVisibility.clear()
@@ -160,10 +170,10 @@ watch(() => props.scale, async () => {
   pageMap.set(1, { viewport: vp, lines: [], translations: [] })
   await nextTick()
   setupObservers()
+  void translateCurrentPage()
 })
 
 watch(() => props.showOriginal, () => {
-  // 切换原文显示：仅切 canvas 可见性，译文层不变
   document
     .querySelectorAll<HTMLCanvasElement>('.pdf-page__canvas')
     .forEach((c) => {
@@ -171,10 +181,38 @@ watch(() => props.showOriginal, () => {
     })
 })
 
+function setupScrollSync() {
+  const orig = origScrollRef.value
+  const trans = transScrollRef.value
+  if (!orig || !trans) return
+  orig.addEventListener('scroll', () => {
+    if (syncingScroll) return
+    syncingScroll = true
+    trans.scrollTop = orig.scrollTop
+    requestAnimationFrame(() => { syncingScroll = false })
+  })
+  trans.addEventListener('scroll', () => {
+    if (syncingScroll) return
+    syncingScroll = true
+    orig.scrollTop = trans.scrollTop
+    requestAnimationFrame(() => { syncingScroll = false })
+  })
+}
+
+function clearNonCurrentTranslationLayers() {
+  if (!transScrollRef.value) return
+  transScrollRef.value.querySelectorAll<HTMLElement>('.pdf-page').forEach((container) => {
+    const pageNum = Number(container.dataset.pageNum)
+    if (pageNum === currentPageNum.value) return
+    const transLayer = container.querySelector<HTMLElement>('.pdf-page__translationlayer')
+    if (transLayer) transLayer.innerHTML = ''
+  })
+}
+
 function setupObservers() {
   renderObserver?.disconnect()
   pageTrackObserver?.disconnect()
-  if (!scrollRef.value) return
+  if (!origScrollRef.value) return
 
   renderObserver = new IntersectionObserver(
     (entries) => {
@@ -189,7 +227,7 @@ function setupObservers() {
         }
       })
     },
-    { root: scrollRef.value, rootMargin: '200px' },
+    { root: origScrollRef.value, rootMargin: '200px' },
   )
 
   pageTrackObserver = new IntersectionObserver(
@@ -211,10 +249,10 @@ function setupObservers() {
         currentPageNum.value = bestPage
       }
     },
-    { root: scrollRef.value, threshold: [0, 0.25, 0.5, 0.75, 1] },
+    { root: origScrollRef.value, threshold: [0, 0.25, 0.5, 0.75, 1] },
   )
 
-  const containers = scrollRef.value.querySelectorAll<HTMLElement>('.pdf-page')
+  const containers = origScrollRef.value.querySelectorAll<HTMLElement>('.pdf-page')
   containers.forEach((c) => {
     renderObserver!.observe(c)
     pageTrackObserver!.observe(c)
@@ -226,14 +264,13 @@ async function renderPage(pageNum: number) {
   renderedPages.add(pageNum)
   const slot = pageSlots.find((s) => s.pageNum === pageNum)
   if (!slot) return
-  const container = scrollRef.value?.querySelector<HTMLElement>(
+  const container = origScrollRef.value?.querySelector<HTMLElement>(
     `.pdf-page[data-page-num="${pageNum}"]`,
   )
   if (!container) return
   const canvas = container.querySelector<HTMLCanvasElement>('.pdf-page__canvas')
   const textLayer = container.querySelector<HTMLElement>('.pdf-page__textlayer')
-  const transLayer = container.querySelector<HTMLElement>('.pdf-page__translationlayer')
-  if (!canvas || !textLayer || !transLayer) return
+  if (!canvas || !textLayer) return
 
   try {
     const page = await pdfDoc.getPage(pageNum)
@@ -254,14 +291,12 @@ async function renderPage(pageNum: number) {
     })
     await renderTask.promise
 
-    // 取文本并重建行
     const textContent = await page.getTextContent()
     const items = textContent.items as unknown as PdfTextItem[]
     const lines = reconstructLines(items)
     const entry = pageMap.get(pageNum)!
     entry.lines = lines
 
-    // 渲染原文 textLayer（透明，便于复制）
     textLayer.style.width = viewport.width + 'px'
     textLayer.style.height = viewport.height + 'px'
     textLayer.innerHTML = ''
@@ -269,7 +304,6 @@ async function renderPage(pageNum: number) {
       const span = document.createElement('span')
       span.textContent = line.text
       span.style.position = 'absolute'
-      // PDF 坐标系 y 向上，DOM y 向下，需翻转
       span.style.left = line.x + 'px'
       span.style.top = viewport.height - line.y + 'px'
       span.style.fontSize = Math.max(8, line.height * props.scale * 0.9) + 'px'
@@ -294,7 +328,7 @@ async function translateCurrentPage() {
   const entry = pageMap.get(pageNum)
   if (!slot || !entry || !entry.lines.length || !props.targetLang) return
 
-  const container = scrollRef.value?.querySelector<HTMLElement>(
+  const container = transScrollRef.value?.querySelector<HTMLElement>(
     `.pdf-page[data-page-num="${pageNum}"]`,
   )
   const transLayer = container?.querySelector<HTMLElement>('.pdf-page__translationlayer')
@@ -303,42 +337,11 @@ async function translateCurrentPage() {
   await translatePage(pageNum, entry.lines, transLayer, entry.viewport)
 }
 
-const CACHE_SCHEMA = 'v2'
+const CACHE_SCHEMA = 'v3'
 
 function cacheMatchesTexts(cached: { lines: string[]; translations: string[] }, texts: string[]): boolean {
   if (cached.translations.length !== texts.length || cached.lines.length !== texts.length) return false
   return cached.lines.every((line, i) => line === texts[i])
-}
-
-function computeTranslationPlacement(
-  line: PdfLine,
-  viewport: pdfjsLib.PageViewport,
-  trText: string,
-): { left: number; top: number; maxWidth: number; fontSize: number } {
-  const origTop = viewport.height - line.y
-  const lineBoxHeight = line.height * props.scale
-  const fontSize = Math.max(7, line.height * props.scale * 0.82)
-  const gap = 3
-
-  const besideX = line.x + Math.max(line.width, line.text.length * fontSize * 0.45) + gap
-  const shortLine = line.text.length <= 6 && trText.length <= 12
-  const roomBeside = besideX + 40 < viewport.width * 0.92
-
-  if (shortLine && roomBeside) {
-    return {
-      left: besideX,
-      top: origTop,
-      maxWidth: viewport.width - besideX - 8,
-      fontSize,
-    }
-  }
-
-  return {
-    left: line.x,
-    top: origTop + lineBoxHeight + gap,
-    maxWidth: Math.max(line.width, viewport.width - line.x - 8),
-    fontSize,
-  }
 }
 
 async function translatePage(
@@ -374,19 +377,12 @@ async function translatePage(
   slot.translating = true
   slot.translateError = false
   try {
-    const res = await translateBatch({
-      texts,
-      targetLang: props.targetLang,
-    })
+    const res = await translateBatch({ texts, targetLang: props.targetLang })
     const translations = res.translations ?? []
     if (translations.length !== texts.length) {
       throw new Error('translation length mismatch')
     }
-    await putCachedTranslation(key, {
-      lines: texts,
-      translations,
-      ts: Date.now(),
-    })
+    await putCachedTranslation(key, { lines: texts, translations, ts: Date.now() })
     const entry = pageMap.get(pageNum)
     if (entry) entry.translations = translations
     renderTranslations(translatable, translations, transLayer, viewport)
@@ -412,32 +408,32 @@ function renderTranslations(
     const tr = translations[idx]
     if (!tr || !tr.trim()) return
 
-    const { left, top, maxWidth, fontSize } = computeTranslationPlacement(line, viewport, tr)
+    const fontSize = Math.max(8, line.height * props.scale * 0.9)
     const span = document.createElement('span')
     span.textContent = tr
-    span.className = 'pdf-page__translation'
     span.style.position = 'absolute'
-    span.style.left = left + 'px'
-    span.style.top = top + 'px'
-    span.style.maxWidth = maxWidth + 'px'
+    span.style.left = line.x + 'px'
+    span.style.top = (viewport.height - line.y) + 'px'
+    span.style.maxWidth = (viewport.width - line.x - 4) + 'px'
     span.style.fontSize = fontSize + 'px'
     span.style.lineHeight = '1.3'
     span.style.whiteSpace = 'normal'
     span.style.wordBreak = 'break-word'
-    span.style.fontFamily = '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif'
-    span.style.color = '#1d4ed8'
+    span.style.fontFamily = '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans", sans-serif'
+    if (props.targetLang === 'ar') {
+      span.style.direction = 'rtl'
+      span.style.fontFamily = '"Noto Naskh Arabic", "Noto Sans Arabic", sans-serif'
+    } else if (props.targetLang === 'hi') {
+      span.style.fontFamily = '"Noto Sans Devanagari", "Noto Sans", sans-serif'
+    }
+    span.style.color = '#1e3a8a'
     span.style.fontWeight = '500'
-    span.style.background = 'rgba(239, 246, 255, 0.88)'
-    span.style.padding = '1px 3px'
-    span.style.borderRadius = '2px'
-    span.style.borderLeft = '2px solid #93c5fd'
     transLayer.appendChild(span)
   })
 }
 
 function cleanupPage(pageNum: number) {
-  // 离开视口释放 canvas 内存，保留译文缓存
-  const container = scrollRef.value?.querySelector<HTMLElement>(
+  const container = origScrollRef.value?.querySelector<HTMLElement>(
     `.pdf-page[data-page-num="${pageNum}"]`,
   )
   const canvas = container?.querySelector<HTMLCanvasElement>('.pdf-page__canvas')
@@ -458,14 +454,40 @@ function cleanupPage(pageNum: number) {
   background: #525659;
   overflow: hidden;
 }
-.pdf-bilingual-reader__scroll {
+.pdf-bilingual-reader__split {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+.pdf-bilingual-reader__pane {
+  flex: 1 1 50%;
   height: 100%;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 8px 12px 12px;
+  position: relative;
+}
+.pdf-bilingual-reader__pane:nth-child(2) {
+  padding: 12px 12px 12px 8px;
+}
+.pdf-bilingual-reader__pane-label {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  align-self: center;
+  margin-bottom: 4px;
+  padding: 2px 10px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 11px;
+  pointer-events: none;
+}
+.pdf-bilingual-reader__pane-label--trans {
+  background: rgba(30, 58, 138, 0.85);
 }
 .pdf-bilingual-reader__placeholder {
   display: flex;
@@ -489,6 +511,9 @@ function cleanupPage(pageNum: number) {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
   background: #fff;
 }
+.pdf-page__inner--trans {
+  background: #f8fafc;
+}
 .pdf-page__canvas {
   display: block;
   position: relative;
@@ -505,7 +530,8 @@ function cleanupPage(pageNum: number) {
   position: absolute;
   inset: 0;
   z-index: 3;
-  pointer-events: none;
+  pointer-events: auto;
+  user-select: text;
 }
 .pdf-page__badge {
   position: absolute;

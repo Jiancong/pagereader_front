@@ -662,6 +662,8 @@ export default {
     back: "Back",
     targetLang: "Target language",
     showOriginal: "Show original",
+    original: "Original",
+    translation: "Translation",
     langZh: "Chinese",
     langEn: "English",
     langJa: "Japanese",

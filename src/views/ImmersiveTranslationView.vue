@@ -17,11 +17,6 @@
           </select>
         </label>
 
-        <label class="it-field it-field--toggle">
-          <input type="checkbox" v-model="showOriginal" />
-          <span>{{ t('translate.showOriginal') }}</span>
-        </label>
-
         <div class="it-field it-field--zoom">
           <button class="it-btn it-btn--sm" @click="zoomOut" :disabled="scale <= 0.5">−</button>
           <span class="it-zoom-value">{{ Math.round(scale * 100) }}%</span>
@@ -42,7 +37,7 @@
       :file="file"
       :object-url="objectUrl"
       :target-lang="targetLang"
-      :show-original="showOriginal"
+      :show-original="true"
       :scale="scale"
     />
   </div>
@@ -63,14 +58,20 @@ const file = computed(() => store.file)
 const objectUrl = computed(() => store.objectUrl)
 const fileName = computed(() => store.file?.name ?? '')
 
-const targetLang = ref<'zh' | 'en' | 'ja'>(locale.value === 'en' ? 'en' : 'zh')
-const showOriginal = ref(true)
+const targetLang = ref<string>(locale.value === 'en' ? 'en' : 'zh')
 const scale = ref(1.2)
 
 const langOptions = computed(() => [
   { value: 'zh', label: t('translate.langZh') },
   { value: 'en', label: t('translate.langEn') },
   { value: 'ja', label: t('translate.langJa') },
+  { value: 'es', label: 'Español' },
+  { value: 'fr', label: 'Français' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'ru', label: 'Русский' },
+  { value: 'ar', label: 'العربية' },
+  { value: 'pt', label: 'Português' },
+  { value: 'hi', label: 'हिन्दी' },
 ])
 
 function zoomIn() {

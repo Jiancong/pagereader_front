@@ -643,6 +643,8 @@ export default {
     back: "返回",
     targetLang: "目标语言",
     showOriginal: "显示原文",
+    original: "原文",
+    translation: "译文",
     langZh: "中文",
     langEn: "英文",
     langJa: "日文",
