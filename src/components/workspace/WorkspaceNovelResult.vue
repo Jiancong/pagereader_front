@@ -208,6 +208,7 @@ import { useNovelGuidePlayAll } from "@/composables/useNovelGuidePlayAll"
 import { downloadMarkdownFile, sanitizeDownloadBasename } from "@/utils/downloadMarkdownFile"
 import { buildNovelGuideOutline } from "@/utils/novelGuideSections"
 import type { NovelGuideOutlineItem } from "@/utils/novelGuideSections"
+import { normalizeNovelGuideMarkdown } from "@/utils/novelMarkdownHeadings"
 import {
   restoreHighlights,
   resolveAnnotationIdFromTarget,
@@ -284,7 +285,7 @@ const activeSectionTurns = computed(() => {
   if (activeSection.value?.kind === "outline" && activeSection.value.outlineItems?.length) {
     return []
   }
-  const markdown = activeSection.value?.markdown || ""
+  const markdown = normalizeNovelGuideMarkdown(activeSection.value?.markdown || "")
   const turns = splitOutlineSpeakerTurns(markdown)
   return turns.length ? turns : markdown ? [markdown] : []
 })

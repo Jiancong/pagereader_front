@@ -2,7 +2,7 @@
 // @author hc
 
 import type { NovelNode } from "@/utils/novelStream"
-import { demoteH2ToH3InSectionBody } from "@/utils/novelMarkdownHeadings"
+import { demoteH2ToH3InSectionBody, normalizeNovelGuideMarkdown } from "@/utils/novelMarkdownHeadings"
 
 export type NovelGuideSectionKind = "summary" | "characters" | "chapter" | "qa" | "outline" | "generic"
 
@@ -158,7 +158,7 @@ function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
         id: isSummary ? "summary" : slugify(heading || nodeKey || "section"),
         kind: isSummary ? "summary" : "generic",
         label: heading || (isSummary ? "全书摘要" : "内容"),
-        markdown: pickString(node.text),
+        markdown: normalizeNovelGuideMarkdown(pickString(node.text)),
       })
       continue
     }
@@ -199,7 +199,7 @@ function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
           id: `chapter-${chapter.index ?? index + 1}`,
           kind: "chapter",
           label: chapterTitle,
-          markdown: text,
+          markdown: normalizeNovelGuideMarkdown(text),
         })
       })
       continue
@@ -223,7 +223,7 @@ function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
         id: slugify(heading || nodeKey || `section-${sections.length}`) || `section-${sections.length}`,
         kind: "generic",
         label: heading || "内容",
-        markdown: fallback,
+        markdown: normalizeNovelGuideMarkdown(fallback),
       })
     }
   }
@@ -244,7 +244,7 @@ function parseMarkdownSections(markdown: string): NovelGuideSection[] {
   const h2Matches = [...body.matchAll(/^##\s+(.+)$/gm)]
   if (!h2Matches.length) {
     return body
-      ? [{ id: "content", kind: "generic", label: "导读", markdown: body }]
+      ? [{ id: "content", kind: "generic", label: "导读", markdown: normalizeNovelGuideMarkdown(body) }]
       : []
   }
 
@@ -266,7 +266,7 @@ function parseMarkdownSections(markdown: string): NovelGuideSection[] {
           id: `chapter-${slugify(label) || index + 1}`,
           kind: "chapter",
           label: truncateLabel(label),
-          markdown: block.markdown,
+          markdown: normalizeNovelGuideMarkdown(block.markdown),
         })
       })
       continue
@@ -277,7 +277,7 @@ function parseMarkdownSections(markdown: string): NovelGuideSection[] {
         id: "qa",
         kind: "qa",
         label: heading,
-        markdown: sectionBody,
+        markdown: normalizeNovelGuideMarkdown(sectionBody),
       })
       continue
     }
@@ -286,7 +286,7 @@ function parseMarkdownSections(markdown: string): NovelGuideSection[] {
       id: slugify(heading) || `section-${sections.length}`,
       kind: inferred === "generic" ? "generic" : inferred,
       label: heading,
-      markdown: sectionBody,
+      markdown: normalizeNovelGuideMarkdown(sectionBody),
     })
   }
 
