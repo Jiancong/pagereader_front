@@ -362,10 +362,19 @@ function copyPageArtworkToTranslationCanvas(
 
   for (const line of lines) {
     const x = line.x * props.scale * pixelRatio
-    const y = (viewport.height - line.y * props.scale) * pixelRatio
+    const fontSize = lineFontSize(line)
+    // PDF 的 y 是文本基线；右栏必须彻底移除原文，故遮罩覆盖
+    // 基线上方的完整字形范围并留出少量边距。
+    const y = (viewport.height - line.y * props.scale - fontSize * 1.25) * pixelRatio
     const width = Math.max(line.width * props.scale, 2) * pixelRatio
-    const height = Math.max(line.height * props.scale * 1.25, 2) * pixelRatio
-    context.fillRect(x - pixelRatio, y - pixelRatio, width + pixelRatio * 2, height)
+    const height = Math.max(fontSize * 1.85, line.height * props.scale * 2, 2) * pixelRatio
+    const horizontalPadding = pixelRatio * 3
+    context.fillRect(
+      x - horizontalPadding,
+      y - pixelRatio,
+      width + horizontalPadding * 2,
+      height,
+    )
   }
 }
 
@@ -487,9 +496,10 @@ function renderTranslations(
 
     const x = line.x * props.scale
     const width = Math.max(line.width * props.scale, 40)
-    const top = viewport.height - line.y * props.scale
-    const centered = isLineCentered(line, viewport.width)
     const baseFontSize = lineFontSize(line)
+    // 与 PDF 原文一样，以基线为锚点后上移一个字号。
+    const top = viewport.height - line.y * props.scale - baseFontSize
+    const centered = isLineCentered(line, viewport.width)
     const fontSize = fitFontSize(tr, baseFontSize, width, fontFamily)
     const span = document.createElement('span')
     span.textContent = tr
