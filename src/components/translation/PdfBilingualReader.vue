@@ -67,12 +67,15 @@ interface PageSlot {
   translateError: boolean
 }
 const pageSlots = reactive<PageSlot[]>([])
+const currentPageNum = ref(1)
 
 let pdfDoc: pdfjsLib.PDFDocumentProxy | null = null
 let loadingTask: pdfjsLib.PDFDocumentLoadingTask | null = null
 const pageMap = new Map<number, { viewport: pdfjsLib.PageViewport; lines: PdfLine[]; translations: string[] }>()
 const renderedPages = new Set<number>()
-let observer: IntersectionObserver | null = null
+const pageVisibility = new Map<number, number>()
+let renderObserver: IntersectionObserver | null = null
+let pageTrackObserver: IntersectionObserver | null = null
 
 onMounted(async () => {
   try {
@@ -97,7 +100,7 @@ onMounted(async () => {
     pageMap.set(1, { viewport: baseViewport, lines: [], translations: [] })
     loading.value = false
     await nextTick()
-    setupObserver()
+    setupObservers()
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e)
     loading.value = false
@@ -105,15 +108,46 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  observer?.disconnect()
+  renderObserver?.disconnect()
+  pageTrackObserver?.disconnect()
   loadingTask?.destroy().catch(() => {})
 })
+
+watch(() => props.targetLang, () => {
+  pageSlots.forEach((slot) => {
+    slot.translating = false
+    slot.translateError = false
+  })
+  void translateCurrentPage()
+})
+
+watch(currentPageNum, (pageNum) => {
+  pageSlots.forEach((slot) => {
+    if (slot.pageNum !== pageNum) {
+      slot.translating = false
+      slot.translateError = false
+    }
+  })
+  clearNonCurrentTranslationLayers()
+  void translateCurrentPage()
+})
+
+function clearNonCurrentTranslationLayers() {
+  if (!scrollRef.value) return
+  scrollRef.value.querySelectorAll<HTMLElement>('.pdf-page').forEach((container) => {
+    const pageNum = Number(container.dataset.pageNum)
+    if (pageNum === currentPageNum.value) return
+    const transLayer = container.querySelector<HTMLElement>('.pdf-page__translationlayer')
+    if (transLayer) transLayer.innerHTML = ''
+  })
+}
 
 watch(() => props.scale, async () => {
   if (!pdfDoc) return
   // 重置已渲染页，触发重新渲染
   renderedPages.clear()
   pageMap.clear()
+  pageVisibility.clear()
   const firstPage = await pdfDoc.getPage(1)
   const vp = firstPage.getViewport({ scale: props.scale })
   const ph = vp.height
@@ -125,7 +159,7 @@ watch(() => props.scale, async () => {
   })
   pageMap.set(1, { viewport: vp, lines: [], translations: [] })
   await nextTick()
-  setupObserver()
+  setupObservers()
 })
 
 watch(() => props.showOriginal, () => {
@@ -137,10 +171,12 @@ watch(() => props.showOriginal, () => {
     })
 })
 
-function setupObserver() {
-  observer?.disconnect()
+function setupObservers() {
+  renderObserver?.disconnect()
+  pageTrackObserver?.disconnect()
   if (!scrollRef.value) return
-  observer = new IntersectionObserver(
+
+  renderObserver = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         const el = entry.target as HTMLElement
@@ -155,8 +191,34 @@ function setupObserver() {
     },
     { root: scrollRef.value, rootMargin: '200px' },
   )
+
+  pageTrackObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        const pageNum = Number((entry.target as HTMLElement).dataset.pageNum)
+        if (!pageNum) return
+        pageVisibility.set(pageNum, entry.isIntersecting ? entry.intersectionRatio : 0)
+      })
+      let bestPage = currentPageNum.value
+      let bestRatio = 0
+      pageVisibility.forEach((ratio, pageNum) => {
+        if (ratio > bestRatio) {
+          bestRatio = ratio
+          bestPage = pageNum
+        }
+      })
+      if (bestRatio > 0 && bestPage !== currentPageNum.value) {
+        currentPageNum.value = bestPage
+      }
+    },
+    { root: scrollRef.value, threshold: [0, 0.25, 0.5, 0.75, 1] },
+  )
+
   const containers = scrollRef.value.querySelectorAll<HTMLElement>('.pdf-page')
-  containers.forEach((c) => observer!.observe(c))
+  containers.forEach((c) => {
+    renderObserver!.observe(c)
+    pageTrackObserver!.observe(c)
+  })
 }
 
 async function renderPage(pageNum: number) {
@@ -218,11 +280,27 @@ async function renderPage(pageNum: number) {
 
     slot.rendered = true
 
-    // 翻译
-    void translatePage(pageNum, lines, transLayer, viewport)
-  } catch (e) {
+    if (pageNum === currentPageNum.value) {
+      void translateCurrentPage()
+    }
+  } catch {
     slot.translateError = true
   }
+}
+
+async function translateCurrentPage() {
+  const pageNum = currentPageNum.value
+  const slot = pageSlots.find((s) => s.pageNum === pageNum)
+  const entry = pageMap.get(pageNum)
+  if (!slot || !entry || !entry.lines.length || !props.targetLang) return
+
+  const container = scrollRef.value?.querySelector<HTMLElement>(
+    `.pdf-page[data-page-num="${pageNum}"]`,
+  )
+  const transLayer = container?.querySelector<HTMLElement>('.pdf-page__translationlayer')
+  if (!transLayer) return
+
+  await translatePage(pageNum, entry.lines, transLayer, entry.viewport)
 }
 
 async function translatePage(
@@ -232,20 +310,31 @@ async function translatePage(
   viewport: pdfjsLib.PageViewport,
 ) {
   const slot = pageSlots.find((s) => s.pageNum === pageNum)
-  if (!slot) return
-  const texts = lines.map((l) => l.text).filter((s) => s.trim().length > 0)
+  if (!slot || pageNum !== currentPageNum.value) return
+
+  const translatable = lines
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => line.text.trim().length > 0)
+  const texts = translatable.map(({ line }) => line.text)
+
   if (texts.length === 0 || !props.targetLang) {
     transLayer.innerHTML = ''
+    slot.translateError = false
     return
   }
+
   const key = buildCacheKey(fileHash.value, pageNum, props.targetLang)
-  // 缓存命中
   const cached = await getCachedTranslation(key)
   if (cached && cached.translations.length === texts.length) {
-    renderTranslations(lines, cached.translations, transLayer, viewport)
+    slot.translateError = false
+    renderTranslations(translatable, cached.translations, transLayer, viewport)
+    const entry = pageMap.get(pageNum)
+    if (entry) entry.translations = cached.translations
     return
   }
+
   slot.translating = true
+  slot.translateError = false
   try {
     const res = await translateBatch({
       texts,
@@ -255,23 +344,24 @@ async function translatePage(
     if (translations.length !== texts.length) {
       throw new Error('translation length mismatch')
     }
-    void putCachedTranslation(key, {
+    await putCachedTranslation(key, {
       lines: texts,
       translations,
       ts: Date.now(),
     })
     const entry = pageMap.get(pageNum)
     if (entry) entry.translations = translations
-    renderTranslations(lines, translations, transLayer, viewport)
-  } catch (e) {
+    renderTranslations(translatable, translations, transLayer, viewport)
+  } catch {
     slot.translateError = true
+    transLayer.innerHTML = ''
   } finally {
     slot.translating = false
   }
 }
 
 function renderTranslations(
-  lines: PdfLine[],
+  translatable: Array<{ line: PdfLine; index: number }>,
   translations: string[],
   transLayer: HTMLElement,
   viewport: pdfjsLib.PageViewport,
@@ -280,14 +370,13 @@ function renderTranslations(
   transLayer.style.width = viewport.width + 'px'
   transLayer.style.height = viewport.height + 'px'
   const fontSize = Math.max(7, 9 * props.scale)
-  lines.forEach((line, idx) => {
+  translatable.forEach(({ line }, idx) => {
     const tr = translations[idx]
     if (!tr || !tr.trim()) return
     const span = document.createElement('span')
     span.textContent = tr
     span.style.position = 'absolute'
     span.style.left = line.x + 'px'
-    // 译文叠在原文行下方
     span.style.top = viewport.height - line.y + line.height * props.scale + 'px'
     span.style.maxWidth = viewport.width - line.x + 'px'
     span.style.fontSize = fontSize + 'px'
