@@ -68,42 +68,54 @@ export function reconstructLines(items: PdfTextItem[]): PdfLine[] {
     const sorted = [...cluster].sort(
       (a, b) => a.transform[4] - b.transform[4],
     )
-    const first = sorted[0]
-    const last = sorted[sorted.length - 1]
-    const x = first.transform[4]
-    const y = first.transform[5]
-    const width = last.transform[4] + last.width - x
-    const height = sorted.reduce(
+    const clusterY = sorted[0].transform[5]
+    const clusterHeight = sorted.reduce(
       (m, it) => Math.max(m, it.height || 0),
       0,
     )
 
-    let text = ""
-    let prevEndX = first.transform[4]
+    let segStartX = sorted[0].transform[4]
+    let segText = ""
+    let prevEndX = sorted[0].transform[4]
     let prevHadSpace = false
+
+    const flush = () => {
+      const trimmed = segText.trim()
+      if (!trimmed) return
+      const segEndX = prevEndX
+      lines.push({
+        text: trimmed,
+        x: segStartX,
+        y: clusterY,
+        width: segEndX - segStartX,
+        height: clusterHeight,
+      })
+      segText = ""
+    }
+
     for (let i = 0; i < sorted.length; i++) {
       const it = sorted[i]
       const startX = it.transform[4]
       if (i > 0) {
         const gap = startX - prevEndX
         if (gap >= BREAK_GAP) {
-          // 间距过大：单独成新行（避免把不相关的列拼进来）
-          lines.push({ text: text.trim(), x, y, width, height })
-          text = ""
+          flush()
+          segStartX = startX
         } else if (gap > JOIN_GAP) {
-          if (!prevHadSpace && !text.endsWith(" ")) text += " "
+          if (!prevHadSpace && !segText.endsWith(" ")) segText += " "
         }
       }
-      text += it.str
+      segText += it.str
       prevEndX = startX + it.width
       prevHadSpace = it.str.endsWith(" ")
       if (it.hasEOL) {
-        lines.push({ text: text.trim(), x, y, width, height })
-        text = ""
+        flush()
+        if (i + 1 < sorted.length) {
+          segStartX = sorted[i + 1].transform[4]
+        }
       }
     }
-    const trimmed = text.trim()
-    if (trimmed) lines.push({ text: trimmed, x, y, width, height })
+    flush()
   }
 
   // 3. 按 Y 降序（PDF 坐标系 y 向上，阅读顺序自上而下）

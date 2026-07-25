@@ -369,24 +369,27 @@ function renderTranslations(
   transLayer.innerHTML = ''
   transLayer.style.width = viewport.width + 'px'
   transLayer.style.height = viewport.height + 'px'
-  const fontSize = Math.max(7, 9 * props.scale)
+
   translatable.forEach(({ line }, idx) => {
     const tr = translations[idx]
     if (!tr || !tr.trim()) return
+
+    // 与原文 textlayer 完全一致的字号与位置，覆盖原文
+    const fontSize = Math.max(8, line.height * props.scale * 0.9)
     const span = document.createElement('span')
     span.textContent = tr
     span.style.position = 'absolute'
     span.style.left = line.x + 'px'
-    span.style.top = viewport.height - line.y + line.height * props.scale + 'px'
-    span.style.maxWidth = viewport.width - line.x + 'px'
+    span.style.top = (viewport.height - line.y) + 'px'
+    span.style.maxWidth = (viewport.width - line.x) + 'px'
     span.style.fontSize = fontSize + 'px'
-    span.style.lineHeight = '1.25'
+    span.style.lineHeight = '1.2'
     span.style.whiteSpace = 'normal'
     span.style.wordBreak = 'break-word'
-    span.style.background = 'rgba(255,255,255,0.92)'
+    span.style.background = 'rgba(255,255,255,1)'
     span.style.color = '#1a1a1a'
-    span.style.padding = '0 2px'
-    span.style.borderRadius = '2px'
+    span.style.padding = '0 1px'
+    span.style.borderRadius = '1px'
     transLayer.appendChild(span)
   })
 }
