@@ -29,7 +29,10 @@ export type NovelData = {
   format?: string
   document_type?: string
   markdown?: string
+  /** Legacy SSE / inline field */
   novel_nodes?: NovelNode[]
+  /** OSS artifact payload field (document guides) */
+  nodes?: NovelNode[]
   date?: string
   chapter_count?: number
   qa_count?: number
@@ -90,12 +93,21 @@ export function isNovelMetadata(meta: unknown): boolean {
   return isNovelStreamPayload(meta)
 }
 
+function normalizeNovelNodeArray(value: unknown): NovelNode[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null
+  return value as NovelNode[]
+}
+
 function pickNovelNodes(obj: Record<string, unknown>): NovelNode[] | null {
-  const direct = obj.novel_nodes
-  if (Array.isArray(direct) && direct.length > 0) return direct as NovelNode[]
+  const direct = normalizeNovelNodeArray(obj.novel_nodes) ?? normalizeNovelNodeArray(obj.nodes)
+  if (direct) return direct
 
   const nested = pickNovelData(obj)
-  if (nested?.novel_nodes?.length) return nested.novel_nodes
+  if (nested) {
+    const fromNested =
+      normalizeNovelNodeArray(nested.novel_nodes) ?? normalizeNovelNodeArray(nested.nodes)
+    if (fromNested) return fromNested
+  }
 
   const payload = asRecord(obj.payload)
   if (payload) {
@@ -190,10 +202,13 @@ function pickNovelStats(root: Record<string, unknown>, nodes: NovelNode[] | null
   if (nodes?.length) {
     for (const node of nodes) {
       const key = pickString(node.node_key)
-      if (key === "chapter_guide") {
-        chapterCount =
+      if (key === "chapter_guide" || key === "chapter_summaries" || key === "outline") {
+        const count =
           node.chapter_count ??
-          (Array.isArray(node.chapters) ? node.chapters.length : chapterCount)
+          (Array.isArray(node.chapters) ? node.chapters.length : undefined)
+        if (count != null) {
+          chapterCount = Math.max(chapterCount ?? 0, count)
+        }
       }
       if (key === "qa") {
         qaCount = node.qa_count ?? (Array.isArray(node.items) ? node.items.length : qaCount)
@@ -219,7 +234,7 @@ function pickNovelData(obj: Record<string, unknown>): NovelData | null {
     asRecord(asRecord(obj.payload)?.payload)
   if (!nested) return null
   const markdown = pickString(nested.markdown)
-  const nodes = nested.novel_nodes
+  const nodes = nested.novel_nodes ?? nested.nodes
   if (!markdown && !pickString(nested.title) && !(Array.isArray(nodes) && nodes.length)) return null
   return nested as NovelData
 }
@@ -491,7 +506,8 @@ async function fetchNovelArtifact(url: string): Promise<NovelData | null> {
   const payload = await fetchNovelArtifactPayload(url)
   if (!payload) return null
   const data = pickNovelData({ payload, novel_data: payload, ...payload }) ?? (payload as NovelData)
-  if (pickString(data.markdown) || data.novel_nodes?.length || pickString(data.title)) return data
+  const nodes = data.novel_nodes ?? data.nodes
+  if (pickString(data.markdown) || nodes?.length || pickString(data.title)) return data
   return null
 }
 
@@ -514,8 +530,9 @@ export async function getNovelMarkdown(payload: unknown): Promise<string> {
 
   const inline = pickNovelData(root)
   if (inline?.markdown) return inline.markdown
-  if (inline?.novel_nodes?.length) {
-    const fromNodes = buildMarkdownFromNovelNodes(inline.novel_nodes, { title })
+  const inlineNodeList = inline?.novel_nodes ?? inline?.nodes
+  if (inlineNodeList?.length) {
+    const fromNodes = buildMarkdownFromNovelNodes(inlineNodeList, { title })
     if (fromNodes) return fromNodes
   }
 
@@ -530,8 +547,9 @@ export async function getNovelMarkdown(payload: unknown): Promise<string> {
       }
       const fetched = await fetchNovelArtifact(url)
       if (fetched?.markdown) return fetched.markdown
-      if (fetched?.novel_nodes?.length) {
-        return buildMarkdownFromNovelNodes(fetched.novel_nodes, { title })
+      const fetchedNodeList = fetched?.novel_nodes ?? fetched?.nodes
+      if (fetchedNodeList?.length) {
+        return buildMarkdownFromNovelNodes(fetchedNodeList, { title })
       }
     }
   }
@@ -544,6 +562,30 @@ export async function getNovelMarkdown(payload: unknown): Promise<string> {
   )
 }
 
+async function fetchNovelArtifactContext(
+  root: Record<string, unknown>,
+): Promise<{ payload: Record<string, unknown> | null; nodes: NovelNode[] | null }> {
+  const inlineNodes = pickNovelNodes(root)
+  const inline = pickNovelData(root)
+  if (inlineNodes?.length && (pickString(inline?.title) || pickString(root.title))) {
+    return { payload: inline as Record<string, unknown>, nodes: inlineNodes }
+  }
+
+  const url = pickNovelDataUrl(root)
+  if (!url) return { payload: null, nodes: inlineNodes }
+
+  try {
+    const payload = await fetchNovelArtifactPayload(url)
+    if (!payload) return { payload: null, nodes: inlineNodes }
+    return {
+      payload,
+      nodes: pickNovelNodes(payload) ?? inlineNodes,
+    }
+  } catch {
+    return { payload: null, nodes: inlineNodes }
+  }
+}
+
 export async function resolveNovelFromStreamComplete(
   payload: unknown,
 ): Promise<NovelResult | null> {
@@ -551,22 +593,25 @@ export async function resolveNovelFromStreamComplete(
   const root = asRecord(payload)
   if (!root) return null
 
+  const artifact = await fetchNovelArtifactContext(root)
+  const nodes = artifact.nodes
   const markdown = await getNovelMarkdown(root)
-  if (!markdown) return null
+  if (!markdown && !nodes?.length) return null
 
   const inline = pickNovelData(root)
-  const nodes = pickNovelNodes(root)
-  const stats = pickNovelStats(root, nodes)
+  const mergedRoot = artifact.payload ? { ...root, ...artifact.payload } : root
+  const stats = pickNovelStats(mergedRoot, nodes)
   const response = pickString(root.response)
   const title =
     pickString(inline?.title) ||
+    pickString(artifact.payload?.title) ||
     pickString(root.title) ||
     pickTitleFromResponse(response) ||
     markdown.match(/^#\s+(.+)$/m)?.[1]?.trim()
 
   return {
     title: title || undefined,
-    markdown,
+    markdown: markdown || (nodes?.length ? buildMarkdownFromNovelNodes(nodes, { title }) : ""),
     message:
       pickNovelSummaryContent(response) ||
       pickString(root.message) ||

@@ -100,6 +100,17 @@ function buildCharacterTableMarkdown(node: NovelNode): string {
   return rows.join("\n")
 }
 
+function buildChapterListTocMarkdown(chapters: NonNullable<NovelNode["chapters"]>): string {
+  const lines: string[] = []
+  for (const chapter of chapters) {
+    const title = pickString(chapter.title)
+    if (!title) continue
+    const index = chapter.index != null ? `${chapter.index}. ` : ""
+    lines.push(`- ${index}${title}`)
+  }
+  return lines.join("\n").trim()
+}
+
 function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
   const sections: NovelGuideSection[] = []
 
@@ -109,10 +120,11 @@ function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
     const heading = pickString(node.title)
 
     if (contentType === "markdown" && pickString(node.text)) {
+      const isSummary = nodeKey === "book_summary" || nodeKey === "document_summary"
       sections.push({
-        id: nodeKey === "book_summary" ? "summary" : slugify(heading || nodeKey || "section"),
-        kind: nodeKey === "book_summary" ? "summary" : "generic",
-        label: heading || (nodeKey === "book_summary" ? "全书摘要" : "内容"),
+        id: isSummary ? "summary" : slugify(heading || nodeKey || "section"),
+        kind: isSummary ? "summary" : "generic",
+        label: heading || (isSummary ? "全书摘要" : "内容"),
         markdown: pickString(node.text),
       })
       continue
@@ -132,6 +144,19 @@ function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
 
     if (contentType === "chapter_list" || nodeKey === "chapter_guide") {
       const chapters = Array.isArray(node.chapters) ? node.chapters : []
+      if (!chapters.length) continue
+
+      // Document guide TOC: keep outline as one navigable section instead of 100+ entries.
+      if (nodeKey === "outline") {
+        sections.push({
+          id: "outline",
+          kind: "generic",
+          label: heading || "目录大纲",
+          markdown: buildChapterListTocMarkdown(chapters),
+        })
+        continue
+      }
+
       chapters.forEach((chapter, index) => {
         const chapterTitle = pickString(chapter.title) || `第 ${chapter.index ?? index + 1} 章`
         const text = pickString(chapter.text)
