@@ -303,6 +303,44 @@ async function translateCurrentPage() {
   await translatePage(pageNum, entry.lines, transLayer, entry.viewport)
 }
 
+const CACHE_SCHEMA = 'v2'
+
+function cacheMatchesTexts(cached: { lines: string[]; translations: string[] }, texts: string[]): boolean {
+  if (cached.translations.length !== texts.length || cached.lines.length !== texts.length) return false
+  return cached.lines.every((line, i) => line === texts[i])
+}
+
+function computeTranslationPlacement(
+  line: PdfLine,
+  viewport: pdfjsLib.PageViewport,
+  trText: string,
+): { left: number; top: number; maxWidth: number; fontSize: number } {
+  const origTop = viewport.height - line.y
+  const lineBoxHeight = line.height * props.scale
+  const fontSize = Math.max(7, line.height * props.scale * 0.82)
+  const gap = 3
+
+  const besideX = line.x + Math.max(line.width, line.text.length * fontSize * 0.45) + gap
+  const shortLine = line.text.length <= 6 && trText.length <= 12
+  const roomBeside = besideX + 40 < viewport.width * 0.92
+
+  if (shortLine && roomBeside) {
+    return {
+      left: besideX,
+      top: origTop,
+      maxWidth: viewport.width - besideX - 8,
+      fontSize,
+    }
+  }
+
+  return {
+    left: line.x,
+    top: origTop + lineBoxHeight + gap,
+    maxWidth: Math.max(line.width, viewport.width - line.x - 8),
+    fontSize,
+  }
+}
+
 async function translatePage(
   pageNum: number,
   lines: PdfLine[],
@@ -323,9 +361,9 @@ async function translatePage(
     return
   }
 
-  const key = buildCacheKey(fileHash.value, pageNum, props.targetLang)
+  const key = `${buildCacheKey(fileHash.value, pageNum, props.targetLang)}:${CACHE_SCHEMA}`
   const cached = await getCachedTranslation(key)
-  if (cached && cached.translations.length === texts.length) {
+  if (cached && cacheMatchesTexts(cached, texts)) {
     slot.translateError = false
     renderTranslations(translatable, cached.translations, transLayer, viewport)
     const entry = pageMap.get(pageNum)
@@ -374,22 +412,25 @@ function renderTranslations(
     const tr = translations[idx]
     if (!tr || !tr.trim()) return
 
-    // 与原文 textlayer 完全一致的字号与位置，覆盖原文
-    const fontSize = Math.max(8, line.height * props.scale * 0.9)
+    const { left, top, maxWidth, fontSize } = computeTranslationPlacement(line, viewport, tr)
     const span = document.createElement('span')
     span.textContent = tr
+    span.className = 'pdf-page__translation'
     span.style.position = 'absolute'
-    span.style.left = line.x + 'px'
-    span.style.top = (viewport.height - line.y) + 'px'
-    span.style.maxWidth = (viewport.width - line.x) + 'px'
+    span.style.left = left + 'px'
+    span.style.top = top + 'px'
+    span.style.maxWidth = maxWidth + 'px'
     span.style.fontSize = fontSize + 'px'
-    span.style.lineHeight = '1.2'
+    span.style.lineHeight = '1.3'
     span.style.whiteSpace = 'normal'
     span.style.wordBreak = 'break-word'
-    span.style.background = 'rgba(255,255,255,1)'
-    span.style.color = '#1a1a1a'
-    span.style.padding = '0 1px'
-    span.style.borderRadius = '1px'
+    span.style.fontFamily = '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif'
+    span.style.color = '#1d4ed8'
+    span.style.fontWeight = '500'
+    span.style.background = 'rgba(239, 246, 255, 0.88)'
+    span.style.padding = '1px 3px'
+    span.style.borderRadius = '2px'
+    span.style.borderLeft = '2px solid #93c5fd'
     transLayer.appendChild(span)
   })
 }
