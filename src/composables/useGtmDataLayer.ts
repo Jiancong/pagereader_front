@@ -49,6 +49,7 @@ export function gtmPageTypeFromRoute(
   if (n === "project-reader") return "project_reader"
   if (n === "project-community") return "project_community"
   if (n === "about" || n === "terms" || n === "privacy" || n === "contact") return "legal"
+  if (n === "translate") return "translate"
   if (path.includes("/explore/project/") && path.endsWith("/read")) return "project_reader"
   if (path.includes("/explore/project/")) return "project_community"
   return n || "other"

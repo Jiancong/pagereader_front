@@ -53,6 +53,11 @@ const routes = [
     component: () => import("./views/ProjectPlayerView.vue"),
   },
   {
+    path: "/translate",
+    name: "translate",
+    component: () => import("./views/ImmersiveTranslationView.vue"),
+  },
+  {
     path: "/debug-ppt",
     name: "debug-ppt",
     component: () => import("./views/DebugPptView.vue"),

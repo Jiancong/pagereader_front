@@ -46,8 +46,8 @@
         </div>
       </div>
 
-      <!-- 生成模式选择器（YouTube tab 隐藏） -->
-      <div v-if="activeTab !== 'youtube'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
+      <!-- 生成模式选择器（YouTube / 沉浸式翻译 tab 隐藏） -->
+      <div v-if="activeTab !== 'youtube' && activeTab !== 'translate'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('landing.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
           <label
@@ -192,7 +192,7 @@
           </div>
 
           <!-- YouTube 视频 -->
-          <div v-else class="space-y-6">
+          <div v-else-if="activeTab === 'youtube'" class="space-y-6">
             <div class="mb-6">
               <h3 class="text-lg font-semibold text-foreground">{{ t('landing.youtubeTitle') }}</h3>
               <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.youtubeHint') }}</p>
@@ -229,6 +229,61 @@
               {{ t('landing.youtubeGenerate') }}
             </button>
           </div>
+
+          <!-- 沉浸式翻译 -->
+          <div v-else-if="activeTab === 'translate'" class="space-y-6">
+            <div class="mb-6">
+              <h3 class="text-lg font-semibold text-foreground">{{ t('landing.translateTitle') }}</h3>
+              <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.translateHint') }}</p>
+            </div>
+
+            <div
+              @dragover.prevent="isDragging = true"
+              @dragleave="isDragging = false"
+              @drop.prevent="handlePdfDrop"
+              :class="[
+                'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
+                isDragging ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
+              ]"
+              @click="pdfFileInput?.click()"
+            >
+              <input
+                ref="pdfFileInput"
+                type="file"
+                accept=".pdf,application/pdf"
+                class="hidden"
+                @change="handlePdfSelect"
+              />
+              <div v-if="selectedPdf" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
+                <FileText class="h-10 w-10 flex-shrink-0 text-primary" />
+                <div class="min-w-0 flex-1 text-left">
+                  <p class="break-words font-medium text-foreground">{{ selectedPdf.name }}</p>
+                  <p class="text-sm text-muted-foreground">{{ formatFileSize(selectedPdf.size) }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary"
+                  @click.stop="clearSelectedPdf"
+                >
+                  <X class="h-5 w-5 text-muted-foreground" />
+                </button>
+              </div>
+              <template v-else>
+                <Languages class="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <p class="mt-4 font-medium text-foreground">{{ t('landing.translatePickPdf') }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.translateFormats') }}</p>
+              </template>
+            </div>
+
+            <button
+              :disabled="!selectedPdf"
+              class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="startImmersiveTranslation"
+            >
+              <Languages class="h-5 w-5" />
+              {{ t('landing.translateStart') }}
+            </button>
+          </div>
         </div>
       </div>
       </template>
@@ -238,8 +293,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, markRaw, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube } from 'lucide-vue-next'
+import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages } from 'lucide-vue-next'
 import {
   gtmGenerateIntent,
   gtmGeneratorTabSelect,
@@ -248,11 +304,14 @@ import {
   gtmFileSelected,
   LANDING_WATCH_DEMO_EVENT,
 } from '@/composables/useGtmDataLayer'
+import { useTranslateFileStore } from '@/stores/translateFile'
 
-type TabId = 'upload' | 'quick' | 'youtube'
+type TabId = 'upload' | 'quick' | 'youtube' | 'translate'
 type QueueMode = 'CARD' | 'DOCUMENT' | 'NOVEL'
 
 const { t } = useI18n()
+const router = useRouter()
+const translateFileStore = useTranslateFileStore()
 const emit = defineEmits<{ start: [payload: { mode: string; prompt: string }] }>()
 
 const activeTab = ref<TabId>('upload')
@@ -264,12 +323,15 @@ const youtubePrompt = ref('')
 const isDragging = ref(false)
 const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const selectedPdf = ref<File | null>(null)
+const pdfFileInput = ref<HTMLInputElement | null>(null)
 const showDemoVideo = ref(false)
 
 const tabs = computed(() => [
   { id: 'upload' as TabId, label: t('landing.tabUpload'), icon: markRaw(Upload) },
   { id: 'quick' as TabId, label: t('landing.tabQuick'), icon: markRaw(MessageSquare) },
   { id: 'youtube' as TabId, label: t('landing.tabYoutube'), icon: markRaw(Youtube) },
+  { id: 'translate' as TabId, label: t('landing.tabTranslate'), icon: markRaw(Languages) },
 ])
 
 const QUICK_EXAMPLE_IDS = [
@@ -374,6 +436,38 @@ const clearSelectedFile = () => {
   if (fileInput.value) fileInput.value.value = ''
 }
 
+const handlePdfSelect = (e: Event) => {
+  const files = (e.target as HTMLInputElement).files
+  if (files && files.length > 0) {
+    const f = files[0]
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') return
+    selectedPdf.value = f
+    gtmFileSelected(f)
+  }
+}
+
+const handlePdfDrop = (e: DragEvent) => {
+  isDragging.value = false
+  const files = e.dataTransfer?.files
+  if (files && files.length > 0) {
+    const f = files[0]
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') return
+    selectedPdf.value = f
+    gtmFileSelected(f)
+  }
+}
+
+const clearSelectedPdf = () => {
+  selectedPdf.value = null
+  if (pdfFileInput.value) pdfFileInput.value.value = ''
+}
+
+const startImmersiveTranslation = () => {
+  if (!selectedPdf.value) return
+  translateFileStore.setFile(selectedPdf.value)
+  router.push({ name: 'translate' })
+}
+
 const selectQuickExample = (example: { id: string; prompt: string }) => {
   prompt.value = example.prompt
   gtmQuickExampleClick(example.id)
@@ -399,12 +493,13 @@ const generateFromYoutube = () => {
   emit('start', { mode: 'youtube', prompt: youtubePrompt.value.trim() || youtubeUrl.value.trim() })
 }
 
-// YouTube tab 强制 DOCUMENT 模式；切到 quick 时若为 NOVEL 降级为 CARD
+// YouTube tab 强制 DOCUMENT 模式；沉浸式翻译 tab 不涉及 queue；切到 quick 时若为 NOVEL 降级为 CARD
 watch(activeTab, (tab) => {
   if (tab === 'youtube') {
     queue.value = 'DOCUMENT'
     if (!youtubePrompt.value.trim()) youtubePrompt.value = t('landing.youtubePromptDefault')
   }
+  if (tab === 'translate') queue.value = 'DOCUMENT'
   if (tab === 'quick' && queue.value === 'NOVEL') queue.value = 'CARD'
 })
 
