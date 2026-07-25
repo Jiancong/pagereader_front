@@ -314,12 +314,40 @@ async function renderPage(pageNum: number) {
 
     slot.rendered = true
 
+    syncTransPageSize(pageNum, viewport)
+
     if (pageNum === currentPageNum.value) {
       void translateCurrentPage()
     }
   } catch {
     slot.translateError = true
   }
+}
+
+function syncTransPageSize(pageNum: number, viewport: pdfjsLib.PageViewport) {
+  const transInner = transScrollRef.value?.querySelector<HTMLElement>(
+    `.pdf-page[data-page-num="${pageNum}"] .pdf-page__inner`,
+  )
+  if (!transInner) return
+  transInner.style.width = viewport.width + 'px'
+  transInner.style.height = viewport.height + 'px'
+}
+
+function lineFontSize(line: PdfLine): number {
+  return Math.max(8, line.height * props.scale * 0.9)
+}
+
+function isLineCentered(line: PdfLine, pageWidth: number): boolean {
+  const mid = line.x + line.width / 2
+  return Math.abs(mid - pageWidth / 2) < pageWidth * 0.1
+}
+
+function fontFamilyForLang(lang: string): string {
+  if (lang === 'zh') return '"Noto Serif SC", "Songti SC", "SimSun", serif'
+  if (lang === 'ja') return '"Noto Serif JP", "Yu Mincho", serif'
+  if (lang === 'ar') return '"Noto Naskh Arabic", "Noto Sans Arabic", serif'
+  if (lang === 'hi') return '"Noto Serif Devanagari", "Noto Sans Devanagari", serif'
+  return '"Noto Serif", "Times New Roman", Times, serif'
 }
 
 async function translateCurrentPage() {
@@ -334,6 +362,7 @@ async function translateCurrentPage() {
   const transLayer = container?.querySelector<HTMLElement>('.pdf-page__translationlayer')
   if (!transLayer) return
 
+  syncTransPageSize(pageNum, entry.viewport)
   await translatePage(pageNum, entry.lines, transLayer, entry.viewport)
 }
 
@@ -404,30 +433,40 @@ function renderTranslations(
   transLayer.style.width = viewport.width + 'px'
   transLayer.style.height = viewport.height + 'px'
 
+  const fontFamily = fontFamilyForLang(props.targetLang)
+
   translatable.forEach(({ line }, idx) => {
     const tr = translations[idx]
     if (!tr || !tr.trim()) return
 
-    const fontSize = Math.max(8, line.height * props.scale * 0.9)
+    const fontSize = lineFontSize(line)
+    const centered = isLineCentered(line, viewport.width)
     const span = document.createElement('span')
     span.textContent = tr
     span.style.position = 'absolute'
     span.style.left = line.x + 'px'
     span.style.top = (viewport.height - line.y) + 'px'
-    span.style.maxWidth = (viewport.width - line.x - 4) + 'px'
+    span.style.width = Math.max(line.width, 40) + 'px'
     span.style.fontSize = fontSize + 'px'
-    span.style.lineHeight = '1.3'
-    span.style.whiteSpace = 'normal'
-    span.style.wordBreak = 'break-word'
-    span.style.fontFamily = '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans", sans-serif'
+    span.style.lineHeight = '1'
+    span.style.fontFamily = fontFamily
+    span.style.color = '#000'
+    span.style.fontWeight = 'normal'
+    span.style.display = 'block'
+
+    if (centered) {
+      span.style.textAlign = 'center'
+      span.style.whiteSpace = 'normal'
+      span.style.wordBreak = 'break-word'
+    } else {
+      span.style.textAlign = 'left'
+      span.style.whiteSpace = 'nowrap'
+    }
+
     if (props.targetLang === 'ar') {
       span.style.direction = 'rtl'
-      span.style.fontFamily = '"Noto Naskh Arabic", "Noto Sans Arabic", sans-serif'
-    } else if (props.targetLang === 'hi') {
-      span.style.fontFamily = '"Noto Sans Devanagari", "Noto Sans", sans-serif'
     }
-    span.style.color = '#1e3a8a'
-    span.style.fontWeight = '500'
+
     transLayer.appendChild(span)
   })
 }
@@ -512,7 +551,7 @@ function cleanupPage(pageNum: number) {
   background: #fff;
 }
 .pdf-page__inner--trans {
-  background: #f8fafc;
+  background: #fff;
 }
 .pdf-page__canvas {
   display: block;
