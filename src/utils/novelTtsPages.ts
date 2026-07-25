@@ -24,7 +24,9 @@ function resolveTtsVoice(text: string): string {
 export function buildTtsPagesFromNovelSections(sections: NovelGuideSection[]): TtsPageInput[] {
   return sections.map((section, index) => {
     const title = section.label.trim()
-    const body = stripMarkdownForTts(section.markdown)
+    const outlineBody =
+      section.outlineItems?.map((item) => item.title).join("\n") ?? ""
+    const body = outlineBody || stripMarkdownForTts(section.markdown)
     const text = [title, body].filter(Boolean).join("\n\n")
     return {
       index: index + 1,

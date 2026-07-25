@@ -4,13 +4,20 @@
 import type { NovelNode } from "@/utils/novelStream"
 import { demoteH2ToH3InSectionBody } from "@/utils/novelMarkdownHeadings"
 
-export type NovelGuideSectionKind = "summary" | "characters" | "chapter" | "qa" | "generic"
+export type NovelGuideSectionKind = "summary" | "characters" | "chapter" | "qa" | "outline" | "generic"
+
+export type NovelGuideOutlineItem = {
+  index?: number
+  title: string
+  level: "part" | "chapter" | "section"
+}
 
 export type NovelGuideSection = {
   id: string
   kind: NovelGuideSectionKind
   label: string
   markdown: string
+  outlineItems?: NovelGuideOutlineItem[]
 }
 
 export type NovelGuideOutline = {
@@ -100,15 +107,41 @@ function buildCharacterTableMarkdown(node: NovelNode): string {
   return rows.join("\n")
 }
 
-function buildChapterListTocMarkdown(chapters: NonNullable<NovelNode["chapters"]>): string {
-  const lines: string[] = []
+function normalizeOutlineTitle(title: string): string {
+  return title.replace(/\.+\s*$/g, "").replace(/\s+/g, " ").trim()
+}
+
+function classifyOutlineLevel(title: string): NovelGuideOutlineItem["level"] {
+  const t = normalizeOutlineTitle(title)
+  if (/^(Part\s+)?[IVXLC]+\b/i.test(t) && !/^\d/.test(t)) return "part"
+  if (/^\d+\s+[A-Za-z\u4e00-\u9fff]/.test(t)) return "chapter"
+  return "section"
+}
+
+function shouldSkipOutlineEntry(title: string): boolean {
+  const t = normalizeOutlineTitle(title)
+  if (!t) return true
+  if (/^Chapter\s+\d+$/i.test(t)) return true
+  if (/^Part\s+(I|II|III|IV|V|VI|\d+)$/i.test(t)) return true
+  return false
+}
+
+function buildOutlineTocItems(chapters: NonNullable<NovelNode["chapters"]>): NovelGuideOutlineItem[] {
+  const items: NovelGuideOutlineItem[] = []
   for (const chapter of chapters) {
-    const title = pickString(chapter.title)
-    if (!title) continue
-    const index = chapter.index != null ? `${chapter.index}. ` : ""
-    lines.push(`- ${index}${title}`)
+    const title = normalizeOutlineTitle(pickString(chapter.title))
+    if (shouldSkipOutlineEntry(title)) continue
+    items.push({
+      index: chapter.index,
+      title,
+      level: classifyOutlineLevel(title),
+    })
   }
-  return lines.join("\n").trim()
+  return items
+}
+
+function buildOutlineTocMarkdown(items: NovelGuideOutlineItem[]): string {
+  return items.map((item) => `${item.index ?? ""}. ${item.title}`.trim()).join("\n")
 }
 
 function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
@@ -148,11 +181,13 @@ function buildSectionsFromNovelNodes(nodes: NovelNode[]): NovelGuideSection[] {
 
       // Document guide TOC: keep outline as one navigable section instead of 100+ entries.
       if (nodeKey === "outline") {
+        const outlineItems = buildOutlineTocItems(chapters)
         sections.push({
           id: "outline",
-          kind: "generic",
+          kind: "outline",
           label: heading || "目录大纲",
-          markdown: buildChapterListTocMarkdown(chapters),
+          markdown: buildOutlineTocMarkdown(outlineItems),
+          outlineItems,
         })
         continue
       }
@@ -265,6 +300,13 @@ export function buildNovelGuideExportMarkdown(outline: NovelGuideOutline): strin
 
   for (const section of outline.sections) {
     parts.push(`## ${section.label}`, "")
+    if (section.outlineItems?.length) {
+      for (const item of section.outlineItems) {
+        parts.push(`${item.index != null ? `${item.index}. ` : ""}${item.title}`)
+      }
+      parts.push("")
+      continue
+    }
     const body = demoteH2ToH3InSectionBody(section.markdown.trim())
     if (body) parts.push(body, "")
   }

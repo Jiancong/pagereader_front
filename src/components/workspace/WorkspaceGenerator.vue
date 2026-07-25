@@ -39,6 +39,10 @@
               <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
           </button>
+          <button :class="tabClass('translate')" @click="activeTab = 'translate'">
+            <Languages class="h-4 w-4" />
+            {{ t('workspace.tabTranslate') }}
+          </button>
         </div>
     </div>
 
@@ -80,7 +84,7 @@
     </div>
 
     <template v-else>
-      <div class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
+      <div v-if="activeTab !== 'translate'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
           <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
@@ -194,8 +198,66 @@
           </form>
         </div>
 
+        <!-- 沉浸式 PDF 翻译 -->
+        <div v-else-if="activeTab === 'translate'" class="p-6 sm:p-8">
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.translateTitle') }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.translateHint') }}</p>
+          </div>
+
+          <div
+            @dragover.prevent="isDraggingPdf = true"
+            @dragleave="isDraggingPdf = false"
+            @drop.prevent="handlePdfDrop"
+            :class="[
+              'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
+              isDraggingPdf ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
+            ]"
+            @click="pdfFileInput?.click()"
+          >
+            <input
+              ref="pdfFileInput"
+              type="file"
+              accept=".pdf,application/pdf"
+              class="hidden"
+              @change="handlePdfSelect"
+            />
+            <div v-if="hasTranslatePdf" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
+              <FileText class="h-10 w-10 flex-shrink-0 text-primary" />
+              <div class="min-w-0 flex-1 text-left">
+                <p class="break-words font-medium text-foreground">{{ translatePdfName }}</p>
+                <p v-if="translatePdfSizeLabel" class="text-sm text-muted-foreground">{{ translatePdfSizeLabel }}</p>
+                <p v-if="cloudPdfDocument" class="text-xs text-muted-foreground">{{ t('workspace.fromCloudLibrary') }}</p>
+              </div>
+              <button type="button" class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary" @click.stop="clearTranslatePdf">
+                <X class="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+            <template v-else>
+              <Languages class="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <p class="mt-4 font-medium text-foreground">{{ t('workspace.translatePickPdf') }}</p>
+              <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.translateFormats') }}</p>
+            </template>
+          </div>
+
+          <p class="mt-4 text-xs text-muted-foreground">{{ t('workspace.translateFromCloud') }}</p>
+
+          <p v-if="translateError" class="mt-4 text-sm text-red-400">{{ translateError }}</p>
+
+          <button
+            type="button"
+            :disabled="!hasTranslatePdf || translateLoading"
+            class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="startImmersiveTranslation"
+          >
+            <Loader2 v-if="translateLoading" class="h-5 w-5 animate-spin" />
+            <Languages v-else class="h-5 w-5" />
+            {{ translateLoading ? t('workspace.translateFetchingPdf') : t('workspace.translateStart') }}
+          </button>
+        </div>
+
         <!-- YouTube 视频生成 PPT -->
-        <div v-else class="p-6 sm:p-8">
+        <div v-else-if="activeTab === 'youtube'" class="p-6 sm:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('youtubeTitle')) }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('youtubeHint')) }}</p>
@@ -277,7 +339,7 @@
         </div>
 
         <!-- 错误（当前标签任务） -->
-        <div v-if="activeTask.errorMsg" class="border-t border-border bg-red-500/10 px-6 py-4 text-sm text-red-400 sm:px-8">
+        <div v-if="activeTab !== 'translate' && activeTask.errorMsg" class="border-t border-border bg-red-500/10 px-6 py-4 text-sm text-red-400 sm:px-8">
           <p>{{ activeTask.errorMsg }}</p>
           <RouterLink
             v-if="activeTask.showCreditsCta"
@@ -289,7 +351,10 @@
         </div>
 
         <!-- 进度（当前标签任务） -->
-        <div v-if="activeTask.logs.length || activeTask.isGenerating || activeTask.elapsedMs != null" class="border-t border-border bg-secondary/20 p-6 sm:p-8">
+        <div
+          v-if="activeTab !== 'translate' && (activeTask.logs.length || activeTask.isGenerating || activeTask.elapsedMs != null)"
+          class="border-t border-border bg-secondary/20 p-6 sm:p-8"
+        >
           <h4 class="mb-3 flex items-center justify-between gap-3 font-semibold text-foreground">
             <span class="flex items-center gap-2">
               <span v-if="activeTask.isGenerating" class="relative flex h-2.5 w-2.5">
@@ -335,9 +400,10 @@
 
 <script setup lang="ts">
 import { ref, computed, reactive, watch, onBeforeUnmount } from "vue"
-import { RouterLink } from "vue-router"
+import { RouterLink, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
-import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube } from "lucide-vue-next"
+import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages } from "lucide-vue-next"
+import { useTranslateFileStore } from "@/stores/translateFile"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
 import WorkspaceNovelResult from "@/components/workspace/WorkspaceNovelResult.vue"
@@ -442,7 +508,10 @@ const ragTask = reactive<GeneratorTask>(createTask("DOCUMENT"))
 /** YouTube 视频生成 PPT：独立任务 */
 const youtubeTask = reactive<GeneratorTask>(createTask("DOCUMENT"))
 
-const activeTab = ref<"prompt" | "upload" | "youtube">("upload")
+const router = useRouter()
+const translateFileStore = useTranslateFileStore()
+
+const activeTab = ref<"prompt" | "upload" | "youtube" | "translate">("upload")
 const input = ref(props.initialPrompt || "")
 const youtubeUrl = ref("")
 const youtubePrompt = ref("")
@@ -452,6 +521,13 @@ let youtubeAbort: AbortController | null = null
 const uploadedFile = ref<File | null>(null)
 const cloudDocument = ref<UploadedDocument | null>(null)
 const cloudDocumentSize = ref<number | undefined>(undefined)
+const selectedPdf = ref<File | null>(null)
+const cloudPdfDocument = ref<UploadedDocument | null>(null)
+const cloudPdfSize = ref<number | undefined>(undefined)
+const pdfFileInput = ref<HTMLInputElement | null>(null)
+const isDraggingPdf = ref(false)
+const translateLoading = ref(false)
+const translateError = ref("")
 const uploadPrompt = ref("")
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -462,6 +538,21 @@ const attachedDocName = computed(
 const attachedDocSizeLabel = computed(() => {
   if (uploadedFile.value) return `${(uploadedFile.value.size / 1024 / 1024).toFixed(2)} MB`
   if (cloudDocumentSize.value != null) return formatBytes(cloudDocumentSize.value)
+  return ""
+})
+
+const isPdfDocument = (doc: UploadedDocument | null | undefined) => {
+  if (!doc) return false
+  return /\.pdf$/i.test(doc.name || "") || /pdf/i.test(String(doc.type || ""))
+}
+
+const hasTranslatePdf = computed(() => Boolean(selectedPdf.value || cloudPdfDocument.value))
+const translatePdfName = computed(
+  () => selectedPdf.value?.name || cloudPdfDocument.value?.name || "",
+)
+const translatePdfSizeLabel = computed(() => {
+  if (selectedPdf.value) return formatBytes(selectedPdf.value.size)
+  if (cloudPdfSize.value != null) return formatBytes(cloudPdfSize.value)
   return ""
 })
 
@@ -526,7 +617,7 @@ const activeElapsedDisplay = computed(() => {
   return null
 })
 
-const tabClass = (tab: "prompt" | "upload" | "youtube") => [
+const tabClass = (tab: "prompt" | "upload" | "youtube" | "translate") => [
   "flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm",
   activeTab.value === tab ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground",
 ]
@@ -715,6 +806,17 @@ const clearAttachedDoc = () => {
 
 function attachCloudDocument(payload: { doc: UploadedDocument; size?: number }) {
   if (!payload?.doc?.url) return
+
+  if (isPdfDocument(payload.doc) && activeTab.value === "translate") {
+    selectedPdf.value = null
+    if (pdfFileInput.value) pdfFileInput.value.value = ""
+    cloudPdfDocument.value = payload.doc
+    cloudPdfSize.value = payload.size
+    translateError.value = ""
+    gtmAssetAttach(gtmFileExt(payload.doc.name || ""))
+    return
+  }
+
   uploadedFile.value = null
   if (fileInput.value) fileInput.value.value = ""
   cloudDocument.value = payload.doc
@@ -722,6 +824,61 @@ function attachCloudDocument(payload: { doc: UploadedDocument; size?: number }) 
   activeTab.value = "upload"
   applyDefaultUploadPrompt()
   gtmAssetAttach(gtmFileExt(payload.doc.name || ""))
+}
+
+const handlePdfSelect = (e: Event) => {
+  const f = (e.target as HTMLInputElement).files?.[0]
+  if (!f) return
+  if (!/\.pdf$/i.test(f.name) && f.type !== "application/pdf") return
+  cloudPdfDocument.value = null
+  cloudPdfSize.value = undefined
+  selectedPdf.value = f
+  translateError.value = ""
+}
+
+const handlePdfDrop = (e: DragEvent) => {
+  isDraggingPdf.value = false
+  const f = e.dataTransfer?.files?.[0]
+  if (!f) return
+  if (!/\.pdf$/i.test(f.name) && f.type !== "application/pdf") return
+  cloudPdfDocument.value = null
+  cloudPdfSize.value = undefined
+  selectedPdf.value = f
+  translateError.value = ""
+}
+
+const clearTranslatePdf = () => {
+  selectedPdf.value = null
+  cloudPdfDocument.value = null
+  cloudPdfSize.value = undefined
+  translateError.value = ""
+  if (pdfFileInput.value) pdfFileInput.value.value = ""
+}
+
+const startImmersiveTranslation = async () => {
+  translateError.value = ""
+  if (selectedPdf.value) {
+    translateFileStore.setFile(selectedPdf.value)
+    router.push({ name: "translate" })
+    return
+  }
+  if (!cloudPdfDocument.value?.url) return
+
+  translateLoading.value = true
+  try {
+    const res = await fetch(cloudPdfDocument.value.url, { credentials: "omit" })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const blob = await res.blob()
+    const name = cloudPdfDocument.value.name || "document.pdf"
+    const file = new File([blob], name, { type: blob.type || "application/pdf" })
+    translateFileStore.setFile(file)
+    router.push({ name: "translate" })
+  } catch (e: unknown) {
+    translateError.value =
+      e instanceof Error ? e.message : t("workspace.translateFetchFailed")
+  } finally {
+    translateLoading.value = false
+  }
 }
 
 const resolveUserId = async (): Promise<string | null> => {
@@ -1047,6 +1204,10 @@ watch(activeTab, (tab) => {
   }
   if (tab === "prompt" && promptTask.queue === "NOVEL") {
     promptTask.queue = "CARD"
+  }
+  if (tab === "translate" && cloudDocument.value && isPdfDocument(cloudDocument.value)) {
+    cloudPdfDocument.value = cloudDocument.value
+    cloudPdfSize.value = cloudDocumentSize.value
   }
 })
 

@@ -145,16 +145,24 @@
           {{ activeSection.label }}
         </h1>
         <div v-if="activeSection" class="novel-guide-content space-y-4">
-          <div
-            v-for="(turn, turnIndex) in activeSectionTurns"
-            :key="`${activeSection.id}-${turnIndex}`"
-            class="novel-speaker-turn"
-          >
-            <ChatMarkdownBody
-              :content="turn"
-              root-class="novel-guide-markdown"
-            />
-          </div>
+          <NovelGuideOutlineList
+            v-if="activeSection.kind === 'outline' && activeSection.outlineItems?.length"
+            :items="activeSection.outlineItems"
+            :jumpable-titles="chapterTitleSet"
+            @jump="jumpToChapterFromOutline"
+          />
+          <template v-else>
+            <div
+              v-for="(turn, turnIndex) in activeSectionTurns"
+              :key="`${activeSection.id}-${turnIndex}`"
+              class="novel-speaker-turn"
+            >
+              <ChatMarkdownBody
+                :content="turn"
+                root-class="novel-guide-markdown"
+              />
+            </div>
+          </template>
         </div>
       </article>
     </div>
@@ -191,6 +199,7 @@ import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
 import ChatMarkdownBody from "@/components/editor/chat/ChatMarkdownBody.vue"
 import NovelAnnotationMenu from "@/components/workspace/NovelAnnotationMenu.vue"
+import NovelGuideOutlineList from "@/components/workspace/NovelGuideOutlineList.vue"
 import { annotationApi, projectApi } from "@/api"
 import { getToken } from "@/api/token"
 import type { ProjectAnnotation } from "@/api/types"
@@ -198,6 +207,7 @@ import { buildFontFamilyCss, ensureExportFontsReady } from "@/composables/useFon
 import { useNovelGuidePlayAll } from "@/composables/useNovelGuidePlayAll"
 import { downloadMarkdownFile, sanitizeDownloadBasename } from "@/utils/downloadMarkdownFile"
 import { buildNovelGuideOutline } from "@/utils/novelGuideSections"
+import type { NovelGuideOutlineItem } from "@/utils/novelGuideSections"
 import {
   restoreHighlights,
   resolveAnnotationIdFromTarget,
@@ -271,10 +281,28 @@ const activeSection = computed(() =>
 )
 
 const activeSectionTurns = computed(() => {
+  if (activeSection.value?.kind === "outline" && activeSection.value.outlineItems?.length) {
+    return []
+  }
   const markdown = activeSection.value?.markdown || ""
   const turns = splitOutlineSpeakerTurns(markdown)
   return turns.length ? turns : markdown ? [markdown] : []
 })
+
+const chapterTitleSet = computed(() => {
+  const titles = new Set<string>()
+  for (const section of outline.value.sections) {
+    if (section.kind === "chapter") titles.add(section.label.trim())
+  }
+  return titles
+})
+
+function jumpToChapterFromOutline(item: NovelGuideOutlineItem) {
+  const target = outline.value.sections.find(
+    (section) => section.kind === "chapter" && section.label.trim() === item.title.trim(),
+  )
+  if (target) selectSection(target.id)
+}
 
 const fullMarkdownTurns = computed(() => {
   const markdown = props.result.markdown || ""
