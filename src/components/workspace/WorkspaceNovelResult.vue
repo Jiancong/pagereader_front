@@ -202,8 +202,16 @@
       @close="closeAnnotMenu"
     />
 
-    <el-dialog v-model="chatDetailVisible" :title="chatDetailTitle" width="min(760px, calc(100vw - 2rem))">
-      <ChatMarkdownBody :content="chatDetailContent" root-class="novel-guide-markdown" />
+    <el-dialog
+      v-model="chatDetailVisible"
+      class="novel-chat-dialog"
+      modal-class="novel-chat-dialog-overlay"
+      :title="chatDetailTitle"
+      width="min(760px, calc(100vw - 2rem))"
+    >
+      <div class="novel-chat-dialog-content">
+        <ChatMarkdownBody :content="chatDetailContent" root-class="novel-guide-markdown" />
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -972,5 +980,86 @@ function closeAnnotMenuOnScroll() {
 :deep(mark.novel-annotation--noted) {
   background-color: rgba(255, 183, 77, 0.55);
   border-bottom: 2px solid rgba(255, 152, 0, 0.7);
+}
+</style>
+
+<style lang="scss">
+.novel-chat-dialog-overlay {
+  background: rgba(4, 7, 14, 0.72) !important;
+  backdrop-filter: blur(5px);
+}
+
+.el-dialog.novel-chat-dialog {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 1rem;
+  background: #14161e;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.52);
+
+  .el-dialog__header {
+    display: flex;
+    align-items: center;
+    min-height: 3.5rem;
+    margin: 0;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .el-dialog__title {
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .el-dialog__headerbtn {
+    top: 0;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    color: rgba(255, 255, 255, 0.6);
+
+    &:hover {
+      color: #fff;
+    }
+  }
+
+  .el-dialog__body {
+    max-height: min(68vh, 660px);
+    padding: 1.25rem 1.5rem 1.5rem;
+    overflow-y: auto;
+    color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+.novel-chat-dialog-content {
+  font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
+
+  .markdown-body {
+    color: inherit;
+    font-size: 1rem;
+    line-height: 1.8;
+  }
+
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body strong {
+    color: #fff;
+  }
+
+  .markdown-body code {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 0.25rem;
+    background: rgba(148, 163, 184, 0.14);
+    color: #c4d4ff;
+  }
 }
 </style>
