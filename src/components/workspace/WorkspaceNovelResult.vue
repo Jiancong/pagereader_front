@@ -754,41 +754,61 @@ async function askNovelAgent(question: string) {
   chatStreamingContent.value = ""
 
   try {
-    await sendAgentChatWithStream(
-      {
-        message,
-        userId: String(userId),
-        projectId: props.projectId,
-        sessionId,
-        isAgent: true,
-        intent: "novel_related_search",
-        locale: "zh-CN",
-        extra_body: {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
+        resolve()
+      }
+      const fail = (error: Error) => {
+        if (settled) return
+        settled = true
+        reject(error)
+      }
+
+      void sendAgentChatWithStream(
+        {
+          message,
+          userId: String(userId),
+          projectId: props.projectId,
+          sessionId,
+          isAgent: true,
           intent: "novel_related_search",
-          question,
-          novelTitle: props.result.title,
-          sectionId: section.id,
-          sectionTitle: section.label,
-          sectionContent: sectionText,
-          novelDataUrl: props.result.novelDataUrl,
+          locale: "zh-CN",
+          extra_body: {
+            intent: "novel_related_search",
+            question,
+            novelTitle: props.result.title,
+            sectionId: section.id,
+            sectionTitle: section.label,
+            sectionContent: sectionText,
+            novelDataUrl: props.result.novelDataUrl,
+          },
         },
-      },
-      (eventData) => {
-        const event = String(eventData.event || "").toLowerCase()
-        const data = (eventData.data || {}) as Record<string, unknown>
-        const text = getEventText(data)
-        if (event === "llm_text_stream_delta" && text) {
-          chatStreamingContent.value += text
-        } else if ((event === "knowledge_response" || event === "chat_response" || event === "llm_text_stream_end") && text) {
-          chatStreamingContent.value = text
-        }
-      },
-      () => {
-        ElMessage.error("Agent 对话请求失败")
-      },
-      () => {},
-      180_000,
-    )
+        (eventData) => {
+          const event = String(eventData.event || "").toLowerCase()
+          const data = (eventData.data || {}) as Record<string, unknown>
+          const text = getEventText(data)
+          if (event === "llm_text_stream_delta" && text) {
+            chatStreamingContent.value += text
+          } else if ((event === "knowledge_response" || event === "chat_response" || event === "llm_text_stream_end") && text) {
+            chatStreamingContent.value = text
+          }
+          // Document RAG commonly ends with knowledge_response instead of a
+          // separate complete event; otherwise the rail remains loading forever.
+          if (
+            event === "knowledge_response" ||
+            event === "chat_response" ||
+            event === "complete"
+          ) finish()
+          if (event === "error") fail(new Error(String(data.message || data.error || "agent stream error")))
+        },
+        fail,
+        finish,
+        180_000,
+      ).catch(fail)
+    })
     finalContent = chatStreamingContent.value.trim()
     if (!finalContent) throw new Error("empty agent response")
 

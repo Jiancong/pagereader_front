@@ -49,10 +49,10 @@
             </component>
           </div>
 
-          <template v-if="loading && pendingTerm">
+          <template v-if="loading">
             <div class="ppt-chat-rail-row ppt-chat-rail-row--user">
               <div class="ppt-chat-rail-bubble ppt-chat-rail-bubble--user">
-                <p class="ppt-chat-rail-bubble-text">{{ pendingTerm }}</p>
+                <p class="ppt-chat-rail-bubble-text">{{ pendingTerm || '…' }}</p>
               </div>
             </div>
             <div class="ppt-chat-rail-row ppt-chat-rail-row--ai">
