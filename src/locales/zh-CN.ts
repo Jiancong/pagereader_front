@@ -652,6 +652,7 @@ export default {
     translating: "翻译中…",
     error: "翻译失败",
     retry: "重试",
+    page: "页码",
     noFile: "未选择 PDF 文件，请返回重新上传。",
   },
   community: {

@@ -17,6 +17,22 @@
           </select>
         </label>
 
+        <div class="it-field it-field--pages">
+          <button class="it-btn it-btn--sm" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">‹</button>
+          <input
+            v-model.number="pageInput"
+            class="it-page-input"
+            type="number"
+            min="1"
+            :max="pageCount"
+            :aria-label="t('translate.page')"
+            @change="goToPage(pageInput)"
+            @keyup.enter="goToPage(pageInput)"
+          />
+          <span class="it-page-total">/ {{ pageCount || '—' }}</span>
+          <button class="it-btn it-btn--sm" :disabled="!pageCount || currentPage >= pageCount" @click="goToPage(currentPage + 1)">›</button>
+        </div>
+
         <div class="it-field it-field--zoom">
           <button class="it-btn it-btn--sm" @click="zoomOut" :disabled="scale <= 0.5">−</button>
           <span class="it-zoom-value">{{ Math.round(scale * 100) }}%</span>
@@ -34,17 +50,20 @@
     <!-- 阅读器 -->
     <PdfBilingualReader
       v-else
+      ref="readerRef"
       :file="file"
       :object-url="objectUrl"
       :target-lang="targetLang"
       :show-original="true"
       :scale="scale"
+      @page-change="onPageChange"
+      @page-count="onPageCount"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PdfBilingualReader from '@/components/translation/PdfBilingualReader.vue'
@@ -60,6 +79,10 @@ const fileName = computed(() => store.file?.name ?? '')
 
 const targetLang = ref<string>(locale.value === 'en' ? 'en' : 'zh')
 const scale = ref(1.2)
+const readerRef = ref<InstanceType<typeof PdfBilingualReader> | null>(null)
+const currentPage = ref(1)
+const pageCount = ref(0)
+const pageInput = ref(1)
 
 const langOptions = computed(() => [
   { value: 'zh', label: t('translate.langZh') },
@@ -80,6 +103,21 @@ function zoomIn() {
 function zoomOut() {
   scale.value = Math.max(0.5, +(scale.value - 0.2).toFixed(2))
 }
+function onPageChange(page: number) {
+  currentPage.value = page
+}
+function onPageCount(count: number) {
+  pageCount.value = count
+}
+function goToPage(page: number) {
+  if (!Number.isFinite(page) || !pageCount.value) return
+  const target = Math.min(Math.max(Math.trunc(page), 1), pageCount.value)
+  pageInput.value = target
+  readerRef.value?.goToPage(target)
+}
+watch(currentPage, (page) => {
+  pageInput.value = page
+})
 function goBack() {
   router.push({ name: 'landing' })
 }
@@ -147,6 +185,25 @@ onBeforeUnmount(() => {
 }
 .it-field--zoom {
   gap: 4px;
+}
+.it-field--pages {
+  gap: 5px;
+}
+.it-page-input {
+  width: 42px;
+  padding: 3px 4px;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 12px;
+  text-align: center;
+  outline: none;
+}
+.it-page-total {
+  min-width: 32px;
+  color: #d1d5db;
+  font-size: 12px;
 }
 .it-zoom-value {
   min-width: 42px;

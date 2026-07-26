@@ -671,6 +671,7 @@ export default {
     translating: "Translating…",
     error: "Translation failed",
     retry: "Retry",
+    page: "Page number",
     noFile: "No PDF selected. Please go back and upload one.",
   },
   community: {

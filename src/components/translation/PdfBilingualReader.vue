@@ -75,6 +75,10 @@ const props = defineProps<{
   showOriginal: boolean
   scale: number
 }>()
+const emit = defineEmits<{
+  (event: 'page-change', page: number): void
+  (event: 'page-count', count: number): void
+}>()
 
 const { t } = useI18n()
 
@@ -124,6 +128,8 @@ onMounted(async () => {
       })
     }
     pageMap.set(1, { viewport: baseViewport, lines: [], translations: [] })
+    emit('page-count', numPages)
+    emit('page-change', currentPageNum.value)
     loading.value = false
     await nextTick()
     setupObservers()
@@ -149,6 +155,7 @@ watch(() => props.targetLang, () => {
 })
 
 watch(currentPageNum, (pageNum) => {
+  emit('page-change', pageNum)
   pageSlots.forEach((slot) => {
     if (slot.pageNum !== pageNum) {
       slot.translating = false
@@ -203,6 +210,25 @@ function setupScrollSync() {
     orig.scrollTop = trans.scrollTop
     requestAnimationFrame(() => { syncingScroll = false })
   })
+}
+
+function goToPage(page: number) {
+  const target = Math.min(Math.max(Math.trunc(page), 1), pageSlots.length)
+  if (!target) return
+
+  const originalPage = origScrollRef.value?.querySelector<HTMLElement>(
+    `.pdf-page[data-page-num="${target}"]`,
+  )
+  const translationPage = transScrollRef.value?.querySelector<HTMLElement>(
+    `.pdf-page[data-page-num="${target}"]`,
+  )
+  if (!originalPage || !translationPage) return
+
+  syncingScroll = true
+  origScrollRef.value!.scrollTop = originalPage.offsetTop
+  transScrollRef.value!.scrollTop = translationPage.offsetTop
+  requestAnimationFrame(() => { syncingScroll = false })
+  currentPageNum.value = target
 }
 
 function clearNonCurrentTranslationLayers() {
@@ -562,6 +588,8 @@ function cleanupPage(pageNum: number) {
   }
   renderedPages.delete(pageNum)
 }
+
+defineExpose({ goToPage })
 </script>
 
 <style scoped>
