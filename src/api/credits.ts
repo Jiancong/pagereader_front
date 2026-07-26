@@ -3,6 +3,7 @@
 
 import { get } from "./client"
 import { getMyStatus } from "./subscribe"
+import { getCurrentUserId } from "./token"
 import type { CreditsAccount, CreditsAccountRaw, SubscribeMyStatus } from "./types"
 
 /** 将 /credits/account 嵌套响应扁平化为 UI 余额字段 */
@@ -27,7 +28,13 @@ export function normalizeCreditsAccount(
 }
 
 export async function getAccount(): Promise<CreditsAccount> {
-  const raw = await get<CreditsAccountRaw>("/credits/account")
+  const userId = getCurrentUserId()
+  if (!userId) {
+    throw new Error("无法从登录信息读取用户 ID")
+  }
+  const raw = await get<CreditsAccountRaw>("/credits/account", {
+    query: { userId },
+  })
   return normalizeCreditsAccount(raw)
 }
 

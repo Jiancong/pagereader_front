@@ -39,3 +39,31 @@ export function clearLocalAvatar(): void {
 export function isLoggedIn(): boolean {
   return !!getToken()
 }
+
+/** 从登录 JWT 的 USER-INFO 声明读取当前用户 ID，供需显式 userId 的旧接口使用。 */
+export function getCurrentUserId(): number | undefined {
+  const token = getToken()?.replace(/^Bearer\s+/i, "")
+  if (!token || typeof window === "undefined") return undefined
+
+  try {
+    const payload = token.split(".")[1]
+    if (!payload) return undefined
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/")
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")
+    const json = decodeURIComponent(
+      Array.from(atob(padded))
+        .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`)
+        .join(""),
+    )
+    const claims = JSON.parse(json) as {
+      "USER-INFO"?: { id?: number | string }
+      userInfo?: { id?: number | string }
+      id?: number | string
+    }
+    const id = claims["USER-INFO"]?.id ?? claims.userInfo?.id ?? claims.id
+    const userId = typeof id === "number" ? id : Number(id)
+    return Number.isFinite(userId) && userId > 0 ? userId : undefined
+  } catch {
+    return undefined
+  }
+}
