@@ -670,6 +670,7 @@ export default {
     loadingDoc: "Loading PDF…",
     translating: "Translating…",
     error: "Translation failed",
+    retry: "Retry",
     noFile: "No PDF selected. Please go back and upload one.",
   },
   community: {

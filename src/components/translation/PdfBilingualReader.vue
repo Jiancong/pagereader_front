@@ -39,7 +39,12 @@
             <canvas class="pdf-page__translation-canvas"></canvas>
             <div class="pdf-page__translationlayer"></div>
             <div v-if="p.translating" class="pdf-page__badge">{{ t('translate.translating') }}</div>
-            <div v-else-if="p.translateError" class="pdf-page__badge pdf-page__badge--error">{{ t('translate.error') }}</div>
+            <div v-else-if="p.translateError" class="pdf-page__badge pdf-page__badge--error">
+              <span>{{ t('translate.error') }}</span>
+              <button class="pdf-page__retry" type="button" @click="retryTranslation(p.pageNum)">
+                {{ t('translate.retry') }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -421,6 +426,19 @@ async function translateCurrentPage() {
   await translatePage(pageNum, entry.lines, transLayer, entry.viewport)
 }
 
+async function retryTranslation(pageNum: number) {
+  const slot = pageSlots.find((item) => item.pageNum === pageNum)
+  if (!slot || slot.translating) return
+
+  slot.translateError = false
+  if (pageNum !== currentPageNum.value) {
+    currentPageNum.value = pageNum
+    return
+  }
+
+  await translateCurrentPage()
+}
+
 const CACHE_SCHEMA = 'v3'
 
 function cacheMatchesTexts(cached: { lines: string[]; translations: string[] }, texts: string[]): boolean {
@@ -651,5 +669,18 @@ function cleanupPage(pageNum: number) {
 }
 .pdf-page__badge--error {
   background: rgba(220, 38, 38, 0.85);
+}
+.pdf-page__retry {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.pdf-page__retry:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 </style>

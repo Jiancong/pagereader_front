@@ -651,6 +651,7 @@ export default {
     loadingDoc: "正在加载 PDF…",
     translating: "翻译中…",
     error: "翻译失败",
+    retry: "重试",
     noFile: "未选择 PDF 文件，请返回重新上传。",
   },
   community: {
