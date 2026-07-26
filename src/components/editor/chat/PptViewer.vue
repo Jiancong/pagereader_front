@@ -662,7 +662,7 @@
     />
   </div>
 
-    <PptChatHistoryRail
+    <ChatHistoryRail
       v-if="showChatHistoryRail && !isPresentationFullscreen"
       v-model:collapsed="chatHistoryRailCollapsed"
       :items="chatHistoryRailItems"
@@ -707,7 +707,7 @@ import PptMetricCardsRow from "@/components/editor/chat/PptMetricCardsRow.vue";
 import PptChartSourceLine from "@/components/editor/chat/PptChartSourceLine.vue";
 import PptContextMenu from "@/components/editor/chat/PptContextMenu.vue";
 import PptRelatedSearchPanel from "@/components/editor/chat/PptRelatedSearchPanel.vue";
-import PptChatHistoryRail from "@/components/editor/chat/PptChatHistoryRail.vue";
+import ChatHistoryRail from "@/components/editor/chat/ChatHistoryRail.vue";
 import PptVideoExportDialog, { type VideoCaptureResult } from "@/components/editor/chat/PptVideoExportDialog.vue";
 import type { VideoOrientation } from "@/utils/pptVideoExport";
 import PptEditorialBrutalistSlide from "@/components/editor/chat/ppt/themes/editorialBrutalist/PptEditorialBrutalistSlide.vue";

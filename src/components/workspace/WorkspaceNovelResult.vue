@@ -165,6 +165,17 @@
           </template>
         </div>
       </article>
+
+      <ChatHistoryRail
+        v-if="projectId"
+        v-model:collapsed="chatCollapsed"
+        :items="chatItems"
+        :loading="chatLoading"
+        :pending-term="chatPendingQuestion"
+        :streaming-content="chatStreamingContent"
+        @submit-question="askNovelAgent"
+        @open-detail="openChatDetail"
+      />
     </div>
 
     <div v-else class="space-y-4 p-4 sm:p-6">
@@ -190,6 +201,10 @@
       @delete="onMenuDelete"
       @close="closeAnnotMenu"
     />
+
+    <el-dialog v-model="chatDetailVisible" :title="chatDetailTitle" width="min(760px, calc(100vw - 2rem))">
+      <ChatMarkdownBody :content="chatDetailContent" root-class="novel-guide-markdown" />
+    </el-dialog>
   </div>
 </template>
 
@@ -198,11 +213,14 @@ import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
 import ChatMarkdownBody from "@/components/editor/chat/ChatMarkdownBody.vue"
+import ChatHistoryRail from "@/components/editor/chat/ChatHistoryRail.vue"
 import NovelAnnotationMenu from "@/components/workspace/NovelAnnotationMenu.vue"
 import NovelGuideOutlineList from "@/components/workspace/NovelGuideOutlineList.vue"
 import { annotationApi, projectApi } from "@/api"
-import { getToken } from "@/api/token"
-import type { ProjectAnnotation } from "@/api/types"
+import { getCurrentUserId, getToken } from "@/api/token"
+import { appendProjectConversationMessage, getProjectConversationHistory } from "@/api/feed"
+import type { ConversationHistoryVo, ProjectAnnotation } from "@/api/types"
+import { sendAgentChatWithStream } from "@/request/agent"
 import { buildFontFamilyCss, ensureExportFontsReady } from "@/composables/useFontLoader"
 import { useNovelGuidePlayAll } from "@/composables/useNovelGuidePlayAll"
 import { downloadMarkdownFile, sanitizeDownloadBasename } from "@/utils/downloadMarkdownFile"
@@ -250,6 +268,15 @@ const activeSectionId = ref("")
 const articleRef = ref<HTMLElement | null>(null)
 const coverInputRef = ref<HTMLInputElement | null>(null)
 const coverUploading = ref(false)
+type NovelChatItem = { id: string | number; role: "user" | "assistant"; content: string; term?: string }
+const chatCollapsed = ref(false)
+const chatItems = ref<NovelChatItem[]>([])
+const chatLoading = ref(false)
+const chatPendingQuestion = ref("")
+const chatStreamingContent = ref("")
+const chatDetailVisible = ref(false)
+const chatDetailTitle = ref("")
+const chatDetailContent = ref("")
 let lastPlaybackScrollTarget: HTMLElement | null = null
 let playbackPageStartedAt = 0
 let playbackPageEstimateMs = 60_000
@@ -669,8 +696,134 @@ watch(
   { immediate: true },
 )
 
+function novelChatHistoryFromRows(rows: ConversationHistoryVo[]): NovelChatItem[] {
+  return rows
+    .filter((row) => {
+      const meta = row.metadata as Record<string, unknown> | undefined
+      return meta?.intent === "novel_related_search" || meta?.type === "novel_related_search"
+    })
+    .sort((a, b) => (a.sequenceNumber ?? 0) - (b.sequenceNumber ?? 0))
+    .map((row) => ({
+      id: row.id,
+      role: row.role,
+      content: String(row.markdown || row.content || "").trim(),
+      term: row.role === "assistant" ? String((row.metadata as Record<string, unknown>)?.question || "") : undefined,
+    }))
+    .filter((item) => item.content)
+}
+
+async function loadNovelChatHistory() {
+  if (!props.projectId) return
+  try {
+    chatItems.value = novelChatHistoryFromRows(await getProjectConversationHistory(props.projectId))
+  } catch {
+    // 历史读取失败不阻断导读正文。
+  }
+}
+
+function getEventText(data: Record<string, unknown>): string {
+  const value = data.response ?? data.message ?? data.full_text ?? data.content ?? data.delta ?? data.text ?? data.chunk
+  return value == null ? "" : String(value)
+}
+
+function openChatDetail(payload: { term?: string; content: string }) {
+  chatDetailTitle.value = payload.term || t("workspace.chatHistory")
+  chatDetailContent.value = payload.content
+  chatDetailVisible.value = true
+}
+
+async function askNovelAgent(question: string) {
+  const userId = getCurrentUserId()
+  const section = activeSection.value
+  if (!userId || !props.projectId || !section || chatLoading.value) {
+    ElMessage.warning("请登录并选择文档章节后再提问")
+    return
+  }
+
+  const sectionText = section.markdown.slice(0, 12_000)
+  const message = [
+    `请仅根据文档导读《${props.result.title || "当前文档"}》及当前章节回答问题。`,
+    `当前章节：${section.label}`,
+    `章节内容：\n${sectionText}`,
+    `用户问题：${question}`,
+  ].join("\n\n")
+  const sessionId = `novel-related-${Date.now()}`
+  let finalContent = ""
+  chatLoading.value = true
+  chatPendingQuestion.value = question
+  chatStreamingContent.value = ""
+
+  try {
+    await sendAgentChatWithStream(
+      {
+        message,
+        userId: String(userId),
+        projectId: props.projectId,
+        sessionId,
+        isAgent: true,
+        intent: "novel_related_search",
+        locale: "zh-CN",
+        extra_body: {
+          intent: "novel_related_search",
+          question,
+          novelTitle: props.result.title,
+          sectionId: section.id,
+          sectionTitle: section.label,
+          sectionContent: sectionText,
+          novelDataUrl: props.result.novelDataUrl,
+        },
+      },
+      (eventData) => {
+        const event = String(eventData.event || "").toLowerCase()
+        const data = (eventData.data || {}) as Record<string, unknown>
+        const text = getEventText(data)
+        if (event === "llm_text_stream_delta" && text) {
+          chatStreamingContent.value += text
+        } else if ((event === "knowledge_response" || event === "chat_response" || event === "llm_text_stream_end") && text) {
+          chatStreamingContent.value = text
+        }
+      },
+      () => {
+        ElMessage.error("Agent 对话请求失败")
+      },
+      () => {},
+      180_000,
+    )
+    finalContent = chatStreamingContent.value.trim()
+    if (!finalContent) throw new Error("empty agent response")
+
+    const now = Date.now()
+    chatItems.value.push(
+      { id: `novel-user-${now}`, role: "user", content: question },
+      { id: `novel-ai-${now}`, role: "assistant", content: finalContent, term: question },
+    )
+    await Promise.all([
+      appendProjectConversationMessage(props.projectId, {
+        sessionId,
+        role: "user",
+        content: question,
+        metadata: { intent: "novel_related_search", type: "novel_related_search", question, sectionId: section.id, sectionTitle: section.label },
+      }),
+      appendProjectConversationMessage(props.projectId, {
+        sessionId,
+        role: "assistant",
+        content: finalContent,
+        markdown: finalContent,
+        metadata: { intent: "novel_related_search", type: "novel_related_search", question, sectionId: section.id, sectionTitle: section.label },
+      }),
+    ])
+  } catch {
+    if (!finalContent && !chatStreamingContent.value.trim()) ElMessage.error("Agent 暂未返回有效回答，请稍后重试")
+  } finally {
+    chatLoading.value = false
+    chatPendingQuestion.value = ""
+    chatStreamingContent.value = ""
+  }
+}
+
 onMounted(() => {
   void ensureExportFontsReady("SimSun")
+  void loadNovelChatHistory()
   window.addEventListener("pointerdown", onAnnotMenuPointerDown, true)
   window.addEventListener("scroll", closeAnnotMenuOnScroll, true)
   window.addEventListener("resize", closeAnnotMenu)
