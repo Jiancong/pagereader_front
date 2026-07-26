@@ -1,5 +1,5 @@
 <template>
-  <div :class="pptData ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)] overflow-x-hidden' : 'mx-auto w-full min-w-0 max-w-5xl overflow-x-hidden'">
+  <div :class="(pptData || novelResult) ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)] overflow-x-hidden' : 'mx-auto w-full min-w-0 max-w-5xl overflow-x-hidden'">
     <button
       class="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       @click="$emit('back')"
