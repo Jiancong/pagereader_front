@@ -5,14 +5,14 @@
     </div>
     <template v-else-if="status">
       <p class="font-medium text-foreground">{{ planLabel }}</p>
-      <p v-if="paypalStatus" class="mt-0.5 text-[11px] text-muted-foreground">
-        {{ t('billing.paypalStatus') }}: {{ paypalStatus }}
+      <p v-if="showPaymentStatus" class="mt-0.5 text-[11px] text-muted-foreground">
+        {{ t('billing.paymentStatus') }}: {{ paymentStatusLabel }}
       </p>
       <p class="mt-1 font-medium text-foreground">
         {{ t('billing.totalCredits') }}: {{ totalRemaining }}
       </p>
       <p class="text-[11px] text-muted-foreground">
-        {{ t('billing.creditsBreakdown', { daily: dailyRemaining, pkg: packageRemaining, total: totalRemaining }) }}
+        {{ t('billing.creditsBreakdown', { daily: dailyRemaining, pkg: packageRemaining }) }}
       </p>
       <p class="mt-1 text-[11px] leading-snug">{{ t('billing.dailyHint') }}</p>
       <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1">
@@ -85,10 +85,23 @@ const planLabel = computed(() => {
   return String(s.displayName ?? s.planType ?? t('billing.noPlan'))
 })
 
-const paypalStatus = computed(() => {
+/** 是否展示支付/订阅状态行：免费用户（subscriptionStatus=NONE 或 planType=FREE）隐藏 */
+const showPaymentStatus = computed(() => {
   const s = status.value
-  if (!s?.paypalStatus) return ''
-  return String(s.paypalStatus)
+  if (!s) return false
+  const ss = String(s.subscriptionStatus ?? '').toUpperCase()
+  if (ss === 'NONE') return false
+  const pt = String(s.planType ?? '').toUpperCase()
+  if (!pt || pt === 'FREE') return false
+  return !!s.paypalStatus
+})
+
+/** 支付状态展示文案：微信返回 WECHAT_PAY 时本地化，其余直接显示后端值 */
+const paymentStatusLabel = computed(() => {
+  const s = status.value
+  const ps = String(s?.paypalStatus ?? '').toUpperCase()
+  if (ps === 'WECHAT_PAY') return t('billing.wechatPay')
+  return String(s?.paypalStatus ?? '')
 })
 
 function resolveCancelPlanId(s) {

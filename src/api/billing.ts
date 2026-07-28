@@ -19,18 +19,25 @@ function parseCredits(v: unknown): number {
 
 export function getDailyCreditsRemaining(status: SubscribeMyStatus | null | undefined): number {
   if (!status) return 0
+  // 后端真相字段：currentDailyCredits（/subscribe/my/status 的"今日剩余"）、
+  // dailyFreeCreditsRemaining（/credits/account 的同义字段）。
+  // 兜底：/credits/account 的 dailyFreeCredits 在该接口里表示剩余，可作为最后回退。
+  // 注意：/subscribe/my/status 的 dailyFreeCredits 是"计划额度"而非剩余，
+  //       normalize 阶段不会把它写入 dailyFreeCreditsRemaining，所以这里只信剩余字段。
   return parseCredits(
-    status.dailyFreeCreditsRemaining ?? status.dailyFreeCredits ?? status.freeDailyCredits,
+    status.dailyFreeCreditsRemaining ?? status.currentDailyCredits,
   )
 }
 
 export function getPackageCreditsRemaining(status: SubscribeMyStatus | null | undefined): number {
   if (!status) return 0
+  // 后端真相字段：planCredits（/credits/account 主字段）、currentPlanCredits（/subscribe/my/status 别名）。
+  // monthlyFastCredits 是"每月发放额度"不是剩余，绝不可作为剩余读取。
   return parseCredits(
-    status.monthlyCreditsRemaining ??
+    status.planCredits ??
       status.packageCreditsRemaining ??
-      status.packageCredits ??
-      status.monthlyCredits,
+      status.currentPlanCredits ??
+      status.packageCredits,
   )
 }
 

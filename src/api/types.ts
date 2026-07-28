@@ -577,15 +577,29 @@ export interface SubscribeMyStatusRaw {
   subscription?: Record<string, unknown> | null
 }
 
-/** GET /credits/account 原始 data 结构 */
+/** GET /credits/account 原始 data 结构。
+ *  后端真相：totalCredits = dailyFreeCredits + planCredits（仅两列）。
+ *  - dailyFreeCredits：每日免费积分剩余（UTC 0 点重置，不累积）
+ *  - planCredits：套餐/付费积分剩余（订阅、加购 pass、退款回滚全部合并写入）
+ *  - monthlyFastCredits：套餐每月发放额度（仅展示用，不是剩余！）
+ */
 export interface CreditsAccountRaw {
+  /** 每日免费剩余（后端主字段，/credits/account 返回） */
   dailyFreeCredits?: number
+  /** 每日免费剩余（/subscribe/my/status 历史别名） */
   dailyFreeCreditsRemaining?: number
+  /** 每日免费剩余（/subscribe/my/status 别名；与下面额度字段同名但语义不同） */
   currentDailyCredits?: number
+  /** 套餐剩余（/credits/account 主字段，后端真相） */
+  planCredits?: number
+  /** 套餐剩余（/subscribe/my/status 历史别名，等价于 planCredits） */
+  currentPlanCredits?: number
+  /** 套餐每月发放额度（不是剩余！仅展示参考） */
+  monthlyFastCredits?: number
+  /** 历史别名，等价 planCredits；保留兼容 */
   packageCredits?: number
   packageCreditsRemaining?: number
-  currentPlanCredits?: number
-  monthlyFastCredits?: number
+  /** 合计 = dailyFreeCredits + planCredits */
   totalCredits?: number
   credits?: SubscribeMyStatusCredits
 }
@@ -599,6 +613,7 @@ export type CreditsAccount = Pick<
   | "monthlyCredits"
   | "monthlyCreditsRemaining"
   | "packageCreditsRemaining"
+  | "planCredits"
   | "totalCredits"
 >
 
@@ -606,6 +621,9 @@ export type CreditsAccount = Pick<
 export interface SubscribeMyStatus {
   planType?: string
   displayName?: string
+  /** 外层订阅状态：NONE=免费用户 / 视到期=微信 / ACTIVE 等=PayPal */
+  subscriptionStatus?: string
+  /** PayPal 订阅实时状态：null=免费或微信用户；ACTIVE / CANCELLED / SUSPENDED / EXPIRED=PayPal */
   paypalStatus?: string
   /** PayPal plan_id，取消订阅时使用 */
   paypalPlanId?: string
@@ -614,9 +632,15 @@ export interface SubscribeMyStatus {
   canCancel?: boolean
   dailyFreeCredits?: number
   dailyFreeCreditsRemaining?: number
+  /** 每日免费剩余（/subscribe/my/status 历史字段，normalize 后已并入 dailyFreeCreditsRemaining） */
+  currentDailyCredits?: number
   packageCredits?: number
   monthlyCredits?: number
   monthlyCreditsRemaining?: number
+  /** 套餐剩余（后端唯一真相字段） */
+  planCredits?: number
+  /** 套餐剩余（/subscribe/my/status 别名，normalize 后已并入 planCredits） */
+  currentPlanCredits?: number
   totalCredits?: number
   [key: string]: unknown
 }

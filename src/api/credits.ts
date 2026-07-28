@@ -6,23 +6,33 @@ import { getMyStatus } from "./subscribe"
 import { getCurrentUserId } from "./token"
 import type { CreditsAccount, CreditsAccountRaw, SubscribeMyStatus } from "./types"
 
-/** 将 /credits/account 嵌套响应扁平化为 UI 余额字段 */
+/** 将 /credits/account 嵌套响应扁平化为 UI 余额字段。
+ *  后端真相：planCredits 是套餐剩余的主字段，currentPlanCredits 是历史别名。
+ *  dailyFreeCredits 在此接口表示"剩余"，与 /subscribe/my/status 中表示"额度"语义不同。
+ */
 export function normalizeCreditsAccount(
   raw: CreditsAccountRaw | null | undefined,
 ): CreditsAccount {
   if (!raw || typeof raw !== "object") return {}
 
   const credits = raw.credits ?? raw
+  const planCredits =
+    credits.planCredits ??
+    credits.currentPlanCredits ??
+    credits.packageCredits ??
+    credits.packageCreditsRemaining
+  const dailyFree =
+    credits.currentDailyCredits ??
+    credits.dailyFreeCreditsRemaining ??
+    credits.dailyFreeCredits
   return {
-    dailyFreeCredits: credits.dailyFreeCredits,
-    dailyFreeCreditsRemaining:
-      credits.currentDailyCredits ??
-      credits.dailyFreeCreditsRemaining ??
-      credits.dailyFreeCredits,
-    packageCredits: credits.monthlyFastCredits ?? credits.packageCredits ?? credits.currentPlanCredits,
+    dailyFreeCredits: credits.dailyFreeCredits ?? dailyFree,
+    dailyFreeCreditsRemaining: dailyFree,
+    packageCredits: planCredits,
     monthlyCredits: credits.monthlyFastCredits,
-    monthlyCreditsRemaining: credits.currentPlanCredits ?? credits.packageCreditsRemaining,
-    packageCreditsRemaining: credits.currentPlanCredits ?? credits.packageCreditsRemaining,
+    monthlyCreditsRemaining: credits.monthlyFastCredits,
+    packageCreditsRemaining: planCredits,
+    planCredits,
     totalCredits: credits.totalCredits,
   }
 }
