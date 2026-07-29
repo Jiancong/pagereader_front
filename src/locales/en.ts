@@ -826,6 +826,10 @@ export default {
     pptShareNoProject: "No project to share",
     pptShareLinkCopied: "Link copied",
     pptShareCopyFailed: "Copy failed",
+    pptShareLinkedInPreparing: "Writing an English summary…",
+    pptShareLinkedInReadyCopied:
+      "English post pre-filled on LinkedIn — it's also on your clipboard if you need to paste it.",
+    pptShareLinkedInReady: "English post pre-filled on LinkedIn.",
     pptExportGoogleSlidesHint: "Upload the exported PPTX to Google Slides",
     pptExporting: "Exporting…",
     pptExportCapturing: "Rendering slide {current}/{total}…",

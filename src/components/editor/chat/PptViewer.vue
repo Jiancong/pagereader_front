@@ -731,6 +731,7 @@ import {
 } from "@/utils/pptChatHistoryDisplay";
 import { uploadedDocumentsFromPptData } from "@/utils/pptDocumentRag";
 import { buildExploreProjectShareUrl } from "@/utils/feedOpen";
+import { translateBatch } from "@/api/translation";
 import { gtmRelatedSearch } from "@/composables/useGtmDataLayer";
 import { resolveContextSelectionText } from "@/utils/pptContextSelection";
 import {
@@ -5335,15 +5336,119 @@ async function copyShareLink() {
   }
 }
 
+// ── LinkedIn 分享文案（英文 summary + 引导点击） ────────────────────────────
+// LinkedIn 官方 share-offsite 只支持 url 参数，无法预填文案；
+// 这里改用 /feed/?shareActive=true&text= 预填帖子内容，并同步复制到剪贴板兜底。
+const LINKEDIN_TAKEAWAY_MAX = 4;
+const LINKEDIN_TAKEAWAY_TEXT_MAX = 110;
+const LINKEDIN_CJK_RE = /[㐀-䶿一-鿿豈-﫿぀-ヿ가-힯]/;
+
+function cleanShareText(text: unknown): string {
+  return stripPptInlineMarkdown(String(text ?? ""))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function truncateShareText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
+/** 收集 deck 中适合作为分享要点的文本（跳过封面/目录/结尾/引用等版面） */
+function collectLinkedInTakeaways(deck: PptData): string[] {
+  const skipLayouts = new Set(["cover", "end", "toc", "references", "quote"]);
+  const points: string[] = [];
+  for (const slide of deck?.slides ?? []) {
+    if (skipLayouts.has(String(slide.layout ?? ""))) continue;
+    const lines = [
+      ...(slide.content ?? []),
+      ...(slide.left_content ?? []),
+      ...(slide.right_content ?? []),
+    ]
+      .map(cleanShareText)
+      .filter(Boolean);
+    for (const line of lines) {
+      points.push(truncateShareText(line, LINKEDIN_TAKEAWAY_TEXT_MAX));
+      if (points.length >= LINKEDIN_TAKEAWAY_MAX) return points;
+    }
+  }
+  return points;
+}
+
+/** 含 CJK 时批量翻译成英文；翻译失败则降级保留原文，保证分享流程不中断 */
+async function toEnglishShareTexts(texts: string[]): Promise<string[]> {
+  if (!texts.length || !texts.some((text) => LINKEDIN_CJK_RE.test(text))) return texts;
+  try {
+    const res = await translateBatch({ texts, targetLang: "en" });
+    return texts.map((text, i) => cleanShareText(res.translations?.[i]) || text);
+  } catch {
+    return texts;
+  }
+}
+
+/** 生成英文 LinkedIn 分享文案：标题 + 简介 + 要点 + 引导点击 + 链接 */
+async function buildLinkedInShareText(url: string): Promise<string> {
+  const deck = pptSource.value;
+  const brand = t("app.brand");
+  const rawTitle = cleanShareText(deck?.title) || "Presentation";
+  const rawSubtitle = cleanShareText(deck?.subtitle);
+  const rawPoints = collectLinkedInTakeaways(deck);
+
+  const [title, subtitle, ...points] = await toEnglishShareTexts([
+    rawTitle,
+    rawSubtitle,
+    ...rawPoints,
+  ]);
+
+  const lines: string[] = [`📊 ${truncateShareText(title, 120)}`];
+  if (subtitle) {
+    lines.push("", truncateShareText(subtitle, 180));
+  }
+  if (points.length) {
+    lines.push("", "Key takeaways:");
+    for (const point of points) lines.push(`• ${point}`);
+  }
+  const slideCount = deck?.slides?.length ?? 0;
+  const cta =
+    slideCount > 0
+      ? `👉 I turned this into a ${slideCount}-slide interactive deck with ${brand} — click to explore the full presentation:`
+      : "👉 Click to explore the full interactive presentation:";
+  lines.push("", cta, url, "", `#${brand} #AI #Presentation #KeyTakeaways`);
+  return lines.join("\n");
+}
+
 async function shareToLinkedIn() {
   const url = buildShareUrl();
   if (!url) {
     ElMessage.warning(t("agent.pptShareNoProject"));
     return;
   }
-  const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
-  window.open(shareUrl, "_blank", "noopener,noreferrer");
   closeShareMenu();
+  const preparing = ElMessage({
+    message: t("agent.pptShareLinkedInPreparing"),
+    type: "info",
+    duration: 0,
+    grouping: true,
+  });
+  let text: string;
+  try {
+    text = await buildLinkedInShareText(url);
+  } finally {
+    preparing.close();
+  }
+  // 兜底：LinkedIn 预填未生效时，用户可直接粘贴剪贴板中的文案
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    copied = true;
+  } catch {
+    /* 剪贴板不可用时忽略 */
+  }
+  const shareUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(text)}`;
+  window.open(shareUrl, "_blank", "noopener,noreferrer");
+  ElMessage.success(
+    t(copied ? "agent.pptShareLinkedInReadyCopied" : "agent.pptShareLinkedInReady"),
+  );
 }
 
 async function exportGoogleSlides() {

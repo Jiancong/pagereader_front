@@ -807,6 +807,10 @@ export default {
     pptShareNoProject: "暂无可分享的项目",
     pptShareLinkCopied: "链接已复制",
     pptShareCopyFailed: "复制失败",
+    pptShareLinkedInPreparing: "正在生成英文分享文案…",
+    pptShareLinkedInReadyCopied:
+      "英文分享文案已预填到 LinkedIn，同时已复制到剪贴板，如未生效可直接粘贴",
+    pptShareLinkedInReady: "英文分享文案已预填到 LinkedIn",
     pptExportGoogleSlidesHint: "请将导出的 PPTX 上传到 Google Slides",
     pptExporting: "正在导出...",
     pptExportCapturing: "正在渲染第 {current}/{total} 页...",
