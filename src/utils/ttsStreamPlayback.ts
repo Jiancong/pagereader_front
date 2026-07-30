@@ -357,6 +357,11 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
           },
           requestController.signal,
         )
+      } catch (error) {
+        // 后续预取批次不会走外层 try/catch，这里统一拦截（含 HTTP 200 业务错误体）
+        if (requestController.signal.aborted) return
+        stop()
+        options.onError(error instanceof Error ? error.message : String(error))
       } finally {
         inflightRanges.delete(rangeKey)
         activeBatches -= 1
@@ -370,6 +375,7 @@ export function createTtsSequentialPlayer(options: TtsSequentialPlayerOptions) {
       if (abortController === requestController) abortController = null
       checkStreamDone()
     } catch (error) {
+      // runBatch 已自行 onError；此处兜底未预期异常
       if (requestController.signal.aborted) return
       if (abortController === requestController) abortController = null
       stop()

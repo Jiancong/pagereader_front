@@ -2,9 +2,10 @@
 // @author hc @date 2026-06-03
 
 import { buildUrl, ApiError, postJson } from "./client"
-import { getToken } from "./token"
+import { clearToken, getToken } from "./token"
 import { getSavedLocale } from "@/composables/useAppLocale"
 import { getApiContextHeaders } from "@/utils/apiRequestContext"
+import { ReponseCodes } from "@/request/response-codes"
 import type {
   ChatStreamCancelReq,
   ChatStreamReq,
@@ -508,27 +509,100 @@ function parseSseBlock(block: string): { event: string; data: string } | null {
   return { event, data: dataLines.join("\n") }
 }
 
+/** 解析 HTTP 200 却返回的业务错误体（如 { code: 900111, message: "User not logged in" }） */
+function parseTtsBusinessError(text: string, fallbackStatus: number): ApiError | null {
+  const trimmed = String(text || "").trim()
+  if (!trimmed.startsWith("{")) return null
+  try {
+    const body = JSON.parse(trimmed) as {
+      code?: number | string
+      message?: string
+      msg?: string
+      error?: string
+      success?: boolean
+    }
+    if (body == null || typeof body !== "object" || !("code" in body)) return null
+    if (body.success === true) return null
+    const codeNum = Number(body.code)
+    if (!Number.isFinite(codeNum) || codeNum === ReponseCodes.SUCCESS) return null
+    let msg =
+      body.message ||
+      body.msg ||
+      body.error ||
+      `请求失败：${codeNum || fallbackStatus}`
+    if (
+      codeNum === ReponseCodes.NO_AUTH ||
+      codeNum === ReponseCodes.REFRESH_TOKEN_EXPIRED
+    ) {
+      msg = getSavedLocale() === "en" ? "Please log in again" : "未登录或登录已过期"
+    }
+    return new ApiError(codeNum || fallbackStatus, msg)
+  } catch {
+    return null
+  }
+}
+
+function applyTtsAuthSideEffect(error: ApiError): void {
+  if (
+    error.code === ReponseCodes.NO_AUTH ||
+    error.code === ReponseCodes.REFRESH_TOKEN_EXPIRED ||
+    error.code === 401
+  ) {
+    clearToken()
+  }
+}
+
+function throwTtsResponseError(text: string, status: number): never {
+  const biz = parseTtsBusinessError(text, status)
+  if (biz) {
+    applyTtsAuthSideEffect(biz)
+    throw biz
+  }
+  throw new Error(text || `请求失败：${status}`)
+}
+
 async function readTtsSseResponse(
   res: Response,
   cb: TtsStreamCallbacks = {},
   signal?: AbortSignal,
 ): Promise<void> {
-  if (!res.ok || !res.body) {
+  if (!res.body) {
     const text = await res.text().catch(() => "")
-    try {
-      const body = JSON.parse(text) as {
-        code?: number | string
-        message?: string
-        msg?: string
-        error?: string
-      }
-      const code = body.code ?? res.status
-      const msg = body.message || body.msg || body.error || text || `请求失败：${res.status}`
-      throw new ApiError(Number(code) || res.status, msg)
-    } catch (error) {
-      if (error instanceof ApiError) throw error
-      throw new Error(text || `请求失败：${res.status}`)
+    throwTtsResponseError(text, res.status)
+  }
+
+  const contentType = (res.headers.get("content-type") || "").toLowerCase()
+  // 鉴权/网关常以 HTTP 200 + application/json 返回 { code, message }，而非 SSE
+  if (!res.ok || contentType.includes("application/json")) {
+    const text = await res.text().catch(() => "")
+    throwTtsResponseError(text, res.status)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+
+  // Content-Type 缺失或伪装成 event-stream 时，先 peek 首包，拦截 JSON 业务错误
+  while (!buffer.trim()) {
+    if (signal?.aborted) return
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n")
+  }
+
+  const peek = buffer.trim()
+  if (
+    peek.startsWith("{") &&
+    !/^(?:event:|data:|:)/m.test(peek) &&
+    /"code"\s*:/.test(peek)
+  ) {
+    while (true) {
+      if (signal?.aborted) return
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
     }
+    throwTtsResponseError(buffer, res.status)
   }
 
   cb.onConnected?.()
@@ -589,25 +663,29 @@ async function readTtsSseResponse(
           : (data as { message?: string; error?: string })?.message ??
             (data as { error?: string })?.error ??
             "语音生成失败"
+      // SSE error 事件里也可能夹带业务码（如未登录）；抛出让上层统一弹通知
+      if (data && typeof data === "object" && "code" in (data as object)) {
+        const biz = parseTtsBusinessError(JSON.stringify(data), res.status)
+        if (biz) {
+          applyTtsAuthSideEffect(biz)
+          throw biz
+        }
+      }
       cb.onError?.(msg, data)
     }
   }
 
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ""
-
   while (true) {
     if (signal?.aborted) break
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n")
     let idx
     while ((idx = buffer.indexOf("\n\n")) !== -1) {
       const block = buffer.slice(0, idx)
       buffer = buffer.slice(idx + 2)
       if (block.trim()) dispatch(block)
     }
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n")
   }
   if (buffer.trim()) dispatch(buffer)
 }
