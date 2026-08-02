@@ -624,6 +624,7 @@ export default {
     novelAnnotateDeleted: "Deleted",
     novelAnnotateDeleteFailed: "Delete failed, please try again",
     novelAnnotateSelectFirst: "Select some text first to highlight",
+    novelAnnotateDuplicateSynced: "This passage is already highlighted",
     openInPlayer: "Open in player",
     assets: {
       nav: "Assets",

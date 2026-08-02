@@ -153,7 +153,13 @@ export interface RestoreOptions {
  */
 export function restoreHighlights(
   root: HTMLElement,
-  annotations: { id: string; startOffset: number; endOffset: number; note?: string }[],
+  annotations: {
+    id: string
+    startOffset: number
+    endOffset: number
+    selectedText?: string
+    note?: string
+  }[],
   options: RestoreOptions = {},
 ): number {
   unwrapAllAnnotations(root)
@@ -164,7 +170,21 @@ export function restoreHighlights(
 
   // 倒序应用，避免包裹后改变前面文本节点结构导致偏移失效
   const sorted = [...annotations]
-    .filter((a) => a.endOffset > a.startOffset && a.startOffset >= 0 && a.endOffset <= total)
+    .filter((a) => {
+      if (!(a.endOffset > a.startOffset && a.startOffset >= 0 && a.endOffset <= total)) {
+        return false
+      }
+      // 校验 slice 与 selectedText 一致；AI 重生成章节后旧 offset 会错位
+      const stored = String(a.selectedText ?? "").trim()
+      if (stored) {
+        const slice = map.text.slice(a.startOffset, a.endOffset).trim()
+        if (slice !== stored) {
+          console.warn("[annotation] stale offset skipped", a.id, { slice, selectedText: stored })
+          return false
+        }
+      }
+      return true
+    })
     .sort((a, b) => b.startOffset - a.startOffset)
 
   let restored = 0

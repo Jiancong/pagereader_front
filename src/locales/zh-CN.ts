@@ -605,6 +605,7 @@ export default {
     novelAnnotateDeleted: "已删除",
     novelAnnotateDeleteFailed: "删除失败，请稍后重试",
     novelAnnotateSelectFirst: "请先选中一段文字再划线",
+    novelAnnotateDuplicateSynced: "该段落已划线，已同步",
     openInPlayer: "在播放页打开",
     assets: {
       nav: "我的资源",

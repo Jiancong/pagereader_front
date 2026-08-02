@@ -301,6 +301,8 @@ const annotTargetId = ref<string>("")
 const sectionAnnotations = ref<ProjectAnnotation[]>([])
 /** create 模式下临时记录选区偏移（点击 mark 后选区已丢失，故不依赖 Range） */
 let pendingSelection: { start: number; end: number; text: string } | null = null
+/** 创建中锁，防止双击菜单项重复 POST */
+const createInFlight = ref(false)
 
 const outline = computed(() =>
   buildNovelGuideOutline({
@@ -531,23 +533,57 @@ async function onMenuSubmitNote(note: string) {
 }
 
 async function createAnnotationFromSelection(note: string) {
+  // 防抖：创建中再点直接忽略，避免双击菜单项重复 POST
+  if (createInFlight.value) return
   const projectId = String(props.projectId || "").trim()
   const sectionId = activeSectionId.value
   const sel = pendingSelection
   if (!projectId || !sectionId || !sel) return
+
+  const selectedText = sel.text.trim().slice(0, 2000)
+  if (!selectedText) {
+    ElMessage.info(t("workspace.novelAnnotateSelectFirst"))
+    return
+  }
+
+  // 创建前去重：同 sectionId + 同 offset 区间已存在 → 只更新 note/color，不 POST
+  const existing = sectionAnnotations.value.find(
+    (a) =>
+      a.sectionId === sectionId &&
+      a.startOffset === sel.start &&
+      a.endOffset === sel.end,
+  )
+  if (existing) {
+    annotTargetId.value = existing.id
+    annotMenuMode.value = "edit"
+    await updateAnnotationNote(note)
+    return
+  }
+
+  createInFlight.value = true
   try {
     const created = await annotationApi.createAnnotation(projectId, {
       sectionId,
       startOffset: sel.start,
       endOffset: sel.end,
-      selectedText: sel.text,
+      selectedText,
       note: note || undefined,
     })
     sectionAnnotations.value = [...sectionAnnotations.value, created]
     void nextTick(() => applySectionHighlights())
     ElMessage.success(t("workspace.novelAnnotateSaved"))
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : t("workspace.novelAnnotateSaveFailed"))
+    const message = error instanceof Error ? error.message : String(error)
+    // 重复划线：后端已存在该区间，重新拉取合并本地状态，不向用户报错
+    if (/已划线|already/i.test(message)) {
+      await loadSectionAnnotations(sectionId)
+      void nextTick(() => applySectionHighlights())
+      ElMessage.info(t("workspace.novelAnnotateDuplicateSynced"))
+      return
+    }
+    ElMessage.error(message || t("workspace.novelAnnotateSaveFailed"))
+  } finally {
+    createInFlight.value = false
   }
 }
 
