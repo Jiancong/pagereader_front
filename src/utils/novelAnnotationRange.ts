@@ -175,12 +175,15 @@ export function restoreHighlights(
         return false
       }
       // 校验 slice 与 selectedText 一致；AI 重生成章节后旧 offset 会错位
+      // 仅警告不跳过：unwrap+normalize 后 textMap 可能有细微差异，跳过会导致有效划线丢失
       const stored = String(a.selectedText ?? "").trim()
       if (stored) {
         const slice = map.text.slice(a.startOffset, a.endOffset).trim()
         if (slice !== stored) {
-          console.warn("[annotation] stale offset skipped", a.id, { slice, selectedText: stored })
-          return false
+          console.warn("[annotation] offset mismatch (still rendering)", a.id, {
+            slice: slice.slice(0, 40),
+            selectedText: stored.slice(0, 40),
+          })
         }
       }
       return true
@@ -212,19 +215,27 @@ function wrapOffsets(
   const end = locateBoundary(map.nodes, endOffset)
   if (!start || !end) return false
 
-  // 截断起点
   let startNode = start.node
-  if (start.local > 0 && start.local < startNode.length) {
-    startNode = startNode.splitText(start.local) as Text
-  }
-  // 截断终点
   let endNode = end.node
-  if (end.local > 0 && end.local < endNode.length) {
-    endNode.splitText(end.local)
-    // endNode 仍指向区间内部分
-  } else if (end.local === 0 && endNode !== startNode) {
-    // 终点恰好在某节点开头，回退到上一节点末尾
-    // 无需处理
+
+  // 同一文本节点内选中：先 split 终点再 split 起点，否则 start split 后 end 引用失效
+  if (startNode === endNode) {
+    if (end.local > 0 && end.local < endNode.length) {
+      endNode.splitText(end.local)
+    }
+    if (start.local > 0 && start.local < startNode.length) {
+      startNode = startNode.splitText(start.local) as Text
+    }
+    // startNode 现在恰好包含 [start.local, end.local)，endNode 指向其前半段
+    endNode = startNode
+  } else {
+    // 不同节点：先 split 起点，再 split 终点
+    if (start.local > 0 && start.local < startNode.length) {
+      startNode = startNode.splitText(start.local) as Text
+    }
+    if (end.local > 0 && end.local < endNode.length) {
+      endNode.splitText(end.local)
+    }
   }
 
   // 收集 [startNode, endNode] 范围内的文本节点
