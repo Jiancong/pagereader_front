@@ -237,7 +237,20 @@
               <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.translateHint') }}</p>
             </div>
 
+            <!-- 来源切换：PDF / 网页 -->
+            <div class="flex gap-1 rounded-xl border border-border bg-secondary/30 p-1">
+              <button type="button" :class="translateModeClass('pdf')" @click="translateMode = 'pdf'">
+                <FileText class="h-4 w-4" />
+                {{ t('landing.translateModePdf') }}
+              </button>
+              <button type="button" :class="translateModeClass('url')" @click="translateMode = 'url'">
+                <Globe class="h-4 w-4" />
+                {{ t('landing.translateModeUrl') }}
+              </button>
+            </div>
+
             <div
+              v-if="translateMode === 'pdf'"
               @dragover.prevent="isDragging = true"
               @dragleave="isDragging = false"
               @drop.prevent="handlePdfDrop"
@@ -275,8 +288,21 @@
               </template>
             </div>
 
+            <div v-else>
+              <label class="mb-2 block text-sm font-medium text-foreground">{{ t('landing.translateUrlLabel') }}</label>
+              <input
+                v-model="translateUrl"
+                type="url"
+                inputmode="url"
+                class="w-full rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                :placeholder="t('landing.translateUrlPlaceholder')"
+                @keyup.enter="startImmersiveTranslation"
+              />
+              <p class="mt-2 text-xs text-muted-foreground">{{ t('landing.translateUrlHint') }}</p>
+            </div>
+
             <button
-              :disabled="!selectedPdf"
+              :disabled="translateMode === 'pdf' ? !selectedPdf : !isTranslateUrlValid"
               class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               @click="startImmersiveTranslation"
             >
@@ -295,7 +321,7 @@
 import { ref, computed, watch, markRaw, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages } from 'lucide-vue-next'
+import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages, Globe } from 'lucide-vue-next'
 import {
   gtmGenerateIntent,
   gtmGeneratorTabSelect,
@@ -325,6 +351,8 @@ const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const selectedPdf = ref<File | null>(null)
 const pdfFileInput = ref<HTMLInputElement | null>(null)
+const translateMode = ref<'pdf' | 'url'>('pdf')
+const translateUrl = ref('')
 const showDemoVideo = ref(false)
 
 const tabs = computed(() => [
@@ -388,6 +416,29 @@ const availableModes = computed(() => {
 })
 
 const isYoutubeUrlValid = computed(() => /(?:youtube\.com|youtu\.be)/i.test(youtubeUrl.value))
+
+/** 规范化网页地址：补全协议、仅允许 http(s)，非法返回 null */
+const normalizeWebUrl = (input: string): string | null => {
+  const raw = input.trim()
+  if (!raw) return null
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`
+  try {
+    const u = new URL(withScheme)
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null
+    return u.href
+  } catch {
+    return null
+  }
+}
+
+const isTranslateUrlValid = computed(() => normalizeWebUrl(translateUrl.value) !== null)
+
+const translateModeClass = (mode: 'pdf' | 'url') => [
+  'flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:text-sm',
+  translateMode.value === mode
+    ? 'bg-primary text-primary-foreground shadow'
+    : 'text-muted-foreground hover:text-foreground',
+]
 
 const tabClass = (tab: TabId) => [
   'flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm',
@@ -463,6 +514,13 @@ const clearSelectedPdf = () => {
 }
 
 const startImmersiveTranslation = () => {
+  if (translateMode.value === 'url') {
+    const url = normalizeWebUrl(translateUrl.value)
+    if (!url) return
+    translateFileStore.setUrl(url)
+    router.push({ name: 'translate' })
+    return
+  }
   if (!selectedPdf.value) return
   translateFileStore.setFile(selectedPdf.value)
   router.push({ name: 'translate' })

@@ -7,7 +7,7 @@
         {{ t('translate.back') }}
       </button>
 
-      <div class="immersive-translate__title" :title="fileName">{{ fileName }}</div>
+      <div class="immersive-translate__title" :title="headerTitle">{{ headerTitle }}</div>
 
       <div class="immersive-translate__controls">
         <label class="it-field">
@@ -17,7 +17,7 @@
           </select>
         </label>
 
-        <div class="it-field it-field--pages">
+        <div v-if="!isWeb" class="it-field it-field--pages">
           <button class="it-btn it-btn--sm" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">‹</button>
           <input
             v-model.number="pageInput"
@@ -41,15 +41,24 @@
       </div>
     </header>
 
-    <!-- 无文件兜底 -->
-    <div v-if="!file" class="immersive-translate__empty">
+    <!-- 无内容兜底 -->
+    <div v-if="!hasSource" class="immersive-translate__empty">
       <p>{{ t('translate.noFile') }}</p>
       <button class="it-btn it-btn--primary" @click="goBack">{{ t('translate.back') }}</button>
     </div>
 
-    <!-- 阅读器 -->
+    <!-- 网页双语阅读器 -->
+    <WebBilingualReader
+      v-else-if="isWeb"
+      :url="webUrl"
+      :target-lang="targetLang"
+      :scale="scale"
+      @title="onWebTitle"
+    />
+
+    <!-- PDF 双语阅读器 -->
     <PdfBilingualReader
-      v-else
+      v-else-if="file"
       ref="readerRef"
       :file="file"
       :object-url="objectUrl"
@@ -67,6 +76,7 @@ import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PdfBilingualReader from '@/components/translation/PdfBilingualReader.vue'
+import WebBilingualReader from '@/components/translation/WebBilingualReader.vue'
 import { useTranslateFileStore } from '@/stores/translateFile'
 
 const router = useRouter()
@@ -75,7 +85,13 @@ const store = useTranslateFileStore()
 
 const file = computed(() => store.file)
 const objectUrl = computed(() => store.objectUrl)
-const fileName = computed(() => store.file?.name ?? '')
+const isWeb = computed(() => store.mode === 'web')
+const webUrl = computed(() => store.url)
+const hasSource = computed(() => (isWeb.value ? Boolean(store.url) : Boolean(store.file)))
+const webTitle = ref('')
+const headerTitle = computed(() =>
+  isWeb.value ? webTitle.value || store.url : store.file?.name ?? '',
+)
 
 const targetLang = ref<string>(locale.value === 'en' ? 'en' : 'zh')
 const scale = ref(1.2)
@@ -108,6 +124,9 @@ function onPageChange(page: number) {
 }
 function onPageCount(count: number) {
   pageCount.value = count
+}
+function onWebTitle(title: string) {
+  webTitle.value = title
 }
 function goToPage(page: number) {
   if (!Number.isFinite(page) || !pageCount.value) return

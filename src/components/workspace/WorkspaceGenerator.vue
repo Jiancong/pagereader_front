@@ -198,55 +198,82 @@
           </form>
         </div>
 
-        <!-- 沉浸式 PDF 翻译 -->
+        <!-- 沉浸式翻译（PDF / 网页） -->
         <div v-else-if="activeTab === 'translate'" class="p-6 sm:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.translateTitle') }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.translateHint') }}</p>
           </div>
 
-          <div
-            @dragover.prevent="isDraggingPdf = true"
-            @dragleave="isDraggingPdf = false"
-            @drop.prevent="handlePdfDrop"
-            :class="[
-              'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
-              isDraggingPdf ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
-            ]"
-            @click="pdfFileInput?.click()"
-          >
-            <input
-              ref="pdfFileInput"
-              type="file"
-              accept=".pdf,application/pdf"
-              class="hidden"
-              @change="handlePdfSelect"
-            />
-            <div v-if="hasTranslatePdf" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
-              <FileText class="h-10 w-10 flex-shrink-0 text-primary" />
-              <div class="min-w-0 flex-1 text-left">
-                <p class="break-words font-medium text-foreground">{{ translatePdfName }}</p>
-                <p v-if="translatePdfSizeLabel" class="text-sm text-muted-foreground">{{ translatePdfSizeLabel }}</p>
-                <p v-if="cloudPdfDocument" class="text-xs text-muted-foreground">{{ t('workspace.fromCloudLibrary') }}</p>
-              </div>
-              <button type="button" class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary" @click.stop="clearTranslatePdf">
-                <X class="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-            <template v-else>
-              <Languages class="mx-auto h-12 w-12 text-muted-foreground/50" />
-              <p class="mt-4 font-medium text-foreground">{{ t('workspace.translatePickPdf') }}</p>
-              <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.translateFormats') }}</p>
-            </template>
+          <!-- 来源切换：PDF / 网页 -->
+          <div class="mb-6 flex gap-1 rounded-xl border border-border bg-secondary/30 p-1">
+            <button type="button" :class="translateModeClass('pdf')" @click="translateMode = 'pdf'">
+              <FileText class="h-4 w-4" />
+              {{ t('workspace.translateModePdf') }}
+            </button>
+            <button type="button" :class="translateModeClass('url')" @click="translateMode = 'url'">
+              <Globe class="h-4 w-4" />
+              {{ t('workspace.translateModeUrl') }}
+            </button>
           </div>
 
-          <p class="mt-4 text-xs text-muted-foreground">{{ t('workspace.translateFromCloud') }}</p>
+          <template v-if="translateMode === 'pdf'">
+            <div
+              @dragover.prevent="isDraggingPdf = true"
+              @dragleave="isDraggingPdf = false"
+              @drop.prevent="handlePdfDrop"
+              :class="[
+                'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
+                isDraggingPdf ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
+              ]"
+              @click="pdfFileInput?.click()"
+            >
+              <input
+                ref="pdfFileInput"
+                type="file"
+                accept=".pdf,application/pdf"
+                class="hidden"
+                @change="handlePdfSelect"
+              />
+              <div v-if="hasTranslatePdf" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
+                <FileText class="h-10 w-10 flex-shrink-0 text-primary" />
+                <div class="min-w-0 flex-1 text-left">
+                  <p class="break-words font-medium text-foreground">{{ translatePdfName }}</p>
+                  <p v-if="translatePdfSizeLabel" class="text-sm text-muted-foreground">{{ translatePdfSizeLabel }}</p>
+                  <p v-if="cloudPdfDocument" class="text-xs text-muted-foreground">{{ t('workspace.fromCloudLibrary') }}</p>
+                </div>
+                <button type="button" class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary" @click.stop="clearTranslatePdf">
+                  <X class="h-5 w-5 text-muted-foreground" />
+                </button>
+              </div>
+              <template v-else>
+                <Languages class="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <p class="mt-4 font-medium text-foreground">{{ t('workspace.translatePickPdf') }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.translateFormats') }}</p>
+              </template>
+            </div>
+
+            <p class="mt-4 text-xs text-muted-foreground">{{ t('workspace.translateFromCloud') }}</p>
+          </template>
+
+          <div v-else>
+            <label class="mb-2 block text-sm font-medium text-foreground">{{ t('workspace.translateUrlLabel') }}</label>
+            <input
+              v-model="translateUrl"
+              type="url"
+              inputmode="url"
+              class="w-full rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              :placeholder="t('workspace.translateUrlPlaceholder')"
+              @keyup.enter="startImmersiveTranslation"
+            />
+            <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.translateUrlHint') }}</p>
+          </div>
 
           <p v-if="translateError" class="mt-4 text-sm text-red-400">{{ translateError }}</p>
 
           <button
             type="button"
-            :disabled="!hasTranslatePdf || translateLoading"
+            :disabled="translateMode === 'pdf' ? (!hasTranslatePdf || translateLoading) : !isTranslateUrlValid"
             class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             @click="startImmersiveTranslation"
           >
@@ -402,7 +429,7 @@
 import { ref, computed, reactive, watch, onBeforeUnmount } from "vue"
 import { RouterLink, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
-import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages } from "lucide-vue-next"
+import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages, Globe } from "lucide-vue-next"
 import { useTranslateFileStore } from "@/stores/translateFile"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
@@ -528,6 +555,8 @@ const pdfFileInput = ref<HTMLInputElement | null>(null)
 const isDraggingPdf = ref(false)
 const translateLoading = ref(false)
 const translateError = ref("")
+const translateMode = ref<"pdf" | "url">("pdf")
+const translateUrl = ref("")
 const uploadPrompt = ref("")
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -547,6 +576,29 @@ const isPdfDocument = (doc: UploadedDocument | null | undefined) => {
 }
 
 const hasTranslatePdf = computed(() => Boolean(selectedPdf.value || cloudPdfDocument.value))
+
+/** 规范化网页地址：补全协议、仅允许 http(s)，非法返回 null */
+const normalizeWebUrl = (input: string): string | null => {
+  const raw = input.trim()
+  if (!raw) return null
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`
+  try {
+    const u = new URL(withScheme)
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null
+    return u.href
+  } catch {
+    return null
+  }
+}
+
+const isTranslateUrlValid = computed(() => normalizeWebUrl(translateUrl.value) !== null)
+
+const translateModeClass = (mode: "pdf" | "url") => [
+  "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:text-sm",
+  translateMode.value === mode
+    ? "bg-primary text-primary-foreground shadow"
+    : "text-muted-foreground hover:text-foreground",
+]
 const translatePdfName = computed(
   () => selectedPdf.value?.name || cloudPdfDocument.value?.name || "",
 )
@@ -857,6 +909,13 @@ const clearTranslatePdf = () => {
 
 const startImmersiveTranslation = async () => {
   translateError.value = ""
+  if (translateMode.value === "url") {
+    const url = normalizeWebUrl(translateUrl.value)
+    if (!url) return
+    translateFileStore.setUrl(url)
+    router.push({ name: "translate" })
+    return
+  }
   if (selectedPdf.value) {
     translateFileStore.setFile(selectedPdf.value)
     router.push({ name: "translate" })

@@ -120,3 +120,15 @@ export function buildCacheKey(
 ): string {
   return `${fileHash}:${pageNum}:${targetLang}`
 }
+
+/**
+ * 计算任意字符串的轻量哈希（SHA-256 前 32 位十六进制）。
+ * 用于网页翻译按 URL 做缓存键。
+ */
+export async function computeTextHash(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 32)
+}
