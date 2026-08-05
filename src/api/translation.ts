@@ -2,17 +2,22 @@
 // @author hc @date 2026-07-25
 
 import { ApiError, buildUrl } from "./client"
-import { getToken } from "./token"
+import { getToken, clearToken } from "./token"
+import { ReponseCodes } from "@/request/response-codes"
 
 /** 批量翻译请求 */
 export interface TranslateBatchReq {
-  /** 单页合并后的完整行/句数组，建议每页一次性提交（长度 <= ~80） */
+  /** 单批文本数组，建议每批 <= 5 条且总字符 <= ~1000，避免网关超时 */
   texts: string[]
   /** 目标语言，ISO 639-1，如 zh / en / ja */
   targetLang: string
   /** 源语言，可选，缺省由后端自动检测 */
   sourceLang?: string
 }
+
+/** 单批上限：LLM 翻译一批约需 10–20s，过大会触发 api2 网关 502 */
+export const TRANSLATE_BATCH_MAX_TEXTS = 5
+export const TRANSLATE_BATCH_MAX_CHARS = 1000
 
 /** 批量翻译响应 */
 export interface TranslateBatchRes {
@@ -62,10 +67,16 @@ export async function translateBatch(
       const code = record.code
       const success = record.success
       if (code !== 0 && success !== true) {
-        throw new ApiError(
-          typeof code === "number" ? code : res.status,
-          String(record.message || record.msg || "请求失败"),
-        )
+        const numericCode = typeof code === "number" ? code : res.status
+        if (
+          numericCode === ReponseCodes.NO_AUTH ||
+          numericCode === ReponseCodes.TOKEN_EXPIRED ||
+          numericCode === ReponseCodes.REFRESH_TOKEN_EXPIRED
+        ) {
+          clearToken()
+          throw new ApiError(401, "未登录或登录已过期")
+        }
+        throw new ApiError(numericCode, String(record.message || record.msg || "请求失败"))
       }
       const data = record.data
       if (isTranslateBatchRes(data)) return data
@@ -74,4 +85,63 @@ export async function translateBatch(
   }
 
   throw new ApiError(res.status, "翻译响应格式无效")
+}
+
+/** 按条数/字符数切分，避免单批过大导致网关超时（502） */
+export function chunkTranslationTexts(
+  texts: string[],
+  maxTexts = TRANSLATE_BATCH_MAX_TEXTS,
+  maxChars = TRANSLATE_BATCH_MAX_CHARS,
+): string[][] {
+  const chunks: string[][] = []
+  let current: string[] = []
+  let chars = 0
+  for (const text of texts) {
+    if (current.length && (current.length >= maxTexts || chars + text.length > maxChars)) {
+      chunks.push(current)
+      current = []
+      chars = 0
+    }
+    current.push(text)
+    chars += text.length
+  }
+  if (current.length) chunks.push(current)
+  return chunks
+}
+
+/**
+ * 502 时自动拆半重试（Python 已成功但 Java 网关超时的情况）。
+ */
+async function translateBatchWithSplitRetry(
+  texts: string[],
+  targetLang: string,
+): Promise<string[]> {
+  try {
+    const res = await translateBatch({ texts, targetLang })
+    return res.translations
+  } catch (err) {
+    const isTimeout =
+      err instanceof ApiError && (err.code === 502 || err.code === 504 || err.code === 408)
+    if (isTimeout && texts.length > 1) {
+      const mid = Math.ceil(texts.length / 2)
+      const left = await translateBatchWithSplitRetry(texts.slice(0, mid), targetLang)
+      const right = await translateBatchWithSplitRetry(texts.slice(mid), targetLang)
+      return [...left, ...right]
+    }
+    throw err
+  }
+}
+
+/** 自动分批 + 502 拆半重试，返回与 texts 等长的译文 */
+export async function translateTextsInChunks(
+  texts: string[],
+  targetLang: string,
+): Promise<string[]> {
+  if (!texts.length) return []
+  const chunks = chunkTranslationTexts(texts)
+  const out: string[] = []
+  for (const chunk of chunks) {
+    out.push(...(await translateBatchWithSplitRetry(chunk, targetLang)))
+  }
+  return out
 }

@@ -64,7 +64,9 @@ import {
   getCachedTranslation,
   putCachedTranslation,
 } from '@/utils/translationCache'
-import { translateBatch } from '@/api/translation'
+import { translateTextsInChunks } from '@/api/translation'
+import { ApiError } from '@/api/client'
+import { isLoggedIn } from '@/api/token'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
 
@@ -78,6 +80,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'page-change', page: number): void
   (event: 'page-count', count: number): void
+  (event: 'need-login'): void
 }>()
 
 const { t } = useI18n()
@@ -437,6 +440,10 @@ function fitFontSize(text: string, fontSize: number, maxWidth: number, fontFamil
 }
 
 async function translateCurrentPage() {
+  if (!isLoggedIn()) {
+    emit('need-login')
+    return
+  }
   const pageNum = currentPageNum.value
   const slot = pageSlots.find((s) => s.pageNum === pageNum)
   const entry = pageMap.get(pageNum)
@@ -505,8 +512,7 @@ async function translatePage(
   slot.translating = true
   slot.translateError = false
   try {
-    const res = await translateBatch({ texts, targetLang: props.targetLang })
-    const translations = res.translations ?? []
+    const translations = await translateTextsInChunks(texts, props.targetLang)
     if (translations.length !== texts.length) {
       throw new Error('translation length mismatch')
     }
@@ -514,7 +520,10 @@ async function translatePage(
     const entry = pageMap.get(pageNum)
     if (entry) entry.translations = translations
     renderTranslations(translatable, translations, transLayer, viewport)
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError && err.code === 401) {
+      emit('need-login')
+    }
     slot.translateError = true
     transLayer.innerHTML = ''
   } finally {
@@ -589,7 +598,7 @@ function cleanupPage(pageNum: number) {
   renderedPages.delete(pageNum)
 }
 
-defineExpose({ goToPage })
+defineExpose({ goToPage, retryTranslation: translateCurrentPage })
 </script>
 
 <style scoped>

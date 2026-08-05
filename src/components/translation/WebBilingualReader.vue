@@ -26,9 +26,16 @@
           <span class="web-bilingual-reader__spinner"></span>
           {{ t('translate.progress', { done: doneCount, total: totalCount }) }}
         </div>
-        <div v-else-if="translateError" class="web-bilingual-reader__badge web-bilingual-reader__badge--error">
-          <span>{{ t('translate.error') }}</span>
-          <button class="web-bilingual-reader__badge-retry" type="button" @click="runTranslation">
+        <div v-else-if="needsLogin" class="web-bilingual-reader__overlay web-bilingual-reader__overlay--auth">
+          <p class="web-bilingual-reader__overlay-title">{{ t('translate.loginRequired') }}</p>
+          <p class="web-bilingual-reader__overlay-hint">{{ t('translate.loginRequiredHint') }}</p>
+          <button class="web-bilingual-reader__overlay-btn" type="button" @click="emit('need-login')">
+            {{ t('translate.login') }}
+          </button>
+        </div>
+        <div v-else-if="translateError" class="web-bilingual-reader__overlay web-bilingual-reader__overlay--error">
+          <p class="web-bilingual-reader__overlay-title">{{ t('translate.error') }}</p>
+          <button class="web-bilingual-reader__overlay-btn" type="button" @click="runTranslation">
             {{ t('translate.retry') }}
           </button>
         </div>
@@ -41,7 +48,9 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { fetchWebpage } from '@/api/webpage'
-import { translateBatch } from '@/api/translation'
+import { translateTextsInChunks, TRANSLATE_BATCH_MAX_TEXTS, TRANSLATE_BATCH_MAX_CHARS } from '@/api/translation'
+import { ApiError } from '@/api/client'
+import { isLoggedIn } from '@/api/token'
 import {
   prepareWebPage,
   collectTranslationUnits,
@@ -61,6 +70,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   (event: 'title', title: string): void
+  (event: 'need-login'): void
 }>()
 
 const { t } = useI18n()
@@ -74,6 +84,7 @@ const loading = ref(true)
 const loadError = ref('')
 const translating = ref(false)
 const translateError = ref(false)
+const needsLogin = ref(false)
 const doneCount = ref(0)
 const totalCount = ref(0)
 
@@ -85,9 +96,9 @@ let urlHash = ''
 let runToken = 0
 let syncingScroll = false
 
-const CACHE_SCHEMA = 'w1'
-const MAX_BATCH_TEXTS = 40
-const MAX_BATCH_CHARS = 6000
+const CACHE_SCHEMA = 'w2'
+const MAX_BATCH_TEXTS = TRANSLATE_BATCH_MAX_TEXTS
+const MAX_BATCH_CHARS = TRANSLATE_BATCH_MAX_CHARS
 const RTL_LANGS = new Set(['ar', 'he', 'fa', 'ur'])
 
 // ShadowRoot 内的基础样式：仅兜底布局，尽量保留页面原生外观
@@ -202,8 +213,8 @@ async function translateChunk(chunk: WebTranslationUnit[], index: number): Promi
   const cached = await getCachedTranslation(key)
   if (cached && cacheMatches(cached, texts)) return cached.translations
 
-  const res = await translateBatch({ texts, targetLang: props.targetLang })
-  const translations = res.translations ?? []
+  const res = await translateTextsInChunks(texts, props.targetLang)
+  const translations = res
   if (translations.length !== texts.length) {
     throw new Error('translation length mismatch')
   }
@@ -211,9 +222,20 @@ async function translateChunk(chunk: WebTranslationUnit[], index: number): Promi
   return translations
 }
 
+function isAuthError(err: unknown): boolean {
+  return err instanceof ApiError && err.code === 401
+}
+
 async function runTranslation() {
   if (!pristine || !transHostRef.value) return
+  if (!isLoggedIn()) {
+    needsLogin.value = true
+    translateError.value = false
+    translating.value = false
+    return
+  }
   const token = ++runToken
+  needsLogin.value = false
   // 重新克隆右栏内容，避免上一轮译文污染
   const transShadow = transHostRef.value.shadowRoot
   if (!transShadow) return
@@ -238,14 +260,22 @@ async function runTranslation() {
       if (token !== runToken) return
       chunks[i].forEach((unit, j) => applyUnitTranslation(unit, translations[j] ?? ''))
       doneCount.value += chunks[i].length
-    } catch {
+    } catch (err) {
       if (token !== runToken) return
-      translateError.value = true
+      if (isAuthError(err)) {
+        needsLogin.value = true
+        translateError.value = false
+      } else {
+        translateError.value = true
+        needsLogin.value = false
+      }
       break
     }
   }
   if (token === runToken) translating.value = false
 }
+
+defineExpose({ retryTranslation: runTranslation })
 </script>
 
 <style scoped>
@@ -321,6 +351,53 @@ async function runTranslation() {
 }
 .web-bilingual-reader__retry:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+.web-bilingual-reader__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  background: rgba(15, 20, 25, 0.72);
+  backdrop-filter: blur(4px);
+  text-align: center;
+}
+.web-bilingual-reader__overlay--auth {
+  background: rgba(15, 20, 25, 0.78);
+}
+.web-bilingual-reader__overlay--error {
+  background: rgba(69, 10, 10, 0.72);
+}
+.web-bilingual-reader__overlay-title {
+  margin: 0;
+  color: #f9fafb;
+  font-size: 15px;
+  font-weight: 600;
+}
+.web-bilingual-reader__overlay-hint {
+  margin: 0;
+  max-width: 280px;
+  color: #d1d5db;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.web-bilingual-reader__overlay-btn {
+  margin-top: 4px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 999px;
+  background: #6366f1;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.web-bilingual-reader__overlay-btn:hover {
+  background: #4f46e5;
 }
 .web-bilingual-reader__badge {
   position: sticky;

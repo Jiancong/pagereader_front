@@ -50,10 +50,12 @@
     <!-- 网页双语阅读器 -->
     <WebBilingualReader
       v-else-if="isWeb"
+      ref="webReaderRef"
       :url="webUrl"
       :target-lang="targetLang"
       :scale="scale"
       @title="onWebTitle"
+      @need-login="openLogin"
     />
 
     <!-- PDF 双语阅读器 -->
@@ -67,6 +69,15 @@
       :scale="scale"
       @page-change="onPageChange"
       @page-count="onPageCount"
+      @need-login="openLogin"
+    />
+
+    <AuthDialog
+      :open="dialogOpen"
+      default-mode="login"
+      auth-source="translate"
+      @close="dialogOpen = false"
+      @success="onLoginSuccess"
     />
   </div>
 </template>
@@ -77,11 +88,14 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PdfBilingualReader from '@/components/translation/PdfBilingualReader.vue'
 import WebBilingualReader from '@/components/translation/WebBilingualReader.vue'
+import AuthDialog from '@/components/AuthDialog.vue'
 import { useTranslateFileStore } from '@/stores/translateFile'
 
 const router = useRouter()
 const { t, locale } = useI18n()
 const store = useTranslateFileStore()
+
+const dialogOpen = ref(false)
 
 const file = computed(() => store.file)
 const objectUrl = computed(() => store.objectUrl)
@@ -96,6 +110,7 @@ const headerTitle = computed(() =>
 const targetLang = ref<string>(locale.value === 'en' ? 'en' : 'zh')
 const scale = ref(1.2)
 const readerRef = ref<InstanceType<typeof PdfBilingualReader> | null>(null)
+const webReaderRef = ref<InstanceType<typeof WebBilingualReader> | null>(null)
 const currentPage = ref(1)
 const pageCount = ref(0)
 const pageInput = ref(1)
@@ -127,6 +142,17 @@ function onPageCount(count: number) {
 }
 function onWebTitle(title: string) {
   webTitle.value = title
+}
+function openLogin() {
+  dialogOpen.value = true
+}
+function onLoginSuccess() {
+  dialogOpen.value = false
+  if (isWeb.value) {
+    webReaderRef.value?.retryTranslation?.()
+    return
+  }
+  readerRef.value?.retryTranslation?.()
 }
 function goToPage(page: number) {
   if (!Number.isFinite(page) || !pageCount.value) return
