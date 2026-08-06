@@ -18,6 +18,8 @@ export interface TranslateBatchReq {
 /** 单批上限：LLM 翻译一批约需 10–20s，过大会触发 api2 网关 502 */
 export const TRANSLATE_BATCH_MAX_TEXTS = 5
 export const TRANSLATE_BATCH_MAX_CHARS = 1000
+/** 单批等待上限，与 Java→Python 90s 读超时对齐 */
+export const TRANSLATE_BATCH_TIMEOUT_MS = 95000
 
 /** 批量翻译响应 */
 export interface TranslateBatchRes {
@@ -37,6 +39,10 @@ function isTranslateBatchRes(value: unknown): value is TranslateBatchRes {
  * 批量翻译一页文本。
  * 后端当前直接返回 { translations }，也可能包在 R<T> 的 data 字段中。
  */
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError"
+}
+
 export async function translateBatch(
   req: TranslateBatchReq,
 ): Promise<TranslateBatchRes> {
@@ -44,11 +50,22 @@ export async function translateBatch(
   const token = getToken()
   if (token) headers.set("Authorization", token)
 
-  const res = await fetch(buildUrl("/translate/batch"), {
-    method: "POST",
-    headers,
-    body: JSON.stringify(req),
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TRANSLATE_BATCH_TIMEOUT_MS)
+  let res: Response
+  try {
+    res = await fetch(buildUrl("/translate/batch"), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(req),
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (isAbortError(err)) throw new ApiError(408, "翻译请求超时")
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (res.status === 401) {
     throw new ApiError(401, "未登录或登录已过期")

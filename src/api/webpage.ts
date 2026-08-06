@@ -20,7 +20,8 @@ interface WebpageProxyData {
   finalUrl?: string
 }
 
-const FETCH_TIMEOUT_MS = 20000
+const FETCH_TIMEOUT_MS = 30000
+const BACKEND_FETCH_TIMEOUT_MS = 30000
 const MAX_HTML_CHARS = 8 * 1024 * 1024
 
 interface FetchCandidate {
@@ -65,17 +66,31 @@ function normalizeHtmlPayload(data: WebpageProxyData | string, fallbackUrl: stri
   return { html, finalUrl, via: "backend-proxy" }
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError"
+}
+
 /** 同源后端代理：需 JWT，解包 R<{ html, finalUrl? }> 或直接 HTML 字符串 */
 async function fetchViaBackend(target: string): Promise<FetchedWebPage> {
   if (!getToken()) {
     throw new ApiError(401, "未登录或登录已过期")
   }
-  const data = await get<WebpageProxyData | string>("/translate/webpage", {
-    query: { url: target },
-  })
-  const page = normalizeHtmlPayload(data, target)
-  if (!page) throw new ApiError(502, "网页抓取响应无效")
-  return page
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), BACKEND_FETCH_TIMEOUT_MS)
+  try {
+    const data = await get<WebpageProxyData | string>("/translate/webpage", {
+      query: { url: target },
+      signal: controller.signal,
+    })
+    const page = normalizeHtmlPayload(data, target)
+    if (!page) throw new ApiError(502, "网页抓取响应无效")
+    return page
+  } catch (err) {
+    if (isAbortError(err)) throw new ApiError(408, "网页抓取超时")
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function tryFetchPublic(candidate: FetchCandidate): Promise<string | null> {

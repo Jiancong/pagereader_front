@@ -3,6 +3,7 @@
 
 import type { R } from "./types"
 import { getToken, clearToken } from "./token"
+import { ReponseCodes } from "@/request/response-codes"
 
 const BASE = ((import.meta.env.VITE_API_URL as string) ?? "").replace(/\/+$/, "")
 
@@ -56,7 +57,16 @@ async function unwrap<T>(res: Response): Promise<T> {
   }
   const msg = body.message || body.msg || "请求失败"
   if (body.code !== 0 && body.success !== true) {
-    throw new ApiError(body.code, msg)
+    const code = body.code
+    if (
+      code === ReponseCodes.NO_AUTH ||
+      code === ReponseCodes.TOKEN_EXPIRED ||
+      code === ReponseCodes.REFRESH_TOKEN_EXPIRED
+    ) {
+      clearToken()
+      throw new ApiError(401, "未登录或登录已过期")
+    }
+    throw new ApiError(code, msg)
   }
   return body.data
 }

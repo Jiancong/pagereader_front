@@ -151,7 +151,7 @@ async function init() {
       loading.value = false
       return
     }
-    loadError.value = t('translate.webFetchFailed')
+    loadError.value = webFetchErrorMessage(err)
     loading.value = false
   }
 }
@@ -243,6 +243,25 @@ function isAuthError(err: unknown): boolean {
     err.code === ReponseCodes.TOKEN_EXPIRED ||
     err.code === ReponseCodes.REFRESH_TOKEN_EXPIRED
   )
+}
+
+function webFetchErrorMessage(err: unknown): string {
+  if (!(err instanceof ApiError)) return t('translate.webFetchFailed')
+  switch (err.code) {
+    case 400:
+      return t('translate.webFetchInvalidUrl')
+    case 403:
+      return t('translate.webFetchUrlNotAllowed')
+    case 413:
+      return t('translate.webFetchPageTooLarge')
+    case 408:
+    case 504:
+      return t('translate.webFetchTimeout')
+    case 502:
+      return t('translate.webFetchUnavailable')
+    default:
+      return t('translate.webFetchFailed')
+  }
 }
 
 async function runTranslation() {
