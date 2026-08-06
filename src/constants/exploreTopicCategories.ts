@@ -49,15 +49,18 @@ export function isKnownExploreTopicId(id: string): id is Exclude<ExploreTopicCat
   return KNOWN_TOPIC_IDS.has(id)
 }
 
-/** 卡片角标：优先后端 categoryName，否则按 categoryId 映射 i18n */
+/** 卡片角标：优先按 categoryId 映射 i18n，未知 id 时回退后端 categoryName */
 export function resolveExploreTopicLabel(
   item: FeedStreamItemDto,
   translate: (key: string) => string,
 ): string | null {
+  const fromId = resolveExploreTopicLabelById(item.categoryId, translate)
+  if (fromId) return fromId
+
   const name = String(item.categoryName ?? "").trim()
   if (name) return name
 
-  return resolveExploreTopicLabelById(item.categoryId, translate)
+  return null
 }
 
 /** 按 categoryId 映射 i18n 展示名 */

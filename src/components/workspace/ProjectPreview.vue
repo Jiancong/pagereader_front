@@ -41,43 +41,54 @@
         v-if="canShare || sharedToCommunity"
         class="mb-6 rounded-xl border border-border bg-card/40 px-4 py-3"
       >
-        <div class="mb-2 flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-3">
           <p class="text-xs font-medium text-muted-foreground">
             {{ t('workspace.projectTopicCategory') }}
           </p>
-          <span
-            v-if="currentCategoryLabel"
-            class="rounded-md bg-secondary/60 px-2 py-0.5 text-[11px] font-medium text-foreground"
-          >
-            {{ currentCategoryLabel }}
-          </span>
+          <div ref="categoryMenuRef" class="relative">
+            <button
+              type="button"
+              class="inline-flex min-w-[9rem] items-center justify-between gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+              :aria-expanded="categoryMenuOpen"
+              :aria-haspopup="true"
+              :disabled="updatingCategory"
+              @click="categoryMenuOpen = !categoryMenuOpen"
+            >
+              <span>{{ currentCategoryLabel || t('workspace.projectTopicCategoryPlaceholder') }}</span>
+              <ChevronDown
+                class="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform"
+                :class="categoryMenuOpen ? 'rotate-180' : ''"
+              />
+            </button>
+            <div
+              v-if="categoryMenuOpen"
+              class="absolute left-0 top-full z-[120] mt-1.5 min-w-full overflow-hidden rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl"
+              role="listbox"
+              :aria-label="t('workspace.projectTopicCategory')"
+            >
+              <button
+                v-for="cat in EXPLORE_TOPIC_SELECTABLE_OPTIONS"
+                :key="cat.id"
+                type="button"
+                role="option"
+                class="flex w-full items-center rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                :class="
+                  selectedCategoryId === cat.id
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-foreground'
+                "
+                :aria-selected="selectedCategoryId === cat.id"
+                :disabled="updatingCategory"
+                @click="onSelectCategoryFromMenu(cat.id)"
+              >
+                {{ t(cat.i18nKey) }}
+              </button>
+            </div>
+          </div>
           <span v-if="updatingCategory" class="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
             <Loader2 class="h-3 w-3 animate-spin" />
             {{ t('workspace.projectTopicCategorySaving') }}
           </span>
-        </div>
-        <div
-          class="flex flex-wrap gap-2"
-          role="radiogroup"
-          :aria-label="t('workspace.projectTopicCategory')"
-        >
-          <button
-            v-for="cat in EXPLORE_TOPIC_SELECTABLE_OPTIONS"
-            :key="cat.id"
-            type="button"
-            role="radio"
-            class="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            :class="
-              selectedCategoryId === cat.id
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border bg-secondary/40 text-muted-foreground hover:border-primary/40 hover:text-foreground'
-            "
-            :aria-checked="selectedCategoryId === cat.id"
-            :disabled="updatingCategory"
-            @click="onSelectCategory(cat.id)"
-          >
-            {{ t(cat.i18nKey) }}
-          </button>
         </div>
         <p v-if="!sharedToCommunity" class="mt-2 text-[11px] text-muted-foreground">
           {{ t('workspace.projectTopicCategoryOnShareHint') }}
@@ -131,10 +142,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Loader2, Sparkles, ArrowLeft } from 'lucide-vue-next'
+import { Loader2, Sparkles, ArrowLeft, ChevronDown } from 'lucide-vue-next'
 import PptViewer from '@/components/editor/chat/PptViewer.vue'
 import { projectApi } from '../../api'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'
@@ -179,19 +190,26 @@ const error = ref(null)
 const sharing = ref(false)
 const selectedCategoryId = ref('')
 const updatingCategory = ref(false)
+const categoryMenuOpen = ref(false)
+const categoryMenuRef = ref(null)
 
 function syncSelectedCategoryFromProject(proj) {
   const id = String(proj?.categoryId ?? '').trim().toLowerCase()
   selectedCategoryId.value = isKnownExploreTopicId(id) ? id : ''
 }
 
-const currentCategoryLabel = computed(() => {
-  const fromProject = String(project.value?.categoryName ?? '').trim()
-  if (fromProject) return fromProject
-  return resolveExploreTopicLabelById(selectedCategoryId.value || project.value?.categoryId, t)
-})
+const currentCategoryLabel = computed(() =>
+  resolveExploreTopicLabelById(selectedCategoryId.value || project.value?.categoryId, t)
+  || String(project.value?.categoryName ?? '').trim()
+  || null,
+)
 
 const sharedToCommunity = computed(() => isSharedToCommunity(project.value))
+
+function onSelectCategoryFromMenu(categoryId) {
+  categoryMenuOpen.value = false
+  onSelectCategory(categoryId)
+}
 
 async function onSelectCategory(categoryId) {
   if (!categoryId || categoryId === selectedCategoryId.value || updatingCategory.value) return
@@ -378,4 +396,22 @@ function onCoverUploaded(payload) {
   if (!url || !project.value) return
   project.value = { ...project.value, thumbnailUrl: url }
 }
+
+function onDocumentPointerDown(event) {
+  if (
+    categoryMenuOpen.value &&
+    categoryMenuRef.value &&
+    !categoryMenuRef.value.contains(event.target)
+  ) {
+    categoryMenuOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointerDown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocumentPointerDown)
+})
 </script>

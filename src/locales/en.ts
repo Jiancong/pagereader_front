@@ -456,6 +456,7 @@ export default {
     exploreTopicStartup: "Startup",
     exploreCategoryEmpty: "Nothing in this category yet. Try another topic.",
     projectTopicCategory: "Topic category",
+    projectTopicCategoryPlaceholder: "Select category",
     projectTopicCategorySaved: "Category updated",
     projectTopicCategorySaving: "Saving…",
     projectTopicCategoryOnShareHint: "The selected category applies when you share to the community. You can change it anytime after sharing.",

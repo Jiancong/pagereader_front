@@ -446,6 +446,7 @@ export default {
     exploreTopicStartup: "创业",
     exploreCategoryEmpty: "该分类暂无作品，试试其他类别。",
     projectTopicCategory: "主题分类",
+    projectTopicCategoryPlaceholder: "选择分类",
     projectTopicCategorySaved: "分类已更新",
     projectTopicCategorySaving: "保存中…",
     projectTopicCategoryOnShareHint: "分享到社区时将使用所选分类；分享后可直接修改。",
