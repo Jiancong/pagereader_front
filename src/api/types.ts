@@ -107,6 +107,8 @@ export interface FeedStreamItemDto {
   favoriteCount?: number
   viewCount?: number
   categoryId?: string
+  /** 主题分类展示名，如「AI」「教育」 */
+  categoryName?: string
   createdAt?: string
   updatedAt?: string
   likedByMe?: boolean

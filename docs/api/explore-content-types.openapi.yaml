@@ -1,0 +1,203 @@
+openapi: 3.0.3
+info:
+  title: PageReader Explore Feed Topic Category API
+  description: |
+    「探索作品」页按**主题领域**分类筛选的后端规范。
+
+    分类示例：AI、小说、教育、财经、创业（不是演示文稿/卡片等生成模式）。
+
+    **前端已对接**
+    - Tab 筛选传 `categoryId`
+    - 卡片角标展示 `categoryName`（或按 categoryId 映射中文名）
+
+    **Base URL**: `https://page2.top/api2`
+  version: 1.1.0
+
+servers:
+  - url: https://page2.top/api2
+    description: Production
+
+tags:
+  - name: feed
+    description: 探索流
+
+paths:
+  /www/model/feed/stream:
+    post:
+      tags: [feed]
+      summary: 探索作品流（按主题 categoryId 筛选）
+      operationId: getFeedStream
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedStreamRequest"
+            examples:
+              all:
+                summary: 全部
+                value:
+                  page: 1
+                  pageSize: 24
+                  sort: 1
+                  includeUserProjects: true
+              ai:
+                summary: 仅 AI
+                value:
+                  page: 1
+                  pageSize: 24
+                  sort: 1
+                  includeUserProjects: true
+                  categoryId: ai
+              education:
+                summary: 仅教育
+                value:
+                  page: 1
+                  pageSize: 24
+                  sort: 1
+                  includeUserProjects: true
+                  categoryId: education
+      responses:
+        "200":
+          description: 分页结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R_FeedStreamPage"
+
+  /www/model/feed/categories:
+    get:
+      tags: [feed]
+      summary: 获取探索主题分类列表（可选，P1）
+      description: |
+        前端当前使用固定分类 Tab；若后端希望动态配置分类（含排序、多语言名、计数），可提供此接口。
+        未实现时前端 fallback 到内置 5 类 + 全部。
+      operationId: listFeedTopicCategories
+      responses:
+        "200":
+          description: 分类列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R_TopicCategoryList"
+              example:
+                code: 0
+                data:
+                  - id: ai
+                    name: AI
+                    nameEn: AI
+                    sort: 1
+                    count: 128
+                  - id: fiction
+                    name: 小说
+                    nameEn: Fiction
+                    sort: 2
+                    count: 86
+
+components:
+  schemas:
+    FeedStreamRequest:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+        sort:
+          type: integer
+        includeUserProjects:
+          type: boolean
+        categoryId:
+          $ref: "#/components/schemas/TopicCategoryId"
+
+    TopicCategoryId:
+      type: string
+      enum: [ai, fiction, education, finance, startup]
+      description: |
+        主题领域 slug（与前端 Tab 一致）：
+
+        | categoryId | 中文 | 说明 |
+        |------------|------|------|
+        | ai | AI | 大模型、Agent、编程工具等 |
+        | fiction | 小说 | 文学作品、小说导读（《战争与和平》等） |
+        | education | 教育 | 课程、讲座、RL/Stanford 等 |
+        | finance | 财经 | 投资、段永平、芒格等 |
+        | startup | 创业 | Naval、创业访谈、商业思维等 |
+
+        **注意**：`categoryId` 表示内容主题，**不是**生成模式（document/card/novel/outline）。
+        生成模式请用 Project 表的 `generationMode` 字段，勿与主题 categoryId 混用。
+
+    FeedStreamItem:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        sourceType:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        imageUrl:
+          type: string
+        viewCount:
+          type: integer
+        favoriteCount:
+          type: integer
+        categoryId:
+          $ref: "#/components/schemas/TopicCategoryId"
+        categoryName:
+          type: string
+          description: 展示用中文名，如「AI」「教育」；与 categoryId 对应
+
+    FeedStreamPage:
+      type: object
+      required: [page, total, pageSize, data]
+      properties:
+        page:
+          type: integer
+        total:
+          type: integer
+          description: 当前 categoryId 筛选下的总数
+        pageSize:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedStreamItem"
+
+    R_FeedStreamPage:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          $ref: "#/components/schemas/FeedStreamPage"
+
+    TopicCategory:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          $ref: "#/components/schemas/TopicCategoryId"
+        name:
+          type: string
+        nameEn:
+          type: string
+        sort:
+          type: integer
+        count:
+          type: integer
+          description: 该分类下作品数（可选，用于 Tab 展示）
+
+    R_TopicCategoryList:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopicCategory"

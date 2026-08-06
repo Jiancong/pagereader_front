@@ -5,6 +5,29 @@
       <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.exploreSubtitle') }}</p>
     </div>
 
+    <div
+      class="mb-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      role="tablist"
+      :aria-label="t('workspace.exploreTitle')"
+    >
+      <button
+        v-for="cat in EXPLORE_TOPIC_OPTIONS"
+        :key="cat.id"
+        type="button"
+        role="tab"
+        class="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:text-sm"
+        :class="
+          selectedCategory === cat.id
+            ? 'border-primary bg-primary/10 text-primary'
+            : 'border-border bg-secondary/40 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+        "
+        :aria-selected="selectedCategory === cat.id"
+        @click="selectCategory(cat.id)"
+      >
+        {{ t(cat.i18nKey) }}
+      </button>
+    </div>
+
     <div v-if="error" class="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{{ error }}</div>
 
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
@@ -18,7 +41,13 @@
           class="flex flex-1 flex-col text-left"
           @click="$emit('open', item)"
         >
-          <div class="aspect-[3/4] w-full overflow-hidden bg-secondary/40">
+          <div class="aspect-[3/4] w-full overflow-hidden bg-secondary/40 relative">
+            <span
+              v-if="topicLabel(item)"
+              class="absolute left-2 top-2 z-10 max-w-[calc(100%-1rem)] truncate rounded-md bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur"
+            >
+              {{ topicLabel(item) }}
+            </span>
             <img
               v-if="cover(item)"
               :src="cover(item)"
@@ -87,7 +116,9 @@
         {{ t('workspace.loadMore') }}
       </button>
     </div>
-    <p v-if="!loading && !items.length && !error" class="py-12 text-center text-sm text-muted-foreground">{{ t('workspace.noWorks') }}</p>
+    <p v-if="!loading && !items.length && !error" class="py-12 text-center text-sm text-muted-foreground">
+      {{ selectedCategory === 'all' ? t('workspace.noWorks') : t('workspace.exploreCategoryEmpty') }}
+    </p>
   </div>
 </template>
 
@@ -97,6 +128,11 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Loader2, Eye, Heart, Trash2, Share2 } from 'lucide-vue-next'
 import { feedApi, buildFeedStreamRequest, DEFAULT_FEED_STREAM_PAGE_SIZE } from '@/api'
+import {
+  EXPLORE_TOPIC_OPTIONS,
+  resolveExploreTopicLabel,
+  toFeedTopicCategoryFilter,
+} from '@/constants/exploreTopicCategories'
 import { canDeleteFeedItem, feedItemDeleteProjectId } from '@/utils/projectDelete'
 import { buildExploreProjectShareUrl, feedItemShareProjectId } from '@/utils/feedOpen'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
@@ -116,6 +152,7 @@ const page = ref(1)
 const total = ref(0)
 const loading = ref(false)
 const error = ref(null)
+const selectedCategory = ref('all')
 const deletingId = ref(null)
 const favoritingId = ref(null)
 const itemTitleMap = ref({})
@@ -131,6 +168,13 @@ const displayTitle = (item) => {
 const canDelete = (item) => canDeleteFeedItem(item, props.userId)
 const deleteKey = (item) => feedItemDeleteProjectId(item) || item.id
 const shareProjectId = (item) => feedItemShareProjectId(item)
+const topicLabel = (item) => resolveExploreTopicLabel(item, t)
+
+const selectCategory = (category) => {
+  if (selectedCategory.value === category) return
+  selectedCategory.value = category
+  void load(1)
+}
 
 const copyShareLink = async (item) => {
   const projectId = shareProjectId(item)
@@ -205,7 +249,11 @@ const load = async (p) => {
   loading.value = true
   error.value = null
   try {
-    const res = await feedApi.getFeedStream(buildFeedStreamRequest(p, PAGE_SIZE))
+    const res = await feedApi.getFeedStream(
+      buildFeedStreamRequest(p, PAGE_SIZE, {
+        categoryId: toFeedTopicCategoryFilter(selectedCategory.value),
+      }),
+    )
     const nextItems = p === 1 ? res.data : [...items.value, ...res.data]
     items.value = nextItems
     total.value = res.total

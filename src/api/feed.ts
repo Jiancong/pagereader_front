@@ -35,13 +35,16 @@ export const DEFAULT_FEED_STREAM_PAGE_SIZE = 24
 export function buildFeedStreamRequest(
   page: number,
   pageSize = DEFAULT_FEED_STREAM_PAGE_SIZE,
+  opts?: { categoryId?: string },
 ): FeedStreamRequest {
-  return {
+  const req: FeedStreamRequest = {
     page,
     pageSize,
     sort: 1,
     includeUserProjects: true,
   }
+  if (opts?.categoryId) req.categoryId = opts.categoryId
+  return req
 }
 
 export async function getFeedStream(req: FeedStreamRequest): Promise<FeedStreamPageDto> {
