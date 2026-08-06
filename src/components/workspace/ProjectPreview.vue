@@ -37,6 +37,53 @@
         </div>
       </div>
 
+      <section
+        v-if="canShare || sharedToCommunity"
+        class="mb-6 rounded-xl border border-border bg-card/40 px-4 py-3"
+      >
+        <div class="mb-2 flex flex-wrap items-center gap-2">
+          <p class="text-xs font-medium text-muted-foreground">
+            {{ t('workspace.projectTopicCategory') }}
+          </p>
+          <span
+            v-if="currentCategoryLabel"
+            class="rounded-md bg-secondary/60 px-2 py-0.5 text-[11px] font-medium text-foreground"
+          >
+            {{ currentCategoryLabel }}
+          </span>
+          <span v-if="updatingCategory" class="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+            <Loader2 class="h-3 w-3 animate-spin" />
+            {{ t('workspace.projectTopicCategorySaving') }}
+          </span>
+        </div>
+        <div
+          class="flex flex-wrap gap-2"
+          role="radiogroup"
+          :aria-label="t('workspace.projectTopicCategory')"
+        >
+          <button
+            v-for="cat in EXPLORE_TOPIC_SELECTABLE_OPTIONS"
+            :key="cat.id"
+            type="button"
+            role="radio"
+            class="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            :class="
+              selectedCategoryId === cat.id
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border bg-secondary/40 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+            "
+            :aria-checked="selectedCategoryId === cat.id"
+            :disabled="updatingCategory"
+            @click="onSelectCategory(cat.id)"
+          >
+            {{ t(cat.i18nKey) }}
+          </button>
+        </div>
+        <p v-if="!sharedToCommunity" class="mt-2 text-[11px] text-muted-foreground">
+          {{ t('workspace.projectTopicCategoryOnShareHint') }}
+        </p>
+      </section>
+
       <div v-if="pptData" class="mb-8 min-w-0 overflow-hidden">
         <PptViewer
           :ppt-data="pptData"
@@ -107,7 +154,11 @@ import {
   pickPptDataTitle,
 } from '@/utils/projectTitle'
 import { resolveNovelFromHistory } from '@/utils/novelStream'
-import WorkspaceNovelResult from '@/components/workspace/WorkspaceNovelResult.vue'
+import {
+  EXPLORE_TOPIC_SELECTABLE_OPTIONS,
+  isKnownExploreTopicId,
+  resolveExploreTopicLabelById,
+} from '@/constants/exploreTopicCategories'
 
 const props = defineProps({
   projectId: { type: String, required: true },
@@ -126,8 +177,43 @@ const loading = ref(false)
 const loadingDeck = ref(false)
 const error = ref(null)
 const sharing = ref(false)
+const selectedCategoryId = ref('')
+const updatingCategory = ref(false)
+
+function syncSelectedCategoryFromProject(proj) {
+  const id = String(proj?.categoryId ?? '').trim().toLowerCase()
+  selectedCategoryId.value = isKnownExploreTopicId(id) ? id : ''
+}
+
+const currentCategoryLabel = computed(() => {
+  const fromProject = String(project.value?.categoryName ?? '').trim()
+  if (fromProject) return fromProject
+  return resolveExploreTopicLabelById(selectedCategoryId.value || project.value?.categoryId, t)
+})
 
 const sharedToCommunity = computed(() => isSharedToCommunity(project.value))
+
+async function onSelectCategory(categoryId) {
+  if (!categoryId || categoryId === selectedCategoryId.value || updatingCategory.value) return
+  selectedCategoryId.value = categoryId
+  if (!sharedToCommunity.value || !project.value?.id) return
+
+  updatingCategory.value = true
+  try {
+    const result = await projectApi.updateProjectCategory(project.value.id, categoryId)
+    project.value = {
+      ...project.value,
+      categoryId: result.categoryId,
+      categoryName: result.categoryName ?? project.value.categoryName,
+    }
+    ElMessage.success(t('workspace.projectTopicCategorySaved'))
+  } catch (e) {
+    syncSelectedCategoryFromProject(project.value)
+    ElMessage.error(e?.message || t('common.actionFailed'))
+  } finally {
+    updatingCategory.value = false
+  }
+}
 
 /** 内容已就绪：PPT deck 或书籍卡片预览图 */
 const canShare = computed(() => {
@@ -230,12 +316,14 @@ const run = async (id) => {
   pptData.value = null
   novelResult.value = null
   deckMarkdown.value = ''
+  selectedCategoryId.value = ''
   try {
     const [proj, hist] = await Promise.all([
       projectApi.getProject(id),
       projectApi.getProjectConversationHistory(id).catch(() => []),
     ])
     project.value = proj
+    syncSelectedCategoryFromProject(proj)
     history.value = hist
     const loadedNovel = await loadNovelGuide(id, hist, proj)
     if (!loadedNovel) {
@@ -262,6 +350,7 @@ async function onShareToCommunity() {
   sharing.value = true
   try {
     const body = buildShareToCommunityBody(project.value, history.value)
+    if (selectedCategoryId.value) body.categoryId = selectedCategoryId.value
     const result = await projectApi.shareToCommunity(project.value.id, body)
     project.value = {
       ...project.value,

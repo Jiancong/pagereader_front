@@ -1,7 +1,7 @@
 // 读书 / 探索 Feed 模块
 // @author hc @date 2026-06-03
 
-import { ApiError, del, get, postForm, postJson } from "./client"
+import { ApiError, del, get, postForm, postJson, put } from "./client"
 import type {
   FeedStreamRequest,
   FeedStreamPageDto,
@@ -16,6 +16,7 @@ import type {
   ProjectCoverUploadResult,
   ProjectPromptHistoryVo,
   ShareToCommunityResult,
+  UpdateProjectCategoryResult,
   ProjectCommentVo,
   CommentRating,
   RatingFilter,
@@ -218,6 +219,17 @@ export async function shareToCommunity(
   return postJson<ShareToCommunityResult>(
     `/project/${encodeURIComponent(id)}/share-to-community`,
     body,
+  )
+}
+
+// 更新探索主题分类（需登录且为 owner；已分享至社区时同步 Feed 索引）
+export async function updateProjectCategory(
+  id: string,
+  categoryId: string,
+): Promise<UpdateProjectCategoryResult> {
+  return put<UpdateProjectCategoryResult>(
+    `/project/${encodeURIComponent(id)}/category`,
+    { categoryId },
   )
 }
 

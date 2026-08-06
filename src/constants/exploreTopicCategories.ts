@@ -22,6 +22,12 @@ export const EXPLORE_TOPIC_OPTIONS: ExploreTopicOption[] = [
   { id: "startup", i18nKey: "workspace.exploreTopicStartup" },
 ]
 
+/** 项目分类选择（不含「全部」） */
+export const EXPLORE_TOPIC_SELECTABLE_OPTIONS = EXPLORE_TOPIC_OPTIONS.filter(
+  (o): o is ExploreTopicOption & { id: Exclude<ExploreTopicCategory, "all"> } =>
+    o.id !== "all",
+)
+
 const TOPIC_I18N: Record<Exclude<ExploreTopicCategory, "all">, string> = {
   ai: "workspace.exploreTopicAi",
   fiction: "workspace.exploreTopicFiction",
@@ -51,7 +57,15 @@ export function resolveExploreTopicLabel(
   const name = String(item.categoryName ?? "").trim()
   if (name) return name
 
-  const id = String(item.categoryId ?? "").trim().toLowerCase()
+  return resolveExploreTopicLabelById(item.categoryId, translate)
+}
+
+/** 按 categoryId 映射 i18n 展示名 */
+export function resolveExploreTopicLabelById(
+  categoryId: string | null | undefined,
+  translate: (key: string) => string,
+): string | null {
+  const id = String(categoryId ?? "").trim().toLowerCase()
   if (!id || !isKnownExploreTopicId(id)) return null
   return translate(TOPIC_I18N[id])
 }

@@ -11,7 +11,7 @@ info:
     - 卡片角标展示 `categoryName`（或按 categoryId 映射中文名）
 
     **Base URL**: `https://page2.top/api2`
-  version: 1.1.0
+  version: 1.2.0
 
 servers:
   - url: https://page2.top/api2
@@ -20,6 +20,8 @@ servers:
 tags:
   - name: feed
     description: 探索流
+  - name: project
+    description: 项目与社区
 
 paths:
   /www/model/feed/stream:
@@ -94,7 +96,63 @@ paths:
                     sort: 2
                     count: 86
 
+  /project/{projectId}/category:
+    put:
+      tags: [project]
+      summary: 更新项目主题分类（owner，已分享至社区）
+      description: |
+        工作区预览页允许项目 owner 修改探索流中的**主题领域**分类。
+
+        - 需登录且为项目 owner
+        - 项目须已分享至社区（`sharedToCommunity` / feed 可见）
+        - 更新后同步 Feed 索引中的 `categoryId` / `categoryName`
+
+        分享到社区时也可在 `POST /project/{id}/share-to-community` 请求体中附带 `categoryId` 一次性写入。
+      operationId: updateProjectCategory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectCategoryRequest"
+            examples:
+              ai:
+                value:
+                  categoryId: ai
+              education:
+                value:
+                  categoryId: education
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R_UpdateProjectCategoryResult"
+              example:
+                code: 0
+                data:
+                  projectId: "02515d137d60445f967a2ed0732ceb25"
+                  categoryId: education
+                  categoryName: 教育
+        "403":
+          description: 非 owner 或未分享至社区
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     FeedStreamRequest:
       type: object
@@ -201,3 +259,30 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TopicCategory"
+
+    UpdateProjectCategoryRequest:
+      type: object
+      required: [categoryId]
+      properties:
+        categoryId:
+          $ref: "#/components/schemas/TopicCategoryId"
+
+    UpdateProjectCategoryResult:
+      type: object
+      required: [projectId, categoryId]
+      properties:
+        projectId:
+          type: string
+        categoryId:
+          $ref: "#/components/schemas/TopicCategoryId"
+        categoryName:
+          type: string
+          description: 展示用中文名
+
+    R_UpdateProjectCategoryResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          $ref: "#/components/schemas/UpdateProjectCategoryResult"

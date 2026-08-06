@@ -151,6 +151,8 @@ export interface ProjectVo {
   /** complete 后 PPT deck JSON 的 OSS 地址 */
   configFilePath?: string | null
   categoryId?: string
+  /** 主题分类展示名，如「AI」「教育」 */
+  categoryName?: string
   sourceBookTitle?: string | null
   sourceBookAuthor?: string | null
   /** true = 已公开且推荐到社区 */
@@ -187,7 +189,14 @@ export interface ShareToCommunityResult {
   sourceBookAuthor?: string
   thumbnailUrl?: string
   categoryId?: string
+  categoryName?: string
   visibleInFeed?: boolean
+}
+
+export interface UpdateProjectCategoryResult {
+  projectId: string
+  categoryId: string
+  categoryName?: string
 }
 
 export interface ProjectCommentVo {

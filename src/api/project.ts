@@ -12,6 +12,7 @@ export {
   incrementProjectView,
   getMyProjects,
   shareToCommunity,
+  updateProjectCategory,
   forkProject,
   listComments,
   postComment,
