@@ -5,28 +5,11 @@
       <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.exploreSubtitle') }}</p>
     </div>
 
-    <div
-      class="mb-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      role="tablist"
+    <ExploreTopicTabs
+      v-model="selectedCategory"
+      class="mb-4"
       :aria-label="t('workspace.exploreTitle')"
-    >
-      <button
-        v-for="cat in EXPLORE_TOPIC_OPTIONS"
-        :key="cat.id"
-        type="button"
-        role="tab"
-        class="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:text-sm"
-        :class="
-          selectedCategory === cat.id
-            ? 'border-primary bg-primary/10 text-primary'
-            : 'border-border bg-secondary/40 text-muted-foreground hover:border-primary/40 hover:text-foreground'
-        "
-        :aria-selected="selectedCategory === cat.id"
-        @click="selectCategory(cat.id)"
-      >
-        {{ t(cat.i18nKey) }}
-      </button>
-    </div>
+    />
 
     <div v-if="error" class="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{{ error }}</div>
 
@@ -123,16 +106,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Loader2, Eye, Heart, Trash2, Share2 } from 'lucide-vue-next'
 import { feedApi, buildFeedStreamRequest, DEFAULT_FEED_STREAM_PAGE_SIZE } from '@/api'
-import {
-  EXPLORE_TOPIC_OPTIONS,
-  resolveExploreTopicLabel,
-  toFeedTopicCategoryFilter,
-} from '@/constants/exploreTopicCategories'
+import { resolveExploreTopicLabel, toFeedTopicCategoryFilter, isKnownExploreTopicId } from '@/constants/exploreTopicCategories'
+import ExploreTopicTabs from '@/components/explore/ExploreTopicTabs.vue'
 import { canDeleteFeedItem, feedItemDeleteProjectId } from '@/utils/projectDelete'
 import { buildExploreProjectShareUrl, feedItemShareProjectId } from '@/utils/feedOpen'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
@@ -140,6 +120,7 @@ import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
 const props = defineProps({
   userId: { type: [String, Number], default: null },
   showHeader: { type: Boolean, default: true },
+  initialCategory: { type: String, default: 'all' },
 })
 
 const emit = defineEmits(['open', 'deleted'])
@@ -152,7 +133,9 @@ const page = ref(1)
 const total = ref(0)
 const loading = ref(false)
 const error = ref(null)
-const selectedCategory = ref('all')
+const selectedCategory = ref(
+  isKnownExploreTopicId(props.initialCategory) ? props.initialCategory : 'all',
+)
 const deletingId = ref(null)
 const favoritingId = ref(null)
 const itemTitleMap = ref({})
@@ -170,11 +153,17 @@ const deleteKey = (item) => feedItemDeleteProjectId(item) || item.id
 const shareProjectId = (item) => feedItemShareProjectId(item)
 const topicLabel = (item) => resolveExploreTopicLabel(item, t)
 
-const selectCategory = (category) => {
-  if (selectedCategory.value === category) return
-  selectedCategory.value = category
+watch(selectedCategory, () => {
   void load(1)
-}
+})
+
+watch(
+  () => props.initialCategory,
+  (category) => {
+    const next = isKnownExploreTopicId(category) ? category : 'all'
+    if (selectedCategory.value !== next) selectedCategory.value = next
+  },
+)
 
 const copyShareLink = async (item) => {
   const projectId = shareProjectId(item)

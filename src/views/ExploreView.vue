@@ -8,7 +8,11 @@
       @enter="goWorkspace"
     />
     <main class="px-4 py-6 pt-[4.5rem] sm:px-6 sm:py-10 sm:pt-24">
-      <ExploreGrid :user-id="userId" @open="openExploreItem" />
+      <ExploreGrid
+        :user-id="userId"
+        :initial-category="initialCategory"
+        @open="openExploreItem"
+      />
     </main>
     <AppFooter />
     <AuthDialog
@@ -22,22 +26,29 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import AppFooter from '../components/AppFooter.vue'
 import ExploreGrid from '../components/ExploreGrid.vue'
 import AuthDialog from '../components/AuthDialog.vue'
 import { authApi, isLoggedIn, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
+import { isKnownExploreTopicId } from '@/constants/exploreTopicCategories'
 
 const router = useRouter()
+const route = useRoute()
 const logged = ref(false)
 const nickName = ref('')
 const avatar = ref(getLocalAvatar())
 const userId = ref(null)
 const dialogOpen = ref(false)
 const dialogMode = ref('signup')
+
+const initialCategory = computed(() => {
+  const category = String(route.query.category ?? '').trim().toLowerCase()
+  return isKnownExploreTopicId(category) ? category : 'all'
+})
 
 const refresh = async () => {
   logged.value = isLoggedIn()

@@ -1,6 +1,6 @@
 <template>
   <section
-    v-if="cards.length || loading"
+    v-if="visible"
     id="ebooks"
     class="py-20"
     aria-labelledby="ebooks-heading"
@@ -15,18 +15,31 @@
         </p>
       </div>
 
+      <ExploreTopicTabs
+        v-model="selectedCategory"
+        class="mb-8"
+        centered
+        :aria-label="t('landing.ebooks.title')"
+      />
+
       <div v-if="error" class="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">
         {{ error }}
       </div>
 
-      <ul class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      <ul v-if="cards.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <li
           v-for="card in cards"
           :key="card.id"
           class="group overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-primary/50 hover:shadow-lg"
         >
           <RouterLink :to="card.to" class="flex h-full flex-col text-left">
-            <div class="aspect-[3/4] w-full overflow-hidden bg-secondary/40">
+            <div class="relative aspect-[3/4] w-full overflow-hidden bg-secondary/40">
+              <span
+                v-if="card.topicLabel"
+                class="absolute left-2 top-2 z-10 max-w-[calc(100%-1rem)] truncate rounded-md bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur"
+              >
+                {{ card.topicLabel }}
+              </span>
               <img
                 v-if="card.cover"
                 :src="card.cover"
@@ -49,13 +62,20 @@
         </li>
       </ul>
 
+      <p
+        v-else-if="!loading && !error"
+        class="py-12 text-center text-sm text-muted-foreground"
+      >
+        {{ selectedCategory === 'all' ? t('workspace.noWorks') : t('workspace.exploreCategoryEmpty') }}
+      </p>
+
       <div v-if="loading" class="mt-8 flex justify-center text-muted-foreground">
         <Loader2 class="h-5 w-5 animate-spin" />
       </div>
 
       <div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
         <RouterLink
-          to="/explore"
+          :to="exploreLink"
           class="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary/50 px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/50"
         >
           {{ t('landing.ebooks.viewAll') }}
@@ -73,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Loader2, Sparkles } from 'lucide-vue-next'
@@ -81,6 +101,8 @@ import { feedApi, buildFeedStreamRequest } from '@/api'
 import { feedItemShareProjectId } from '@/utils/feedOpen'
 import { bookCardTagline } from '@/utils/bookSeo'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
+import { resolveExploreTopicLabel, toFeedTopicCategoryFilter } from '@/constants/exploreTopicCategories'
+import ExploreTopicTabs from '@/components/explore/ExploreTopicTabs.vue'
 
 defineEmits(['start'])
 
@@ -90,6 +112,14 @@ const cards = ref([])
 const itemTitleMap = ref({})
 const loading = ref(false)
 const error = ref(null)
+const selectedCategory = ref('all')
+const hasLoaded = ref(false)
+
+const visible = computed(() => loading.value || hasLoaded.value)
+const exploreLink = computed(() => {
+  const category = toFeedTopicCategoryFilter(selectedCategory.value)
+  return category ? { path: '/explore', query: { category } } : '/explore'
+})
 
 const displayTitle = (card) => {
   if (card.projectId && itemTitleMap.value[card.projectId]) {
@@ -110,6 +140,7 @@ const buildCard = (item) => {
     to: { name: 'project-community', params: { projectId } },
     cover,
     fallbackTitle,
+    topicLabel: resolveExploreTopicLabel(item, t),
   }
 }
 
@@ -135,17 +166,32 @@ async function loadItemDeckTitles(feedItems) {
   )
 }
 
-onMounted(async () => {
+async function loadFeed() {
   loading.value = true
+  error.value = null
   try {
-    const res = await feedApi.getFeedStream(buildFeedStreamRequest(1))
+    const res = await feedApi.getFeedStream(
+      buildFeedStreamRequest(1, undefined, {
+        categoryId: toFeedTopicCategoryFilter(selectedCategory.value),
+      }),
+    )
     const feedItems = res.data || []
     cards.value = feedItems.map(buildCard).filter(Boolean)
     void loadItemDeckTitles(feedItems)
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')
+    cards.value = []
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
+}
+
+watch(selectedCategory, () => {
+  void loadFeed()
+})
+
+onMounted(() => {
+  void loadFeed()
 })
 </script>
