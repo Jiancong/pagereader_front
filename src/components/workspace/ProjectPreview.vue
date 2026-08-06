@@ -62,7 +62,7 @@
             </button>
             <div
               v-if="categoryMenuOpen"
-              class="absolute left-0 top-full z-[120] mt-1.5 min-w-full overflow-hidden rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl"
+              class="absolute left-0 top-full z-[120] mt-1.5 min-w-full overflow-hidden rounded-xl border border-border bg-card p-1.5 text-foreground shadow-2xl"
               role="listbox"
               :aria-label="t('workspace.projectTopicCategory')"
             >
