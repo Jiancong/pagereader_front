@@ -1,0 +1,313 @@
+openapi: 3.0.3
+info:
+  title: PageReader Immersive Web Translation API
+  description: |
+    沉浸式网页翻译功能所需的后端接口规范。
+
+    **调用顺序**
+    1. `GET /translate/webpage` — 服务端抓取目标网页 HTML
+    2. `POST /translate/batch` — 分批翻译提取出的文本（前端每批 ≤5 条、≤1000 字符）
+
+    **Base URL（生产）**: `https://page2.top/api2`
+
+    **鉴权**: 两个接口均需登录，请求头 `Authorization: {JWT}`（与现有 api2 一致）。
+  version: 1.0.0
+  contact:
+    name: PageReader Frontend Team
+
+servers:
+  - url: https://page2.top/api2
+    description: Production
+  - url: http://localhost:8080/api2
+    description: Local development
+
+tags:
+  - name: translate
+    description: 沉浸式翻译（PDF / 网页）
+
+paths:
+  /translate/webpage:
+    get:
+      tags: [translate]
+      summary: 抓取目标网页 HTML（服务端代理）
+      description: |
+        生产环境前端通过此接口抓取外部网页，避免浏览器 CORS 限制。
+
+        **后端职责**
+        - JWT 鉴权
+        - SSRF 防护（禁止内网/localhost/元数据地址）
+        - HTTP 抓取目标 URL，跟随重定向（建议最多 5 次）
+        - 返回完整 HTML 及最终 URL
+
+        **限制建议**
+        - 连接超时 5s，读取超时 15–20s
+        - 响应体 ≤ 8MB
+        - User-Agent 使用正常浏览器 UA
+      operationId: fetchWebpage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: url
+          in: query
+          required: true
+          description: 目标网页完整 URL
+          schema:
+            type: string
+            format: uri
+            example: https://paulgraham.com/ds.html
+      responses:
+        "200":
+          description: 抓取成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R_WebpageProxyData"
+              examples:
+                success:
+                  summary: 标准成功响应
+                  value:
+                    code: 0
+                    message: success
+                    data:
+                      html: "<!DOCTYPE html><html><head><title>Do Things that Don't Scale</title></head><body>...</body></html>"
+                      finalUrl: https://paulgraham.com/ds.html
+        "401":
+          description: HTTP 401（可选，前端也会识别业务码 900111）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R_Error"
+        "502":
+          description: 目标站不可达或响应无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R_Error"
+              example:
+                code: 502
+                message: Failed to fetch webpage
+        "200业务错误":
+          description: HTTP 200 但 code ≠ 0（与现有 api2 风格一致）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R_Error"
+              examples:
+                notLoggedIn:
+                  summary: 未登录
+                  value:
+                    code: 900111
+                    message: User not logged in
+                invalidUrl:
+                  summary: URL 非法
+                  value:
+                    code: 400
+                    message: Invalid URL
+                ssrfBlocked:
+                  summary: SSRF 拦截
+                  value:
+                    code: 403
+                    message: URL not allowed
+                pageTooLarge:
+                  summary: 页面过大
+                  value:
+                    code: 413
+                    message: Page too large
+
+  /translate/batch:
+    post:
+      tags: [translate]
+      summary: 批量翻译文本
+      description: |
+        前端从网页 DOM 提取翻译单元后，按批调用此接口。
+
+        **前端分批策略**（已实现，后端无需切分）
+        - 每批最多 **5** 条文本
+        - 每批总字符 ≤ **1000**
+        - 一篇 paulgraham 文章约 80 段 → 约 16 次请求
+
+        **超时要求（重要）**
+        - Java BFF → Python 读超时建议 **≥ 90s**
+        - Nginx / 网关超时建议 **≥ 90s**
+        - 单批 5 条约需 10–20s；此前 66s 大批次导致网关 502
+
+        **响应要求**
+        - `translations` 数组长度必须与 `texts` 完全一致
+        - 顺序一一对应
+      operationId: translateBatch
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranslateBatchReq"
+            example:
+              texts:
+                - "Do Things that Don't Scale"
+                - "The most common mistake startups make is to solve problems no one has."
+              targetLang: zh
+              sourceLang: en
+      responses:
+        "200":
+          description: 翻译成功
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/R_TranslateBatchRes"
+                  - $ref: "#/components/schemas/TranslateBatchRes"
+              examples:
+                wrapped:
+                  summary: 标准 R<T> 包装（推荐）
+                  value:
+                    code: 0
+                    message: success
+                    data:
+                      translations:
+                        - "做那些无法规模化的事"
+                        - "创业公司最常见的错误是解决没人存在的问题。"
+                direct:
+                  summary: 直接返回（前端也支持）
+                  value:
+                    translations:
+                      - "做那些无法规模化的事"
+                      - "创业公司最常见的错误是解决没人存在的问题。"
+        "401":
+          description: HTTP 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R_Error"
+        "502":
+          description: 翻译服务不可用或网关超时
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R_Error"
+              example:
+                code: 502
+                message: 翻译服务暂时不可用
+        "200业务错误":
+          description: HTTP 200 但 code ≠ 0
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R_Error"
+              examples:
+                notLoggedIn:
+                  value:
+                    code: 900111
+                    message: User not logged in
+                noPoints:
+                  value:
+                    code: 500106
+                    message: Insufficient credits
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: JWT token，与现有 api2 接口一致
+
+  schemas:
+    R_WebpageProxyData:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: integer
+          description: 0 表示成功
+          example: 0
+        message:
+          type: string
+          example: success
+        msg:
+          type: string
+          description: message 别名（部分接口使用）
+        success:
+          type: boolean
+          description: true 也表示成功（与 code=0 二选一或同时）
+        data:
+          oneOf:
+            - $ref: "#/components/schemas/WebpageProxyData"
+            - type: string
+              description: 也可直接返回 HTML 字符串（不推荐）
+
+    WebpageProxyData:
+      type: object
+      required: [html]
+      properties:
+        html:
+          type: string
+          description: 目标页完整 HTML
+          minLength: 80
+        finalUrl:
+          type: string
+          format: uri
+          description: 跟随重定向后的最终 URL；无跳转时可省略，前端 fallback 为请求 url
+
+    TranslateBatchReq:
+      type: object
+      required: [texts, targetLang]
+      properties:
+        texts:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 5
+          description: 待翻译文本，前端每批 ≤5 条
+        targetLang:
+          type: string
+          description: 目标语言 ISO 639-1
+          example: zh
+          enum: [zh, en, ja, ko, fr, de, es, ru, ar, pt, it]
+        sourceLang:
+          type: string
+          description: 源语言，可选，缺省自动检测
+          example: en
+
+    TranslateBatchRes:
+      type: object
+      required: [translations]
+      properties:
+        translations:
+          type: array
+          items:
+            type: string
+          description: 译文，与 texts 等长同序
+
+    R_TranslateBatchRes:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/TranslateBatchRes"
+
+    R_Error:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: |
+            常见错误码：
+            - 900111 未登录
+            - 900102 token 过期
+            - 900103 refresh token 过期
+            - 500106 积分不足
+            - 502 服务不可用 / 网关超时
+          example: 900111
+        message:
+          type: string
+          example: User not logged in
+        msg:
+          type: string

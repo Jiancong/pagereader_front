@@ -1,7 +1,14 @@
 <template>
   <div class="web-bilingual-reader">
+    <!-- 无内容兜底 -->
     <div v-if="loading" class="web-bilingual-reader__placeholder">
       {{ t('translate.loadingWeb') }}
+    </div>
+    <div v-else-if="needsLogin && !pristine" class="web-bilingual-reader__placeholder">
+      <span>{{ t('translate.loginRequired') }}</span>
+      <button class="web-bilingual-reader__retry" type="button" @click="emit('need-login')">
+        {{ t('translate.login') }}
+      </button>
     </div>
     <div v-else-if="loadError" class="web-bilingual-reader__placeholder web-bilingual-reader__placeholder--error">
       <span>{{ loadError }}</span>
@@ -10,7 +17,7 @@
       </button>
     </div>
 
-    <div v-show="!loading && !loadError" class="web-bilingual-reader__split">
+    <div v-show="!loading && !loadError && pristine" class="web-bilingual-reader__split">
       <!-- 左：原文 -->
       <div class="web-bilingual-reader__pane" ref="origScrollRef">
         <div class="web-bilingual-reader__pane-label">{{ t('translate.original') }}</div>
@@ -50,6 +57,7 @@ import { useI18n } from 'vue-i18n'
 import { fetchWebpage } from '@/api/webpage'
 import { translateTextsInChunks, TRANSLATE_BATCH_MAX_TEXTS, TRANSLATE_BATCH_MAX_CHARS } from '@/api/translation'
 import { ApiError } from '@/api/client'
+import { ReponseCodes } from '@/request/response-codes'
 import { isLoggedIn } from '@/api/token'
 import {
   prepareWebPage,
@@ -136,8 +144,13 @@ async function init() {
     mountPanes()
     setupScrollSync()
     await runTranslation()
-  } catch {
+  } catch (err) {
     if (token !== runToken) return
+    if (isAuthError(err)) {
+      needsLogin.value = true
+      loading.value = false
+      return
+    }
     loadError.value = t('translate.webFetchFailed')
     loading.value = false
   }
@@ -223,7 +236,13 @@ async function translateChunk(chunk: WebTranslationUnit[], index: number): Promi
 }
 
 function isAuthError(err: unknown): boolean {
-  return err instanceof ApiError && err.code === 401
+  if (!(err instanceof ApiError)) return false
+  return (
+    err.code === 401 ||
+    err.code === ReponseCodes.NO_AUTH ||
+    err.code === ReponseCodes.TOKEN_EXPIRED ||
+    err.code === ReponseCodes.REFRESH_TOKEN_EXPIRED
+  )
 }
 
 async function runTranslation() {
