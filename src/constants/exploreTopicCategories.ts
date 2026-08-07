@@ -38,6 +38,72 @@ const TOPIC_I18N: Record<Exclude<ExploreTopicCategory, "all">, string> = {
 
 const KNOWN_TOPIC_IDS = new Set<string>(Object.keys(TOPIC_I18N))
 
+/** 生成模式占用 categoryId 时的取值，不能当作探索主题 */
+const GENERATION_MODE_CATEGORY_IDS = new Set([
+  "novel",
+  "document",
+  "card",
+  "outline",
+  "ppt",
+])
+
+const TOPIC_LABEL_ALIASES: Record<Exclude<ExploreTopicCategory, "all">, readonly string[]> = {
+  ai: ["ai"],
+  fiction: ["fiction", "小说"],
+  education: ["education", "教育"],
+  finance: ["finance", "财经"],
+  startup: ["startup", "创业"],
+}
+
+/** 后端 categoryName / 英文名反查 slug */
+export function resolveExploreTopicIdByLabel(
+  label: string | null | undefined,
+): Exclude<ExploreTopicCategory, "all"> | null {
+  const normalized = String(label ?? "").trim().toLowerCase()
+  if (!normalized) return null
+
+  for (const [id, aliases] of Object.entries(TOPIC_LABEL_ALIASES) as Array<
+    [Exclude<ExploreTopicCategory, "all">, readonly string[]]
+  >) {
+    if (aliases.some((alias) => alias.toLowerCase() === normalized)) return id
+  }
+
+  return null
+}
+
+type ProjectTopicSource = {
+  categoryId?: string | null
+  categoryName?: string | null
+  topicCategoryId?: string | null
+  feedCategoryId?: string | null
+  exploreCategoryId?: string | null
+  [key: string]: unknown
+}
+
+/** 从项目详情解析探索主题 categoryId，忽略生成模式占用的 categoryId */
+export function pickProjectExploreTopicCategoryId(
+  project: ProjectTopicSource | null | undefined,
+): Exclude<ExploreTopicCategory, "all"> | "" {
+  if (!project) return ""
+
+  for (const key of ["topicCategoryId", "feedCategoryId", "exploreCategoryId"] as const) {
+    const id = String(project[key] ?? "").trim().toLowerCase()
+    if (isKnownExploreTopicId(id)) return id
+  }
+
+  const rawCategoryId = String(project.categoryId ?? "").trim().toLowerCase()
+  if (isKnownExploreTopicId(rawCategoryId)) return rawCategoryId
+  if (rawCategoryId && !GENERATION_MODE_CATEGORY_IDS.has(rawCategoryId)) {
+    const fromUnknownId = resolveExploreTopicIdByLabel(rawCategoryId)
+    if (fromUnknownId) return fromUnknownId
+  }
+
+  const fromName = resolveExploreTopicIdByLabel(project.categoryName)
+  if (fromName) return fromName
+
+  return ""
+}
+
 /** 后端 Feed 筛选用：all 时不传 categoryId */
 export function toFeedTopicCategoryFilter(
   category: ExploreTopicCategory,

@@ -73,11 +73,11 @@
                 role="option"
                 class="flex w-full items-center rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
                 :class="
-                  selectedCategoryId === cat.id
+                  resolvedTopicCategoryId === cat.id
                     ? 'bg-primary/10 text-primary'
                     : 'text-foreground'
                 "
-                :aria-selected="selectedCategoryId === cat.id"
+                :aria-selected="resolvedTopicCategoryId === cat.id"
                 :disabled="updatingCategory"
                 @click="onSelectCategoryFromMenu(cat.id)"
               >
@@ -167,7 +167,7 @@ import {
 import { resolveNovelFromHistory } from '@/utils/novelStream'
 import {
   EXPLORE_TOPIC_SELECTABLE_OPTIONS,
-  isKnownExploreTopicId,
+  pickProjectExploreTopicCategoryId,
   resolveExploreTopicLabelById,
 } from '@/constants/exploreTopicCategories'
 
@@ -194,12 +194,15 @@ const categoryMenuOpen = ref(false)
 const categoryMenuRef = ref(null)
 
 function syncSelectedCategoryFromProject(proj) {
-  const id = String(proj?.categoryId ?? '').trim().toLowerCase()
-  selectedCategoryId.value = isKnownExploreTopicId(id) ? id : ''
+  selectedCategoryId.value = pickProjectExploreTopicCategoryId(proj)
 }
 
+const resolvedTopicCategoryId = computed(() =>
+  selectedCategoryId.value || pickProjectExploreTopicCategoryId(project.value),
+)
+
 const currentCategoryLabel = computed(() =>
-  resolveExploreTopicLabelById(selectedCategoryId.value || project.value?.categoryId, t)
+  resolveExploreTopicLabelById(resolvedTopicCategoryId.value, t)
   || String(project.value?.categoryName ?? '').trim()
   || null,
 )
@@ -224,6 +227,7 @@ async function onSelectCategory(categoryId) {
       categoryId: result.categoryId,
       categoryName: result.categoryName ?? project.value.categoryName,
     }
+    syncSelectedCategoryFromProject(project.value)
     ElMessage.success(t('workspace.projectTopicCategorySaved'))
   } catch (e) {
     syncSelectedCategoryFromProject(project.value)
@@ -368,7 +372,8 @@ async function onShareToCommunity() {
   sharing.value = true
   try {
     const body = buildShareToCommunityBody(project.value, history.value)
-    if (selectedCategoryId.value) body.categoryId = selectedCategoryId.value
+    const categoryBeforeShare = selectedCategoryId.value || pickProjectExploreTopicCategoryId(project.value)
+    if (categoryBeforeShare) body.categoryId = categoryBeforeShare
     const result = await projectApi.shareToCommunity(project.value.id, body)
     project.value = {
       ...project.value,
@@ -376,6 +381,10 @@ async function onShareToCommunity() {
       sharedToCommunity: true,
       isPrivate: 0,
       isRecommended: 1,
+    }
+    syncSelectedCategoryFromProject(project.value)
+    if (!selectedCategoryId.value && categoryBeforeShare) {
+      selectedCategoryId.value = categoryBeforeShare
     }
     ElMessage.success(t('workspace.shareToCommunitySuccess'))
   } catch (e) {
