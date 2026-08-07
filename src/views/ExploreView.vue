@@ -35,6 +35,7 @@ import AuthDialog from '../components/AuthDialog.vue'
 import { authApi, isLoggedIn, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 import { isKnownExploreTopicId } from '@/constants/exploreTopicCategories'
+import { ensureExploreTopicCategoriesLoaded } from '@/composables/useExploreTopicCategories'
 
 const router = useRouter()
 const route = useRoute()
@@ -71,7 +72,10 @@ const refresh = async () => {
   }
 }
 
-onMounted(refresh)
+onMounted(() => {
+  void ensureExploreTopicCategoriesLoaded()
+  refresh()
+})
 
 const goWorkspace = () => router.push('/workspace')
 

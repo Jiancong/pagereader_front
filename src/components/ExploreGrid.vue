@@ -112,6 +112,7 @@ import { ElMessage } from 'element-plus'
 import { Loader2, Eye, Heart, Trash2, Share2 } from 'lucide-vue-next'
 import { feedApi, buildFeedStreamRequest, DEFAULT_FEED_STREAM_PAGE_SIZE } from '@/api'
 import { resolveExploreTopicLabel, toFeedTopicCategoryFilter, isKnownExploreTopicId } from '@/constants/exploreTopicCategories'
+import { useExploreTopicCategories } from '@/composables/useExploreTopicCategories'
 import ExploreTopicTabs from '@/components/explore/ExploreTopicTabs.vue'
 import { canDeleteFeedItem, feedItemDeleteProjectId } from '@/utils/projectDelete'
 import { buildExploreProjectShareUrl, feedItemShareProjectId } from '@/utils/feedOpen'
@@ -125,7 +126,8 @@ const props = defineProps({
 
 const emit = defineEmits(['open', 'deleted'])
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+void useExploreTopicCategories()
 
 const PAGE_SIZE = DEFAULT_FEED_STREAM_PAGE_SIZE
 const items = ref([])
@@ -151,7 +153,7 @@ const displayTitle = (item) => {
 const canDelete = (item) => canDeleteFeedItem(item, props.userId)
 const deleteKey = (item) => feedItemDeleteProjectId(item) || item.id
 const shareProjectId = (item) => feedItemShareProjectId(item)
-const topicLabel = (item) => resolveExploreTopicLabel(item, t)
+const topicLabel = (item) => resolveExploreTopicLabel(item, locale.value)
 
 watch(selectedCategory, () => {
   void load(1)

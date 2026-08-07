@@ -102,11 +102,13 @@ import { feedItemShareProjectId } from '@/utils/feedOpen'
 import { bookCardTagline } from '@/utils/bookSeo'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
 import { resolveExploreTopicLabel, toFeedTopicCategoryFilter } from '@/constants/exploreTopicCategories'
+import { useExploreTopicCategories } from '@/composables/useExploreTopicCategories'
 import ExploreTopicTabs from '@/components/explore/ExploreTopicTabs.vue'
 
 defineEmits(['start'])
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+void useExploreTopicCategories()
 
 const cards = ref([])
 const itemTitleMap = ref({})
@@ -140,7 +142,7 @@ const buildCard = (item) => {
     to: { name: 'project-community', params: { projectId } },
     cover,
     fallbackTitle,
-    topicLabel: resolveExploreTopicLabel(item, t),
+    topicLabel: resolveExploreTopicLabel(item, locale.value),
   }
 }
 

@@ -122,6 +122,15 @@ export interface FeedStreamPageDto {
   data: FeedStreamItemDto[]
 }
 
+/** 探索流主题分类（GET /www/model/feed/categories） */
+export interface FeedTopicCategoryDto {
+  id: string
+  name: string
+  nameEn?: string
+  sort?: number
+  count?: number
+}
+
 export type FeedFavoriteAction = "click" | "unclick"
 
 export interface FeedFavoriteActionRequest {

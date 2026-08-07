@@ -67,7 +67,7 @@
               :aria-label="t('workspace.projectTopicCategory')"
             >
               <button
-                v-for="cat in EXPLORE_TOPIC_SELECTABLE_OPTIONS"
+                v-for="cat in selectableOptions"
                 :key="cat.id"
                 type="button"
                 role="option"
@@ -81,7 +81,7 @@
                 :disabled="updatingCategory"
                 @click="onSelectCategoryFromMenu(cat.id)"
               >
-                {{ t(cat.i18nKey) }}
+                {{ cat.label }}
               </button>
             </div>
           </div>
@@ -166,10 +166,9 @@ import {
 } from '@/utils/projectTitle'
 import { resolveNovelFromHistory } from '@/utils/novelStream'
 import {
-  EXPLORE_TOPIC_SELECTABLE_OPTIONS,
   pickProjectExploreTopicCategoryId,
-  resolveExploreTopicLabelById,
 } from '@/constants/exploreTopicCategories'
+import { useExploreTopicCategories } from '@/composables/useExploreTopicCategories'
 
 const props = defineProps({
   projectId: { type: String, required: true },
@@ -178,6 +177,7 @@ const props = defineProps({
 const emit = defineEmits(['back', 'fork'])
 
 const { t } = useI18n()
+const { selectableOptions, resolveLabelById } = useExploreTopicCategories()
 
 const project = ref(null)
 const history = ref([])
@@ -202,7 +202,7 @@ const resolvedTopicCategoryId = computed(() =>
 )
 
 const currentCategoryLabel = computed(() =>
-  resolveExploreTopicLabelById(resolvedTopicCategoryId.value, t)
+  resolveLabelById(resolvedTopicCategoryId.value)
   || String(project.value?.categoryName ?? '').trim()
   || null,
 )

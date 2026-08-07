@@ -6,6 +6,7 @@ import type {
   FeedStreamRequest,
   FeedStreamPageDto,
   FeedStreamItemDto,
+  FeedTopicCategoryDto,
   FeedFavoriteAction,
   FeedFavoriteResponseDto,
   FeedManifestItemDto,
@@ -50,6 +51,11 @@ export function buildFeedStreamRequest(
 
 export async function getFeedStream(req: FeedStreamRequest): Promise<FeedStreamPageDto> {
   return postJson<FeedStreamPageDto>("/www/model/feed/stream", req)
+}
+
+/** 探索主题分类列表（匿名可访问；失败时前端 fallback 内置分类） */
+export async function getFeedTopicCategories(): Promise<FeedTopicCategoryDto[]> {
+  return get<FeedTopicCategoryDto[]>("/www/model/feed/categories")
 }
 
 // Feed 单条详情

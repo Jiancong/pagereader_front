@@ -6,7 +6,7 @@
     :aria-label="ariaLabel"
   >
     <button
-      v-for="cat in EXPLORE_TOPIC_OPTIONS"
+      v-for="cat in tabOptions"
       :key="cat.id"
       type="button"
       role="tab"
@@ -19,14 +19,14 @@
       :aria-selected="modelValue === cat.id"
       @click="emit('update:modelValue', cat.id)"
     >
-      {{ t(cat.i18nKey) }}
+      {{ cat.label }}
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import { EXPLORE_TOPIC_OPTIONS, type ExploreTopicCategory } from '@/constants/exploreTopicCategories'
+import { useExploreTopicCategories } from '@/composables/useExploreTopicCategories'
+import type { ExploreTopicCategory } from '@/constants/exploreTopicCategories'
 
 defineProps<{
   modelValue: ExploreTopicCategory
@@ -38,5 +38,5 @@ const emit = defineEmits<{
   'update:modelValue': [value: ExploreTopicCategory]
 }>()
 
-const { t } = useI18n()
+const { tabOptions } = useExploreTopicCategories()
 </script>
