@@ -162,6 +162,12 @@
                 root-class="novel-guide-markdown"
               />
             </div>
+            <p
+              v-if="!activeSectionTurns.length"
+              class="py-8 text-center text-sm text-muted-foreground"
+            >
+              {{ t("workspace.novelResultEmpty") }}
+            </p>
           </template>
         </div>
       </article>
@@ -186,6 +192,12 @@
       >
         <ChatMarkdownBody :content="turn" root-class="novel-guide-markdown" />
       </div>
+      <p
+        v-if="!fullMarkdownTurns.length"
+        class="py-8 text-center text-sm text-muted-foreground"
+      >
+        {{ t("workspace.novelResultEmpty") }}
+      </p>
     </div>
 
     <NovelAnnotationMenu
