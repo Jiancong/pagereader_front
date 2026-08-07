@@ -752,20 +752,77 @@ watch(
   { immediate: true },
 )
 
+function parseNovelChatMetadata(row: ConversationHistoryVo): Record<string, unknown> | undefined {
+  const raw = row.metadata
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>
+  }
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+    } catch {
+      return undefined
+    }
+  }
+  return undefined
+}
+
+function isNovelRelatedSearchRow(row: ConversationHistoryVo): boolean {
+  const sessionId = String(row.sessionId ?? "")
+  if (sessionId.startsWith("novel-related-")) return true
+  const meta = parseNovelChatMetadata(row)
+  return meta?.intent === "novel_related_search" || meta?.type === "novel_related_search"
+}
+
 function novelChatHistoryFromRows(rows: ConversationHistoryVo[]): NovelChatItem[] {
+  const relatedSessionIds = new Set(
+    rows
+      .filter((row) => isNovelRelatedSearchRow(row))
+      .map((row) => String(row.sessionId ?? ""))
+      .filter((id) => id.startsWith("novel-related-")),
+  )
+
+  const questionBySession = new Map<string, string>()
+  for (const row of rows) {
+    if (row.role !== "user") continue
+    const sessionId = String(row.sessionId ?? "")
+    if (!relatedSessionIds.has(sessionId)) continue
+    const meta = parseNovelChatMetadata(row)
+    const question = String(meta?.question ?? row.content ?? "").trim()
+    if (question) questionBySession.set(sessionId, question)
+  }
+
   return rows
     .filter((row) => {
-      const meta = row.metadata as Record<string, unknown> | undefined
-      return meta?.intent === "novel_related_search" || meta?.type === "novel_related_search"
+      const sessionId = String(row.sessionId ?? "")
+      if (relatedSessionIds.has(sessionId)) return true
+      return isNovelRelatedSearchRow(row)
     })
-    .sort((a, b) => (a.sequenceNumber ?? 0) - (b.sequenceNumber ?? 0))
-    .map((row) => ({
-      id: row.id,
-      role: row.role,
-      content: String(row.markdown || row.content || "").trim(),
-      term: row.role === "assistant" ? String((row.metadata as Record<string, unknown>)?.question || "") : undefined,
-    }))
-    .filter((item) => item.content)
+    .sort((a, b) => {
+      const timeA = a.createTime ? Date.parse(String(a.createTime)) : 0
+      const timeB = b.createTime ? Date.parse(String(b.createTime)) : 0
+      if (timeA !== timeB) return timeA - timeB
+      return (a.sequenceNumber ?? 0) - (b.sequenceNumber ?? 0)
+    })
+    .map((row) => {
+      const sessionId = String(row.sessionId ?? "")
+      const meta = parseNovelChatMetadata(row)
+      const content = String(row.markdown || row.content || "").trim()
+      const term =
+        row.role === "user"
+          ? String(meta?.question ?? content)
+          : String(meta?.question ?? questionBySession.get(sessionId) ?? "")
+      return {
+        id: row.id,
+        role: row.role,
+        content,
+        term: term || undefined,
+      }
+    })
+    .filter((item) => item.content && item.content !== "回答完成")
 }
 
 async function loadNovelChatHistory() {

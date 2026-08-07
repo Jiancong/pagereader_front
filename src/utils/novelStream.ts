@@ -248,11 +248,21 @@ export function looksLikeNovelArtifact(url: string): boolean {
 }
 
 function pickNovelDataUrl(obj: Record<string, unknown>): string {
-  return (
+  const direct =
     pickString(obj.novel_data_url) ||
     pickString(obj.remote_url) ||
     pickString(asRecord(obj.novel_data_artifact)?.url)
-  )
+  if (direct) return direct
+
+  const imageUrls = obj.imageUrls
+  if (Array.isArray(imageUrls)) {
+    for (const url of imageUrls) {
+      const candidate = String(url ?? "").trim()
+      if (candidate && looksLikeNovelArtifact(candidate)) return candidate
+    }
+  }
+
+  return ""
 }
 
 function extractMarkdownFromResponse(response: string): string {
@@ -625,15 +635,27 @@ export async function resolveNovelFromStreamComplete(
 }
 
 export function pickNovelMetadataFromHistory(history: unknown[]): Record<string, unknown> | null {
+  let fallback: Record<string, unknown> | null = null
+
   for (let i = history.length - 1; i >= 0; i -= 1) {
     const row = history[i]
     const rec = asRecord(row)
     if (!rec) continue
     if (rec.role !== "assistant" && !parseMetadataRecord(rec.metadata)) continue
     if (!isNovelHistoryRow(rec)) continue
-    return mergeNovelPayloadFromHistoryRow(rec)
+
+    const merged = mergeNovelPayloadFromHistoryRow(rec)
+    const meta = parseMetadataRecord(rec.metadata)
+    const hasNodes =
+      Boolean(pickNovelNodes(merged)?.length) ||
+      Boolean(meta && pickNovelNodes(meta)?.length)
+    const hasArtifactUrl = Boolean(pickNovelDataUrl(merged))
+
+    if (hasNodes || hasArtifactUrl) return merged
+    fallback ??= merged
   }
-  return null
+
+  return fallback
 }
 
 export async function resolveNovelFromHistory(

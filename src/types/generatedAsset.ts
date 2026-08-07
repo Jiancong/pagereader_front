@@ -27,7 +27,11 @@ export function isGeneratedProject(p: ProjectVo): boolean {
 }
 
 export function isNovelProject(p: ProjectVo): boolean {
-  return p.categoryId === "novel"
+  if (p.categoryId === "novel") return true
+  // 探索主题 categoryId（如 startup/education）会覆盖生成模式，用书籍字段辅助识别
+  if (p.sourceBookTitle || p.sourceBookTitleEn || p.canonicalBookKey) return true
+  if (p.wordCount != null && Number(p.wordCount) > 0 && !p.configFilePath) return true
+  return false
 }
 
 export function isPptProject(p: ProjectVo): boolean {

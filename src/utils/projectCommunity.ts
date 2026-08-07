@@ -1,9 +1,11 @@
 import type { ConversationHistoryVo, ProjectVo } from "@/api/types"
 import { extractMarkdownImageUrls } from "@/utils/bookCardStream"
 import { looksLikeImagePreviewUrl } from "@/utils/userAssets"
+import { looksLikeNovelArtifact } from "@/utils/novelStream"
 
 export function looksLikeDeckJson(url: string): boolean {
   const s = String(url || "").toLowerCase()
+  if (looksLikeNovelArtifact(s)) return false
   return s.endsWith(".json") || s.includes("/projects/") || s.includes("ppt_data")
 }
 

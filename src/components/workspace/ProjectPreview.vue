@@ -302,7 +302,7 @@ const projectMarkdown = computed(() =>
 
 async function loadNovelGuide(id, hist, proj) {
   const resolved = await resolveNovelFromHistory(hist, proj)
-  if (resolved?.markdown) {
+  if (resolved?.markdown || resolved?.novelNodes?.length) {
     novelResult.value = resolved
     return true
   }
