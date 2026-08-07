@@ -15,7 +15,10 @@
       :my-projects="myProjects"
       :project-title-map="projectTitleMap"
       :loading-projects="loadingProjects"
+      :loading-more-projects="loadingMoreProjects"
+      :has-more-projects="projectsHasMore"
       :deleting-project-id="deletingProjectId"
+      @load-more-projects="loadMoreProjects"
       :mobile-open="mobileSidebarOpen"
       @new="onSidebarNav(returnToGenerator)"
       @explore="onSidebarNav(() => (view = 'explore'))"
@@ -97,6 +100,9 @@ const avatar = ref(getLocalAvatar())
 const myProjects = ref([])
 const projectTitleMap = ref({})
 const loadingProjects = ref(false)
+const loadingMoreProjects = ref(false)
+const projectsHasMore = ref(false)
+const projectPage = ref(0)
 const deletingProjectId = ref(null)
 const genPrompt = ref('')
 const genKey = ref(0)
@@ -120,17 +126,44 @@ const onSidebarNav = (action) => {
   mobileSidebarOpen.value = false
 }
 
+const MY_PROJECTS_PAGE_SIZE = 30
+
 const loadProjects = async () => {
   loadingProjects.value = true
   try {
-    const page = await feedApi.getMyProjects(0, 30)
+    const page = await feedApi.getMyProjects(0, MY_PROJECTS_PAGE_SIZE)
     const projects = page.content ?? []
+    projectPage.value = 0
+    projectsHasMore.value = page.last === false
     myProjects.value = projects
     void loadProjectDeckTitles(projects)
   } catch {
     myProjects.value = []
+    projectsHasMore.value = false
   } finally {
     loadingProjects.value = false
+  }
+}
+
+const loadMoreProjects = async () => {
+  if (loadingProjects.value || loadingMoreProjects.value || !projectsHasMore.value) return
+  loadingMoreProjects.value = true
+  try {
+    const nextPage = projectPage.value + 1
+    const page = await feedApi.getMyProjects(nextPage, MY_PROJECTS_PAGE_SIZE)
+    projectPage.value = nextPage
+    projectsHasMore.value = page.last === false
+    const incoming = page.content ?? []
+    const seen = new Set(myProjects.value.map((p) => p.id))
+    myProjects.value = [
+      ...myProjects.value,
+      ...incoming.filter((p) => p?.id && !seen.has(p.id)),
+    ]
+    void loadProjectDeckTitles(incoming)
+  } catch {
+    /* 保留已加载列表 */
+  } finally {
+    loadingMoreProjects.value = false
   }
 }
 

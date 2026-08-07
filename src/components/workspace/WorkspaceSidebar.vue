@@ -81,7 +81,7 @@
       >
         {{ t('workspace.myHistory') }}
       </p>
-      <div class="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+      <div ref="historyScrollRef" class="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
         <div
           v-if="loadingProjects"
           :class="[
@@ -92,60 +92,76 @@
           <Loader2 class="h-4 w-4 animate-spin" />
           <span v-if="!isCollapsed">{{ t('workspace.loading') }}</span>
         </div>
-        <p
-          v-else-if="!myProjects.length && !isCollapsed"
-          class="px-2 py-2 text-xs text-muted-foreground/70"
-        >
-          {{ t('workspace.noHistory') }}
-        </p>
-        <div
-          v-for="p in myProjects"
-          v-else
-          :key="p.id"
-          :class="[
-            'group flex w-full items-center rounded-lg transition-colors',
-            isCollapsed ? 'justify-center p-1' : 'gap-1 pr-1',
-            activeProjectId === p.id ? 'bg-secondary' : 'hover:bg-secondary/60',
-          ]"
-        >
-          <button
-            :title="projectDisplayTitle(p)"
+        <template v-else>
+          <p
+            v-if="!myProjects.length && !isCollapsed"
+            class="px-2 py-2 text-xs text-muted-foreground/70"
+          >
+            {{ t('workspace.noHistory') }}
+          </p>
+          <div
+            v-for="p in myProjects"
+            :key="p.id"
             :class="[
-              'flex items-center rounded-lg text-sm transition-colors',
-              isCollapsed
-                ? 'p-1.5'
-                : 'min-w-0 flex-1 gap-2 px-2 py-2 text-left',
-              activeProjectId === p.id
-                ? 'text-foreground'
-                : 'text-muted-foreground group-hover:text-foreground',
+              'group flex w-full items-center rounded-lg transition-colors',
+              isCollapsed ? 'justify-center p-1' : 'gap-1 pr-1',
+              activeProjectId === p.id ? 'bg-secondary' : 'hover:bg-secondary/60',
             ]"
-            @click="$emit('open-project', p.id)"
           >
-            <img
-              v-if="p.thumbnailUrl"
-              :src="p.thumbnailUrl"
-              alt=""
+            <button
+              :title="projectDisplayTitle(p)"
               :class="[
-                'flex-shrink-0 rounded object-cover',
-                isCollapsed ? 'h-8 w-8' : 'h-8 w-8',
+                'flex items-center rounded-lg text-sm transition-colors',
+                isCollapsed
+                  ? 'p-1.5'
+                  : 'min-w-0 flex-1 gap-2 px-2 py-2 text-left',
+                activeProjectId === p.id
+                  ? 'text-foreground'
+                  : 'text-muted-foreground group-hover:text-foreground',
               ]"
-              loading="lazy"
-            />
-            <FileText v-else :class="['flex-shrink-0', isCollapsed ? 'h-5 w-5' : 'h-4 w-4']" />
-            <span v-if="!isCollapsed" class="truncate">{{ projectDisplayTitle(p) }}</span>
-          </button>
-          <button
-            v-if="!isCollapsed"
-            type="button"
-            :title="t('workspace.deleteProject')"
-            class="flex-shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
-            :disabled="deletingProjectId === p.id"
-            @click.stop="$emit('delete-project', p.id)"
+              @click="$emit('open-project', p.id)"
+            >
+              <img
+                v-if="p.thumbnailUrl"
+                :src="p.thumbnailUrl"
+                alt=""
+                :class="[
+                  'flex-shrink-0 rounded object-cover',
+                  isCollapsed ? 'h-8 w-8' : 'h-8 w-8',
+                ]"
+                loading="lazy"
+              />
+              <FileText v-else :class="['flex-shrink-0', isCollapsed ? 'h-5 w-5' : 'h-4 w-4']" />
+              <span v-if="!isCollapsed" class="truncate">{{ projectDisplayTitle(p) }}</span>
+            </button>
+            <button
+              v-if="!isCollapsed"
+              type="button"
+              :title="t('workspace.deleteProject')"
+              class="flex-shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+              :disabled="deletingProjectId === p.id"
+              @click.stop="$emit('delete-project', p.id)"
+            >
+              <Loader2 v-if="deletingProjectId === p.id" class="h-4 w-4 animate-spin" />
+              <Trash2 v-else class="h-4 w-4" />
+            </button>
+          </div>
+          <div
+            v-if="hasMoreProjects || loadingMoreProjects"
+            ref="historyLoadSentinelRef"
+            :class="[
+              'flex items-center justify-center py-2 text-muted-foreground',
+              isCollapsed ? 'px-0' : 'px-2',
+            ]"
+            :aria-hidden="!loadingMoreProjects"
           >
-            <Loader2 v-if="deletingProjectId === p.id" class="h-4 w-4 animate-spin" />
-            <Trash2 v-else class="h-4 w-4" />
-          </button>
-        </div>
+            <Loader2
+              v-if="loadingMoreProjects"
+              class="h-4 w-4 animate-spin"
+              :aria-label="t('workspace.loading')"
+            />
+          </div>
+        </template>
       </div>
     </div>
 
@@ -208,7 +224,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import {
   Plus,
   Compass,
@@ -239,13 +255,18 @@ const props = defineProps({
   myProjects: { type: Array, default: () => [] },
   projectTitleMap: { type: Object, default: () => ({}) },
   loadingProjects: { type: Boolean, default: false },
+  loadingMoreProjects: { type: Boolean, default: false },
+  hasMoreProjects: { type: Boolean, default: false },
   deletingProjectId: { type: String, default: null },
   mobileOpen: { type: Boolean, default: false },
 })
-const emit = defineEmits(['new', 'explore', 'open-project', 'delete-project', 'logout', 'select-document', 'close-mobile'])
+const emit = defineEmits(['new', 'explore', 'open-project', 'delete-project', 'logout', 'select-document', 'close-mobile', 'load-more-projects'])
 
 const assetsOpen = ref(false)
 const collapsed = ref(false)
+const historyScrollRef = ref(null)
+const historyLoadSentinelRef = ref(null)
+let historyScrollObserver = null
 const isCollapsed = computed(() => collapsed.value && !props.mobileOpen)
 
 const { t } = useI18n()
@@ -278,11 +299,88 @@ function onOpenProject(projectId) {
   emit('open-project', projectId)
 }
 
+function setupHistoryScrollObserver() {
+  historyScrollObserver?.disconnect()
+  historyScrollObserver = null
+
+  if (
+    props.loadingProjects ||
+    !props.hasMoreProjects ||
+    !historyScrollRef.value ||
+    !historyLoadSentinelRef.value
+  ) {
+    return
+  }
+
+  historyScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        emit('load-more-projects')
+      }
+    },
+    { root: historyScrollRef.value, rootMargin: '64px', threshold: 0 },
+  )
+  historyScrollObserver.observe(historyLoadSentinelRef.value)
+}
+
+watch(
+  () => [
+    props.hasMoreProjects,
+    props.loadingMoreProjects,
+    props.loadingProjects,
+    props.myProjects.length,
+    isCollapsed.value,
+    props.mobileOpen,
+  ],
+  () => {
+    void nextTick(() => setupHistoryScrollObserver())
+  },
+)
+
+watch(
+  () => props.loadingProjects,
+  (loading, wasLoading) => {
+    if (!wasLoading || loading || !props.hasMoreProjects) return
+    void nextTick(() => {
+      const root = historyScrollRef.value
+      const sentinel = historyLoadSentinelRef.value
+      if (!root || !sentinel) return
+      const rootRect = root.getBoundingClientRect()
+      const sentinelRect = sentinel.getBoundingClientRect()
+      if (sentinelRect.top <= rootRect.bottom + 64) {
+        emit('load-more-projects')
+      }
+    })
+  },
+)
+
+watch(
+  () => props.loadingMoreProjects,
+  (loading, wasLoading) => {
+    if (!wasLoading || loading || !props.hasMoreProjects) return
+    void nextTick(() => {
+      const root = historyScrollRef.value
+      const sentinel = historyLoadSentinelRef.value
+      if (!root || !sentinel) return
+      const rootRect = root.getBoundingClientRect()
+      const sentinelRect = sentinel.getBoundingClientRect()
+      if (sentinelRect.top <= rootRect.bottom + 64) {
+        emit('load-more-projects')
+      }
+    })
+  },
+)
+
 onMounted(() => {
   try {
     collapsed.value = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
   } catch {
     collapsed.value = false
   }
+  void nextTick(() => setupHistoryScrollObserver())
+})
+
+onBeforeUnmount(() => {
+  historyScrollObserver?.disconnect()
 })
 </script>
