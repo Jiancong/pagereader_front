@@ -7,7 +7,7 @@ import { ReponseCodes } from "@/request/response-codes"
 
 /** 批量翻译请求 */
 export interface TranslateBatchReq {
-  /** 单批文本数组，建议每批 <= 5 条且总字符 <= ~1000，避免网关超时 */
+  /** 单批文本数组，建议每批 <= 600 条，避免超过 BFF / Python 上限 */
   texts: string[]
   /** 目标语言，ISO 639-1，如 zh / en / ja */
   targetLang: string
@@ -15,9 +15,10 @@ export interface TranslateBatchReq {
   sourceLang?: string
 }
 
-/** 单批上限：LLM 翻译一批约需 10–20s，过大会触发 api2 网关 502 */
-export const TRANSLATE_BATCH_MAX_TEXTS = 5
-export const TRANSLATE_BATCH_MAX_CHARS = 1000
+/** 单批条数上限，与 Java BFF translate.batch.max-texts、Python TRANSLATE_BATCH_MAX_TEXTS 对齐 */
+export const TRANSLATE_BATCH_MAX_TEXTS = 600
+/** 单批总字符上限，避免单批过大导致网关超时（502）；600 条约 200 字/条 */
+export const TRANSLATE_BATCH_MAX_CHARS = 120_000
 /** 单批等待上限，与 Java→Python 90s 读超时对齐 */
 export const TRANSLATE_BATCH_TIMEOUT_MS = 95000
 
