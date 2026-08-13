@@ -48,13 +48,10 @@ export function getTotalCreditsRemaining(status: SubscribeMyStatus | null | unde
   return getDailyCreditsRemaining(status) + getPackageCreditsRemaining(status)
 }
 
-/** CARD：每日免费优先 + 套餐；DOCUMENT / NOVEL / OUTLINE：仅套餐积分 */
+/** 各模式均可用每日免费 + 套餐；优先扣免费额度 */
 export function canAffordQueue(status: SubscribeMyStatus | null | undefined, queue: PptQueue): boolean {
   const cost = QUEUE_CREDIT_COST[queue]
-  const daily = getDailyCreditsRemaining(status)
-  const pkg = getPackageCreditsRemaining(status)
-  if (queue === "CARD") return daily + pkg >= cost
-  return pkg >= cost
+  return getTotalCreditsRemaining(status) >= cost
 }
 
 export function isCreditsInsufficientMessage(msg: string): boolean {

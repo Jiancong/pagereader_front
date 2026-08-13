@@ -259,13 +259,13 @@ export default {
       "Pay per generation. Upload a book or document for visual card summaries or a full presentation deck.",
     howTitle: "How credits work",
     howHint:
-      "Each mode is charged per run; follow-ups in the same project are not charged again. Daily free credits apply to card generation only (no rollover).",
+      "Each mode is charged per run; follow-ups in the same project are not charged again. Daily free credits apply to all generation modes (no rollover).",
     usageDocument: "Document generation · Presentations",
     usageDocumentCredits: "30 credits / run",
     usageNovelCredits: "30 credits / run",
     usageOutlineCredits: "30 credits / run",
     usageDocumentDesc:
-      "Structure books and documents into PPT-style decks—great for sharing, teaching, and reports. Package credits only.",
+      "Structure books and documents into PPT-style decks—great for sharing, teaching, and reports. Daily free credits are used first, then package credits.",
     usageCard: "Card generation · Visual summaries",
     usageCardCredits: "60 credits / run",
     usageCardDesc:
@@ -277,7 +277,7 @@ export default {
     starterPrice: "$9.9 / mo",
     starterCredits: "900 credits / month",
     starterEquiv: "~30 document or ~15 card generations",
-    starterDaily: "60 daily free credits (card generation)",
+    starterDaily: "60 daily free credits (all generation modes)",
     starterF1: "Great for your first book or document analysis",
     starterF2: "Card and document modes; export PPTX / PDF",
     starterF3: "Chinese & English UI",
@@ -287,7 +287,7 @@ export default {
     proPrice: "$29.9 / mo",
     proCredits: "3,000 credits / month",
     proEquiv: "~100 document or ~50 card generations",
-    proDaily: "90 daily free credits (card generation)",
+    proDaily: "90 daily free credits (all generation modes)",
     proF1: "Reading, teaching, and research workflows",
     proF2: "Lower cost per run for many books",
     proF3: "Priority email support",
@@ -304,7 +304,7 @@ export default {
     paypalBillingNote: "PayPal: auto-renewing subscription, billed each cycle",
     paypalNotConfigured: "PayPal is not configured",
     subscribeSuccess: "Subscription successful! Your credits are updated—you're ready to go.",
-    dailyFreeNote: "30 free credits / day · card generation",
+    dailyFreeNote: "30 free credits / day · all generation modes",
     wechatPay: "WeChat Pay (scan)",
     wechatMonthlyPrice: "{price} / mo",
     wechatMonthlyPriceApprox: "Approx. {price} / mo (USD→HKD estimate)",
@@ -313,7 +313,7 @@ export default {
     freePrice: "Free",
     freeCredits: "30 free credits / day",
     freeF1: "No card required—start right away",
-    freeF2: "Card generation (daily free credits)",
+    freeF2: "Card and document generation (daily free credits)",
     freeF3: "Export PPTX / PDF",
     freeCta: "Start for free",
     storageLabel: "Cloud storage: {size}",
@@ -326,10 +326,10 @@ export default {
           "PageReader uses an agent workflow: it understands your book or document and intent, then generates cards or a presentation deck. Each run is charged by the mode you choose.",
         agentP2: "Credits per run depend on:",
         liDocument:
-          "<strong>Document / Novel generation:</strong> {document} credits per run—package credits only.",
+          "<strong>Document / Novel generation:</strong> {document} credits per run—daily {daily} free credits are used first, then package credits.",
         liCard: "<strong>Card generation:</strong> {card} credits per run—daily {daily} free credits are used first, then package credits.",
         liDaily:
-          "<strong>Daily free credits:</strong> {daily} per day, card generation only; unused daily credits do not roll over.",
+          "<strong>Daily free credits:</strong> {daily} per day, usable for all generation modes; unused daily credits do not roll over.",
         liFollowUp: "<strong>Same-project follow-ups:</strong> in-deck Q&amp;A does not charge another generation fee.",
         note: "<strong>Note:</strong> The workspace pre-checks your balance before generation. Upgrade or contact sales if you run low.",
       },
@@ -348,7 +348,7 @@ export default {
           "<strong>Example:</strong> Starter ({monthly} credits/month), cap {cap}. With {remain} credits left at renewal, balance is capped at {cap} and {surplus} credits expire.",
         dailyTitle: "Daily free credits",
         dailyP:
-          "{daily} free credits per day apply to card generation only—they <strong>do not roll over</strong> and reset each day.",
+          "{daily} free credits per day apply to all generation modes—they <strong>do not roll over</strong> and reset each day.",
         topupTitle: "Top-up credits",
         topupP:
           "Separately purchased top-up credits (when available) do not expire while your account stays active, per your invoice or sales agreement.",
@@ -370,7 +370,7 @@ export default {
           "Structures content into a full presentation deck—ideal for sharing, teaching, and reports. {document} credits per run; daily {daily} free credits are used first, then package credits.",
         cardTitle: "Card generation",
         cardP:
-          "Distills key ideas into explanatory cards for visual understanding. {card} credits per run; package credits only.",
+          "Distills key ideas into explanatory cards for visual understanding. {card} credits per run; daily {daily} free credits are used first, then package credits.",
         tip: "Follow-ups and refinements within the same project do not charge another generation fee.",
       },
       upgrade: {
@@ -386,7 +386,7 @@ export default {
     packageCredits: "Package credits",
     totalCredits: "Available credits",
     creditsBreakdown: "Daily free {daily} · package {pkg}",
-    dailyHint: "Free credits apply to card generation only. Document/novel generation uses package credits or an upgraded plan.",
+    dailyHint: "Daily free credits apply to all generation modes. Free credits are used first, then package credits.",
     managePlan: "Manage subscription",
     subscribeCta: "View plans",
     paypalStatus: "PayPal status",

@@ -461,7 +461,7 @@ export interface ChatStreamReq {
   uploaded_documents?: UploadedDocument[]
   /** 显式项目标题；上传 PDF 时建议传去后缀书名 */
   projectName?: string
-  /** CARD 60 credits/run (daily free first); DOCUMENT/NOVEL/OUTLINE 30 credits/run (package only) */
+  /** CARD 60 / DOCUMENT·NOVEL·OUTLINE 30；各模式均先扣每日免费，不足再扣套餐 */
   queue?: PptQueue
   /** 后端 generation mode：novel / document / card / markdown（与 queue 二选一或同时传） */
   mode?: string
