@@ -190,7 +190,10 @@ function authStreamHeaders(): Headers {
   return headers
 }
 
-async function readSseResponse(res: Response, cb: ChatStreamCallbacks = {}): Promise<void> {
+async function readSseResponse(
+  res: Response,
+  cb: ChatStreamCallbacks = {},
+): Promise<{ completed: boolean }> {
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => "")
     try {
@@ -211,6 +214,7 @@ async function readSseResponse(res: Response, cb: ChatStreamCallbacks = {}): Pro
 
   cb.onStarted?.()
 
+  let completed = false
   const dispatch = async (block: string) => {
     const parsed = parseBlock(block)
     if (!parsed) return
@@ -230,6 +234,7 @@ async function readSseResponse(res: Response, cb: ChatStreamCallbacks = {}): Pro
       event === "novel_complete" ||
       event === "outline_complete"
     ) {
+      completed = true
       await cb.onComplete?.(data)
     } else if (event === "error") {
       const msg =
@@ -260,6 +265,7 @@ async function readSseResponse(res: Response, cb: ChatStreamCallbacks = {}): Pro
     }
   }
   if (buffer.trim()) await dispatch(buffer)
+  return { completed }
 }
 
 export function isLikelyYoutubeUrl(raw: string): boolean {
@@ -298,7 +304,7 @@ export async function youtubePptStream(
   req: YoutubePptStreamReq,
   cb: ChatStreamCallbacks = {},
   signal?: AbortSignal,
-): Promise<{ streamRequestId: string }> {
+): Promise<{ streamRequestId: string; completed: boolean }> {
   const streamRequestId = req.stream_request_id ?? String(Date.now())
   const body = buildYoutubeStreamBody({ ...req, stream_request_id: streamRequestId })
 
@@ -309,8 +315,8 @@ export async function youtubePptStream(
     signal,
   })
 
-  await readSseResponse(res, cb)
-  return { streamRequestId }
+  const { completed } = await readSseResponse(res, cb)
+  return { streamRequestId, completed }
 }
 
 export async function fetchYoutubeTranscript(

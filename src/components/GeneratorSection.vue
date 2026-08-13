@@ -87,7 +87,7 @@
               <input
                 ref="fileInput"
                 type="file"
-                accept=".pdf,.doc,.docx,.txt,.md"
+                accept=".pdf,.doc,.docx,.txt,.md,.epub"
                 class="hidden"
                 @change="handleFileSelect"
               />

@@ -132,7 +132,7 @@
             class="cursor-pointer rounded-xl border-2 border-dashed border-border bg-secondary/30 p-8 text-center transition-colors hover:border-primary/50"
             @click="fileInput?.click()"
           >
-            <input ref="fileInput" type="file" accept=".pdf,.doc,.docx,.txt,.md" class="hidden" @change="onFileChange" />
+            <input ref="fileInput" type="file" accept=".pdf,.doc,.docx,.txt,.md,.epub" class="hidden" @change="onFileChange" />
             <div v-if="hasAttachedDoc" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
               <FileText class="hidden h-10 w-10 text-primary sm:block" />
               <div class="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
@@ -471,6 +471,7 @@ import {
 } from "../../api"
 import type { PptQueue, YoutubeTranscriptResult } from "@/api/types"
 import { resolvePptDataFromStreamComplete, isPptStreamPayload } from "@/utils/pptCompletePayload"
+import { pollProjectPptAfterStreamDisconnect } from "@/utils/streamProjectPoll"
 import { notifyCreditsRefresh } from "@/composables/useCreditsRefresh"
 import type { UploadedDocument } from "@/utils/pptDocumentRag"
 import { formatBytes } from "@/utils/userAssets"
@@ -969,7 +970,7 @@ const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, me
   youtubeAbort?.abort()
   youtubeAbort = new AbortController()
 
-  await agentApi.youtubePptStream(
+  const { completed } = await agentApi.youtubePptStream(
     {
       youtube_url: youtubeUrlValue,
       project_id: task.projectId,
@@ -1038,6 +1039,26 @@ const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, me
     },
     youtubeAbort.signal,
   )
+
+  if (completed || task.pptData || task.novelResult || task.outlineResult || task.cardResult) return
+
+  appendLog(task, t("workspace.youtubeStreamDisconnectedPolling"))
+  const resolved = await pollProjectPptAfterStreamDisconnect(task.projectId, {
+    signal: youtubeAbort?.signal,
+  })
+  if (resolved?.pptData) {
+    await handlePptStreamComplete(
+      task,
+      {
+        ppt_data: resolved.pptData,
+        project_id: task.projectId,
+        markdown: resolved.markdown,
+      },
+      "upload",
+    )
+  } else if (!task.pptData) {
+    applyStreamError(task, t("workspace.youtubeStreamPollTimeout"), "upload")
+  }
 }
 
 const runStream = async (

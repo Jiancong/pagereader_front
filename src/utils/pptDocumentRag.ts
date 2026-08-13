@@ -42,7 +42,7 @@ export type PptDocumentFileItem = {
 const PPT_DOC_MAX_COUNT = 8;
 const PPT_DOC_MAX_BYTES = 50 * 1024 * 1024;
 
-const PPT_DOC_EXT_RE = /\.(pdf|docx?|md|markdown|txt)$/i;
+const PPT_DOC_EXT_RE = /\.(pdf|docx?|md|markdown|txt|epub)$/i;
 
 export function isHttpShareUrl(url: string): boolean {
   const t = String(url || "").trim();
@@ -57,6 +57,7 @@ export function inferPptDocumentType(name: string, mime?: string): string {
   if (lower.endsWith(".doc") || m === "application/msword") return "doc";
   if (lower.endsWith(".md") || lower.endsWith(".markdown")) return "md";
   if (lower.endsWith(".txt") || m.startsWith("text/")) return "txt";
+  if (lower.endsWith(".epub") || m === "application/epub+zip") return "epub";
   const dot = lower.lastIndexOf(".");
   return dot >= 0 ? lower.slice(dot + 1) : "txt";
 }
@@ -69,7 +70,8 @@ export function isAllowedPptDocumentFile(file: File): boolean {
     m.includes("msword") ||
     m.includes("wordprocessingml") ||
     m === "text/plain" ||
-    m === "text/markdown"
+    m === "text/markdown" ||
+    m === "application/epub+zip"
   );
 }
 
