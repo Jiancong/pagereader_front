@@ -6,7 +6,7 @@ info:
 
     **调用顺序**
     1. `GET /translate/webpage` — 服务端抓取目标网页 HTML
-    2. `POST /translate/batch` — 分批翻译提取出的文本（前端每批 ≤600 条、≤120000 字符）
+    2. `POST /translate/batch` — 分批翻译提取出的文本（前端每批 ≤200 条、≤120000 字符）
 
     **Base URL（生产）**: `https://page2.top/api2`
 
@@ -122,14 +122,14 @@ paths:
         前端从网页 DOM 提取翻译单元后，按批调用此接口。
 
         **前端分批策略**（已实现，后端无需切分）
-        - 每批最多 **600** 条文本
+        - 每批最多 **200** 条文本
         - 每批总字符 ≤ **120000**
-        - 一篇 paulgraham 文章约 80 段 → 通常 1 次请求即可
+        - 导航/侧边栏较多的教程页可能超过 200 段，前端会自动拆成多批
 
         **超时要求（重要）**
         - Java BFF → Python 读超时建议 **≥ 90s**
         - Nginx / 网关超时建议 **≥ 90s**
-        - 单批 600 条以内由 LLM 耗时决定；网关读超时建议 **≥ 90s**
+        - 单批 200 条以内由 LLM 耗时决定；网关读超时建议 **≥ 90s**
 
         **响应要求**
         - `translations` 数组长度必须与 `texts` 完全一致
@@ -259,8 +259,8 @@ components:
           items:
             type: string
           minItems: 1
-          maxItems: 600
-          description: 待翻译文本，前端每批 ≤600 条
+          maxItems: 200
+          description: 待翻译文本，前端每批 ≤200 条
         targetLang:
           type: string
           description: 目标语言 ISO 639-1

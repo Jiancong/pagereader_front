@@ -7,7 +7,7 @@ import { ReponseCodes } from "@/request/response-codes"
 
 /** 批量翻译请求 */
 export interface TranslateBatchReq {
-  /** 单批文本数组，建议每批 <= 600 条，避免超过 BFF / Python 上限 */
+  /** 单批文本数组，建议每批 <= 200 条（与 BFF translate.batch.max-texts 一致） */
   texts: string[]
   /** 目标语言，ISO 639-1，如 zh / en / ja */
   targetLang: string
@@ -15,9 +15,9 @@ export interface TranslateBatchReq {
   sourceLang?: string
 }
 
-/** 单批条数上限，与 Java BFF translate.batch.max-texts、Python TRANSLATE_BATCH_MAX_TEXTS 对齐 */
-export const TRANSLATE_BATCH_MAX_TEXTS = 600
-/** 单批总字符上限，避免单批过大导致网关超时（502）；600 条约 200 字/条 */
+/** 单批条数上限，与 Java BFF translate.batch.max-texts（200）对齐 */
+export const TRANSLATE_BATCH_MAX_TEXTS = 200
+/** 单批总字符上限，避免单批过大导致网关超时（502） */
 export const TRANSLATE_BATCH_MAX_CHARS = 120_000
 /** 单批等待上限，与 Java→Python 90s 读超时对齐 */
 export const TRANSLATE_BATCH_TIMEOUT_MS = 95000
@@ -127,8 +127,15 @@ export function chunkTranslationTexts(
   return chunks
 }
 
+function shouldSplitTranslateBatch(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false
+  if (err.code === 502 || err.code === 504 || err.code === 408) return true
+  if (err.code === 400 && /200|最多|max.*text/i.test(err.message)) return true
+  return false
+}
+
 /**
- * 502 时自动拆半重试（Python 已成功但 Java 网关超时的情况）。
+ * 502/408 或单批条数超限时自动拆半重试。
  */
 async function translateBatchWithSplitRetry(
   texts: string[],
@@ -138,9 +145,7 @@ async function translateBatchWithSplitRetry(
     const res = await translateBatch({ texts, targetLang })
     return res.translations
   } catch (err) {
-    const isTimeout =
-      err instanceof ApiError && (err.code === 502 || err.code === 504 || err.code === 408)
-    if (isTimeout && texts.length > 1) {
+    if (shouldSplitTranslateBatch(err) && texts.length > 1) {
       const mid = Math.ceil(texts.length / 2)
       const left = await translateBatchWithSplitRetry(texts.slice(0, mid), targetLang)
       const right = await translateBatchWithSplitRetry(texts.slice(mid), targetLang)
@@ -150,7 +155,7 @@ async function translateBatchWithSplitRetry(
   }
 }
 
-/** 自动分批 + 502 拆半重试，返回与 texts 等长的译文 */
+/** 自动分批 + 超时/条数超限拆半重试，返回与 texts 等长的译文 */
 export async function translateTextsInChunks(
   texts: string[],
   targetLang: string,
