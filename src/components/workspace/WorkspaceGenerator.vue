@@ -132,7 +132,7 @@
             class="cursor-pointer rounded-xl border-2 border-dashed border-border bg-secondary/30 p-8 text-center transition-colors hover:border-primary/50"
             @click="fileInput?.click()"
           >
-            <input ref="fileInput" type="file" accept=".pdf,.doc,.docx,.txt,.md,.epub" class="hidden" @change="onFileChange" />
+            <input ref="fileInput" type="file" accept=".pdf,.doc,.docx,.txt,.md,.epub,.srt" class="hidden" @change="onFileChange" />
             <div v-if="hasAttachedDoc" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
               <FileText class="hidden h-10 w-10 text-primary sm:block" />
               <div class="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
@@ -153,6 +153,26 @@
               <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.uploadFormatsShort') }}</p>
             </template>
           </div>
+          <div
+            v-if="srtPreview && srtPreview.cueCount > 0"
+            class="mt-4 rounded-xl border border-border bg-secondary/30 p-4 text-left"
+          >
+            <p class="text-sm font-medium text-foreground">{{ t('workspace.srtPreviewTitle') }}</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {{
+                t('workspace.srtPreviewMeta', {
+                  cues: srtPreview.cueCount,
+                  speakers: srtPreview.speakers.length,
+                  chars: srtPreview.charCount,
+                })
+              }}
+            </p>
+            <pre
+              v-if="srtPreview.previewText"
+              class="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground"
+            >{{ srtPreview.previewText }}</pre>
+          </div>
+          <p v-else-if="uploadFileError" class="mt-3 text-sm text-red-400">{{ uploadFileError }}</p>
           <div v-if="hasAttachedDoc && !isNovelMode" class="mt-6">
             <label class="mb-2 block text-sm font-medium text-foreground">{{ t(workspaceCopyKey('uploadPromptLabel')) }}</label>
             <p class="mb-2 text-xs text-muted-foreground">{{ t(workspaceCopyKey('uploadPromptHint')) }}</p>
@@ -474,6 +494,8 @@ import { resolvePptDataFromStreamComplete, isPptStreamPayload } from "@/utils/pp
 import { pollProjectPptAfterStreamDisconnect } from "@/utils/streamProjectPoll"
 import { notifyCreditsRefresh } from "@/composables/useCreditsRefresh"
 import type { UploadedDocument } from "@/utils/pptDocumentRag"
+import { validatePptDocumentFile } from "@/utils/pptDocumentRag"
+import { isSrtFileName, readSrtFile, parseSrtContent, type SrtParseResult } from "@/utils/srtParser"
 import { formatBytes } from "@/utils/userAssets"
 import {
   gtmGenerateStart,
@@ -559,9 +581,17 @@ const translateError = ref("")
 const translateMode = ref<"pdf" | "url">("pdf")
 const translateUrl = ref("")
 const uploadPrompt = ref("")
+const uploadFileError = ref("")
+const srtPreview = ref<SrtParseResult | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const hasAttachedDoc = computed(() => Boolean(uploadedFile.value || cloudDocument.value))
+const isAttachedSrt = computed(() => {
+  if (uploadedFile.value) return isSrtFileName(uploadedFile.value.name, uploadedFile.value.type)
+  const doc = cloudDocument.value
+  if (!doc) return false
+  return isSrtFileName(doc.name || "", String(doc.type || ""))
+})
 const attachedDocName = computed(
   () => uploadedFile.value?.name || cloudDocument.value?.name || "",
 )
@@ -823,13 +853,43 @@ function docBaseName(filename: string): string {
 /** 按当前 RAG 任务 queue，填充上传分析默认诉求（随 Card / Document 模式切换） */
 function applyDefaultUploadPrompt() {
   if (!hasAttachedDoc.value) return
-  const key =
+  let key =
     ragTask.queue === "CARD"
       ? "workspace.uploadPromptDefaultCard"
       : ragTask.queue === "NOVEL"
         ? "workspace.uploadPromptDefaultNovel"
         : "workspace.uploadPromptDefault"
+  if (isAttachedSrt.value && ragTask.queue !== "NOVEL") {
+    key =
+      ragTask.queue === "CARD"
+        ? "workspace.uploadPromptDefaultSrtCard"
+        : "workspace.uploadPromptDefaultSrt"
+  }
   uploadPrompt.value = t(key)
+}
+
+async function refreshSrtPreview(file: File | null, doc: UploadedDocument | null) {
+  srtPreview.value = null
+  if (file && isSrtFileName(file.name, file.type)) {
+    try {
+      srtPreview.value = await readSrtFile(file)
+      if (!srtPreview.value.cueCount) {
+        uploadFileError.value = t("workspace.srtParseEmpty")
+      }
+    } catch {
+      uploadFileError.value = t("workspace.srtParseFailed")
+    }
+    return
+  }
+  if (doc && isSrtFileName(doc.name || "", String(doc.type || ""))) {
+    try {
+      const res = await fetch(doc.url)
+      if (!res.ok) throw new Error("fetch failed")
+      srtPreview.value = parseSrtContent(await res.text())
+    } catch {
+      // 云库 SRT 预览失败不阻断上传
+    }
+  }
 }
 
 watch(
@@ -839,14 +899,27 @@ watch(
   },
 )
 
-const onFileChange = (e: Event) => {
+const onFileChange = async (e: Event) => {
   const f = (e.target as HTMLInputElement).files?.[0]
-  if (f) {
-    cloudDocument.value = null
-    cloudDocumentSize.value = undefined
-    uploadedFile.value = f
-    applyDefaultUploadPrompt()
+  if (!f) return
+  uploadFileError.value = ""
+  srtPreview.value = null
+  const validationError = validatePptDocumentFile(f)
+  if (validationError === "unsupported") {
+    uploadFileError.value = t("workspace.uploadUnsupportedType")
+    if (fileInput.value) fileInput.value.value = ""
+    return
   }
+  if (validationError === "too_large") {
+    uploadFileError.value = t("workspace.uploadTooLarge")
+    if (fileInput.value) fileInput.value.value = ""
+    return
+  }
+  cloudDocument.value = null
+  cloudDocumentSize.value = undefined
+  uploadedFile.value = f
+  await refreshSrtPreview(f, null)
+  applyDefaultUploadPrompt()
 }
 
 const clearAttachedDoc = () => {
@@ -854,6 +927,8 @@ const clearAttachedDoc = () => {
   cloudDocument.value = null
   cloudDocumentSize.value = undefined
   uploadPrompt.value = ""
+  uploadFileError.value = ""
+  srtPreview.value = null
   if (fileInput.value) fileInput.value.value = ""
 }
 
@@ -875,6 +950,8 @@ function attachCloudDocument(payload: { doc: UploadedDocument; size?: number }) 
   cloudDocument.value = payload.doc
   cloudDocumentSize.value = payload.size
   activeTab.value = "upload"
+  uploadFileError.value = ""
+  void refreshSrtPreview(null, payload.doc)
   applyDefaultUploadPrompt()
   gtmAssetAttach(gtmFileExt(payload.doc.name || ""))
 }

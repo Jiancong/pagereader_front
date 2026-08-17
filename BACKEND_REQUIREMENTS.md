@@ -198,6 +198,134 @@ Header: Authorization: <JWT>
 3. 生成结束后 `GET /project/{id}/conversation/history` 至少有 user + assistant 记录；`complete` 里的 `projectId` 与列表 `id` 一致。
 4. 刷新页面后侧边栏仍能看到该条历史。
 
+### 2.2 【新增】SRT 字幕文件解析（document RAG）
+
+前端「上传资料分析」已支持 **`.srt`** 字幕文件（常见于播客、访谈、视频转写）。文件仍走 OSS 直传，随 `uploaded_documents` 传给 `chat-stream`，`type` 为 `"srt"`。
+
+#### 前端发送示例
+
+```json
+{
+  "message": "根据这份访谈字幕，整理核心观点，做 12 页分享 PPT…",
+  "projectId": "550e8400-e29b-41d4-a716-446655440000",
+  "isAgent": true,
+  "queue": "DOCUMENT",
+  "uploaded_documents": [
+    {
+      "url": "https://.../interview.srt",
+      "name": "张小珺商业访谈录.srt",
+      "type": "srt"
+    }
+  ]
+}
+```
+
+#### SRT 文件格式（后端需支持的样例）
+
+```srt
+12
+00:01:23,280 --> 00:01:40,180
+[SPEAKER_02|fp:05ef90b4] Hello大家好欢迎收听张小珺商业访谈录我是小军这是一档由语言及世界工作室出品的深度访谈节目
+
+13
+00:01:40,180 --> 00:01:50,260
+[SPEAKER_00|fp:cdfded77] 我们希望和你一起从这里探索新世界今天的嘉宾我们很开心邀请了OpenAI的研究员姚顺雨2025年4月
+```
+
+每条 cue 结构：**序号行** → **时间轴行**（`HH:MM:SS,mmm --> HH:MM:SS,mmm`）→ **一行或多行正文**。正文行首可能带说话人标签 `[SPEAKER_XX|fp:hex]` 或 `[SPEAKER_XX]`。
+
+#### 后端解析要求
+
+| 步骤 | 要求 |
+|------|------|
+| 1. 识别类型 | `uploaded_documents[].type === "srt"` 或文件名以 `.srt` 结尾 |
+| 2. 下载原文 | 从 OSS `url` 拉取 UTF-8 文本（兼容 BOM；换行 `\n` / `\r\n`） |
+| 3. 解析 cue | 按空行分块；跳过纯数字序号行；解析时间轴；合并 cue 内多行正文 |
+| 4. 剥离标签 | 去掉行首 `[SPEAKER_xx\|fp:…]` / `[SPEAKER_xx]`，**保留说话人 ID** 供后续引用（见下） |
+| 5. 输出文本 | 合并为 document RAG 可用的纯文本，推荐格式：`SPEAKER_02: Hello大家好…`（每 cue 一行或按说话人轮次分段） |
+| 6. 元数据 | 在 `document_rag.documents[]` 中返回 `type: "srt"`、`char_count`、可选 `section_count`（cue 数）、`speaker_count` |
+
+**推荐解析伪代码（与前端 `src/utils/srtParser.ts` 对齐）**：
+
+```python
+SPEAKER_TAG_RE = r'^\[([^\]|]+)(?:\|[^\]]+)?\]\s*'
+TIMESTAMP_RE = r'^(\d{1,2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[,.]\d{3})'
+
+def parse_srt(raw: str) -> list[dict]:
+    cues = []
+    for block in raw.strip().split("\n\n"):
+        lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+        if len(lines) < 2:
+            continue
+        i = 1 if lines[0].isdigit() else 0
+        m = re.match(TIMESTAMP_RE, lines[i])
+        if not m:
+            continue
+        text_lines = lines[i + 1:]
+        speaker = None
+        parts = []
+        for line in text_lines:
+            sm = re.match(SPEAKER_TAG_RE, line)
+            if sm and not speaker:
+                speaker = sm.group(1)
+            parts.append(re.sub(SPEAKER_TAG_RE, "", line).strip())
+        text = " ".join(p for p in parts if p)
+        if text:
+            cues.append({"start": m.group(1), "end": m.group(2), "speaker": speaker, "text": text})
+    return cues
+
+def to_plain_text(cues) -> str:
+    return "\n".join(
+        f"{c['speaker']}: {c['text']}" if c.get('speaker') else c['text']
+        for c in cues
+    )
+```
+
+#### document RAG 与生成
+
+| 项 | 要求 |
+|----|------|
+| 分块 | 与 `txt` 类似，对解析后的纯文本做 chunk；**可选**按 cue 边界或按说话人轮次分块，避免截断单句 |
+| 检索 | `document_search` 应能命中字幕正文；进度文案可提示「正在解析字幕…」 |
+| 生成 | PPT / 卡片 / 导读模式均适用；访谈类内容建议在 deck 中保留**话题分段**与**主要嘉宾/说话人** |
+| 项目标题 | `name` 优先取 `uploaded_documents[0].name` 去 `.srt` 后缀；complete 后可用 LLM 抽取节目名/访谈标题覆盖 |
+| OSS complete | `contentType` 建议接受 `application/x-subrip` 或 `text/plain`；**无需**为 SRT 生成 PDF 式缩略图，Assets 列表可显示通用文档占位图标 |
+
+#### SSE `document_rag` 响应补充（SRT）
+
+```json
+{
+  "document_rag": {
+    "enabled": true,
+    "documents": [
+      {
+        "name": "张小珺商业访谈录.srt",
+        "url": "https://.../interview.srt",
+        "type": "srt",
+        "char_count": 45230,
+        "section_count": 318,
+        "speaker_count": 3
+      }
+    ],
+    "chunk_count": 42
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `section_count` | 解析出的 cue 条数（可选，与前端预览「N 条字幕」一致） |
+| `speaker_count` | 去重后的说话人数量（可选） |
+| `error` | 解析失败时填写原因，前端会跳过该文档 |
+
+#### 验收用例
+
+1. 上传含 `[SPEAKER_xx|fp:…]` 标签的 SRT → `chat-stream` 正常生成，`document_rag.enabled === true`。
+2. `document_rag.documents[0].type === "srt"`，`char_count > 0`，`section_count` 与文件 cue 数大致一致。
+3. 生成 PPT 内容应基于字幕正文（非空、非乱码），能体现访谈/播客主题而非仅文件名。
+4. 侧边栏历史项目 `name` 为去 `.srt` 后的文件名或 LLM 抽取的节目名。
+5. 云资源库重新选用已上传 SRT → 与本地文件行为一致。
+
 ---
 
 ## 3. Agent 流式生成（核心）
