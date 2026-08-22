@@ -556,6 +556,12 @@ export default {
     progressTitle: "Progress",
     elapsedTime: "Elapsed {time}",
     preparing: "Preparing…",
+    generationLongRunningHint:
+      "Analysis may take 30 minutes to several hours with Local LLM, depending on document length. You can leave this page and check results later under My History.",
+    generationLongRunningToast:
+      "Task submitted. Analysis may take a while—you can do something else and come back later to check progress or results.",
+    streamDisconnectedPolling: "Connection closed — still waiting for the result in the background…",
+    streamPollTimeout: "This is taking longer than expected. Check My History later for the result.",
     loginRequiredGenerate: "Please log in to generate",
     generateFailed: "Generation failed",
     uploadingDoc: "Uploading document…",

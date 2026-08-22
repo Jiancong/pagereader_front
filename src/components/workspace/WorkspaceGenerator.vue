@@ -417,6 +417,12 @@
               {{ t('workspace.elapsedTime', { time: activeElapsedDisplay }) }}
             </span>
           </h4>
+          <p
+            v-if="activeTask.isGenerating"
+            class="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+          >
+            {{ t('workspace.generationLongRunningHint') }}
+          </p>
           <div v-if="activeTask.isGenerating" class="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
             <div class="flex items-center gap-3">
               <Loader2 class="h-5 w-5 flex-shrink-0 animate-spin text-primary" />
@@ -449,6 +455,7 @@
 import { ref, computed, reactive, watch, onBeforeUnmount } from "vue"
 import { RouterLink, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
+import { ElMessage } from "element-plus"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages, Globe } from "lucide-vue-next"
 import { useTranslateFileStore } from "@/stores/translateFile"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
@@ -491,7 +498,7 @@ import {
 } from "../../api"
 import type { PptQueue, YoutubeTranscriptResult } from "@/api/types"
 import { resolvePptDataFromStreamComplete, isPptStreamPayload } from "@/utils/pptCompletePayload"
-import { pollProjectPptAfterStreamDisconnect } from "@/utils/streamProjectPoll"
+import { pollProjectGenerationAfterStreamDisconnect, GENERATION_POLL_MAX_WAIT_MS } from "@/utils/streamProjectPoll"
 import { notifyCreditsRefresh } from "@/composables/useCreditsRefresh"
 import type { UploadedDocument } from "@/utils/pptDocumentRag"
 import { validatePptDocumentFile } from "@/utils/pptDocumentRag"
@@ -706,6 +713,73 @@ const tabClass = (tab: "prompt" | "upload" | "youtube" | "translate") => [
 ]
 
 const appendLog = (task: GeneratorTask, line: string) => task.logs.push(line)
+
+function hasTaskResult(task: GeneratorTask): boolean {
+  return Boolean(task.pptData || task.cardResult || task.novelResult || task.outlineResult)
+}
+
+async function pollAndRecoverTaskResult(task: GeneratorTask, mode: "prompt" | "upload") {
+  appendLog(task, t("workspace.streamDisconnectedPolling"))
+  const resolved = await pollProjectGenerationAfterStreamDisconnect(task.projectId, task.queue, {
+    maxWaitMs: GENERATION_POLL_MAX_WAIT_MS,
+  })
+
+  if (resolved?.kind === "ppt" && resolved.ppt?.pptData) {
+    await handlePptStreamComplete(
+      task,
+      {
+        ppt_data: resolved.ppt.pptData,
+        project_id: task.projectId,
+        markdown: resolved.ppt.markdown,
+      },
+      mode,
+    )
+    return
+  }
+  if (resolved?.kind === "novel" && resolved.novel) {
+    await handleNovelStreamComplete(
+      task,
+      {
+        output_format: "novel",
+        novel_nodes: resolved.novel.novelNodes,
+        title: resolved.novel.title,
+        markdown: resolved.novel.markdown,
+      },
+      mode,
+    )
+    return
+  }
+  if (resolved?.kind === "outline" && resolved.outline) {
+    await handleOutlineStreamComplete(
+      task,
+      {
+        output_format: "outline",
+        markdown: resolved.outline.markdown,
+        nodes: resolved.outline.sections,
+        title: resolved.outline.title,
+      },
+      mode,
+    )
+    return
+  }
+  if (resolved?.kind === "card" && resolved.card) {
+    await handleCardStreamComplete(
+      task,
+      {
+        status: "design_complete",
+        response: resolved.card.content,
+        image_urls: resolved.card.imageUrls,
+        message: resolved.card.message,
+      },
+      mode,
+    )
+    return
+  }
+
+  if (!hasTaskResult(task)) {
+    applyStreamError(task, t("workspace.streamPollTimeout"), mode)
+  }
+}
 
 async function handleOutlineStreamComplete(
   task: GeneratorTask,
@@ -1120,20 +1194,21 @@ const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, me
   if (completed || task.pptData || task.novelResult || task.outlineResult || task.cardResult) return
 
   appendLog(task, t("workspace.youtubeStreamDisconnectedPolling"))
-  const resolved = await pollProjectPptAfterStreamDisconnect(task.projectId, {
+  const resolved = await pollProjectGenerationAfterStreamDisconnect(task.projectId, task.queue, {
     signal: youtubeAbort?.signal,
+    maxWaitMs: GENERATION_POLL_MAX_WAIT_MS,
   })
-  if (resolved?.pptData) {
+  if (resolved?.kind === "ppt" && resolved.ppt?.pptData) {
     await handlePptStreamComplete(
       task,
       {
-        ppt_data: resolved.pptData,
+        ppt_data: resolved.ppt.pptData,
         project_id: task.projectId,
-        markdown: resolved.markdown,
+        markdown: resolved.ppt.markdown,
       },
       "upload",
     )
-  } else if (!task.pptData) {
+  } else if (!hasTaskResult(task)) {
     applyStreamError(task, t("workspace.youtubeStreamPollTimeout"), "upload")
   }
 }
@@ -1151,7 +1226,9 @@ const runStream = async (
     task.isGenerating = false
     return
   }
-  await agentApi.chatStream(
+  let streamCompleted = false
+  try {
+    const streamResult = await agentApi.chatStream(
     {
       message,
       userId,
@@ -1193,7 +1270,7 @@ const runStream = async (
           }
           return
         }
-        if (task.cardResult || task.pptData || task.novelResult || task.outlineResult) return
+        if (hasTaskResult(task)) return
         if (event === "novel_complete" || (event === "complete" && isNovelStreamPayload(data))) {
           await handleNovelStreamComplete(task, data, mode)
           return
@@ -1213,7 +1290,7 @@ const runStream = async (
           }
           return
         }
-        if (task.pptData || task.cardResult || task.novelResult || task.outlineResult) return
+        if (hasTaskResult(task)) return
         const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>
         if (isOutlineStreamPayload(o)) {
           await handleOutlineStreamComplete(task, data, mode)
@@ -1232,12 +1309,23 @@ const runStream = async (
         }
       },
       onError: (msg: string) => {
+        if (hasTaskResult(task)) return
         stopTaskTimer(task)
         applyStreamError(task, msg, mode)
         refreshCreditsBar()
       },
     },
   )
+    streamCompleted = streamResult.completed
+  } catch {
+    if (!hasTaskResult(task) && !task.errorMsg) {
+      appendLog(task, t("workspace.streamDisconnectedPolling"))
+    }
+  }
+
+  if (!hasTaskResult(task) && !task.errorMsg && !streamCompleted) {
+    await pollAndRecoverTaskResult(task, mode)
+  }
 }
 
 const newProjectId = () =>
@@ -1261,6 +1349,12 @@ const startTask = (task: GeneratorTask) => {
   task.isGenerating = true
   timerNow.value = Date.now()
   ensureTimerTick()
+  appendLog(task, t("workspace.generationLongRunningHint"))
+  ElMessage.info({
+    message: t("workspace.generationLongRunningToast"),
+    duration: 8000,
+    showClose: true,
+  })
 }
 
 const handleGenerateError = (task: GeneratorTask, e: unknown, mode: "prompt" | "upload" = "prompt") => {
@@ -1481,7 +1575,9 @@ const runYoutubeOutlineStream = async (task: GeneratorTask, youtubeUrlValue: str
     await handleOutlineStreamComplete(task, data, "upload")
   }
 
-  await agentApi.chatStream(
+  let streamCompleted = false
+  try {
+    const streamResult = await agentApi.chatStream(
     {
       message: youtubeUrlValue,
       userId,
@@ -1532,6 +1628,7 @@ const runYoutubeOutlineStream = async (task: GeneratorTask, youtubeUrlValue: str
         }
       },
       onError: (msg: string) => {
+        if (hasTaskResult(task)) return
         stopTaskTimer(task)
         applyStreamError(task, msg, "upload")
         refreshCreditsBar()
@@ -1539,6 +1636,16 @@ const runYoutubeOutlineStream = async (task: GeneratorTask, youtubeUrlValue: str
     },
     youtubeAbort.signal,
   )
+    streamCompleted = streamResult.completed
+  } catch {
+    if (!hasTaskResult(task) && !task.errorMsg) {
+      appendLog(task, t("workspace.streamDisconnectedPolling"))
+    }
+  }
+
+  if (!hasTaskResult(task) && !task.errorMsg && !streamCompleted) {
+    await pollAndRecoverTaskResult(task, "upload")
+  }
 }
 
 onBeforeUnmount(() => {

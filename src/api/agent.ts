@@ -400,7 +400,7 @@ export async function chatStream(
   body: ChatStreamReq,
   cb: ChatStreamCallbacks = {},
   signal?: AbortSignal,
-): Promise<void> {
+): Promise<{ completed: boolean }> {
   const res = await fetch(buildUrl("/agent/chat-stream"), {
     method: "POST",
     headers: authStreamHeaders(),
@@ -408,7 +408,7 @@ export async function chatStream(
     signal,
   })
 
-  await readSseResponse(res, cb)
+  return readSseResponse(res, cb)
 }
 
 export interface RefineGenerationQueryReq {

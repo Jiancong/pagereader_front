@@ -539,6 +539,12 @@ export default {
     progressTitle: "生成进度",
     elapsedTime: "用时 {time}",
     preparing: "正在准备...",
+    generationLongRunningHint:
+      "分析可能需要 30 分钟至数小时（Local LLM 视文档长度而定）。您可以暂时离开页面，稍后在「我的历史」中查看结果。",
+    generationLongRunningToast:
+      "任务已提交。分析可能耗时较长，您可以先做其他事情，稍后回来查看进度或结果。",
+    streamDisconnectedPolling: "连接已断开，正在后台继续等待生成结果…",
+    streamPollTimeout: "生成耗时较长，请稍后在「我的历史」中查看结果",
     loginRequiredGenerate: "请先登录后再生成",
     generateFailed: "生成失败",
     uploadingDoc: "正在上传文档...",
