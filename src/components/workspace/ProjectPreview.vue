@@ -194,19 +194,73 @@ const updatingCategory = ref(false)
 const categoryMenuOpen = ref(false)
 const categoryMenuRef = ref(null)
 
+function categoryDraftKey(projectId) {
+  return `project-topic-category:${projectId}`
+}
+
+function readCategoryDraft(projectId) {
+  if (!projectId || typeof sessionStorage === 'undefined') return ''
+  try {
+    return String(sessionStorage.getItem(categoryDraftKey(projectId)) || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+function writeCategoryDraft(projectId, categoryId) {
+  if (!projectId || typeof sessionStorage === 'undefined') return
+  try {
+    if (categoryId) sessionStorage.setItem(categoryDraftKey(projectId), categoryId)
+    else sessionStorage.removeItem(categoryDraftKey(projectId))
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 function syncSelectedCategoryFromProject(proj) {
-  selectedCategoryId.value = pickProjectExploreTopicCategoryId(proj)
+  const fromProject = pickProjectExploreTopicCategoryId(proj)
+  const draft = !isSharedToCommunity(proj) ? readCategoryDraft(proj?.id) : ''
+  selectedCategoryId.value = fromProject || draft || ''
 }
 
 const resolvedTopicCategoryId = computed(() =>
   selectedCategoryId.value || pickProjectExploreTopicCategoryId(project.value),
 )
 
-const currentCategoryLabel = computed(() =>
-  resolveLabelById(resolvedTopicCategoryId.value)
-  || String(project.value?.categoryName ?? '').trim()
-  || null,
-)
+const currentCategoryLabel = computed(() => {
+  const id = resolvedTopicCategoryId.value
+  if (!id) {
+    return String(project.value?.categoryName ?? '').trim() || null
+  }
+  const fromCatalog = resolveLabelById(id)
+  if (fromCatalog) return fromCatalog
+  const fromOptions = selectableOptions.value.find(
+    (option) => option.id.toLowerCase() === id.toLowerCase(),
+  )?.label
+  if (fromOptions) return fromOptions
+  // 已手动选择分类时，不再回退到可能过时的 project.categoryName（如小说导读默认「小说」）
+  if (selectedCategoryId.value) return id
+  return String(project.value?.categoryName ?? '').trim() || null
+})
+
+function applyLocalCategorySelection(categoryId) {
+  const label =
+    resolveLabelById(categoryId)
+    || selectableOptions.value.find((option) => option.id === categoryId)?.label
+    || ''
+  selectedCategoryId.value = categoryId
+  if (!project.value) return
+  project.value = {
+    ...project.value,
+    topicCategoryId: categoryId,
+    exploreCategoryId: categoryId,
+    feedCategoryId: categoryId,
+    ...(label ? { categoryName: label } : {}),
+  }
+  if (!isSharedToCommunity(project.value)) {
+    writeCategoryDraft(project.value.id, categoryId)
+  }
+}
 
 const sharedToCommunity = computed(() => isSharedToCommunity(project.value))
 
@@ -216,15 +270,23 @@ function onSelectCategoryFromMenu(categoryId) {
 }
 
 async function onSelectCategory(categoryId) {
-  if (!categoryId || categoryId === selectedCategoryId.value || updatingCategory.value) return
-  selectedCategoryId.value = categoryId
-  if (!sharedToCommunity.value || !project.value?.id) return
+  const currentId = resolvedTopicCategoryId.value
+  if (!categoryId || categoryId === currentId || updatingCategory.value) return
+  if (!project.value?.id) return
+
+  applyLocalCategorySelection(categoryId)
+
+  // 未分享时后端通常不接受 PUT；选择仅保存在本地，分享时随 share-to-community 提交
+  if (!sharedToCommunity.value) return
 
   updatingCategory.value = true
   try {
     const result = await projectApi.updateProjectCategory(project.value.id, categoryId)
     project.value = {
       ...project.value,
+      topicCategoryId: result.categoryId,
+      exploreCategoryId: result.categoryId,
+      feedCategoryId: result.categoryId,
       categoryId: result.categoryId,
       categoryName: result.categoryName ?? project.value.categoryName,
     }
@@ -384,6 +446,7 @@ async function onShareToCommunity() {
       isRecommended: 1,
     }
     syncSelectedCategoryFromProject(project.value)
+    writeCategoryDraft(project.value.id, '')
     if (!selectedCategoryId.value && categoryBeforeShare) {
       selectedCategoryId.value = categoryBeforeShare
     }

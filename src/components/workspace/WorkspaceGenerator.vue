@@ -132,7 +132,7 @@
             class="cursor-pointer rounded-xl border-2 border-dashed border-border bg-secondary/30 p-8 text-center transition-colors hover:border-primary/50"
             @click="fileInput?.click()"
           >
-            <input ref="fileInput" type="file" accept=".pdf,.doc,.docx,.txt,.md,.epub,.srt" class="hidden" @change="onFileChange" />
+            <input ref="fileInput" type="file" accept=".pdf,.doc,.docx,.txt,.md,.epub,.mobi,.srt" class="hidden" @change="onFileChange" />
             <div v-if="hasAttachedDoc" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
               <FileText class="hidden h-10 w-10 text-primary sm:block" />
               <div class="flex min-w-0 flex-1 items-start gap-3 sm:items-center">

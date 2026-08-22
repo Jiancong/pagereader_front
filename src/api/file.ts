@@ -135,6 +135,7 @@ function guessContentType(file: File): string {
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     txt: "text/plain",
     md: "text/markdown",
+    mobi: "application/x-mobipocket-ebook",
     srt: "application/x-subrip",
   }
   return (ext && map[ext]) || "application/octet-stream"
