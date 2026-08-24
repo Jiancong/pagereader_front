@@ -52,8 +52,8 @@
 
     <!-- EPUB 阅读器 -->
     <EpubReader
-      v-else-if="isEpub"
-      :object-url="objectUrl"
+      v-else-if="isEpub && file"
+      :file="file"
     />
 
     <!-- MOBI 暂不支持 -->

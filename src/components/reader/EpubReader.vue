@@ -1,12 +1,11 @@
 <template>
   <div class="epub-reader" ref="rootRef">
-    <div v-if="loading" class="epub-reader__placeholder">{{ t('reader.loading') }}</div>
-    <div v-else-if="loadError" class="epub-reader__placeholder epub-reader__placeholder--error">
-      {{ loadError }}
-    </div>
-
-    <div v-show="!loading && !loadError" class="epub-reader__stage">
+    <div class="epub-reader__stage">
       <div ref="viewerRef" class="epub-reader__viewer"></div>
+      <div v-if="loading" class="epub-reader__overlay">{{ t('reader.loading') }}</div>
+      <div v-else-if="loadError" class="epub-reader__overlay epub-reader__overlay--error">
+        {{ loadError }}
+      </div>
     </div>
 
     <div v-if="!loading && !loadError" class="epub-reader__nav">
@@ -34,7 +33,7 @@ import { useI18n } from 'vue-i18n'
 import ePub, { type Book, type Rendition } from 'epubjs'
 
 const props = defineProps<{
-  objectUrl: string
+  file: File
 }>()
 
 const { t } = useI18n()
@@ -53,7 +52,10 @@ let resizeObserver: ResizeObserver | null = null
 
 onMounted(async () => {
   try {
-    book = ePub(props.objectUrl)
+    // blob: URL 没有 .epub 扩展名，epubjs 无法据此识别格式；
+    // 直接传 ArrayBuffer，epubjs 会按二进制 EPUB 打开。
+    const data = await props.file.arrayBuffer()
+    book = ePub(data)
     await book.ready
 
     rendition = book.renderTo(viewerRef.value!, {
@@ -63,7 +65,6 @@ onMounted(async () => {
       spread: 'none',
       allowScriptedContent: false,
     })
-    await rendition.display()
 
     rendition.on('relocated', (location: any) => {
       atStart.value = location.atStart ?? false
@@ -88,8 +89,10 @@ onMounted(async () => {
       }
     })
 
+    await rendition.display()
     loading.value = false
     await nextTick()
+
     resizeObserver = new ResizeObserver(() => {
       if (rendition && viewerRef.value) {
         const rect = viewerRef.value.getBoundingClientRect()
@@ -126,6 +129,7 @@ function prev() {
   background: #f3f4f6;
 }
 .epub-reader__stage {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -138,6 +142,19 @@ function prev() {
   max-width: 900px;
   background: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+.epub-reader__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 14px;
+}
+.epub-reader__overlay--error {
+  color: #dc2626;
 }
 .epub-reader__nav {
   display: flex;
@@ -192,16 +209,5 @@ function prev() {
 .er-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-.epub-reader__placeholder {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #d1d5db;
-  font-size: 14px;
-}
-.epub-reader__placeholder--error {
-  color: #fca5a5;
 }
 </style>
