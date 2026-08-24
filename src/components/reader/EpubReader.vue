@@ -8,7 +8,11 @@
       </div>
     </div>
 
-    <div v-if="!loading && !loadError" class="epub-reader__nav">
+    <div
+      class="epub-reader__nav"
+      :class="{ 'epub-reader__nav--hidden': loading || Boolean(loadError) }"
+      :aria-hidden="loading || Boolean(loadError)"
+    >
       <button class="er-btn" :disabled="atStart" @click="prev">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         {{ t('reader.prev') }}
@@ -50,6 +54,8 @@ let book: Book | null = null
 let rendition: Rendition | null = null
 let resizeObserver: ResizeObserver | null = null
 let originalAddEventListener: typeof window.addEventListener | null = null
+let renderedWidth = 0
+let renderedHeight = 0
 
 /**
  * epubjs 在 default manager 中调用 window.addEventListener("unload", ...) 注册卸载清理。
@@ -83,6 +89,8 @@ onMounted(async () => {
     const rect = viewerRef.value!.getBoundingClientRect()
     const w = Math.max(1, Math.floor(rect.width))
     const h = Math.max(1, Math.floor(rect.height))
+    renderedWidth = w
+    renderedHeight = h
 
     installUnloadShim()
     rendition = book.renderTo(viewerRef.value!, {
@@ -124,11 +132,20 @@ onMounted(async () => {
     resizeObserver = new ResizeObserver(() => {
       if (rendition && viewerRef.value) {
         const rect = viewerRef.value.getBoundingClientRect()
-        rendition.resize(rect.width, rect.height)
+        const width = Math.max(1, Math.floor(rect.width))
+        const height = Math.max(1, Math.floor(rect.height))
+        // ResizeObserver always fires once after observe(). epubjs resize() clears
+        // all views first; before its initial location is reported, it cannot
+        // restore the cleared chapter and leaves an empty epub-container.
+        if (width === renderedWidth && height === renderedHeight) return
+        renderedWidth = width
+        renderedHeight = height
+        rendition.resize(width, height)
       }
     })
     resizeObserver.observe(viewerRef.value!)
   } catch (e) {
+    uninstallUnloadShim()
     loadError.value = e instanceof Error ? e.message : String(e)
     loading.value = false
   }
@@ -195,6 +212,10 @@ function prev() {
   background: #1f2937;
   color: #e5e7eb;
   flex-shrink: 0;
+}
+.epub-reader__nav--hidden {
+  visibility: hidden;
+  pointer-events: none;
 }
 .epub-reader__progress {
   flex: 1;
