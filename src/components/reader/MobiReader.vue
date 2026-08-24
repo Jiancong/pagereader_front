@@ -25,11 +25,52 @@ const loadError = ref('')
 
 let view: any = null
 
+// foliate-view renders each section inside an iframe. Keyboard / mouse events
+// happening inside those iframes never bubble to the parent window, so the
+// navigation handlers registered on `window` in ReaderView don't fire while
+// the reader content has focus. We attach our own listeners to each loaded
+// iframe document via the view's 'load' event and clean them up on unload.
+const trackedDocs = new Set<Document>()
+
+function onDocKeyDown(e: KeyboardEvent) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    e.preventDefault()
+    next()
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    prev()
+  }
+}
+function onDocContextMenu(e: MouseEvent) {
+  e.preventDefault()
+  next()
+}
+
+function attachToDoc(doc: Document) {
+  if (trackedDocs.has(doc)) return
+  trackedDocs.add(doc)
+  doc.addEventListener('keydown', onDocKeyDown, true)
+  doc.addEventListener('contextmenu', onDocContextMenu, true)
+}
+function detachFromDoc(doc: Document) {
+  if (!trackedDocs.has(doc)) return
+  trackedDocs.delete(doc)
+  doc.removeEventListener('keydown', onDocKeyDown, true)
+  doc.removeEventListener('contextmenu', onDocContextMenu, true)
+}
+
+function onLoad(e: Event) {
+  const doc = (e as CustomEvent).detail?.doc
+  if (doc) attachToDoc(doc)
+}
+
 onMounted(async () => {
   try {
     await nextTick()
     view = document.createElement('foliate-view')
     containerRef.value?.appendChild(view)
+
+    view.addEventListener('load', onLoad)
 
     await view.open(props.file)
     // `open()` only sets up the book + renderer; it does not display any
@@ -44,6 +85,9 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (view) {
+    view.removeEventListener('load', onLoad)
+    for (const doc of trackedDocs) detachFromDoc(doc)
+    trackedDocs.clear()
     view.close?.()
     view.remove()
     view = null
