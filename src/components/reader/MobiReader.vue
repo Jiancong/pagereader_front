@@ -1,10 +1,10 @@
 <template>
   <div class="mobi-reader">
-    <div v-if="loading" class="mobi-reader__placeholder">{{ t('reader.loading') }}</div>
-    <div v-else-if="loadError" class="mobi-reader__placeholder mobi-reader__placeholder--error">
+    <div ref="containerRef" class="mobi-reader__container"></div>
+    <div v-if="loading" class="mobi-reader__overlay">{{ t('reader.loading') }}</div>
+    <div v-else-if="loadError" class="mobi-reader__overlay mobi-reader__overlay--error">
       {{ loadError }}
     </div>
-    <div v-show="!loading && !loadError" ref="containerRef" class="mobi-reader__container"></div>
   </div>
 </template>
 
@@ -31,11 +31,10 @@ onMounted(async () => {
     view = document.createElement('foliate-view')
     containerRef.value?.appendChild(view)
 
-    view.addEventListener('load', () => {
-      view.renderer.next()
-    })
-
     await view.open(props.file)
+    // `open()` only sets up the book + renderer; it does not display any
+    // content. We must explicitly navigate to render the first page.
+    await view.next()
     loading.value = false
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e)
@@ -44,8 +43,9 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  if (view && containerRef.value) {
-    containerRef.value.removeChild(view)
+  if (view) {
+    view.close?.()
+    view.remove()
     view = null
   }
 })
@@ -62,6 +62,7 @@ defineExpose({ next, prev })
 
 <style scoped>
 .mobi-reader {
+  position: relative;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -78,15 +79,18 @@ defineExpose({ next, prev })
   height: 100%;
   border: none;
 }
-.mobi-reader__placeholder {
-  flex: 1;
+.mobi-reader__overlay {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #6b7280;
   font-size: 14px;
+  background: #f3f4f6;
+  pointer-events: none;
 }
-.mobi-reader__placeholder--error {
+.mobi-reader__overlay--error {
   color: #dc2626;
 }
 </style>
