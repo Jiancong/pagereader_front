@@ -43,6 +43,10 @@
             <Languages class="h-4 w-4" />
             {{ t('workspace.tabTranslate') }}
           </button>
+          <button :class="tabClass('read')" @click="activeTab = 'read'">
+            <BookOpen class="h-4 w-4" />
+            {{ t('workspace.tabRead') }}
+          </button>
         </div>
     </div>
 
@@ -303,6 +307,58 @@
           </button>
         </div>
 
+        <!-- 在线阅读 -->
+        <div v-else-if="activeTab === 'read'" class="p-6 sm:p-8">
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.readTitle') }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.readHint') }}</p>
+          </div>
+
+          <div
+            @dragover.prevent="isDraggingReader = true"
+            @dragleave="isDraggingReader = false"
+            @drop.prevent="handleReaderDrop"
+            :class="[
+              'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
+              isDraggingReader ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
+            ]"
+            @click="readerFileInput?.click()"
+          >
+            <input
+              ref="readerFileInput"
+              type="file"
+              accept=".pdf,.epub,.mobi,.azw,.azw3,application/pdf,application/epub+zip"
+              class="hidden"
+              @change="handleReaderSelect"
+            />
+            <div v-if="selectedReaderFile" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
+              <BookOpen class="h-10 w-10 flex-shrink-0 text-primary" />
+              <div class="min-w-0 flex-1 text-left">
+                <p class="break-words font-medium text-foreground">{{ selectedReaderFile.name }}</p>
+                <p v-if="readerFileSizeLabel" class="text-sm text-muted-foreground">{{ readerFileSizeLabel }}</p>
+              </div>
+              <button type="button" class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary" @click.stop="clearReaderFile">
+                <X class="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+            <template v-else>
+              <BookOpen class="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <p class="mt-4 font-medium text-foreground">{{ t('workspace.readPickFile') }}</p>
+              <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.readFormats') }}</p>
+            </template>
+          </div>
+
+          <button
+            type="button"
+            :disabled="!selectedReaderFile"
+            class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="startReading"
+          >
+            <BookOpen class="h-5 w-5" />
+            {{ t('workspace.readStart') }}
+          </button>
+        </div>
+
         <!-- YouTube 视频生成 PPT -->
         <div v-else-if="activeTab === 'youtube'" class="p-6 sm:p-8">
           <div class="mb-6">
@@ -456,8 +512,9 @@ import { ref, computed, reactive, watch, onBeforeUnmount } from "vue"
 import { RouterLink, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
-import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages, Globe } from "lucide-vue-next"
+import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages, Globe, BookOpen } from "lucide-vue-next"
 import { useTranslateFileStore } from "@/stores/translateFile"
+import { useReaderFileStore } from "@/stores/reader"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
 import WorkspaceNovelResult from "@/components/workspace/WorkspaceNovelResult.vue"
@@ -567,8 +624,9 @@ const youtubeTask = reactive<GeneratorTask>(createTask("DOCUMENT"))
 
 const router = useRouter()
 const translateFileStore = useTranslateFileStore()
+const readerFileStore = useReaderFileStore()
 
-const activeTab = ref<"prompt" | "upload" | "youtube" | "translate">("upload")
+const activeTab = ref<"prompt" | "upload" | "youtube" | "translate" | "read">("upload")
 const input = ref(props.initialPrompt || "")
 const youtubeUrl = ref("")
 const youtubePrompt = ref("")
@@ -587,6 +645,9 @@ const translateLoading = ref(false)
 const translateError = ref("")
 const translateMode = ref<"pdf" | "url">("pdf")
 const translateUrl = ref("")
+const selectedReaderFile = ref<File | null>(null)
+const readerFileInput = ref<HTMLInputElement | null>(null)
+const isDraggingReader = ref(false)
 const uploadPrompt = ref("")
 const uploadFileError = ref("")
 const srtPreview = ref<SrtParseResult | null>(null)
@@ -645,6 +706,9 @@ const translatePdfSizeLabel = computed(() => {
   if (cloudPdfSize.value != null) return formatBytes(cloudPdfSize.value)
   return ""
 })
+const readerFileSizeLabel = computed(() =>
+  selectedReaderFile.value ? formatBytes(selectedReaderFile.value.size) : "",
+)
 
 const activeTask = computed(() => {
   if (activeTab.value === "prompt") return promptTask
@@ -707,7 +771,7 @@ const activeElapsedDisplay = computed(() => {
   return null
 })
 
-const tabClass = (tab: "prompt" | "upload" | "youtube" | "translate") => [
+const tabClass = (tab: "prompt" | "upload" | "youtube" | "translate" | "read") => [
   "flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm",
   activeTab.value === tab ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground",
 ]
@@ -1057,6 +1121,28 @@ const clearTranslatePdf = () => {
   cloudPdfSize.value = undefined
   translateError.value = ""
   if (pdfFileInput.value) pdfFileInput.value.value = ""
+}
+
+const handleReaderDrop = (e: DragEvent) => {
+  isDraggingReader.value = false
+  const files = e.dataTransfer?.files
+  if (files && files.length > 0) selectedReaderFile.value = files[0]
+}
+
+const handleReaderSelect = (e: Event) => {
+  const files = (e.target as HTMLInputElement).files
+  if (files && files.length > 0) selectedReaderFile.value = files[0]
+}
+
+const clearReaderFile = () => {
+  selectedReaderFile.value = null
+  if (readerFileInput.value) readerFileInput.value.value = ""
+}
+
+const startReading = () => {
+  if (!selectedReaderFile.value) return
+  readerFileStore.setFile(selectedReaderFile.value)
+  router.push({ name: "reader" })
 }
 
 const startImmersiveTranslation = async () => {

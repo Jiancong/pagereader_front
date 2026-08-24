@@ -26,6 +26,7 @@
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
     "element-plus": "^2.7.0",
+    "epubjs": "^0.3.93",
     "katex": "^0.17.0",
     "lodash-es": "^4.17.21",
     "lucide-vue-next": "^0.400.0",

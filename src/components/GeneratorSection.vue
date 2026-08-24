@@ -46,8 +46,8 @@
         </div>
       </div>
 
-      <!-- 生成模式选择器（YouTube / 沉浸式翻译 tab 隐藏） -->
-      <div v-if="activeTab !== 'youtube' && activeTab !== 'translate'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
+      <!-- 生成模式选择器（YouTube / 沉浸式翻译 / 阅读 tab 隐藏） -->
+      <div v-if="activeTab !== 'youtube' && activeTab !== 'translate' && activeTab !== 'read'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('landing.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
           <label
@@ -310,6 +310,61 @@
               {{ t('landing.translateStart') }}
             </button>
           </div>
+
+          <!-- 在线阅读 -->
+          <div v-else-if="activeTab === 'read'" class="space-y-6">
+            <div class="mb-6">
+              <h3 class="text-lg font-semibold text-foreground">{{ t('landing.readTitle') }}</h3>
+              <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.readHint') }}</p>
+            </div>
+
+            <div
+              @dragover.prevent="isDraggingReader = true"
+              @dragleave="isDraggingReader = false"
+              @drop.prevent="handleReaderDrop"
+              :class="[
+                'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
+                isDraggingReader ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
+              ]"
+              @click="readerFileInput?.click()"
+            >
+              <input
+                ref="readerFileInput"
+                type="file"
+                accept=".pdf,.epub,.mobi,.azw,.azw3,application/pdf,application/epub+zip"
+                class="hidden"
+                @change="handleReaderSelect"
+              />
+              <div v-if="selectedReaderFile" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
+                <BookOpen class="h-10 w-10 flex-shrink-0 text-primary" />
+                <div class="min-w-0 flex-1 text-left">
+                  <p class="break-words font-medium text-foreground">{{ selectedReaderFile.name }}</p>
+                  <p class="text-sm text-muted-foreground">{{ formatFileSize(selectedReaderFile.size) }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary"
+                  @click.stop="clearReaderFile"
+                >
+                  <X class="h-5 w-5 text-muted-foreground" />
+                </button>
+              </div>
+              <template v-else>
+                <BookOpen class="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <p class="mt-4 font-medium text-foreground">{{ t('landing.readPickFile') }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.readFormats') }}</p>
+              </template>
+            </div>
+
+            <button
+              :disabled="!selectedReaderFile"
+              class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="startReading"
+            >
+              <BookOpen class="h-5 w-5" />
+              {{ t('landing.readStart') }}
+            </button>
+          </div>
         </div>
       </div>
       </template>
@@ -321,7 +376,7 @@
 import { ref, computed, watch, markRaw, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages, Globe } from 'lucide-vue-next'
+import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages, Globe, BookOpen } from 'lucide-vue-next'
 import {
   gtmGenerateIntent,
   gtmGeneratorTabSelect,
@@ -331,13 +386,15 @@ import {
   LANDING_WATCH_DEMO_EVENT,
 } from '@/composables/useGtmDataLayer'
 import { useTranslateFileStore } from '@/stores/translateFile'
+import { useReaderFileStore } from '@/stores/reader'
 
-type TabId = 'upload' | 'quick' | 'youtube' | 'translate'
+type TabId = 'upload' | 'quick' | 'youtube' | 'translate' | 'read'
 type QueueMode = 'CARD' | 'DOCUMENT' | 'NOVEL'
 
 const { t } = useI18n()
 const router = useRouter()
 const translateFileStore = useTranslateFileStore()
+const readerFileStore = useReaderFileStore()
 const emit = defineEmits<{ start: [payload: { mode: string; prompt: string }] }>()
 
 const activeTab = ref<TabId>('upload')
@@ -354,12 +411,16 @@ const pdfFileInput = ref<HTMLInputElement | null>(null)
 const translateMode = ref<'pdf' | 'url'>('pdf')
 const translateUrl = ref('')
 const showDemoVideo = ref(false)
+const selectedReaderFile = ref<File | null>(null)
+const readerFileInput = ref<HTMLInputElement | null>(null)
+const isDraggingReader = ref(false)
 
 const tabs = computed(() => [
   { id: 'upload' as TabId, label: t('landing.tabUpload'), icon: markRaw(Upload) },
   { id: 'quick' as TabId, label: t('landing.tabQuick'), icon: markRaw(MessageSquare) },
   { id: 'youtube' as TabId, label: t('landing.tabYoutube'), icon: markRaw(Youtube) },
   { id: 'translate' as TabId, label: t('landing.tabTranslate'), icon: markRaw(Languages) },
+  { id: 'read' as TabId, label: t('landing.tabRead'), icon: markRaw(BookOpen) },
 ])
 
 const QUICK_EXAMPLE_IDS = [
@@ -526,6 +587,28 @@ const startImmersiveTranslation = () => {
   router.push({ name: 'translate' })
 }
 
+const handleReaderDrop = (e: DragEvent) => {
+  isDraggingReader.value = false
+  const files = e.dataTransfer?.files
+  if (files && files.length > 0) selectedReaderFile.value = files[0]
+}
+
+const handleReaderSelect = (e: Event) => {
+  const files = (e.target as HTMLInputElement).files
+  if (files && files.length > 0) selectedReaderFile.value = files[0]
+}
+
+const clearReaderFile = () => {
+  selectedReaderFile.value = null
+  if (readerFileInput.value) readerFileInput.value.value = ''
+}
+
+const startReading = () => {
+  if (!selectedReaderFile.value) return
+  readerFileStore.setFile(selectedReaderFile.value)
+  router.push({ name: 'reader' })
+}
+
 const selectQuickExample = (example: { id: string; prompt: string }) => {
   prompt.value = example.prompt
   gtmQuickExampleClick(example.id)
@@ -558,6 +641,7 @@ watch(activeTab, (tab) => {
     if (!youtubePrompt.value.trim()) youtubePrompt.value = t('landing.youtubePromptDefault')
   }
   if (tab === 'translate') queue.value = 'DOCUMENT'
+  if (tab === 'read') queue.value = 'DOCUMENT'
   if (tab === 'quick' && queue.value === 'NOVEL') queue.value = 'CARD'
 })
 
