@@ -49,29 +49,26 @@ const atEnd = ref(false)
 let book: Book | null = null
 let rendition: Rendition | null = null
 let resizeObserver: ResizeObserver | null = null
-let iframeObserver: MutationObserver | null = null
+let originalAddEventListener: typeof window.addEventListener | null = null
 
-/** epubjs 在 iframe 内监听 unload；Chrome 默认禁止，需在 iframe 上声明 allow="unload"。 */
-function patchIframeUnloadPermission(iframe: HTMLIFrameElement) {
-  const current = iframe.getAttribute('allow') ?? ''
-  if (!/\bunload\b/.test(current)) {
-    iframe.setAttribute('allow', current ? `${current}; unload` : 'unload')
-  }
+/**
+ * epubjs 在 default manager 中调用 window.addEventListener("unload", ...) 注册卸载清理。
+ * Chrome 已禁止 unload 事件并抛出 Permissions policy violation。
+ * 这里在 renderTo 之前临时拦截 addEventListener，把 "unload" 重定向为 "pagehide"
+ * （现代等价事件，不受 Permissions Policy 限制），renderTo 完成后恢复。
+ */
+function installUnloadShim() {
+  originalAddEventListener = window.addEventListener.bind(window)
+  window.addEventListener = ((type: any, listener?: any, options?: any) => {
+    if (type === 'unload') type = 'pagehide'
+    return originalAddEventListener!(type, listener, options)
+  }) as typeof window.addEventListener
 }
-
-function observeEpubIframes(container: HTMLElement) {
-  container.querySelectorAll('iframe').forEach((el) => patchIframeUnloadPermission(el))
-  iframeObserver = new MutationObserver((mutations) => {
-    for (const m of mutations) {
-      m.addedNodes.forEach((node) => {
-        if (node instanceof HTMLIFrameElement) patchIframeUnloadPermission(node)
-        else if (node instanceof HTMLElement) {
-          node.querySelectorAll('iframe').forEach((el) => patchIframeUnloadPermission(el))
-        }
-      })
-    }
-  })
-  iframeObserver.observe(container, { childList: true, subtree: true })
+function uninstallUnloadShim() {
+  if (originalAddEventListener) {
+    window.addEventListener = originalAddEventListener
+    originalAddEventListener = null
+  }
 }
 
 onMounted(async () => {
@@ -82,8 +79,7 @@ onMounted(async () => {
     book = ePub(data)
     await book.ready
 
-    observeEpubIframes(viewerRef.value!)
-
+    installUnloadShim()
     rendition = book.renderTo(viewerRef.value!, {
       width: '100%',
       height: '100%',
@@ -118,6 +114,7 @@ onMounted(async () => {
     await rendition.display()
     loading.value = false
     await nextTick()
+    uninstallUnloadShim()
 
     resizeObserver = new ResizeObserver(() => {
       if (rendition && viewerRef.value) {
@@ -133,7 +130,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  iframeObserver?.disconnect()
+  uninstallUnloadShim()
   resizeObserver?.disconnect()
   rendition?.destroy()
   book?.destroy()
