@@ -164,8 +164,6 @@ function next() {
 function prev() {
   rendition?.prev()
 }
-
-defineExpose({ next, prev })
 </script>
 
 <style scoped>

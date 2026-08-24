@@ -309,63 +309,54 @@
 
         <!-- 在线阅读 -->
         <div v-else-if="activeTab === 'read'" class="p-6 sm:p-8">
-          <InlineReader
-            v-if="readerActive && selectedReaderFile"
-            :file="selectedReaderFile"
-            :format="readerFormat"
-            :object-url="readerObjectUrl"
-            @back="exitReading"
-          />
-          <template v-else>
-            <div class="mb-6">
-              <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.readTitle') }}</h3>
-              <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.readHint') }}</p>
-            </div>
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.readTitle') }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.readHint') }}</p>
+          </div>
 
-            <div
-              @dragover.prevent="isDraggingReader = true"
-              @dragleave="isDraggingReader = false"
-              @drop.prevent="handleReaderDrop"
-              :class="[
-                'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
-                isDraggingReader ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
-              ]"
-              @click="readerFileInput?.click()"
-            >
-              <input
-                ref="readerFileInput"
-                type="file"
-                accept=".pdf,.epub,.mobi,.azw,.azw3,application/pdf,application/epub+zip"
-                class="hidden"
-                @change="handleReaderSelect"
-              />
-              <div v-if="selectedReaderFile" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
-                <BookOpen class="h-10 w-10 flex-shrink-0 text-primary" />
-                <div class="min-w-0 flex-1 text-left">
-                  <p class="break-words font-medium text-foreground">{{ selectedReaderFile.name }}</p>
-                  <p v-if="readerFileSizeLabel" class="text-sm text-muted-foreground">{{ readerFileSizeLabel }}</p>
-                </div>
-                <button type="button" class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary" @click.stop="clearReaderFile">
-                  <X class="h-5 w-5 text-muted-foreground" />
-                </button>
+          <div
+            @dragover.prevent="isDraggingReader = true"
+            @dragleave="isDraggingReader = false"
+            @drop.prevent="handleReaderDrop"
+            :class="[
+              'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
+              isDraggingReader ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
+            ]"
+            @click="readerFileInput?.click()"
+          >
+            <input
+              ref="readerFileInput"
+              type="file"
+              accept=".pdf,.epub,.mobi,.azw,.azw3,application/pdf,application/epub+zip"
+              class="hidden"
+              @change="handleReaderSelect"
+            />
+            <div v-if="selectedReaderFile" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
+              <BookOpen class="h-10 w-10 flex-shrink-0 text-primary" />
+              <div class="min-w-0 flex-1 text-left">
+                <p class="break-words font-medium text-foreground">{{ selectedReaderFile.name }}</p>
+                <p v-if="readerFileSizeLabel" class="text-sm text-muted-foreground">{{ readerFileSizeLabel }}</p>
               </div>
-              <template v-else>
-                <BookOpen class="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <p class="mt-4 font-medium text-foreground">{{ t('workspace.readPickFile') }}</p>
-                <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.readFormats') }}</p>
-              </template>
+              <button type="button" class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary" @click.stop="clearReaderFile">
+                <X class="h-5 w-5 text-muted-foreground" />
+              </button>
             </div>
+            <template v-else>
+              <BookOpen class="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <p class="mt-4 font-medium text-foreground">{{ t('workspace.readPickFile') }}</p>
+              <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.readFormats') }}</p>
+            </template>
+          </div>
 
-            <button
-              type="button"
-              :disabled="!selectedReaderFile"
-              class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-              @click="startReading"
-            >
-              <BookOpen class="h-5 w-5" />
-              {{ t('workspace.readStart') }}
-            </button>
-          </template>
+          <button
+            type="button"
+            :disabled="!selectedReaderFile"
+            class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="startReading"
+          >
+            <BookOpen class="h-5 w-5" />
+            {{ t('workspace.readStart') }}
+          </button>
         </div>
 
         <!-- YouTube 视频生成 PPT -->
@@ -523,8 +514,7 @@ import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages, Globe, BookOpen } from "lucide-vue-next"
 import { useTranslateFileStore } from "@/stores/translateFile"
-import InlineReader from "@/components/reader/InlineReader.vue"
-import type { ReaderFormat } from "@/stores/reader"
+import { useReaderFileStore } from "@/stores/reader"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
 import WorkspaceNovelResult from "@/components/workspace/WorkspaceNovelResult.vue"
@@ -634,6 +624,7 @@ const youtubeTask = reactive<GeneratorTask>(createTask("DOCUMENT"))
 
 const router = useRouter()
 const translateFileStore = useTranslateFileStore()
+const readerFileStore = useReaderFileStore()
 
 const activeTab = ref<"prompt" | "upload" | "youtube" | "translate" | "read">("upload")
 const input = ref(props.initialPrompt || "")
@@ -657,9 +648,6 @@ const translateUrl = ref("")
 const selectedReaderFile = ref<File | null>(null)
 const readerFileInput = ref<HTMLInputElement | null>(null)
 const isDraggingReader = ref(false)
-const readerActive = ref(false)
-const readerObjectUrl = ref("")
-const readerFormat = ref<ReaderFormat | "">("")
 const uploadPrompt = ref("")
 const uploadFileError = ref("")
 const srtPreview = ref<SrtParseResult | null>(null)
@@ -1151,28 +1139,10 @@ const clearReaderFile = () => {
   if (readerFileInput.value) readerFileInput.value.value = ""
 }
 
-function detectReaderFormat(file: File): ReaderFormat | "" {
-  const name = file.name.toLowerCase()
-  if (name.endsWith(".pdf")) return "pdf"
-  if (name.endsWith(".epub")) return "epub"
-  if (name.endsWith(".mobi") || name.endsWith(".azw") || name.endsWith(".azw3")) return "mobi"
-  return ""
-}
-
 const startReading = () => {
   if (!selectedReaderFile.value) return
-  if (readerObjectUrl.value) URL.revokeObjectURL(readerObjectUrl.value)
-  readerFormat.value = detectReaderFormat(selectedReaderFile.value)
-  readerObjectUrl.value = URL.createObjectURL(selectedReaderFile.value)
-  readerActive.value = true
-}
-
-const exitReading = () => {
-  readerActive.value = false
-  if (readerObjectUrl.value) {
-    URL.revokeObjectURL(readerObjectUrl.value)
-    readerObjectUrl.value = ""
-  }
+  readerFileStore.setFile(selectedReaderFile.value)
+  router.push({ name: "reader" })
 }
 
 const startImmersiveTranslation = async () => {

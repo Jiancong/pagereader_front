@@ -313,66 +313,57 @@
 
           <!-- 在线阅读 -->
           <div v-else-if="activeTab === 'read'" class="space-y-6">
-            <InlineReader
-              v-if="readerActive && selectedReaderFile"
-              :file="selectedReaderFile"
-              :format="readerFormat"
-              :object-url="readerObjectUrl"
-              @back="exitReading"
-            />
-            <template v-else>
-              <div class="mb-6">
-                <h3 class="text-lg font-semibold text-foreground">{{ t('landing.readTitle') }}</h3>
-                <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.readHint') }}</p>
-              </div>
+            <div class="mb-6">
+              <h3 class="text-lg font-semibold text-foreground">{{ t('landing.readTitle') }}</h3>
+              <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.readHint') }}</p>
+            </div>
 
-              <div
-                @dragover.prevent="isDraggingReader = true"
-                @dragleave="isDraggingReader = false"
-                @drop.prevent="handleReaderDrop"
-                :class="[
-                  'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
-                  isDraggingReader ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
-                ]"
-                @click="readerFileInput?.click()"
-              >
-                <input
-                  ref="readerFileInput"
-                  type="file"
-                  accept=".pdf,.epub,.mobi,.azw,.azw3,application/pdf,application/epub+zip"
-                  class="hidden"
-                  @change="handleReaderSelect"
-                />
-                <div v-if="selectedReaderFile" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
-                  <BookOpen class="h-10 w-10 flex-shrink-0 text-primary" />
-                  <div class="min-w-0 flex-1 text-left">
-                    <p class="break-words font-medium text-foreground">{{ selectedReaderFile.name }}</p>
-                    <p class="text-sm text-muted-foreground">{{ formatFileSize(selectedReaderFile.size) }}</p>
-                  </div>
-                  <button
-                    type="button"
-                    class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary"
-                    @click.stop="clearReaderFile"
-                  >
-                    <X class="h-5 w-5 text-muted-foreground" />
-                  </button>
+            <div
+              @dragover.prevent="isDraggingReader = true"
+              @dragleave="isDraggingReader = false"
+              @drop.prevent="handleReaderDrop"
+              :class="[
+                'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
+                isDraggingReader ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
+              ]"
+              @click="readerFileInput?.click()"
+            >
+              <input
+                ref="readerFileInput"
+                type="file"
+                accept=".pdf,.epub,.mobi,.azw,.azw3,application/pdf,application/epub+zip"
+                class="hidden"
+                @change="handleReaderSelect"
+              />
+              <div v-if="selectedReaderFile" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
+                <BookOpen class="h-10 w-10 flex-shrink-0 text-primary" />
+                <div class="min-w-0 flex-1 text-left">
+                  <p class="break-words font-medium text-foreground">{{ selectedReaderFile.name }}</p>
+                  <p class="text-sm text-muted-foreground">{{ formatFileSize(selectedReaderFile.size) }}</p>
                 </div>
-                <template v-else>
-                  <BookOpen class="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p class="mt-4 font-medium text-foreground">{{ t('landing.readPickFile') }}</p>
-                  <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.readFormats') }}</p>
-                </template>
+                <button
+                  type="button"
+                  class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary"
+                  @click.stop="clearReaderFile"
+                >
+                  <X class="h-5 w-5 text-muted-foreground" />
+                </button>
               </div>
+              <template v-else>
+                <BookOpen class="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <p class="mt-4 font-medium text-foreground">{{ t('landing.readPickFile') }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.readFormats') }}</p>
+              </template>
+            </div>
 
-              <button
-                :disabled="!selectedReaderFile"
-                class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                @click="startReading"
-              >
-                <BookOpen class="h-5 w-5" />
-                {{ t('landing.readStart') }}
-              </button>
-            </template>
+            <button
+              :disabled="!selectedReaderFile"
+              class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="startReading"
+            >
+              <BookOpen class="h-5 w-5" />
+              {{ t('landing.readStart') }}
+            </button>
           </div>
         </div>
       </div>
@@ -395,8 +386,7 @@ import {
   LANDING_WATCH_DEMO_EVENT,
 } from '@/composables/useGtmDataLayer'
 import { useTranslateFileStore } from '@/stores/translateFile'
-import InlineReader from '@/components/reader/InlineReader.vue'
-import type { ReaderFormat } from '@/stores/reader'
+import { useReaderFileStore } from '@/stores/reader'
 
 type TabId = 'upload' | 'quick' | 'youtube' | 'translate' | 'read'
 type QueueMode = 'CARD' | 'DOCUMENT' | 'NOVEL'
@@ -404,6 +394,7 @@ type QueueMode = 'CARD' | 'DOCUMENT' | 'NOVEL'
 const { t } = useI18n()
 const router = useRouter()
 const translateFileStore = useTranslateFileStore()
+const readerFileStore = useReaderFileStore()
 const emit = defineEmits<{ start: [payload: { mode: string; prompt: string }] }>()
 
 const activeTab = ref<TabId>('upload')
@@ -423,9 +414,6 @@ const showDemoVideo = ref(false)
 const selectedReaderFile = ref<File | null>(null)
 const readerFileInput = ref<HTMLInputElement | null>(null)
 const isDraggingReader = ref(false)
-const readerActive = ref(false)
-const readerObjectUrl = ref('')
-const readerFormat = ref<ReaderFormat | ''>('')
 
 const tabs = computed(() => [
   { id: 'upload' as TabId, label: t('landing.tabUpload'), icon: markRaw(Upload) },
@@ -615,28 +603,10 @@ const clearReaderFile = () => {
   if (readerFileInput.value) readerFileInput.value.value = ''
 }
 
-function detectReaderFormat(file: File): ReaderFormat | '' {
-  const name = file.name.toLowerCase()
-  if (name.endsWith('.pdf')) return 'pdf'
-  if (name.endsWith('.epub')) return 'epub'
-  if (name.endsWith('.mobi') || name.endsWith('.azw') || name.endsWith('.azw3')) return 'mobi'
-  return ''
-}
-
 const startReading = () => {
   if (!selectedReaderFile.value) return
-  if (readerObjectUrl.value) URL.revokeObjectURL(readerObjectUrl.value)
-  readerFormat.value = detectReaderFormat(selectedReaderFile.value)
-  readerObjectUrl.value = URL.createObjectURL(selectedReaderFile.value)
-  readerActive.value = true
-}
-
-const exitReading = () => {
-  readerActive.value = false
-  if (readerObjectUrl.value) {
-    URL.revokeObjectURL(readerObjectUrl.value)
-    readerObjectUrl.value = ''
-  }
+  readerFileStore.setFile(selectedReaderFile.value)
+  router.push({ name: 'reader' })
 }
 
 const selectQuickExample = (example: { id: string; prompt: string }) => {
