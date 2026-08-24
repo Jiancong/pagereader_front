@@ -49,6 +49,30 @@ const atEnd = ref(false)
 let book: Book | null = null
 let rendition: Rendition | null = null
 let resizeObserver: ResizeObserver | null = null
+let iframeObserver: MutationObserver | null = null
+
+/** epubjs 在 iframe 内监听 unload；Chrome 默认禁止，需在 iframe 上声明 allow="unload"。 */
+function patchIframeUnloadPermission(iframe: HTMLIFrameElement) {
+  const current = iframe.getAttribute('allow') ?? ''
+  if (!/\bunload\b/.test(current)) {
+    iframe.setAttribute('allow', current ? `${current}; unload` : 'unload')
+  }
+}
+
+function observeEpubIframes(container: HTMLElement) {
+  container.querySelectorAll('iframe').forEach((el) => patchIframeUnloadPermission(el))
+  iframeObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      m.addedNodes.forEach((node) => {
+        if (node instanceof HTMLIFrameElement) patchIframeUnloadPermission(node)
+        else if (node instanceof HTMLElement) {
+          node.querySelectorAll('iframe').forEach((el) => patchIframeUnloadPermission(el))
+        }
+      })
+    }
+  })
+  iframeObserver.observe(container, { childList: true, subtree: true })
+}
 
 onMounted(async () => {
   try {
@@ -57,6 +81,8 @@ onMounted(async () => {
     const data = await props.file.arrayBuffer()
     book = ePub(data)
     await book.ready
+
+    observeEpubIframes(viewerRef.value!)
 
     rendition = book.renderTo(viewerRef.value!, {
       width: '100%',
@@ -107,6 +133,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  iframeObserver?.disconnect()
   resizeObserver?.disconnect()
   rendition?.destroy()
   book?.destroy()
