@@ -1,5 +1,5 @@
 <template>
-  <div class="reader-view">
+  <div class="reader-view" @contextmenu="onContextMenu">
     <!-- 顶部工具栏 -->
     <header class="reader-view__toolbar">
       <button class="rv-btn" @click="goBack">
@@ -53,17 +53,16 @@
     <!-- EPUB 阅读器 -->
     <EpubReader
       v-else-if="isEpub && file"
+      ref="epubReaderRef"
       :file="file"
     />
 
-    <!-- MOBI 暂不支持 -->
-    <div v-else-if="isMobi" class="reader-view__unsupported">
-      <FileWarning class="reader-view__unsupported-icon" />
-      <p class="reader-view__unsupported-title">{{ t('reader.mobiUnsupportedTitle') }}</p>
-      <p class="reader-view__unsupported-desc">{{ t('reader.mobiUnsupportedDesc') }}</p>
-      <p v-if="file" class="reader-view__unsupported-file">{{ file.name }}</p>
-      <button class="rv-btn rv-btn--primary" @click="goBack">{{ t('reader.back') }}</button>
-    </div>
+    <!-- MOBI 阅读器 -->
+    <MobiReader
+      v-else-if="isMobi && file"
+      ref="mobiReaderRef"
+      :file="file"
+    />
 
     <!-- 未知格式 -->
     <div v-else class="reader-view__unsupported">
@@ -76,12 +75,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { FileWarning } from 'lucide-vue-next'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
+import MobiReader from '@/components/reader/MobiReader.vue'
 import { useReaderFileStore } from '@/stores/reader'
 
 const router = useRouter()
@@ -98,6 +98,8 @@ const headerTitle = computed(() => store.file?.name ?? '')
 
 const scale = ref(1.2)
 const pdfReaderRef = ref<InstanceType<typeof PdfReader> | null>(null)
+const epubReaderRef = ref<InstanceType<typeof EpubReader> | null>(null)
+const mobiReaderRef = ref<InstanceType<typeof MobiReader> | null>(null)
 const currentPage = ref(1)
 const pageCount = ref(0)
 const pageInput = ref(1)
@@ -123,6 +125,41 @@ function goToPage(page: number) {
 watch(currentPage, (page) => {
   pageInput.value = page
 })
+
+function nextPage() {
+  if (isPdf.value) {
+    goToPage(currentPage.value + 1)
+  } else if (isEpub.value) {
+    epubReaderRef.value?.next()
+  } else if (isMobi.value) {
+    mobiReaderRef.value?.next()
+  }
+}
+function prevPage() {
+  if (isPdf.value) {
+    goToPage(currentPage.value - 1)
+  } else if (isEpub.value) {
+    epubReaderRef.value?.prev()
+  } else if (isMobi.value) {
+    mobiReaderRef.value?.prev()
+  }
+}
+
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    e.preventDefault()
+    nextPage()
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    prevPage()
+  }
+}
+
+function onContextMenu(e: MouseEvent) {
+  e.preventDefault()
+  nextPage()
+}
+
 function goBack() {
   if (window.history.length > 1) {
     router.back()
@@ -131,7 +168,12 @@ function goBack() {
   }
 }
 
+onMounted(() => {
+  window.addEventListener('keydown', onKeyDown)
+})
+
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeyDown)
   store.revoke()
 })
 </script>
