@@ -79,10 +79,15 @@ onMounted(async () => {
     book = ePub(data)
     await book.ready
 
+    // epubjs 分页模式需要明确像素尺寸，百分比会导致空白页。
+    const rect = viewerRef.value!.getBoundingClientRect()
+    const w = Math.max(1, Math.floor(rect.width))
+    const h = Math.max(1, Math.floor(rect.height))
+
     installUnloadShim()
     rendition = book.renderTo(viewerRef.value!, {
-      width: '100%',
-      height: '100%',
+      width: w,
+      height: h,
       flow: 'paginated',
       spread: 'none',
       allowScriptedContent: false,
@@ -161,8 +166,10 @@ function prev() {
   padding: 12px;
 }
 .epub-reader__viewer {
+  flex: 1;
   width: 100%;
   height: 100%;
+  min-height: 0;
   max-width: 900px;
   background: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
