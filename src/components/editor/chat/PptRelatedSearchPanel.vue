@@ -558,6 +558,8 @@ async function runNestedRelatedSearch(term: string) {
 
     slideIndex: props.searchContext.slideIndex,
 
+    pptDataUrl: props.searchContext.pptDataUrl,
+
     uploadedDocuments: props.searchContext.uploadedDocuments,
 
     buildMessage: props.searchContext.buildMessage,

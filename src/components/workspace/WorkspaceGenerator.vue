@@ -81,6 +81,7 @@
         :ppt-data="activeTask.pptData"
         :project-id="activeTask.projectId"
         :markdown="activeTask.markdown"
+        :ppt-data-url="activeTask.pptDataUrl || ''"
         can-upload-cover
         @close="resetActiveTask"
         @update:ppt-data="(d) => (activeTask.pptData = d)"
@@ -584,6 +585,8 @@ type GeneratorTask = {
   errorMsg: string | null
   pptData: any
   markdown: string
+  /** OSS 上 ppt_data JSON 的地址，划词追问回传后端 */
+  pptDataUrl: string | null
   cardResult: BookCardResult | null
   novelResult: NovelResult | null
   outlineResult: OutlineResult | null
@@ -603,6 +606,7 @@ function createTask(defaultQueue: PptQueue): GeneratorTask {
     errorMsg: null,
     pptData: null,
     markdown: "",
+    pptDataUrl: null,
     cardResult: null,
     novelResult: null,
     outlineResult: null,
@@ -795,6 +799,7 @@ async function pollAndRecoverTaskResult(task: GeneratorTask, mode: "prompt" | "u
         ppt_data: resolved.ppt.pptData,
         project_id: task.projectId,
         markdown: resolved.ppt.markdown,
+        ppt_data_url: resolved.ppt.pptDataUrl,
       },
       mode,
     )
@@ -914,6 +919,7 @@ async function handlePptStreamComplete(
     if (resolved) {
       task.pptData = resolved.pptData
       task.markdown = resolved.markdown || ""
+      task.pptDataUrl = resolved.pptDataUrl ?? null
       if (resolved.projectId) task.projectId = resolved.projectId
       gtmGenerateComplete(mode, task.queue, task.projectId)
       emit("project-complete", task.projectId)
@@ -1291,6 +1297,7 @@ const runYoutubeStream = async (task: GeneratorTask, youtubeUrlValue: string, me
         ppt_data: resolved.ppt.pptData,
         project_id: task.projectId,
         markdown: resolved.ppt.markdown,
+        ppt_data_url: resolved.ppt.pptDataUrl,
       },
       "upload",
     )
@@ -1424,6 +1431,7 @@ const startTask = (task: GeneratorTask) => {
   task.showCreditsCta = false
   task.pptData = null
   task.markdown = ""
+  task.pptDataUrl = null
   task.cardResult = null
   task.novelResult = null
   task.outlineResult = null
@@ -1742,6 +1750,7 @@ onBeforeUnmount(() => {
 const resetActiveTask = () => {
   activeTask.value.pptData = null
   activeTask.value.markdown = ""
+  activeTask.value.pptDataUrl = null
   activeTask.value.cardResult = null
   activeTask.value.novelResult = null
   activeTask.value.outlineResult = null

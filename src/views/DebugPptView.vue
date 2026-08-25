@@ -53,7 +53,7 @@
         </span>
       </div>
       <div class="rounded-2xl border border-border bg-card">
-        <PptViewer :ppt-data="pptData" @close="reset" @update:ppt-data="(d) => (pptData = d)" />
+        <PptViewer :ppt-data="pptData" :ppt-data-url="pptDataUrl" @close="reset" @update:ppt-data="(d) => (pptData = d)" />
       </div>
     </div>
   </div>
@@ -66,6 +66,7 @@ import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import {
   resolveLocalPptDeck,
   resolvePptDataFromStreamComplete,
+  pickPptDataUrlFromDeck,
 } from "@/utils/pptCompletePayload"
 
 const raw = ref("")
@@ -73,6 +74,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const info = ref<string | null>(null)
 const pptData = ref<Record<string, unknown> | null>(null)
+const pptDataUrl = ref<string>("")
 
 const slideCount = computed(() =>
   Array.isArray(pptData.value?.slides) ? (pptData.value!.slides as unknown[]).length : 0,
@@ -95,6 +97,7 @@ const parse = async () => {
     const local = resolveLocalPptDeck(json)
     if (local) {
       pptData.value = local
+      pptDataUrl.value = pickPptDataUrlFromDeck(local) || ""
       info.value = "本地解析成功"
       return
     }
@@ -103,6 +106,7 @@ const parse = async () => {
     const resolved = await resolvePptDataFromStreamComplete(json)
     if (resolved) {
       pptData.value = resolved.pptData
+      pptDataUrl.value = resolved.pptDataUrl || ""
       info.value = "已从 ppt_data_url 拉取并解析"
       return
     }
@@ -119,5 +123,6 @@ const parse = async () => {
 
 const reset = () => {
   pptData.value = null
+  pptDataUrl.value = ""
 }
 </script>

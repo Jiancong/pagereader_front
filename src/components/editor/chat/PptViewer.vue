@@ -730,6 +730,7 @@ import {
   type RelatedSearchSessionEntry,
 } from "@/utils/pptChatHistoryDisplay";
 import { uploadedDocumentsFromPptData } from "@/utils/pptDocumentRag";
+import { pickPptDataUrlFromDeck } from "@/utils/pptCompletePayload";
 import { buildExploreProjectShareUrl } from "@/utils/feedOpen";
 import { translateBatch } from "@/api/translation";
 import { gtmRelatedSearch } from "@/composables/useGtmDataLayer";
@@ -849,6 +850,8 @@ const props = withDefaults(
   chatHistory?: ChatHistoryDisplayItem[];
   /** 是否显示上传封面按钮（需 projectId + 已登录） */
   canUploadCover?: boolean;
+  /** OSS 上 ppt_data JSON 的地址；缺省时尝试从 pptData 内解析。划词追问回传 extra_body.pptDataUrl */
+  pptDataUrl?: string;
 }>(),
   {
     canUploadCover: true,
@@ -984,10 +987,17 @@ const {
   closeStream: closeRelatedSearchStream,
 } = usePptRelatedSearch();
 
+const effectivePptDataUrl = computed(() => {
+  const explicit = String(props.pptDataUrl || "").trim();
+  if (explicit) return explicit;
+  return pickPptDataUrlFromDeck(props.pptData);
+});
+
 const pptRelatedSearchContext = computed((): PptRelatedSearchContext => ({
   pptTitle: props.pptData.title,
   projectId: props.projectId,
   slideIndex: currentSlide.value,
+  pptDataUrl: effectivePptDataUrl.value,
   uploadedDocuments: uploadedDocumentsFromPptData(props.pptData),
   buildMessage: buildPptRelatedSearchMessage,
 }));
@@ -1108,6 +1118,7 @@ async function runPptRelatedSearch(term: string, options?: { showPanel?: boolean
     pptTitle: props.pptData.title,
     projectId: props.projectId,
     slideIndex: currentSlide.value,
+    pptDataUrl: effectivePptDataUrl.value,
     uploadedDocuments: uploadedDocumentsFromPptData(props.pptData),
     buildMessage: buildPptRelatedSearchMessage,
     showPanel: options?.showPanel,

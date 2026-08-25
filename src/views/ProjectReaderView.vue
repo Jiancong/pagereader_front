@@ -53,6 +53,7 @@
               :ppt-data="pptData"
               :project-id="projectId"
               :markdown="projectMarkdown"
+              :ppt-data-url="pptDataUrl"
               :chat-history="displayChatHistory"
               @update:ppt-data="(d) => (pptData = d)"
               @related-search-recorded="(e) => (sessionEntries = e)"
@@ -146,6 +147,7 @@ const projectId = computed(() => String(route.params.projectId || ''))
 const project = ref(null)
 const history = ref([])
 const pptData = ref(null)
+const pptDataUrl = ref('')
 const novelResult = ref(null)
 const outlineResult = ref(null)
 const deckMarkdown = ref('')
@@ -250,6 +252,7 @@ async function loadPptDeck(id, proj, hist) {
       const resolved = await resolvePptDataFromStreamComplete({ projectId: id, ppt_data_url })
       if (resolved?.pptData) {
         pptData.value = resolved.pptData
+        pptDataUrl.value = resolved.pptDataUrl || ppt_data_url
         deckMarkdown.value = resolved.markdown || ''
         return
       }
@@ -284,6 +287,7 @@ const load = async (id) => {
   project.value = null
   history.value = []
   pptData.value = null
+  pptDataUrl.value = ''
   novelResult.value = null
   outlineResult.value = null
   deckMarkdown.value = ''

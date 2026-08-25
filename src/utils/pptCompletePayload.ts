@@ -9,6 +9,8 @@ export type PptStreamCompleteResult = {
   pptData: Record<string, unknown>
   projectId?: string
   markdown?: string
+  /** OSS 上 ppt_data JSON 的公网地址（ppt_data_url / remote_url / _artifact_url），供划词追问回传后端拉取原 deck */
+  pptDataUrl?: string
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -123,6 +125,18 @@ export function resolveLocalPptDeck(payload: unknown): Record<string, unknown> |
 }
 
 /**
+ * 从已加载的 deck 对象里尽力解析出 OSS ppt_data URL（ppt_data_url / remote_url / _artifact_url）。
+ * 内联 deck（SSE 直出）通常保留这些字段；从 OSS 拉回的 deck 本身不含自身地址，需由调用方显式传入。
+ */
+export function pickPptDataUrlFromDeck(deck: unknown): string | undefined {
+  const root = asRecord(deck)
+  if (!root) return undefined
+  const nested = asRecord(root.pptData) ?? asRecord(root.ppt_data)
+  const url = pickArtifactUrl(root) ?? (nested ? pickArtifactUrl(nested) : null)
+  return url ?? undefined
+}
+
+/**
  * 解析流式 complete 载荷为 PptViewer 可用的 pptData。
  * 支持：内联 slides、嵌套 ppt_data、OSS ppt_data_url / remote_url。
  */
@@ -143,15 +157,32 @@ export async function resolvePptDataFromStreamComplete(
           ? String(nested.projectId)
           : undefined
 
+  // 优先取调用方显式传入的 ppt_data_url（项目回放场景），其次从载荷里解析
+  const explicitUrl =
+    typeof root.ppt_data_url === "string" && root.ppt_data_url.trim()
+      ? root.ppt_data_url.trim()
+      : null
+  const resolvedPptDataUrl = explicitUrl ?? pickArtifactUrl(root) ?? undefined
+
   const inlineDeck = normalizeDeckFromArtifact(root)
   if (inlineDeck) {
-    return { pptData: finalizePptData(inlineDeck, root), projectId, markdown }
+    return {
+      pptData: finalizePptData(inlineDeck, root),
+      projectId,
+      markdown,
+      pptDataUrl: resolvedPptDataUrl,
+    }
   }
 
   if (nested) {
     const nestedDeck = normalizeDeckFromArtifact(nested)
     if (nestedDeck) {
-      return { pptData: finalizePptData(nestedDeck, root), projectId, markdown }
+      return {
+        pptData: finalizePptData(nestedDeck, root),
+        projectId,
+        markdown,
+        pptDataUrl: resolvedPptDataUrl,
+      }
     }
     const nestedUrl = pickArtifactUrl({ ppt_data: nested, ppt_data_artifact: root.ppt_data_artifact })
     if (nestedUrl) {
@@ -161,6 +192,7 @@ export async function resolvePptDataFromStreamComplete(
           pptData: finalizePptData(fetched.deck, root),
           projectId,
           markdown: markdown ?? fetched.markdown,
+          pptDataUrl: resolvedPptDataUrl ?? nestedUrl,
         }
       }
     }
@@ -174,6 +206,7 @@ export async function resolvePptDataFromStreamComplete(
         pptData: finalizePptData(fetched.deck, root),
         projectId,
         markdown: markdown ?? fetched.markdown,
+        pptDataUrl: resolvedPptDataUrl ?? url,
       }
     }
   }

@@ -35,6 +35,8 @@ export interface PptRelatedSearchContext {
   pptTitle?: string;
   projectId?: string;
   slideIndex?: number;
+  /** OSS 上 ppt_data JSON 的地址，回传 extra_body.pptDataUrl 供后端拉取原 deck（含 document_rag / 原始 MOBI 地址） */
+  pptDataUrl?: string;
   uploadedDocuments?: UploadedDocument[];
   buildMessage: (term: string, pptTitle?: string) => string;
 }
@@ -45,6 +47,8 @@ export interface PptRelatedSearchOptions {
   projectId?: string;
   slideIndex?: number;
   source?: PptRelatedSearchSource;
+  /** OSS 上 ppt_data JSON 的地址，回传 extra_body.pptDataUrl 供后端拉取原 deck */
+  pptDataUrl?: string;
   uploadedDocuments?: UploadedDocument[];
   buildMessage: (term: string, pptTitle?: string) => string;
   /** When false, stream runs without opening the floating result panel */
@@ -214,6 +218,7 @@ export function usePptRelatedSearch() {
     const uploadedDocs = options.uploadedDocuments ?? [];
     const message = options.buildMessage(term, options.pptTitle);
     const pptTitle = String(options.pptTitle || "").trim() || undefined;
+    const pptDataUrl = String(options.pptDataUrl || "").trim() || undefined;
     const source: PptRelatedSearchSource = options.source ?? "MANUAL_SELECTION";
     const extraBody: Record<string, unknown> = {
       intent: PPT_RELATED_SEARCH_INTENT,
@@ -221,6 +226,7 @@ export function usePptRelatedSearch() {
       source,
     };
     if (pptTitle) extraBody.pptTitle = pptTitle;
+    if (pptDataUrl) extraBody.pptDataUrl = pptDataUrl;
     if (typeof options.slideIndex === "number" && !Number.isNaN(options.slideIndex)) {
       extraBody.slideIndex = options.slideIndex;
     }

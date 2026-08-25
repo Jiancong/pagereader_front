@@ -100,6 +100,7 @@
           :ppt-data="pptData"
           :project-id="projectId"
           :markdown="projectMarkdown"
+          :ppt-data-url="pptDataUrl"
           :chat-history="displayChatHistory"
           can-upload-cover
           @update:ppt-data="(d) => (pptData = d)"
@@ -183,6 +184,7 @@ const { selectableOptions, resolveLabelById } = useExploreTopicCategories()
 const project = ref(null)
 const history = ref([])
 const pptData = ref(null)
+const pptDataUrl = ref('')
 const novelResult = ref(null)
 const deckMarkdown = ref('')
 const loading = ref(false)
@@ -381,6 +383,7 @@ async function loadPptDeck(id, proj, hist) {
       const resolved = await resolvePptDataFromStreamComplete({ projectId: id, ppt_data_url })
       if (resolved?.pptData) {
         pptData.value = resolved.pptData
+        pptDataUrl.value = resolved.pptDataUrl || ppt_data_url
         deckMarkdown.value = resolved.markdown || ''
         return
       }
@@ -399,6 +402,7 @@ const run = async (id) => {
   project.value = null
   history.value = []
   pptData.value = null
+  pptDataUrl.value = ''
   novelResult.value = null
   deckMarkdown.value = ''
   selectedCategoryId.value = ''
