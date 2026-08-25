@@ -197,3 +197,100 @@ Play Console 只接受带 release 签名的 APK/AAB。一次性配置：
 - **包名（appId）**：同时改 `capacitor.config.json` 的 `appId` 和 `android/app/build.gradle` 的 `applicationId` / `namespace`，然后 `npm run android:clean && npm run android:sync`。
 - **应用名**：改 `capacitor.config.json` 的 `appName`，以及 `android/app/src/main/res/values/strings.xml` 里的 `app_name`、`title_activity_main`，再 `npm run android:sync`。
 
+---
+
+## iOS App 构建
+
+同一套 Capacitor 6 配置也支持把 Vue 3 + Vite 前端打包成 iOS 应用。构建流程：`vite build`（相对 base）→ `cap sync ios`（同步到 `ios/App/App/public`）→ Xcode 编译 IPA。
+
+> ⚠️ iOS 工程**只能在 macOS 上编译和签名**。本仓库在 Windows 上已经生成好 `ios/` 工程文件并提交，但产出 IPA / 上架 App Store 必须在装了 Xcode 15+ 的 Mac 上进行。
+
+### 本机环境前置条件（仅 macOS）
+
+1. **Xcode 15+**（含 iOS SDK 与 Swift 编译器）
+   - 从 Mac App Store 安装，或从 [developer.apple.com/xcode](https://developer.apple.com/xcode/) 下载。
+   - 首次安装后命令行执行 `sudo xcodebuild -license` 和 `sudo xcode-select --install` 接受协议并装好 Command Line Tools。
+
+2. **CocoaPods**
+   - 用于安装 `ios/App/Pods` 下的原生依赖。
+   - 安装：`sudo gem install cocoapods`（或用 Homebrew `brew install cocoapods`）。
+   - 验证：`pod --version`。
+
+3. **Apple Developer 账号**（发布到 App Store 必需）
+   - 在 [developer.apple.com](https://developer.apple.com/) 注册，并在 Xcode 里登录你的 Apple ID。
+   - 在 Member Center 创建 App ID（Bundle ID 填 `top.page2.app`）、发布证书与 Provisioning Profile。
+
+### 已落地的代码改造
+
+| 文件 | 作用 |
+| --- | --- |
+| `capacitor.config.json` | 新增 `ios` 段（`contentInset`、背景色）与 `server.iosScheme=https`；`appId`/`appName` 与 Android 共用 |
+| `package.json` | 新增 `@capacitor/ios` 依赖与 `ios:*` / `build:ios` 一组脚本 |
+| `scripts/buildIos.mjs` | 一键脚本：`CAPACITOR=1 SKIP_SEO=1 vite build` + `cap sync ios` |
+| `ios/` | 已通过 `npx cap add ios` 生成的完整 Xcode 工程（Bundle ID `top.page2.app`，版本 1.0） |
+| `ios/App/App/Info.plist` | 已加 `ITSAppUsesNonExemptEncryption=false`（避免每次提交被问出口合规）与 `NSAppTransportSecurity` 允许 WebView 加载外部内容 |
+| `src/router.ts` | 复用既有逻辑：在原生壳内自动切换为 `createWebHashHistory()`，Android/iOS 通用 |
+
+### 构建命令一览
+
+```bash
+# 1. 构建 Web 资源并同步到 ios/ 工程（不需要 Xcode，纯 Node，任意平台可跑）
+npm run build:ios
+
+# 2. 把 dist/ 重新同步到 ios/（不重新 build Web，调试时常用）
+npm run ios:sync
+
+# 3. 在 Xcode 里打开 ios/App/App.xcworkspace
+npm run ios:open
+
+# 4. 连接真机/模拟器，直接安装并运行 debug 版（仅 macOS）
+npm run ios:run
+
+# 5. 产出 release IPA（需要先在 Xcode 配置签名，仅 macOS）
+npm run ios:build-release
+
+# 清理 iOS 工程缓存（编译异常时使用，仅 macOS）
+npm run ios:clean
+```
+
+### 产出可发布的 IPA（签名配置）
+
+App Store 只接受带签名与正确 Provisioning Profile 的 IPA。一次性配置：
+
+1. **在 Xcode 里配置签名**：`npm run ios:open` → 选中 `App` target → Signing & Capabilities → Team 选你的开发者账号，让 Xcode 自动管理签名（推荐），或手动指定 Provisioning Profile。
+
+2. **设置版本号**：在 Xcode 的 General 里改 `Version`（`MARKETING_VERSION`，对应 `CFBundleShortVersionString`）和 `Build`（`CURRENT_PROJECT_VERSION`）。也可直接改 `ios/App/App.xcodeproj/project.pbxproj` 里这两项。
+
+3. **构建 release IPA**：
+
+   ```bash
+   npm run ios:build-release
+   ```
+
+   产物路径：`ios/App/output`（`cap build ios` 默认输出目录）。
+
+   也可以用 Xcode：`npm run ios:open` → Product → Archive，再在 Organizer 里 Distribute App → App Store Connect。
+
+### 发布到 App Store
+
+1. 在 [App Store Connect](https://appstoreconnect.apple.com/) 创建新 App，主语言、Bundle ID 选 `top.page2.app`（即 `capacitor.config.json` 里的 `appId`），SKU 自定义。
+2. 通过 Xcode Organizer 上传 Archive（Distribute App → App Store Connect → Upload），或用 `npm run ios:build-release` 产出 IPA 后用 [Transporter](https://apps.apple.com/app/transporter/id1450874784) 上传。
+3. 首次上传需要填写隐私政策 URL（项目里已有 `/privacy` 路由，可直接用线上地址）、年龄分级、App 隐私清单等。
+4. 应用图标默认是 Capacitor 自带的占位图，建议替换 `ios/App/App/Assets.xcassets/AppIcon.appiconset` 为自己的图标，并用 [Xcode Asset Catalog](https://developer.apple.com/documentation/xcode/asset-management) 生成各尺寸。
+5. 启动图（LaunchScreen）：默认使用 `ios/App/App/Base.lproj/LaunchScreen.storyboard`，可按需自定义。
+
+### 修改包名 / 应用名（iOS）
+
+- **包名（Bundle ID）**：改 `capacitor.config.json` 的 `appId`，并在 Xcode 里改 `App` target 的 Bundle Identifier，然后 `npm run ios:clean && npm run ios:sync`。
+- **应用名**：改 `capacitor.config.json` 的 `appName`，以及 `ios/App/App/Info.plist` 里的 `CFBundleDisplayName`，再 `npm run ios:sync`。
+
+### 跨平台同步
+
+`cap sync` 不带平台参数时会同时同步 Android 与 iOS：
+
+```bash
+npm run build:fast        # 先 build 出 dist/
+npx cap sync               # 同时同步到 android/ 和 ios/
+```
+
+

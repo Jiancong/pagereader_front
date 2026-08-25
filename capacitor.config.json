@@ -6,8 +6,14 @@
     "allowMixedContent": false,
     "webContentsDebuggingEnabled": false
   },
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#ffffff",
+    "limitsNavigationsToAppBoundDomains": false
+  },
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "iosScheme": "https"
   },
   "plugins": {
     "CapacitorHttp": {

@@ -18,11 +18,19 @@
     "android:open": "npx cap open android",
     "android:run": "npm run build:android && npx cap run android",
     "android:build-release": "npm run build:android && npx cap build android",
-    "android:clean": "npx cap clean android"
+    "android:clean": "npx cap clean android",
+    "build:ios": "node scripts/buildIos.mjs",
+    "ios:add": "npx cap add ios",
+    "ios:sync": "npx cap sync ios",
+    "ios:open": "npx cap open ios",
+    "ios:run": "npm run build:ios && npx cap run ios",
+    "ios:build-release": "npm run build:ios && npx cap build ios",
+    "ios:clean": "npx cap clean ios"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
     "@capacitor/core": "^6.2.1",
+    "@capacitor/ios": "^6.2.1",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
     "element-plus": "^2.7.0",

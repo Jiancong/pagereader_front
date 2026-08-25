@@ -19,3 +19,9 @@ dist-ssr
 *.keystore
 *.jks
 keystore.properties
+
+# iOS 签名与配置（绝不入库）
+*.mobileprovision
+*.p12
+*.cer
+ios/App/exportOptions.plist
