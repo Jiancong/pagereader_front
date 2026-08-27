@@ -1,6 +1,8 @@
 <template>
   <div class="mobi-reader">
-    <div ref="containerRef" class="mobi-reader__container"></div>
+    <div class="mobi-reader__zoom-wrap" :style="{ zoom: scale }">
+      <div ref="containerRef" class="mobi-reader__container"></div>
+    </div>
     <div v-if="loading" class="mobi-reader__overlay">{{ t('reader.loading') }}</div>
     <div v-else-if="loadError" class="mobi-reader__overlay mobi-reader__overlay--error">
       {{ loadError }}
@@ -15,6 +17,13 @@ import 'foliate-js/view.js'
 
 const props = defineProps<{
   file: File
+  scale?: number
+}>()
+
+const emit = defineEmits<{
+  'page-change': [page: number]
+  'page-count': [count: number]
+  zoom: [delta: number]
 }>()
 
 const { t } = useI18n()
@@ -24,12 +33,8 @@ const loading = ref(true)
 const loadError = ref('')
 
 let view: any = null
+let pageTotal = 0
 
-// foliate-view renders each section inside an iframe. Keyboard / mouse events
-// happening inside those iframes never bubble to the parent window, so the
-// navigation handlers registered on `window` in ReaderView don't fire while
-// the reader content has focus. We attach our own listeners to each loaded
-// iframe document via the view's 'load' event and clean them up on unload.
 const trackedDocs = new Set<Document>()
 
 function onDocKeyDown(e: KeyboardEvent) {
@@ -45,23 +50,40 @@ function onDocContextMenu(e: MouseEvent) {
   e.preventDefault()
   next()
 }
+function onDocWheel(e: WheelEvent) {
+  if (!e.ctrlKey && !e.metaKey) return
+  e.preventDefault()
+  emit('zoom', e.deltaY > 0 ? -0.1 : 0.1)
+}
 
 function attachToDoc(doc: Document) {
   if (trackedDocs.has(doc)) return
   trackedDocs.add(doc)
   doc.addEventListener('keydown', onDocKeyDown, true)
   doc.addEventListener('contextmenu', onDocContextMenu, true)
+  doc.addEventListener('wheel', onDocWheel, { capture: true, passive: false })
 }
 function detachFromDoc(doc: Document) {
   if (!trackedDocs.has(doc)) return
   trackedDocs.delete(doc)
   doc.removeEventListener('keydown', onDocKeyDown, true)
   doc.removeEventListener('contextmenu', onDocContextMenu, true)
+  doc.removeEventListener('wheel', onDocWheel, true)
 }
 
 function onLoad(e: Event) {
   const doc = (e as CustomEvent).detail?.doc
   if (doc) attachToDoc(doc)
+}
+
+function onRelocate(e: Event) {
+  const detail = (e as CustomEvent).detail
+  const location = detail?.location
+  if (!location || location.total <= 0) return
+  pageTotal = location.total
+  const page = location.current + 1
+  emit('page-change', page)
+  emit('page-count', location.total)
 }
 
 onMounted(async () => {
@@ -71,10 +93,9 @@ onMounted(async () => {
     containerRef.value?.appendChild(view)
 
     view.addEventListener('load', onLoad)
+    view.addEventListener('relocate', onRelocate)
 
     await view.open(props.file)
-    // `open()` only sets up the book + renderer; it does not display any
-    // content. We must explicitly navigate to render the first page.
     await view.next()
     loading.value = false
   } catch (e) {
@@ -86,6 +107,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   if (view) {
     view.removeEventListener('load', onLoad)
+    view.removeEventListener('relocate', onRelocate)
     for (const doc of trackedDocs) detachFromDoc(doc)
     trackedDocs.clear()
     view.close?.()
@@ -100,8 +122,14 @@ function next() {
 function prev() {
   view?.goLeft()
 }
+function goToPage(page: number) {
+  if (!view || !pageTotal) return
+  const target = Math.min(Math.max(Math.trunc(page), 1), pageTotal)
+  const fraction = (target - 1) / pageTotal
+  void view.goToFraction(fraction)
+}
 
-defineExpose({ next, prev })
+defineExpose({ next, prev, goToPage })
 </script>
 
 <style scoped>
@@ -111,6 +139,13 @@ defineExpose({ next, prev })
   flex: 1;
   min-height: 0;
   background: #f3f4f6;
+  overflow: auto;
+}
+.mobi-reader__zoom-wrap {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  transform-origin: top center;
 }
 .mobi-reader__container {
   flex: 1;

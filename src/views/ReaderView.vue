@@ -1,5 +1,5 @@
 <template>
-  <div class="reader-view" @contextmenu="onContextMenu">
+  <div class="reader-view" @contextmenu="onContextMenu" @wheel="onWheel">
     <!-- 顶部工具栏 -->
     <header class="reader-view__toolbar">
       <button class="rv-btn" @click="goBack">
@@ -10,7 +10,7 @@
       <div class="reader-view__title" :title="headerTitle">{{ headerTitle }}</div>
 
       <div class="reader-view__controls">
-        <div v-if="isPdf" class="rv-field rv-field--pages">
+        <div v-if="hasSource && (isPdf || isEpub || isMobi)" class="rv-field rv-field--pages">
           <button class="rv-btn rv-btn--sm" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">‹</button>
           <input
             v-model.number="pageInput"
@@ -26,7 +26,7 @@
           <button class="rv-btn rv-btn--sm" :disabled="!pageCount || currentPage >= pageCount" @click="goToPage(currentPage + 1)">›</button>
         </div>
 
-        <div v-if="isPdf" class="rv-field rv-field--zoom">
+        <div v-if="hasSource && (isPdf || isEpub || isMobi)" class="rv-field rv-field--zoom">
           <button class="rv-btn rv-btn--sm" @click="zoomOut" :disabled="scale <= 0.5">−</button>
           <span class="rv-zoom-value">{{ Math.round(scale * 100) }}%</span>
           <button class="rv-btn rv-btn--sm" @click="zoomIn" :disabled="scale >= 3">+</button>
@@ -55,6 +55,10 @@
       v-else-if="isEpub && file"
       ref="epubReaderRef"
       :file="file"
+      :scale="scale"
+      @page-change="onPageChange"
+      @page-count="onPageCount"
+      @zoom="applyZoomDelta"
     />
 
     <!-- MOBI 阅读器 -->
@@ -62,6 +66,10 @@
       v-else-if="isMobi && file"
       ref="mobiReaderRef"
       :file="file"
+      :scale="scale"
+      @page-change="onPageChange"
+      @page-count="onPageCount"
+      @zoom="applyZoomDelta"
     />
 
     <!-- 未知格式 -->
@@ -104,11 +112,23 @@ const currentPage = ref(1)
 const pageCount = ref(0)
 const pageInput = ref(1)
 
+function clampScale(value: number) {
+  return Math.min(3, Math.max(0.5, +value.toFixed(2)))
+}
 function zoomIn() {
-  scale.value = Math.min(3, +(scale.value + 0.2).toFixed(2))
+  scale.value = clampScale(scale.value + 0.2)
 }
 function zoomOut() {
-  scale.value = Math.max(0.5, +(scale.value - 0.2).toFixed(2))
+  scale.value = clampScale(scale.value - 0.2)
+}
+function applyZoomDelta(delta: number) {
+  scale.value = clampScale(scale.value + delta)
+}
+function onWheel(e: WheelEvent) {
+  if (!e.ctrlKey && !e.metaKey) return
+  if (!isPdf.value && !isEpub.value && !isMobi.value) return
+  e.preventDefault()
+  applyZoomDelta(e.deltaY > 0 ? -0.1 : 0.1)
 }
 function onPageChange(page: number) {
   currentPage.value = page
@@ -120,7 +140,13 @@ function goToPage(page: number) {
   if (!Number.isFinite(page) || !pageCount.value) return
   const target = Math.min(Math.max(Math.trunc(page), 1), pageCount.value)
   pageInput.value = target
-  pdfReaderRef.value?.goToPage(target)
+  if (isPdf.value) {
+    pdfReaderRef.value?.goToPage(target)
+  } else if (isEpub.value) {
+    epubReaderRef.value?.goToPage(target)
+  } else if (isMobi.value) {
+    mobiReaderRef.value?.goToPage(target)
+  }
 }
 watch(currentPage, (page) => {
   pageInput.value = page
