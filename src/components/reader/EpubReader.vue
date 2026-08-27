@@ -1,9 +1,7 @@
 <template>
   <div class="epub-reader" ref="rootRef">
     <div class="epub-reader__stage">
-      <div class="epub-reader__zoom-wrap" :style="{ zoom: scale }">
-        <div ref="viewerRef" class="epub-reader__viewer"></div>
-      </div>
+      <div ref="viewerRef" class="epub-reader__viewer"></div>
       <div v-if="loading" class="epub-reader__overlay">{{ t('reader.loading') }}</div>
       <div v-else-if="loadError" class="epub-reader__overlay epub-reader__overlay--error">
         {{ loadError }}
@@ -29,7 +27,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ePub, { type Book, type Rendition } from 'epubjs'
 
@@ -62,7 +60,14 @@ let originalAddEventListener: typeof window.addEventListener | null = null
 let renderedWidth = 0
 let renderedHeight = 0
 
+const BASE_FONT_SIZE = 16
 const trackedDocs = new Set<Document>()
+
+watch(() => props.scale, (s) => {
+  if (!rendition) return
+  const size = Math.round(BASE_FONT_SIZE * (s ?? 1))
+  rendition.themes.fontSize(`${size}px`)
+})
 
 function updatePageInfo(location: any) {
   if (!book || book.locations.length() === 0 || !location?.start?.cfi) return
@@ -150,6 +155,7 @@ onMounted(async () => {
       spread: 'none',
       allowScriptedContent: false,
     })
+    rendition.themes.fontSize(`${Math.round(BASE_FONT_SIZE * (props.scale ?? 1))}px`)
 
     rendition.on('relocated', (location: any) => {
       atStart.value = location.atStart ?? false
@@ -236,13 +242,6 @@ defineExpose({ next, prev, goToPage })
   justify-content: center;
   padding: 12px;
   overflow: auto;
-}
-.epub-reader__zoom-wrap {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  min-height: 0;
-  transform-origin: top center;
 }
 .epub-reader__viewer {
   flex: 1;
