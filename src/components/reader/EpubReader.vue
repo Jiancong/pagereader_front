@@ -64,14 +64,9 @@ const BASE_FONT_SIZE = 16
 const trackedDocs = new Set<Document>()
 
 function applyZoomToDoc(doc: Document, scale: number) {
-  const size = Math.round(BASE_FONT_SIZE * scale)
-  let style = doc.getElementById('epub-zoom-style') as HTMLStyleElement | null
-  if (!style) {
-    style = doc.createElement('style')
-    style.id = 'epub-zoom-style'
-    doc.head?.appendChild(style)
-  }
-  style.textContent = `html, body { font-size: ${size}px !important; }`
+  const el = doc.documentElement
+  if (!el) return
+  ;(el.style as any).zoom = String(scale)
 }
 
 function applyZoom(scale: number) {
