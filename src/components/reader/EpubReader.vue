@@ -63,10 +63,24 @@ let renderedHeight = 0
 const BASE_FONT_SIZE = 16
 const trackedDocs = new Set<Document>()
 
+function applyZoomToDoc(doc: Document, scale: number) {
+  const size = Math.round(BASE_FONT_SIZE * scale)
+  let style = doc.getElementById('epub-zoom-style') as HTMLStyleElement | null
+  if (!style) {
+    style = doc.createElement('style')
+    style.id = 'epub-zoom-style'
+    doc.head?.appendChild(style)
+  }
+  style.textContent = `html, body { font-size: ${size}px !important; }`
+}
+
+function applyZoom(scale: number) {
+  for (const doc of trackedDocs) applyZoomToDoc(doc, scale)
+}
+
 watch(() => props.scale, (s) => {
   if (!rendition) return
-  const size = Math.round(BASE_FONT_SIZE * (s ?? 1))
-  rendition.themes.fontSize(`${size}px`)
+  applyZoom(s ?? 1)
 })
 
 function updatePageInfo(location: any) {
@@ -155,7 +169,6 @@ onMounted(async () => {
       spread: 'none',
       allowScriptedContent: false,
     })
-    rendition.themes.fontSize(`${Math.round(BASE_FONT_SIZE * (props.scale ?? 1))}px`)
 
     rendition.on('relocated', (location: any) => {
       atStart.value = location.atStart ?? false
@@ -165,10 +178,13 @@ onMounted(async () => {
 
     rendition.on('rendered', (_section: any, view: any) => {
       const doc = view?.document as Document | undefined
-      if (doc) attachToDoc(doc)
+      if (doc) {
+        attachToDoc(doc)
+        applyZoomToDoc(doc, props.scale ?? 1)
+      }
 
       if (book && book.locations.length() === 0) {
-        void book.locations.generate(1024).then(() => {
+        void book.locations.generate(200).then(() => {
           if (rendition) {
             const loc = rendition.currentLocation() as any
             updatePageInfo(loc)
