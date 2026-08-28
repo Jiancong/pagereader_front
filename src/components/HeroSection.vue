@@ -22,10 +22,6 @@
         {{ t('landing.heroSubtitle') }}
       </p>
 
-      <p class="mx-auto mb-8 max-w-xl text-balance text-sm italic text-muted-foreground/80 sm:text-base">
-        “{{ t('landing.heroQuote') }}”
-      </p>
-
       <div class="mx-auto mb-10 flex max-w-2xl items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left text-sm text-muted-foreground sm:items-center">
         <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Headphones class="h-5 w-5" />

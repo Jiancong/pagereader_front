@@ -59,8 +59,8 @@ export default {
     productHuntBannerLong: "🎉 Now live on Product Hunt — your upvote makes our day.",
     productHuntBadgeAlt: "{brand} on Product Hunt",
     heroBadge: "AI-powered presentation generation",
-    heroTitle: "One prompt.",
-    heroTitleHighlight: "Pro slides.",
+    heroTitle: "Because life's too short for a book you're not in the mood for.",
+    heroTitleHighlight: "",
     heroSubtitle:
       "Upload books, papers, or notes and let AI structure them into a deck—or describe your topic in one sentence and get polished slides in seconds.",
     heroQuote: "Because life's too short for a book you're not in the mood for.",
