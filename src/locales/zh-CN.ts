@@ -63,6 +63,7 @@ export default {
     heroTitleHighlight: "专业PPT",
     heroSubtitle:
       "上传图书、论文、资料，AI 自动提取核心内容并生成结构化演示文稿。或者只需输入一句话，即刻获得精美 PPT。",
+    heroQuote: "人生太短，不该浪费在一本没心情读的书上。",
     heroAudioTitle: "生成书籍，自带有声书体验",
     heroAudioDesc:
       "把生成的图书摘要同步变成可连续播放的有声内容，用更轻松的听觉盛宴吸收故事、观点与关键启发。",
