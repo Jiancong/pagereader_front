@@ -734,6 +734,9 @@ export default {
     unsupportedTitle: "暂不支持该格式",
     xlsxEmptySheet: "此工作表为空。",
     xlsxNoSheets: "文件中未找到工作表。",
+    xlsxRowCount: "已显示 {shown} / 共 {total} 条",
+    xlsxScrollMore: "· 继续向下滚动加载",
+    xlsxLoadingMore: "正在加载更多…",
   },
   community: {
     bookSource: "书籍来源",

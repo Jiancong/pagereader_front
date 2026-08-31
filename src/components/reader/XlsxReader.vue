@@ -5,16 +5,27 @@
       {{ loadError }}
     </div>
     <template v-else>
+      <div v-if="totalDataRows > 0" class="xlsx-reader__meta">
+        {{ t('reader.xlsxRowCount', { shown: shownDataRows, total: totalDataRows }) }}
+        <span v-if="hasMoreRows" class="xlsx-reader__meta-hint">{{ t('reader.xlsxScrollMore') }}</span>
+      </div>
+
       <div class="xlsx-reader__zoom" :style="{ zoom: scale ?? 1 }">
-        <div class="xlsx-reader__scroll">
-          <table v-if="rows.length" class="xlsx-reader__table">
+        <div ref="scrollRef" class="xlsx-reader__scroll" @scroll="onScroll">
+          <table v-if="headerRow.length" class="xlsx-reader__table">
+            <thead>
+              <tr>
+                <th v-for="(cell, colIndex) in headerRow" :key="colIndex">{{ formatCell(cell) }}</th>
+              </tr>
+            </thead>
             <tbody>
-              <tr v-for="(row, rowIndex) in rows" :key="rowIndex">
+              <tr v-for="(row, rowIndex) in bodyRows" :key="rowIndex">
                 <td v-for="(cell, colIndex) in row" :key="colIndex">{{ formatCell(cell) }}</td>
               </tr>
             </tbody>
           </table>
           <p v-else class="xlsx-reader__empty">{{ t('reader.xlsxEmptySheet') }}</p>
+          <p v-if="loadingMore" class="xlsx-reader__loading-more">{{ t('reader.xlsxLoadingMore') }}</p>
         </div>
       </div>
 
@@ -35,10 +46,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 type XlsxModule = typeof import('xlsx')
+
+const ROW_BATCH = 80
+const DATE_HEADER_PATTERN = /^(date|日期|time|时间)$/i
 
 const props = defineProps<{
   file: File
@@ -54,9 +68,19 @@ const { t } = useI18n()
 
 const loading = ref(true)
 const loadError = ref('')
+const loadingMore = ref(false)
 const sheetNames = ref<string[]>([])
 const activeSheetIndex = ref(0)
-const rows = ref<unknown[][]>([])
+const scrollRef = ref<HTMLElement | null>(null)
+
+const headerRow = ref<unknown[]>([])
+const allBodyRows = ref<unknown[][]>([])
+const visibleCount = ref(ROW_BATCH)
+
+const totalDataRows = computed(() => allBodyRows.value.length)
+const shownDataRows = computed(() => Math.min(visibleCount.value, totalDataRows.value))
+const hasMoreRows = computed(() => shownDataRows.value < totalDataRows.value)
+const bodyRows = computed(() => allBodyRows.value.slice(0, visibleCount.value))
 
 let xlsxModule: XlsxModule | null = null
 let workbook: import('xlsx').WorkBook | null = null
@@ -72,6 +96,64 @@ function formatCell(value: unknown) {
   return String(value)
 }
 
+function findDateColumnIndex(header: unknown[]) {
+  for (let i = 0; i < header.length; i++) {
+    const label = String(header[i] ?? '').trim()
+    if (DATE_HEADER_PATTERN.test(label)) return i
+  }
+  return -1
+}
+
+function parseCellDate(value: unknown, XLSX: XlsxModule): number {
+  if (value instanceof Date) return value.getTime()
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const parsed = XLSX.SSF?.parse_date_code?.(value)
+    if (parsed) {
+      return new Date(parsed.y, parsed.m - 1, parsed.d, parsed.H, parsed.M, parsed.S).getTime()
+    }
+    return value
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const ts = Date.parse(value)
+    if (!Number.isNaN(ts)) return ts
+  }
+  return Number.NEGATIVE_INFINITY
+}
+
+function normalizeRows(data: unknown[][]) {
+  const maxCols = data.reduce((max, row) => Math.max(max, row.length), 0)
+  return data.map((row) => {
+    const normalized = [...row]
+    while (normalized.length < maxCols) normalized.push('')
+    return normalized
+  })
+}
+
+function sortBodyByDateDesc(body: unknown[][], dateColIndex: number, XLSX: XlsxModule) {
+  if (dateColIndex < 0) return body
+  return [...body].sort((a, b) => {
+    const tb = parseCellDate(b[dateColIndex], XLSX)
+    const ta = parseCellDate(a[dateColIndex], XLSX)
+    return tb - ta
+  })
+}
+
+function loadMoreRows() {
+  if (!hasMoreRows.value || loadingMore.value) return
+  loadingMore.value = true
+  requestAnimationFrame(() => {
+    visibleCount.value = Math.min(visibleCount.value + ROW_BATCH, totalDataRows.value)
+    loadingMore.value = false
+  })
+}
+
+function onScroll() {
+  const el = scrollRef.value
+  if (!el || !hasMoreRows.value) return
+  const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 240
+  if (nearBottom) loadMoreRows()
+}
+
 function loadSheet(index: number) {
   if (!workbook || !xlsxModule) return
   const XLSX = xlsxModule
@@ -79,14 +161,23 @@ function loadSheet(index: number) {
   if (!name) return
   const sheet = workbook.Sheets[name]
   const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })
-  const maxCols = data.reduce((max, row) => Math.max(max, row.length), 0)
-  rows.value = data.map((row) => {
-    const normalized = [...row]
-    while (normalized.length < maxCols) normalized.push('')
-    return normalized
-  })
+  const normalized = normalizeRows(data)
+  if (normalized.length === 0) {
+    headerRow.value = []
+    allBodyRows.value = []
+    visibleCount.value = ROW_BATCH
+    activeSheetIndex.value = index
+    emit('page-change', index + 1)
+    return
+  }
+  const [header, ...body] = normalized
+  const dateColIndex = findDateColumnIndex(header)
+  headerRow.value = header
+  allBodyRows.value = sortBodyByDateDesc(body, dateColIndex, XLSX)
+  visibleCount.value = ROW_BATCH
   activeSheetIndex.value = index
   emit('page-change', index + 1)
+  scrollRef.value?.scrollTo({ top: 0 })
 }
 
 function selectSheet(index: number) {
@@ -137,6 +228,21 @@ onMounted(async () => {
   min-height: 0;
   background: #f3f4f6;
 }
+.xlsx-reader__meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #1f2937;
+  color: #d1d5db;
+  font-size: 12px;
+  border-bottom: 1px solid #111827;
+  flex-shrink: 0;
+}
+.xlsx-reader__meta-hint {
+  color: #9ca3af;
+}
 .xlsx-reader__zoom {
   flex: 1;
   min-height: 0;
@@ -167,6 +273,24 @@ onMounted(async () => {
   min-width: 72px;
   max-width: 320px;
   color: #111827;
+}
+.xlsx-reader__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  background: #f9fafb;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  color: #374151;
+}
+.xlsx-reader__loading-more {
+  padding: 12px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
 }
 .xlsx-reader__empty {
   padding: 24px;

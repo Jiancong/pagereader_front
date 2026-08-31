@@ -753,6 +753,9 @@ export default {
     unsupportedTitle: "This format isn't supported",
     xlsxEmptySheet: "This worksheet is empty.",
     xlsxNoSheets: "No worksheets found in this file.",
+    xlsxRowCount: "Showing {shown} of {total} rows",
+    xlsxScrollMore: "· scroll for more",
+    xlsxLoadingMore: "Loading more rows…",
   },
   community: {
     bookSource: "Book source",
