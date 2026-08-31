@@ -6,28 +6,8 @@
     </div>
     <template v-else>
       <div v-if="totalDataRows > 0" class="xlsx-reader__meta">
-        <div class="xlsx-reader__meta-left">
-          <span>{{ t('reader.xlsxTotalRows', { total: totalDataRows }) }}</span>
-          <span v-if="hasMoreRows" class="xlsx-reader__meta-hint">{{ t('reader.xlsxScrollMore') }}</span>
-        </div>
-        <div v-if="dateColIndex >= 0" class="xlsx-reader__sort">
-          <button
-            type="button"
-            class="xlsx-reader__sort-btn"
-            :class="{ 'xlsx-reader__sort-btn--active': dateSortOrder === 'desc' }"
-            @click="setDateSortOrder('desc')"
-          >
-            {{ t('reader.xlsxSortDesc') }}
-          </button>
-          <button
-            type="button"
-            class="xlsx-reader__sort-btn"
-            :class="{ 'xlsx-reader__sort-btn--active': dateSortOrder === 'asc' }"
-            @click="setDateSortOrder('asc')"
-          >
-            {{ t('reader.xlsxSortAsc') }}
-          </button>
-        </div>
+        <span>{{ t('reader.xlsxTotalRows', { total: totalDataRows }) }}</span>
+        <span v-if="hasMoreRows" class="xlsx-reader__meta-hint">{{ t('reader.xlsxScrollMore') }}</span>
       </div>
 
       <div class="xlsx-reader__zoom" :style="{ zoom: scale ?? 1 }">
@@ -35,7 +15,21 @@
           <table v-if="headerRow.length" class="xlsx-reader__table">
             <thead>
               <tr>
-                <th v-for="(cell, colIndex) in headerRow" :key="colIndex">{{ formatCell(cell) }}</th>
+                <th
+                  v-for="(cell, colIndex) in headerRow"
+                  :key="colIndex"
+                  class="xlsx-reader__th-sortable"
+                  :class="{
+                    'xlsx-reader__th-sortable--active': sortColIndex === colIndex,
+                    'xlsx-reader__th-sortable--asc': sortColIndex === colIndex && sortOrder === 'asc',
+                    'xlsx-reader__th-sortable--desc': sortColIndex === colIndex && sortOrder === 'desc',
+                  }"
+                  :title="headerSortTitle(colIndex)"
+                  @click="onHeaderSort(colIndex)"
+                >
+                  <span class="xlsx-reader__th-label">{{ formatCell(cell) }}</span>
+                  <span class="xlsx-reader__th-sort-icon" aria-hidden="true">{{ headerSortIcon(colIndex) }}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -99,7 +93,7 @@ const ROW_BATCH = 80
 const DATE_HEADER_PATTERN = /^(date|日期|time|时间)$/i
 const BODY_HEADER_PATTERN = /^(body|内容|正文|description|描述|summary|摘要)$/i
 
-type DateSortOrder = 'desc' | 'asc'
+type SortOrder = 'asc' | 'desc'
 
 const props = defineProps<{
   file: File
@@ -123,7 +117,8 @@ const scrollRef = ref<HTMLElement | null>(null)
 const headerRow = ref<unknown[]>([])
 const bodyColIndex = ref(-1)
 const dateColIndex = ref(-1)
-const dateSortOrder = ref<DateSortOrder>('desc')
+const sortColIndex = ref(-1)
+const sortOrder = ref<SortOrder>('desc')
 const rawBodyRows = ref<unknown[][]>([])
 const allBodyRows = ref<unknown[][]>([])
 const visibleCount = ref(ROW_BATCH)
@@ -241,39 +236,99 @@ function normalizeRows(data: unknown[][]) {
   })
 }
 
-function sortBodyByDate(
+function isDateColumn(colIndex: number) {
+  return colIndex === dateColIndex.value
+}
+
+function getSortValue(value: unknown, colIndex: number, XLSX: XlsxModule): number | string {
+  if (isDateColumn(colIndex)) {
+    return parseCellDate(value, XLSX)
+  }
+  if (value instanceof Date) {
+    return value.getTime()
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      return Number(trimmed)
+    }
+    return trimmed.toLocaleLowerCase()
+  }
+  if (value == null || value === '') return ''
+  return String(value).toLocaleLowerCase()
+}
+
+function compareRows(a: unknown[], b: unknown[], colIndex: number, XLSX: XlsxModule) {
+  const va = getSortValue(a[colIndex], colIndex, XLSX)
+  const vb = getSortValue(b[colIndex], colIndex, XLSX)
+  if (typeof va === 'number' && typeof vb === 'number') {
+    if (va === vb) return 0
+    return va < vb ? -1 : 1
+  }
+  return String(va).localeCompare(String(vb), undefined, { numeric: true, sensitivity: 'base' })
+}
+
+function sortBodyByColumn(
   body: unknown[][],
   colIndex: number,
+  order: SortOrder,
   XLSX: XlsxModule,
-  order: DateSortOrder,
 ) {
   if (colIndex < 0) return body
   return [...body].sort((a, b) => {
-    const ta = parseCellDate(a[colIndex], XLSX)
-    const tb = parseCellDate(b[colIndex], XLSX)
-    return order === 'desc' ? tb - ta : ta - tb
+    const cmp = compareRows(a, b, colIndex, XLSX)
+    return order === 'asc' ? cmp : -cmp
   })
 }
 
-function applyDateSort() {
-  if (!xlsxModule) {
+function applySort() {
+  if (!xlsxModule || sortColIndex.value < 0) {
     allBodyRows.value = rawBodyRows.value
     return
   }
-  allBodyRows.value = sortBodyByDate(
+  allBodyRows.value = sortBodyByColumn(
     rawBodyRows.value,
-    dateColIndex.value,
+    sortColIndex.value,
+    sortOrder.value,
     xlsxModule,
-    dateSortOrder.value,
   )
 }
 
-function setDateSortOrder(order: DateSortOrder) {
-  if (dateColIndex.value < 0 || dateSortOrder.value === order) return
-  dateSortOrder.value = order
-  applyDateSort()
+function defaultSortForColumn(colIndex: number): SortOrder {
+  return isDateColumn(colIndex) ? 'desc' : 'asc'
+}
+
+function onHeaderSort(colIndex: number) {
+  if (sortColIndex.value === colIndex) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortColIndex.value = colIndex
+    sortOrder.value = defaultSortForColumn(colIndex)
+  }
+  applySort()
   visibleCount.value = ROW_BATCH
   scrollRef.value?.scrollTo({ top: 0 })
+}
+
+function headerSortIcon(colIndex: number) {
+  if (sortColIndex.value !== colIndex) return '↕'
+  return sortOrder.value === 'asc' ? '↑' : '↓'
+}
+
+function headerSortTitle(colIndex: number) {
+  if (sortColIndex.value !== colIndex) return t('reader.xlsxSortClick')
+  return sortOrder.value === 'asc' ? t('reader.xlsxSortAsc') : t('reader.xlsxSortDesc')
+}
+
+function resetSortState(header: unknown[]) {
+  dateColIndex.value = findDateColumnIndex(header)
+  const defaultCol = dateColIndex.value >= 0 ? dateColIndex.value : -1
+  sortColIndex.value = defaultCol
+  sortOrder.value = defaultCol >= 0 ? defaultSortForColumn(defaultCol) : 'asc'
 }
 
 function loadMoreRows() {
@@ -306,6 +361,7 @@ function loadSheet(index: number) {
     headerRow.value = []
     bodyColIndex.value = -1
     dateColIndex.value = -1
+    sortColIndex.value = -1
     rawBodyRows.value = []
     allBodyRows.value = []
     visibleCount.value = ROW_BATCH
@@ -316,10 +372,9 @@ function loadSheet(index: number) {
   const [header, ...body] = normalized
   headerRow.value = header
   bodyColIndex.value = findBodyColumnIndex(header)
-  dateColIndex.value = findDateColumnIndex(header)
-  dateSortOrder.value = 'desc'
+  resetSortState(header)
   rawBodyRows.value = body
-  applyDateSort()
+  applySort()
   visibleCount.value = ROW_BATCH
   activeSheetIndex.value = index
   emit('page-change', index + 1)
@@ -377,8 +432,8 @@ onMounted(async () => {
 .xlsx-reader__meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: center;
+  gap: 8px;
   padding: 6px 12px;
   background: #1f2937;
   color: #d1d5db;
@@ -386,38 +441,8 @@ onMounted(async () => {
   border-bottom: 1px solid #111827;
   flex-shrink: 0;
 }
-.xlsx-reader__meta-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
 .xlsx-reader__meta-hint {
   color: #9ca3af;
-}
-.xlsx-reader__sort {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.xlsx-reader__sort-btn {
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid #374151;
-  background: #111827;
-  color: #9ca3af;
-  font-size: 11px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.xlsx-reader__sort-btn:hover {
-  background: #1f2937;
-  color: #d1d5db;
-}
-.xlsx-reader__sort-btn--active {
-  border-color: #6366f1;
-  background: #374151;
-  color: #fff;
 }
 .xlsx-reader__zoom {
   flex: 1;
@@ -491,6 +516,36 @@ onMounted(async () => {
   text-align: left;
   white-space: nowrap;
   color: #374151;
+}
+.xlsx-reader__th-sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, color 0.15s;
+}
+.xlsx-reader__th-sortable:hover {
+  background: #f3f4f6;
+}
+.xlsx-reader__th-sortable--active {
+  background: #eef2ff;
+  color: #4338ca;
+}
+.xlsx-reader__th-label {
+  margin-right: 4px;
+}
+.xlsx-reader__th-sort-icon {
+  display: inline-block;
+  min-width: 12px;
+  font-size: 11px;
+  color: #9ca3af;
+  vertical-align: middle;
+}
+.xlsx-reader__th-sortable--active .xlsx-reader__th-sort-icon {
+  color: #6366f1;
+}
+.xlsx-reader__th-sortable--asc .xlsx-reader__th-sort-icon,
+.xlsx-reader__th-sortable--desc .xlsx-reader__th-sort-icon {
+  color: #4338ca;
+  font-weight: 700;
 }
 .xlsx-reader__loading-more {
   padding: 12px;
