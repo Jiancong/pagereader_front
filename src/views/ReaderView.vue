@@ -93,15 +93,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { FileWarning } from 'lucide-vue-next'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
 import MobiReader from '@/components/reader/MobiReader.vue'
-import XlsxReader from '@/components/reader/XlsxReader.vue'
 import { useReaderFileStore } from '@/stores/reader'
+
+const XlsxReader = defineAsyncComponent(() => import('@/components/reader/XlsxReader.vue'))
 
 const router = useRouter()
 const { t } = useI18n()

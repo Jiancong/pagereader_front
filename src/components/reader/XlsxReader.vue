@@ -37,7 +37,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import * as XLSX from 'xlsx'
+
+type XlsxModule = typeof import('xlsx')
 
 const props = defineProps<{
   file: File
@@ -57,7 +58,13 @@ const sheetNames = ref<string[]>([])
 const activeSheetIndex = ref(0)
 const rows = ref<unknown[][]>([])
 
-let workbook: XLSX.WorkBook | null = null
+let xlsxModule: XlsxModule | null = null
+let workbook: import('xlsx').WorkBook | null = null
+
+async function getXlsx() {
+  if (!xlsxModule) xlsxModule = await import('xlsx')
+  return xlsxModule
+}
 
 function formatCell(value: unknown) {
   if (value == null || value === '') return ''
@@ -66,7 +73,8 @@ function formatCell(value: unknown) {
 }
 
 function loadSheet(index: number) {
-  if (!workbook) return
+  if (!workbook || !xlsxModule) return
+  const XLSX = xlsxModule
   const name = sheetNames.value[index]
   if (!name) return
   const sheet = workbook.Sheets[name]
@@ -102,6 +110,7 @@ defineExpose({ next, prev, goToPage })
 
 onMounted(async () => {
   try {
+    const XLSX = await getXlsx()
     const buffer = await props.file.arrayBuffer()
     workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
     sheetNames.value = workbook.SheetNames
