@@ -20,7 +20,19 @@
             </thead>
             <tbody>
               <tr v-for="(row, rowIndex) in bodyRows" :key="rowIndex">
-                <td v-for="(cell, colIndex) in row" :key="colIndex">{{ formatCell(cell) }}</td>
+                <td
+                  v-for="(cell, colIndex) in row"
+                  :key="colIndex"
+                  :class="{ 'xlsx-reader__cell--body': isBodyColumn(colIndex) }"
+                  @mouseenter="onCellEnter($event, cell, colIndex)"
+                  @mouseleave="hideCellPopover"
+                >
+                  <span
+                    v-if="isBodyColumn(colIndex)"
+                    class="xlsx-reader__cell-clamp"
+                  >{{ formatCell(cell) }}</span>
+                  <template v-else>{{ formatCell(cell) }}</template>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -42,6 +54,18 @@
         </button>
       </div>
     </template>
+
+    <Teleport to="body">
+      <div
+        v-if="cellPopover.visible"
+        class="xlsx-reader__popover"
+        :style="{ top: `${cellPopover.y}px`, left: `${cellPopover.x}px` }"
+        @mouseenter="keepCellPopover"
+        @mouseleave="hideCellPopover"
+      >
+        {{ cellPopover.text }}
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -53,6 +77,7 @@ type XlsxModule = typeof import('xlsx')
 
 const ROW_BATCH = 80
 const DATE_HEADER_PATTERN = /^(date|日期|time|时间)$/i
+const BODY_HEADER_PATTERN = /^(body|内容|正文|description|描述|summary|摘要)$/i
 
 const props = defineProps<{
   file: File
@@ -74,8 +99,26 @@ const activeSheetIndex = ref(0)
 const scrollRef = ref<HTMLElement | null>(null)
 
 const headerRow = ref<unknown[]>([])
+const bodyColIndex = ref(-1)
 const allBodyRows = ref<unknown[][]>([])
 const visibleCount = ref(ROW_BATCH)
+const cellPopover = ref({ visible: false, text: '', x: 0, y: 0 })
+
+let popoverHideTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearPopoverHideTimer() {
+  if (popoverHideTimer) {
+    clearTimeout(popoverHideTimer)
+    popoverHideTimer = null
+  }
+}
+
+function scheduleHideCellPopover() {
+  clearPopoverHideTimer()
+  popoverHideTimer = setTimeout(() => {
+    cellPopover.value.visible = false
+  }, 120)
+}
 
 const totalDataRows = computed(() => allBodyRows.value.length)
 const shownDataRows = computed(() => Math.min(visibleCount.value, totalDataRows.value))
@@ -102,6 +145,51 @@ function findDateColumnIndex(header: unknown[]) {
     if (DATE_HEADER_PATTERN.test(label)) return i
   }
   return -1
+}
+
+function findBodyColumnIndex(header: unknown[]) {
+  for (let i = 0; i < header.length; i++) {
+    const label = String(header[i] ?? '').trim()
+    if (BODY_HEADER_PATTERN.test(label)) return i
+  }
+  return -1
+}
+
+function isBodyColumn(colIndex: number) {
+  return colIndex === bodyColIndex.value
+}
+
+function onCellEnter(event: MouseEvent, cell: unknown, colIndex: number) {
+  if (!isBodyColumn(colIndex)) return
+  clearPopoverHideTimer()
+  const text = formatCell(cell)
+  if (!text) return
+  const target = event.currentTarget as HTMLElement | null
+  const clamp = target?.querySelector('.xlsx-reader__cell-clamp') as HTMLElement | null
+  const truncated = clamp ? clamp.scrollWidth > clamp.clientWidth + 1 : text.length > 48
+  if (!truncated) return
+  const rect = (clamp ?? target)?.getBoundingClientRect()
+  if (!rect) return
+  const margin = 8
+  const maxWidth = Math.min(420, window.innerWidth - margin * 2)
+  let x = rect.left
+  if (x + maxWidth > window.innerWidth - margin) {
+    x = Math.max(margin, window.innerWidth - maxWidth - margin)
+  }
+  let y = rect.bottom + 6
+  const estimatedHeight = Math.min(280, window.innerHeight * 0.5)
+  if (y + estimatedHeight > window.innerHeight - margin) {
+    y = Math.max(margin, rect.top - estimatedHeight - 6)
+  }
+  cellPopover.value = { visible: true, text, x, y }
+}
+
+function hideCellPopover() {
+  scheduleHideCellPopover()
+}
+
+function keepCellPopover() {
+  clearPopoverHideTimer()
 }
 
 function parseCellDate(value: unknown, XLSX: XlsxModule): number {
@@ -148,6 +236,8 @@ function loadMoreRows() {
 }
 
 function onScroll() {
+  clearPopoverHideTimer()
+  cellPopover.value.visible = false
   const el = scrollRef.value
   if (!el || !hasMoreRows.value) return
   const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 240
@@ -164,6 +254,7 @@ function loadSheet(index: number) {
   const normalized = normalizeRows(data)
   if (normalized.length === 0) {
     headerRow.value = []
+    bodyColIndex.value = -1
     allBodyRows.value = []
     visibleCount.value = ROW_BATCH
     activeSheetIndex.value = index
@@ -173,6 +264,7 @@ function loadSheet(index: number) {
   const [header, ...body] = normalized
   const dateColIndex = findDateColumnIndex(header)
   headerRow.value = header
+  bodyColIndex.value = findBodyColumnIndex(header)
   allBodyRows.value = sortBodyByDateDesc(body, dateColIndex, XLSX)
   visibleCount.value = ROW_BATCH
   activeSheetIndex.value = index
@@ -273,6 +365,36 @@ onMounted(async () => {
   min-width: 72px;
   max-width: 320px;
   color: #111827;
+}
+.xlsx-reader__cell--body {
+  max-width: 180px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  vertical-align: middle;
+}
+.xlsx-reader__cell-clamp {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+.xlsx-reader__popover {
+  position: fixed;
+  z-index: 10000;
+  max-width: min(420px, calc(100vw - 16px));
+  max-height: min(280px, 50vh);
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #111827;
+  color: #f9fafb;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
 }
 .xlsx-reader__table th {
   position: sticky;
