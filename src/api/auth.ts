@@ -13,6 +13,7 @@ import type {
   VerifyVO,
   UserDetail,
   EmailCodeType,
+  ResetPwdByEmailCodeReq,
 } from "./types"
 
 // 密码登录，成功后写入 JWT
@@ -63,6 +64,11 @@ export async function sendEmailCode(email: string, type: EmailCodeType): Promise
   return postJson(`/verifyImage/email/${encodeURIComponent(email)}`, undefined, {
     query: { type },
   })
+}
+
+// 忘记密码：验证码 + 新密码
+export async function resetPwdByEmailCode(req: ResetPwdByEmailCodeReq): Promise<unknown> {
+  return postJson("/verifyImage/resetPwdByEmailCode", req)
 }
 
 // 当前用户详情

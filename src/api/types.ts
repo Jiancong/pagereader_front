@@ -60,6 +60,12 @@ export interface ChangeEmailReq {
   emailCode: string
 }
 
+export interface ResetPwdByEmailCodeReq {
+  email: string
+  code: string
+  newPwd: string
+}
+
 // 图形验证码
 export interface VerifyVO {
   uuid: string
