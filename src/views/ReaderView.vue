@@ -10,7 +10,7 @@
       <div class="reader-view__title" :title="headerTitle">{{ headerTitle }}</div>
 
       <div class="reader-view__controls">
-        <div v-if="hasSource && (isPdf || isEpub || isMobi)" class="rv-field rv-field--pages">
+        <div v-if="hasSource && (isPdf || isEpub || isMobi || isXlsx)" class="rv-field rv-field--pages">
           <button class="rv-btn rv-btn--sm" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">‹</button>
           <input
             v-model.number="pageInput"
@@ -26,7 +26,7 @@
           <button class="rv-btn rv-btn--sm" :disabled="!pageCount || currentPage >= pageCount" @click="goToPage(currentPage + 1)">›</button>
         </div>
 
-        <div v-if="hasSource && (isPdf || isEpub || isMobi)" class="rv-field rv-field--zoom">
+        <div v-if="hasSource && (isPdf || isEpub || isMobi || isXlsx)" class="rv-field rv-field--zoom">
           <button class="rv-btn rv-btn--sm" @click="zoomOut" :disabled="scale <= 0.5">−</button>
           <span class="rv-zoom-value">{{ Math.round(scale * 100) }}%</span>
           <button class="rv-btn rv-btn--sm" @click="zoomIn" :disabled="scale >= 3">+</button>
@@ -72,6 +72,16 @@
       @zoom="applyZoomDelta"
     />
 
+    <!-- XLSX 阅读器 -->
+    <XlsxReader
+      v-else-if="isXlsx && file"
+      ref="xlsxReaderRef"
+      :file="file"
+      :scale="scale"
+      @page-change="onPageChange"
+      @page-count="onPageCount"
+    />
+
     <!-- 未知格式 -->
     <div v-else class="reader-view__unsupported">
       <FileWarning class="reader-view__unsupported-icon" />
@@ -90,6 +100,7 @@ import { FileWarning } from 'lucide-vue-next'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
 import MobiReader from '@/components/reader/MobiReader.vue'
+import XlsxReader from '@/components/reader/XlsxReader.vue'
 import { useReaderFileStore } from '@/stores/reader'
 
 const router = useRouter()
@@ -101,6 +112,7 @@ const objectUrl = computed(() => store.objectUrl)
 const isPdf = computed(() => store.format === 'pdf')
 const isEpub = computed(() => store.format === 'epub')
 const isMobi = computed(() => store.format === 'mobi')
+const isXlsx = computed(() => store.format === 'xlsx')
 const hasSource = computed(() => Boolean(store.file))
 const headerTitle = computed(() => store.file?.name ?? '')
 
@@ -108,6 +120,7 @@ const scale = ref(1.2)
 const pdfReaderRef = ref<InstanceType<typeof PdfReader> | null>(null)
 const epubReaderRef = ref<InstanceType<typeof EpubReader> | null>(null)
 const mobiReaderRef = ref<InstanceType<typeof MobiReader> | null>(null)
+const xlsxReaderRef = ref<InstanceType<typeof XlsxReader> | null>(null)
 const currentPage = ref(1)
 const pageCount = ref(0)
 const pageInput = ref(1)
@@ -126,7 +139,7 @@ function applyZoomDelta(delta: number) {
 }
 function onWheel(e: WheelEvent) {
   if (!e.ctrlKey && !e.metaKey) return
-  if (!isPdf.value && !isEpub.value && !isMobi.value) return
+  if (!isPdf.value && !isEpub.value && !isMobi.value && !isXlsx.value) return
   e.preventDefault()
   applyZoomDelta(e.deltaY > 0 ? -0.1 : 0.1)
 }
@@ -146,6 +159,8 @@ function goToPage(page: number) {
     epubReaderRef.value?.goToPage(target)
   } else if (isMobi.value) {
     mobiReaderRef.value?.goToPage(target)
+  } else if (isXlsx.value) {
+    xlsxReaderRef.value?.goToPage(target)
   }
 }
 watch(currentPage, (page) => {
@@ -159,6 +174,8 @@ function nextPage() {
     epubReaderRef.value?.next()
   } else if (isMobi.value) {
     mobiReaderRef.value?.next()
+  } else if (isXlsx.value) {
+    xlsxReaderRef.value?.next()
   }
 }
 function prevPage() {
@@ -168,6 +185,8 @@ function prevPage() {
     epubReaderRef.value?.prev()
   } else if (isMobi.value) {
     mobiReaderRef.value?.prev()
+  } else if (isXlsx.value) {
+    xlsxReaderRef.value?.prev()
   }
 }
 

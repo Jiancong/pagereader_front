@@ -331,7 +331,7 @@
               <input
                 ref="readerFileInput"
                 type="file"
-                accept=".pdf,.epub,.mobi,.azw,.azw3,application/pdf,application/epub+zip"
+                accept=".pdf,.epub,.mobi,.azw,.azw3,.xlsx,.xls,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 class="hidden"
                 @change="handleReaderSelect"
               />
