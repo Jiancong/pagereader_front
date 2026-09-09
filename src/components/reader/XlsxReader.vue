@@ -24,10 +24,20 @@
                     'xlsx-reader__th-sortable--asc': sortColIndex === colIndex && sortOrder === 'asc',
                     'xlsx-reader__th-sortable--desc': sortColIndex === colIndex && sortOrder === 'desc',
                   }"
+                  :style="cellStyle(cell)"
                   :title="headerSortTitle(colIndex)"
                   @click="onHeaderSort(colIndex)"
                 >
-                  <span class="xlsx-reader__th-label">{{ formatCell(cell) }}</span>
+                  <span class="xlsx-reader__th-label">
+                    <template v-if="cell && cell.richText">
+                      <span
+                        v-for="(rt, i) in cell.richText"
+                        :key="i"
+                        :style="rt.style"
+                      >{{ rt.text }}</span>
+                    </template>
+                    <template v-else>{{ formatCell(cell) }}</template>
+                  </span>
                   <span class="xlsx-reader__th-sort-icon" aria-hidden="true">{{ headerSortIcon(colIndex) }}</span>
                 </th>
               </tr>
@@ -38,11 +48,19 @@
                   v-for="(cell, colIndex) in row"
                   :key="colIndex"
                   :class="{ 'xlsx-reader__cell--body': isBodyColumn(colIndex) }"
+                  :style="cellStyle(cell)"
                   @mouseenter="onCellEnter($event, cell, colIndex)"
                   @mouseleave="hideCellPopover"
                 >
+                  <template v-if="cell && cell.richText">
+                    <span
+                      v-for="(rt, i) in cell.richText"
+                      :key="i"
+                      :style="rt.style"
+                    >{{ rt.text }}</span>
+                  </template>
                   <span
-                    v-if="isBodyColumn(colIndex)"
+                    v-else-if="isBodyColumn(colIndex)"
                     class="xlsx-reader__cell-clamp"
                   >{{ formatCell(cell) }}</span>
                   <template v-else>{{ formatCell(cell) }}</template>
@@ -86,25 +104,26 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import ExcelJS from 'exceljs'
 
-type XlsxModule = typeof import('xlsx')
+type RichRun = { text: string; style: Record<string, string> }
+type StyledCell = {
+  value: unknown
+  text: string
+  style: Record<string, string>
+  richText?: RichRun[]
+}
 
 const ROW_BATCH = 80
 const DATE_HEADER_PATTERN = /^(date|日期|time|时间)$/i
 const BODY_HEADER_PATTERN = /^(body|内容|正文|description|描述|summary|摘要)$/i
-
 type SortOrder = 'asc' | 'desc'
 
-const props = defineProps<{
-  file: File
-  scale?: number
-}>()
-
+const props = defineProps<{ file: File; scale?: number }>()
 const emit = defineEmits<{
   'page-change': [page: number]
   'page-count': [count: number]
 }>()
-
 const { t } = useI18n()
 
 const loading = ref(true)
@@ -113,18 +132,19 @@ const loadingMore = ref(false)
 const sheetNames = ref<string[]>([])
 const activeSheetIndex = ref(0)
 const scrollRef = ref<HTMLElement | null>(null)
-
-const headerRow = ref<unknown[]>([])
+const headerRow = ref<StyledCell[]>([])
 const bodyColIndex = ref(-1)
 const dateColIndex = ref(-1)
 const sortColIndex = ref(-1)
 const sortOrder = ref<SortOrder>('desc')
-const rawBodyRows = ref<unknown[][]>([])
-const allBodyRows = ref<unknown[][]>([])
+const rawBodyRows = ref<StyledCell[][]>([])
+const allBodyRows = ref<StyledCell[][]>([])
 const visibleCount = ref(ROW_BATCH)
 const cellPopover = ref({ visible: false, text: '', x: 0, y: 0 })
 
 let popoverHideTimer: ReturnType<typeof setTimeout> | null = null
+let workbook: ExcelJS.Workbook | null = null
+let worksheets: ExcelJS.Worksheet[] = []
 
 function clearPopoverHideTimer() {
   if (popoverHideTimer) {
@@ -132,7 +152,6 @@ function clearPopoverHideTimer() {
     popoverHideTimer = null
   }
 }
-
 function scheduleHideCellPopover() {
   clearPopoverHideTimer()
   popoverHideTimer = setTimeout(() => {
@@ -144,41 +163,174 @@ const totalDataRows = computed(() => allBodyRows.value.length)
 const hasMoreRows = computed(() => visibleCount.value < totalDataRows.value)
 const bodyRows = computed(() => allBodyRows.value.slice(0, visibleCount.value))
 
-let xlsxModule: XlsxModule | null = null
-let workbook: import('xlsx').WorkBook | null = null
+// ---- color / style helpers ----
+const THEME_COLORS = [
+  '#FFFFFF', '#000000', '#E7E6E6', '#44546A', '#4472C4', '#ED7D31',
+  '#A5A5A5', '#FFC000', '#5B9BD5', '#70AD47', '#0563C1', '#954F72',
+]
+const INDEXED_COLORS = [
+  '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+  '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+  '#800000', '#008000', '#000080', '#808000', '#800080', '#008080', '#C0C0C0', '#808080',
+  '#9999FF', '#993366', '#FFFFCC', '#CCFFFF', '#660066', '#FF8080', '#0066CC', '#CCCCFF',
+]
 
-async function getXlsx() {
-  if (!xlsxModule) xlsxModule = await import('xlsx')
-  return xlsxModule
+function applyTint(hex: string, tint?: number): string {
+  if (tint == null || tint === 0) return hex
+  const h = hex.replace('#', '')
+  if (h.length !== 6) return hex
+  let r = parseInt(h.slice(0, 2), 16)
+  let g = parseInt(h.slice(2, 4), 16)
+  let b = parseInt(h.slice(4, 6), 16)
+  const apply = (c: number) =>
+    tint < 0 ? Math.round(c * (1 + tint)) : Math.round(c * (1 - tint) + 255 * tint)
+  r = apply(r); g = apply(g); b = apply(b)
+  const toHex = (c: number) => Math.max(0, Math.min(255, c)).toString(16).padStart(2, '0')
+  return '#' + toHex(r) + toHex(g) + toHex(b)
 }
 
-function formatCell(value: unknown) {
-  if (value == null || value === '') return ''
-  if (value instanceof Date) return value.toLocaleString()
-  return String(value)
+type ColorLike = { argb?: string; theme?: number; indexed?: number; tint?: number }
+function colorToCss(color?: ColorLike): string | undefined {
+  if (!color) return undefined
+  if (color.argb) {
+    const a = color.argb
+    return '#' + (a.length === 8 ? a.slice(2) : a)
+  }
+  if (color.theme != null && color.theme >= 0 && color.theme < THEME_COLORS.length) {
+    return applyTint(THEME_COLORS[color.theme], color.tint)
+  }
+  if (color.indexed != null && color.indexed >= 0 && color.indexed < INDEXED_COLORS.length) {
+    return INDEXED_COLORS[color.indexed]
+  }
+  return undefined
 }
 
-function findDateColumnIndex(header: unknown[]) {
+const BORDER_STYLE_MAP: Record<string, string> = {
+  thin: '1px solid', medium: '2px solid', thick: '3px solid', dotted: '1px dotted',
+  dashed: '1px dashed', double: '3px double', hair: '1px solid', mediumDashed: '2px dashed',
+  mediumDashDot: '2px solid', mediumDashDotDot: '2px solid', slantDashDot: '2px solid',
+}
+function borderCss(b?: { style?: string; color?: ColorLike }): string | undefined {
+  if (!b || !b.style) return undefined
+  const ws = BORDER_STYLE_MAP[b.style]
+  if (!ws) return undefined
+  return `${ws} ${colorToCss(b.color) || '#000000'}`
+}
+
+function fontToCss(font?: Partial<ExcelJS.Font>): Record<string, string> {
+  const css: Record<string, string> = {}
+  if (!font) return css
+  if (font.bold) css['font-weight'] = '700'
+  if (font.italic) css['font-style'] = 'italic'
+  if (font.size) css['font-size'] = `${font.size}px`
+  if (font.name) css['font-family'] = `"${font.name}", sans-serif`
+  const deco: string[] = []
+  if (font.underline) deco.push('underline')
+  if (font.strike) deco.push('line-through')
+  if (deco.length) css['text-decoration'] = deco.join(' ')
+  const color = colorToCss(font.color as ColorLike)
+  if (color) css['color'] = color
+  return css
+}
+
+function cellStyle(cell?: StyledCell | null): Record<string, string> {
+  return cell?.style ?? {}
+}
+
+// ---- value / text helpers ----
+function richTextRuns(value: unknown): RichRun[] | undefined {
+  if (value && typeof value === 'object' && 'richText' in value) {
+    const rt = (value as { richText: { text: string; font?: Partial<ExcelJS.Font> }[] }).richText
+    return rt.map((r) => ({ text: r.text, style: fontToCss(r.font) }))
+  }
+  return undefined
+}
+
+function rawValue(value: unknown): unknown {
+  if (value == null) return ''
+  if (value instanceof Date) return value
+  if (typeof value === 'object') {
+    const v = value as Record<string, unknown>
+    if (Array.isArray(v.richText)) return v.richText.map((r: { text: string }) => r.text).join('')
+    if ('result' in v && v.result != null) return v.result
+    if ('formula' in v) return (v.result as unknown) ?? ''
+    if ('text' in v) return v.text
+    if ('error' in v) return v.error
+  }
+  return value
+}
+
+function displayText(cell: ExcelJS.Cell, raw: unknown): string {
+  if (raw == null || raw === '') return ''
+  if (raw instanceof Date) return raw.toLocaleString()
+  const text = (cell as unknown as { text?: string }).text
+  if (typeof text === 'string' && text !== '') return text
+  return String(raw)
+}
+
+function makeStyledCell(cell: ExcelJS.Cell): StyledCell {
+  const value = cell.value
+  const richText = richTextRuns(value)
+  const raw = rawValue(value)
+  const text = displayText(cell, raw)
+  const style: Record<string, string> = {}
+  Object.assign(style, fontToCss(cell.font))
+
+  const fill = cell.fill
+  if (fill && fill.type === 'pattern' && fill.pattern && fill.pattern !== 'none') {
+    const fg = colorToCss(fill.fgColor as ColorLike)
+    const bg = colorToCss(fill.bgColor as ColorLike)
+    const fillcolor = fg ?? bg
+    if (fillcolor) style['background-color'] = fillcolor
+  }
+
+  const align = cell.alignment
+  if (align) {
+    if (align.horizontal) style['text-align'] = align.horizontal
+    if (align.vertical) style['vertical-align'] = align.vertical
+    style['white-space'] = 'pre-wrap'
+  }
+
+  const border = cell.border
+  if (border) {
+    const top = borderCss(border.top as { style?: string; color?: ColorLike })
+    const bottom = borderCss(border.bottom as { style?: string; color?: ColorLike })
+    const left = borderCss(border.left as { style?: string; color?: ColorLike })
+    const right = borderCss(border.right as { style?: string; color?: ColorLike })
+    if (top) style['border-top'] = top
+    if (bottom) style['border-bottom'] = bottom
+    if (left) style['border-left'] = left
+    if (right) style['border-right'] = right
+  }
+  return { value: raw, text, style, richText }
+}
+
+function formatCell(cell?: StyledCell | null): string {
+  return cell?.text ?? ''
+}
+
+function emptyCell(): StyledCell {
+  return { value: '', text: '', style: {} }
+}
+
+// ---- column detection / sorting ----
+function findDateColumnIndex(header: StyledCell[]) {
   for (let i = 0; i < header.length; i++) {
-    const label = String(header[i] ?? '').trim()
-    if (DATE_HEADER_PATTERN.test(label)) return i
+    if (DATE_HEADER_PATTERN.test((header[i]?.text ?? '').trim())) return i
   }
   return -1
 }
-
-function findBodyColumnIndex(header: unknown[]) {
+function findBodyColumnIndex(header: StyledCell[]) {
   for (let i = 0; i < header.length; i++) {
-    const label = String(header[i] ?? '').trim()
-    if (BODY_HEADER_PATTERN.test(label)) return i
+    if (BODY_HEADER_PATTERN.test((header[i]?.text ?? '').trim())) return i
   }
   return -1
 }
-
 function isBodyColumn(colIndex: number) {
   return colIndex === bodyColIndex.value
 }
 
-function onCellEnter(event: MouseEvent, cell: unknown, colIndex: number) {
+function onCellEnter(event: MouseEvent, cell: StyledCell | null, colIndex: number) {
   if (!isBodyColumn(colIndex)) return
   clearPopoverHideTimer()
   const text = formatCell(cell)
@@ -202,24 +354,12 @@ function onCellEnter(event: MouseEvent, cell: unknown, colIndex: number) {
   }
   cellPopover.value = { visible: true, text, x, y }
 }
+function hideCellPopover() { scheduleHideCellPopover() }
+function keepCellPopover() { clearPopoverHideTimer() }
 
-function hideCellPopover() {
-  scheduleHideCellPopover()
-}
-
-function keepCellPopover() {
-  clearPopoverHideTimer()
-}
-
-function parseCellDate(value: unknown, XLSX: XlsxModule): number {
+function parseCellDate(value: unknown): number {
   if (value instanceof Date) return value.getTime()
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    const parsed = XLSX.SSF?.parse_date_code?.(value)
-    if (parsed) {
-      return new Date(parsed.y, parsed.m - 1, parsed.d, parsed.H, parsed.M, parsed.S).getTime()
-    }
-    return value
-  }
+  if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string' && value.trim()) {
     const ts = Date.parse(value)
     if (!Number.isNaN(ts)) return ts
@@ -227,11 +367,11 @@ function parseCellDate(value: unknown, XLSX: XlsxModule): number {
   return Number.NEGATIVE_INFINITY
 }
 
-function normalizeRows(data: unknown[][]) {
+function normalizeRows(data: StyledCell[][]) {
   const maxCols = data.reduce((max, row) => Math.max(max, row.length), 0)
   return data.map((row) => {
     const normalized = [...row]
-    while (normalized.length < maxCols) normalized.push('')
+    while (normalized.length < maxCols) normalized.push(emptyCell())
     return normalized
   })
 }
@@ -240,31 +380,23 @@ function isDateColumn(colIndex: number) {
   return colIndex === dateColIndex.value
 }
 
-function getSortValue(value: unknown, colIndex: number, XLSX: XlsxModule): number | string {
-  if (isDateColumn(colIndex)) {
-    return parseCellDate(value, XLSX)
-  }
-  if (value instanceof Date) {
-    return value.getTime()
-  }
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value
-  }
+function getSortValue(value: unknown, colIndex: number): number | string {
+  if (isDateColumn(colIndex)) return parseCellDate(value)
+  if (value instanceof Date) return value.getTime()
+  if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string') {
     const trimmed = value.trim()
     if (!trimmed) return ''
-    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-      return Number(trimmed)
-    }
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed)
     return trimmed.toLocaleLowerCase()
   }
   if (value == null || value === '') return ''
   return String(value).toLocaleLowerCase()
 }
 
-function compareRows(a: unknown[], b: unknown[], colIndex: number, XLSX: XlsxModule) {
-  const va = getSortValue(a[colIndex], colIndex, XLSX)
-  const vb = getSortValue(b[colIndex], colIndex, XLSX)
+function compareRows(a: StyledCell[], b: StyledCell[], colIndex: number) {
+  const va = getSortValue(a[colIndex]?.value, colIndex)
+  const vb = getSortValue(b[colIndex]?.value, colIndex)
   if (typeof va === 'number' && typeof vb === 'number') {
     if (va === vb) return 0
     return va < vb ? -1 : 1
@@ -272,21 +404,16 @@ function compareRows(a: unknown[], b: unknown[], colIndex: number, XLSX: XlsxMod
   return String(va).localeCompare(String(vb), undefined, { numeric: true, sensitivity: 'base' })
 }
 
-function sortBodyByColumn(
-  body: unknown[][],
-  colIndex: number,
-  order: SortOrder,
-  XLSX: XlsxModule,
-) {
+function sortBodyByColumn(body: StyledCell[][], colIndex: number, order: SortOrder) {
   if (colIndex < 0) return body
   return [...body].sort((a, b) => {
-    const cmp = compareRows(a, b, colIndex, XLSX)
+    const cmp = compareRows(a, b, colIndex)
     return order === 'asc' ? cmp : -cmp
   })
 }
 
 function applySort() {
-  if (!xlsxModule || sortColIndex.value < 0) {
+  if (sortColIndex.value < 0) {
     allBodyRows.value = rawBodyRows.value
     return
   }
@@ -294,7 +421,6 @@ function applySort() {
     rawBodyRows.value,
     sortColIndex.value,
     sortOrder.value,
-    xlsxModule,
   )
 }
 
@@ -324,7 +450,7 @@ function headerSortTitle(colIndex: number) {
   return sortOrder.value === 'asc' ? t('reader.xlsxSortAsc') : t('reader.xlsxSortDesc')
 }
 
-function resetSortState(header: unknown[]) {
+function resetSortState(header: StyledCell[]) {
   dateColIndex.value = findDateColumnIndex(header)
   const defaultCol = dateColIndex.value >= 0 ? dateColIndex.value : -1
   sortColIndex.value = defaultCol
@@ -349,14 +475,28 @@ function onScroll() {
   if (nearBottom) loadMoreRows()
 }
 
+function buildGrid(sheet: ExcelJS.Worksheet): StyledCell[][] {
+  const rowCount = sheet.rowCount
+  const colCount = sheet.columnCount
+  const grid: StyledCell[][] = []
+  for (let r = 1; r <= rowCount; r++) {
+    const row = sheet.getRow(r)
+    const cells: StyledCell[] = []
+    for (let c = 1; c <= colCount; c++) {
+      const cell = row.getCell(c)
+      cells[c - 1] = makeStyledCell(cell)
+    }
+    grid.push(cells)
+  }
+  return grid
+}
+
 function loadSheet(index: number) {
-  if (!workbook || !xlsxModule) return
-  const XLSX = xlsxModule
-  const name = sheetNames.value[index]
-  if (!name) return
-  const sheet = workbook.Sheets[name]
-  const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })
-  const normalized = normalizeRows(data)
+  if (!workbook) return
+  const sheet = worksheets[index]
+  if (!sheet) return
+  const grid = buildGrid(sheet)
+  const normalized = normalizeRows(grid)
   if (normalized.length === 0) {
     headerRow.value = []
     bodyColIndex.value = -1
@@ -386,26 +526,19 @@ function selectSheet(index: number) {
   loadSheet(index)
 }
 
-function next() {
-  selectSheet(activeSheetIndex.value + 1)
-}
-
-function prev() {
-  selectSheet(activeSheetIndex.value - 1)
-}
-
-function goToPage(page: number) {
-  selectSheet(page - 1)
-}
+function next() { selectSheet(activeSheetIndex.value + 1) }
+function prev() { selectSheet(activeSheetIndex.value - 1) }
+function goToPage(page: number) { selectSheet(page - 1) }
 
 defineExpose({ next, prev, goToPage })
 
 onMounted(async () => {
   try {
-    const XLSX = await getXlsx()
     const buffer = await props.file.arrayBuffer()
-    workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
-    sheetNames.value = workbook.SheetNames
+    workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(buffer)
+    worksheets = workbook.worksheets
+    sheetNames.value = worksheets.map((w) => w.name)
     if (sheetNames.value.length === 0) {
       loadError.value = t('reader.xlsxNoSheets')
       loading.value = false
@@ -464,6 +597,7 @@ onMounted(async () => {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
   font-size: 13px;
   line-height: 1.4;
+  border-spacing: 0;
 }
 .xlsx-reader__table td {
   border: 1px solid #e5e7eb;
@@ -520,14 +654,13 @@ onMounted(async () => {
 .xlsx-reader__th-sortable {
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s, color 0.15s;
+  transition: box-shadow 0.15s;
 }
 .xlsx-reader__th-sortable:hover {
-  background: #f3f4f6;
+  box-shadow: inset 0 0 0 2px #c7d2fe;
 }
 .xlsx-reader__th-sortable--active {
-  background: #eef2ff;
-  color: #4338ca;
+  box-shadow: inset 0 0 0 2px #6366f1;
 }
 .xlsx-reader__th-label {
   margin-right: 4px;
