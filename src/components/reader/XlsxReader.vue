@@ -5,9 +5,89 @@
       {{ loadError }}
     </div>
     <template v-else>
-      <div v-if="totalDataRows > 0" class="xlsx-reader__meta">
-        <span>{{ t('reader.xlsxTotalRows', { total: totalDataRows }) }}</span>
+      <div v-if="totalDataRows > 0 || editMode" class="xlsx-reader__meta">
+        <span v-if="totalDataRows > 0">{{ t('reader.xlsxTotalRows', { total: totalDataRows }) }}</span>
         <span v-if="hasMoreRows" class="xlsx-reader__meta-hint">{{ t('reader.xlsxScrollMore') }}</span>
+        <div class="xlsx-reader__meta-actions">
+          <button
+            type="button"
+            class="xlsx-reader__meta-btn"
+            :class="{ 'xlsx-reader__meta-btn--active': editMode }"
+            @click="toggleEditMode"
+          >{{ editMode ? '完成编辑' : '编辑' }}</button>
+          <button
+            v-if="editMode"
+            type="button"
+            class="xlsx-reader__meta-btn"
+            @click="downloadXlsx"
+          >下载</button>
+        </div>
+      </div>
+
+      <div v-if="editMode" class="xlsx-reader__toolbar">
+        <select
+          class="xlsx-reader__tb-select"
+          :value="sel.fontName || ''"
+          :disabled="!selected"
+          @change="sel.fontName = ($event.target as HTMLSelectElement).value; applyFormat()"
+        >
+          <option value="">默认字体</option>
+          <option v-for="f in FONT_FAMILIES" :key="f" :value="f">{{ f }}</option>
+        </select>
+        <select
+          class="xlsx-reader__tb-select xlsx-reader__tb-select--sm"
+          :value="sel.fontSize || ''"
+          :disabled="!selected"
+          @change="sel.fontSize = Number(($event.target as HTMLSelectElement).value) || undefined; applyFormat()"
+        >
+          <option value="">字号</option>
+          <option v-for="s in FONT_SIZES" :key="s" :value="s">{{ s }}</option>
+        </select>
+        <span class="xlsx-reader__tb-divider"></span>
+        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.bold }" :disabled="!selected" @click="toggleBold" style="font-weight:700">B</button>
+        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.italic }" :disabled="!selected" @click="toggleItalic" style="font-style:italic">I</button>
+        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.underline }" :disabled="!selected" @click="toggleUnderline" style="text-decoration:underline">U</button>
+        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.strike }" :disabled="!selected" @click="toggleStrike" style="text-decoration:line-through">S</button>
+        <span class="xlsx-reader__tb-divider"></span>
+        <label class="xlsx-reader__tb-color" :class="{ 'is-disabled': !selected }">
+          <span class="xlsx-reader__tb-color-label">A</span>
+          <input
+            type="color"
+            class="xlsx-reader__tb-color-input"
+            :value="sel.fontColor || '#000000'"
+            :disabled="!selected"
+            @input="sel.fontColor = ($event.target as HTMLInputElement).value; applyFormat()"
+          >
+        </label>
+        <label class="xlsx-reader__tb-color" :class="{ 'is-disabled': !selected }">
+          <span class="xlsx-reader__tb-color-fill"></span>
+          <input
+            type="color"
+            class="xlsx-reader__tb-color-input"
+            :value="sel.fillColor || '#ffffff'"
+            :disabled="!selected"
+            @input="sel.fillColor = ($event.target as HTMLInputElement).value; applyFormat()"
+          >
+        </label>
+        <span class="xlsx-reader__tb-divider"></span>
+        <select
+          class="xlsx-reader__tb-select xlsx-reader__tb-select--sm"
+          :value="sel.hAlign || ''"
+          :disabled="!selected"
+          @change="sel.hAlign = ($event.target as HTMLSelectElement).value || undefined; applyFormat()"
+        >
+          <option value="">对齐</option>
+          <option value="left">左对齐</option>
+          <option value="center">居中</option>
+          <option value="right">右对齐</option>
+          <option value="justify">两端</option>
+        </select>
+        <button
+          v-if="selected"
+          type="button"
+          class="xlsx-reader__tb-btn"
+          @click="startEdit"
+        >编辑文字</button>
       </div>
 
       <div class="xlsx-reader__zoom" :style="{ zoom: scale ?? 1 }">
@@ -18,27 +98,43 @@
                 <th
                   v-for="(cell, colIndex) in headerRow"
                   :key="colIndex"
-                  class="xlsx-reader__th-sortable"
-                  :class="{
-                    'xlsx-reader__th-sortable--active': sortColIndex === colIndex,
-                    'xlsx-reader__th-sortable--asc': sortColIndex === colIndex && sortOrder === 'asc',
-                    'xlsx-reader__th-sortable--desc': sortColIndex === colIndex && sortOrder === 'desc',
-                  }"
+                  :class="[
+                    editMode ? 'xlsx-reader__th-editable' : 'xlsx-reader__th-sortable',
+                    {
+                      'xlsx-reader__th-sortable--active': !editMode && sortColIndex === colIndex,
+                      'xlsx-reader__th-sortable--asc': !editMode && sortColIndex === colIndex && sortOrder === 'asc',
+                      'xlsx-reader__th-sortable--desc': !editMode && sortColIndex === colIndex && sortOrder === 'desc',
+                      'xlsx-reader__cell--selected': editMode && isSelected(0, colIndex),
+                    },
+                  ]"
                   :style="cellStyle(cell)"
-                  :title="headerSortTitle(colIndex)"
-                  @click="onHeaderSort(colIndex)"
+                  :title="editMode ? '' : headerSortTitle(colIndex)"
+                  :data-r="0"
+                  :data-c="colIndex"
+                  @click="editMode ? selectCell(0, colIndex) : onHeaderSort(colIndex)"
+                  @dblclick="editMode ? (selectCell(0, colIndex), startEdit()) : undefined"
                 >
-                  <span class="xlsx-reader__th-label">
-                    <template v-if="cell && cell.richText">
-                      <span
-                        v-for="(rt, i) in cell.richText"
-                        :key="i"
-                        :style="rt.style"
-                      >{{ rt.text }}</span>
-                    </template>
-                    <template v-else>{{ formatCell(cell) }}</template>
-                  </span>
-                  <span class="xlsx-reader__th-sort-icon" aria-hidden="true">{{ headerSortIcon(colIndex) }}</span>
+                  <span
+                    v-if="editMode && isSelected(0, colIndex) && editing"
+                    class="xlsx-reader__cell-edit"
+                    contenteditable="true"
+                    @keydown="onCellKeydown"
+                    @blur="commitEdit"
+                    v-text="formatCell(cell)"
+                  ></span>
+                  <template v-else>
+                    <span class="xlsx-reader__th-label">
+                      <template v-if="cell && cell.richText">
+                        <span
+                          v-for="(rt, i) in cell.richText"
+                          :key="i"
+                          :style="rt.style"
+                        >{{ rt.text }}</span>
+                      </template>
+                      <template v-else>{{ formatCell(cell) }}</template>
+                    </span>
+                    <span v-if="!editMode" class="xlsx-reader__th-sort-icon" aria-hidden="true">{{ headerSortIcon(colIndex) }}</span>
+                  </template>
                 </th>
               </tr>
             </thead>
@@ -47,12 +143,28 @@
                 <td
                   v-for="(cell, colIndex) in row"
                   :key="colIndex"
-                  :class="{ 'xlsx-reader__cell--body': isBodyColumn(colIndex) }"
+                  :class="{
+                    'xlsx-reader__cell--body': isBodyColumn(colIndex),
+                    'xlsx-reader__cell--selected': editMode && isSelected(rowIndex + 1, colIndex),
+                    'xlsx-reader__cell--editable': editMode,
+                  }"
                   :style="cellStyle(cell)"
-                  @mouseenter="onCellEnter($event, cell, colIndex)"
-                  @mouseleave="hideCellPopover"
+                  :data-r="rowIndex + 1"
+                  :data-c="colIndex"
+                  @click="editMode ? selectCell(rowIndex + 1, colIndex) : undefined"
+                  @dblclick="editMode ? (selectCell(rowIndex + 1, colIndex), startEdit()) : undefined"
+                  @mouseenter="!editMode ? onCellEnter($event, cell, colIndex) : undefined"
+                  @mouseleave="!editMode ? hideCellPopover : undefined"
                 >
-                  <template v-if="cell && cell.richText">
+                  <span
+                    v-if="editMode && isSelected(rowIndex + 1, colIndex) && editing"
+                    class="xlsx-reader__cell-edit"
+                    contenteditable="true"
+                    @keydown="onCellKeydown"
+                    @blur="commitEdit"
+                    v-text="formatCell(cell)"
+                  ></span>
+                  <template v-else-if="cell && cell.richText">
                     <span
                       v-for="(rt, i) in cell.richText"
                       :key="i"
@@ -102,15 +214,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ExcelJS from 'exceljs'
 
 type RichRun = { text: string; style: Record<string, string> }
+type CellFormat = {
+  fontName?: string
+  fontSize?: number
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  strike?: boolean
+  fontColor?: string
+  fillColor?: string
+  hAlign?: string
+  vAlign?: string
+}
 type StyledCell = {
   value: unknown
   text: string
   style: Record<string, string>
+  format: CellFormat
   richText?: RichRun[]
 }
 
@@ -276,18 +401,40 @@ function makeStyledCell(cell: ExcelJS.Cell): StyledCell {
   const style: Record<string, string> = {}
   Object.assign(style, fontToCss(cell.font))
 
+  const format: CellFormat = {}
+  const font = cell.font
+  if (font) {
+    if (font.name) format.fontName = font.name
+    if (font.size) format.fontSize = font.size
+    if (font.bold) format.bold = true
+    if (font.italic) format.italic = true
+    if (font.underline) format.underline = true
+    if (font.strike) format.strike = true
+    const fc = colorToCss(font.color as ColorLike)
+    if (fc) format.fontColor = fc
+  }
+
   const fill = cell.fill
   if (fill && fill.type === 'pattern' && fill.pattern && fill.pattern !== 'none') {
     const fg = colorToCss(fill.fgColor as ColorLike)
     const bg = colorToCss(fill.bgColor as ColorLike)
     const fillcolor = fg ?? bg
-    if (fillcolor) style['background-color'] = fillcolor
+    if (fillcolor) {
+      style['background-color'] = fillcolor
+      format.fillColor = fillcolor
+    }
   }
 
   const align = cell.alignment
   if (align) {
-    if (align.horizontal) style['text-align'] = align.horizontal
-    if (align.vertical) style['vertical-align'] = align.vertical
+    if (align.horizontal) {
+      style['text-align'] = align.horizontal
+      format.hAlign = align.horizontal
+    }
+    if (align.vertical) {
+      style['vertical-align'] = align.vertical
+      format.vAlign = align.vertical
+    }
     style['white-space'] = 'pre-wrap'
   }
 
@@ -302,7 +449,7 @@ function makeStyledCell(cell: ExcelJS.Cell): StyledCell {
     if (left) style['border-left'] = left
     if (right) style['border-right'] = right
   }
-  return { value: raw, text, style, richText }
+  return { value: raw, text, style, format, richText }
 }
 
 function formatCell(cell?: StyledCell | null): string {
@@ -310,7 +457,7 @@ function formatCell(cell?: StyledCell | null): string {
 }
 
 function emptyCell(): StyledCell {
-  return { value: '', text: '', style: {} }
+  return { value: '', text: '', style: {}, format: {} }
 }
 
 // ---- column detection / sorting ----
@@ -413,15 +560,15 @@ function sortBodyByColumn(body: StyledCell[][], colIndex: number, order: SortOrd
 }
 
 function applySort() {
-  if (sortColIndex.value < 0) {
+  if (!editMode.value && sortColIndex.value >= 0) {
+    allBodyRows.value = sortBodyByColumn(
+      rawBodyRows.value,
+      sortColIndex.value,
+      sortOrder.value,
+    )
+  } else {
     allBodyRows.value = rawBodyRows.value
-    return
   }
-  allBodyRows.value = sortBodyByColumn(
-    rawBodyRows.value,
-    sortColIndex.value,
-    sortOrder.value,
-  )
 }
 
 function defaultSortForColumn(colIndex: number): SortOrder {
@@ -495,6 +642,8 @@ function loadSheet(index: number) {
   if (!workbook) return
   const sheet = worksheets[index]
   if (!sheet) return
+  selected.value = null
+  editing.value = false
   const grid = buildGrid(sheet)
   const normalized = normalizeRows(grid)
   if (normalized.length === 0) {
@@ -529,6 +678,183 @@ function selectSheet(index: number) {
 function next() { selectSheet(activeSheetIndex.value + 1) }
 function prev() { selectSheet(activeSheetIndex.value - 1) }
 function goToPage(page: number) { selectSheet(page - 1) }
+
+// ---- editing ----
+const editMode = ref(false)
+const selected = ref<{ row: number; col: number } | null>(null)
+const editing = ref(false)
+const sel = ref<CellFormat>({})
+const FONT_FAMILIES = [
+  'Calibri', 'Arial', 'Times New Roman', 'Microsoft YaHei', 'SimSun',
+  'SimHei', 'KaiTi', 'FangSong', 'Verdana', 'Courier New', 'Georgia',
+]
+const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72]
+
+function toggleEditMode() {
+  editMode.value = !editMode.value
+  if (!editMode.value) {
+    selected.value = null
+    editing.value = false
+  } else {
+    applySort()
+  }
+}
+
+function getGridRow(row: number): StyledCell[] | null {
+  if (row === 0) return headerRow.value
+  const body = allBodyRows.value[row - 1]
+  return body ?? null
+}
+
+function getExcelCell(gridRow: number, gridCol: number): ExcelJS.Cell | null {
+  const sheet = worksheets[activeSheetIndex.value]
+  if (!sheet) return null
+  return sheet.getCell(gridRow + 1, gridCol + 1)
+}
+
+function selectCell(row: number, col: number) {
+  if (!editMode.value) return
+  editing.value = false
+  selected.value = { row, col }
+  const gridRow = getGridRow(row)
+  const cell = gridRow?.[col]
+  sel.value = { ...(cell?.format ?? {}) }
+}
+
+function isSelected(row: number, col: number) {
+  return selected.value?.row === row && selected.value?.col === col
+}
+
+function startEdit() {
+  if (!selected.value) return
+  editing.value = true
+}
+
+function commitEdit() {
+  if (!selected.value || !editing.value) return
+  const { row, col } = selected.value
+  const gridRow = getGridRow(row)
+  if (!gridRow) { editing.value = false; return }
+  const cell = gridRow[col]
+  if (!cell) { editing.value = false; return }
+  const el = scrollRef.value?.querySelector(`[data-r="${row}"][data-c="${col}"] .xlsx-reader__cell-edit`) as HTMLElement | null
+  const newText = el?.innerText ?? ''
+  cell.text = newText
+  cell.value = newText
+  cell.richText = undefined
+  const ex = getExcelCell(row, col)
+  if (ex) ex.value = newText
+  editing.value = false
+}
+
+function cancelEdit() {
+  editing.value = false
+}
+
+watch(editing, (val) => {
+  if (!val || !selected.value) return
+  nextTick(() => {
+    const { row, col } = selected.value!
+    const el = scrollRef.value?.querySelector(`[data-r="${row}"][data-c="${col}"] .xlsx-reader__cell-edit`) as HTMLElement | null
+    if (el) {
+      el.focus()
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      const selObj = window.getSelection()
+      selObj?.removeAllRanges()
+      selObj?.addRange(range)
+    }
+  })
+})
+
+function onCellKeydown(e: KeyboardEvent) {
+  if (!editing.value) return
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEdit() }
+  else if (e.key === 'Escape') { e.preventDefault(); cancelEdit() }
+}
+
+function cssToArgb(css?: string): string | undefined {
+  if (!css) return undefined
+  const h = css.replace('#', '')
+  if (h.length === 6) return 'FF' + h
+  if (h.length === 8) return h
+  return undefined
+}
+
+function applyFormat() {
+  if (!selected.value) return
+  const { row, col } = selected.value
+  const gridRow = getGridRow(row)
+  const cell = gridRow?.[col]
+  if (!cell) return
+  cell.format = { ...sel.value }
+  const s: Record<string, string> = {}
+  const f = cell.format
+  if (f.bold) s['font-weight'] = '700'
+  if (f.italic) s['font-style'] = 'italic'
+  if (f.fontSize) s['font-size'] = `${f.fontSize}px`
+  if (f.fontName) s['font-family'] = `"${f.fontName}", sans-serif`
+  const deco: string[] = []
+  if (f.underline) deco.push('underline')
+  if (f.strike) deco.push('line-through')
+  if (deco.length) s['text-decoration'] = deco.join(' ')
+  if (f.fontColor) s['color'] = f.fontColor
+  if (f.fillColor) s['background-color'] = f.fillColor
+  if (f.hAlign) s['text-align'] = f.hAlign
+  if (f.vAlign) s['vertical-align'] = f.vAlign
+  s['white-space'] = 'pre-wrap'
+  // preserve borders
+  if (cell.style['border-top']) s['border-top'] = cell.style['border-top']
+  if (cell.style['border-bottom']) s['border-bottom'] = cell.style['border-bottom']
+  if (cell.style['border-left']) s['border-left'] = cell.style['border-left']
+  if (cell.style['border-right']) s['border-right'] = cell.style['border-right']
+  cell.style = s
+  // write to exceljs
+  const ex = getExcelCell(row, col)
+  if (ex) {
+    ex.font = {
+      ...(f.fontName ? { name: f.fontName } : {}),
+      ...(f.fontSize ? { size: f.fontSize } : {}),
+      bold: !!f.bold,
+      italic: !!f.italic,
+      underline: !!f.underline,
+      strike: !!f.strike,
+      ...(f.fontColor ? { color: { argb: cssToArgb(f.fontColor) } } : {}),
+    }
+    if (f.fillColor) {
+      ex.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cssToArgb(f.fillColor) } }
+    }
+    ex.alignment = {
+      ...(f.hAlign ? { horizontal: f.hAlign } : {}),
+      ...(f.vAlign ? { vertical: f.vAlign } : {}),
+      wrapText: true,
+    }
+  }
+}
+
+function toggleBold() { sel.value.bold = !sel.value.bold; applyFormat() }
+function toggleItalic() { sel.value.italic = !sel.value.italic; applyFormat() }
+function toggleUnderline() { sel.value.underline = !sel.value.underline; applyFormat() }
+function toggleStrike() { sel.value.strike = !sel.value.strike; applyFormat() }
+
+async function downloadXlsx() {
+  if (!workbook) return
+  try {
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const base = props.file.name.replace(/\.xlsx$/i, '')
+    a.download = `${base}-edited.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : String(e)
+  }
+}
 
 defineExpose({ next, prev, goToPage })
 
@@ -731,5 +1057,152 @@ onMounted(async () => {
 }
 .xlsx-reader__overlay--error {
   color: #dc2626;
+}
+/* meta actions */
+.xlsx-reader__meta-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.xlsx-reader__meta-btn {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #d1d5db;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.xlsx-reader__meta-btn:hover {
+  background: #1f2937;
+}
+.xlsx-reader__meta-btn--active {
+  background: #4338ca;
+  border-color: #6366f1;
+  color: #fff;
+}
+/* toolbar */
+.xlsx-reader__toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 12px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+.xlsx-reader__tb-select {
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  color: #111827;
+  cursor: pointer;
+  max-width: 140px;
+}
+.xlsx-reader__tb-select--sm {
+  max-width: 80px;
+}
+.xlsx-reader__tb-select:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+.xlsx-reader__tb-btn {
+  min-width: 28px;
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  color: #111827;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.xlsx-reader__tb-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+.xlsx-reader__tb-btn:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+.xlsx-reader__tb-btn.is-active {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #4338ca;
+}
+.xlsx-reader__tb-divider {
+  display: inline-block;
+  width: 1px;
+  height: 22px;
+  background: #e5e7eb;
+  margin: 0 4px;
+}
+.xlsx-reader__tb-color {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  overflow: hidden;
+}
+.xlsx-reader__tb-color.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.xlsx-reader__tb-color-label {
+  font-weight: 700;
+  font-size: 14px;
+  color: #111827;
+  pointer-events: none;
+}
+.xlsx-reader__tb-color-fill {
+  width: 14px;
+  height: 14px;
+  border: 1px solid #9ca3af;
+  background: #fff;
+  pointer-events: none;
+}
+.xlsx-reader__tb-color-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.xlsx-reader__tb-color-input:disabled {
+  cursor: not-allowed;
+}
+/* editable cells */
+.xlsx-reader__cell--editable {
+  cursor: cell;
+}
+.xlsx-reader__cell--selected {
+  outline: 2px solid #4338ca;
+  outline-offset: -2px;
+}
+.xlsx-reader__th-editable {
+  cursor: cell;
+  user-select: none;
+}
+.xlsx-reader__cell-edit {
+  display: block;
+  outline: none;
+  min-height: 1.2em;
+  min-width: 40px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.xlsx-reader__cell-edit:focus {
+  box-shadow: inset 0 0 0 2px #c7d2fe;
 }
 </style>
