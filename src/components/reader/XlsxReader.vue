@@ -8,6 +8,8 @@
       <div v-if="totalDataRows > 0" class="xlsx-reader__meta">
         <span>{{ t('reader.xlsxTotalRows', { total: totalDataRows }) }}</span>
         <span v-if="hasMoreRows" class="xlsx-reader__meta-hint">{{ t('reader.xlsxScrollMore') }}</span>
+        <span v-if="isDirty" class="xlsx-reader__meta-dirty">未保存</span>
+        <span v-if="saveHint" class="xlsx-reader__meta-save-hint">{{ saveHint }}</span>
         <div class="xlsx-reader__meta-actions">
           <button
             type="button"
@@ -19,8 +21,16 @@
           <button
             type="button"
             class="xlsx-reader__meta-btn"
-            @click="downloadXlsx"
-          >下载</button>
+            :class="{ 'xlsx-reader__meta-btn--active': isDirty }"
+            title="Ctrl+S 保存"
+            @click="saveXlsx"
+          >保存</button>
+          <button
+            type="button"
+            class="xlsx-reader__meta-btn"
+            title="导出为 xlsx 文件"
+            @click="exportXlsx"
+          >导出 xlsx</button>
         </div>
       </div>
 
@@ -277,6 +287,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ExcelJS from 'exceljs'
+import { useReaderFileStore } from '@/stores/reader'
 
 type RichRun = { text: string; style: Record<string, string> }
 type CellFormat = {
@@ -344,6 +355,7 @@ async function saveUndoSnapshot() {
     const buf = await workbook.xlsx.writeBuffer()
     undoStack.value.push(buf.slice(0))
     if (undoStack.value.length > MAX_UNDO) undoStack.value.shift()
+    markDirty()
   } finally {
     undoSaving = false
   }
@@ -1199,7 +1211,16 @@ async function insertColumnsAt(count: number, dir: ColInsertDir = 'left') {
 }
 
 function onGlobalKeyDown(e: KeyboardEvent) {
-  if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z' || e.shiftKey) return
+  const mod = e.ctrlKey || e.metaKey
+  if (!mod) return
+
+  if (e.key.toLowerCase() === 's') {
+    e.preventDefault()
+    void saveXlsx()
+    return
+  }
+
+  if (e.key.toLowerCase() !== 'z' || e.shiftKey) return
   const target = e.target as HTMLElement
   if (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
   if (editing.value) return
@@ -1213,20 +1234,102 @@ function onDocumentMouseDown(e: MouseEvent) {
   closeCtxMenu()
 }
 
-async function downloadXlsx() {
+const isDirty = ref(false)
+const saveHint = ref('')
+let saveHintTimer: ReturnType<typeof setTimeout> | null = null
+const readerStore = useReaderFileStore()
+
+function markDirty() {
+  isDirty.value = true
+}
+
+function showSaveHint(msg: string) {
+  saveHint.value = msg
+  if (saveHintTimer) clearTimeout(saveHintTimer)
+  saveHintTimer = setTimeout(() => {
+    saveHint.value = ''
+  }, 2500)
+}
+
+function normalizeXlsxFilename(name: string) {
+  const base = name.replace(/\.xls$/i, '').replace(/\.xlsx$/i, '')
+  return `${base}.xlsx`
+}
+
+async function getWorkbookBuffer(): Promise<ArrayBuffer | null> {
+  if (!workbook) return null
+  if (editing.value) await commitEdit()
+  return (await workbook.xlsx.writeBuffer()) as ArrayBuffer
+}
+
+function triggerDownload(buffer: ArrayBuffer, filename: string) {
+  const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  const blob = new Blob([buffer], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+async function saveWithPicker(buffer: ArrayBuffer, filename: string): Promise<'saved' | 'cancelled' | 'unsupported'> {
+  const pickerWindow = window as Window & {
+    showSaveFilePicker?: (options: {
+      suggestedName?: string
+      types?: { description: string; accept: Record<string, string[]> }[]
+    }) => Promise<FileSystemFileHandle>
+  }
+  if (!pickerWindow.showSaveFilePicker) return 'unsupported'
+  try {
+    const handle = await pickerWindow.showSaveFilePicker({
+      suggestedName: filename,
+      types: [{
+        description: 'Excel Workbook',
+        accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] },
+      }],
+    })
+    const writable = await handle.createWritable()
+    await writable.write(buffer)
+    await writable.close()
+    return 'saved'
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled'
+    return 'unsupported'
+  }
+}
+
+async function saveXlsx() {
   if (!workbook) return
   try {
-    const buffer = await workbook.xlsx.writeBuffer()
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    const base = props.file.name.replace(/\.xlsx$/i, '')
-    a.download = `${base}-edited.xlsx`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    const buffer = await getWorkbookBuffer()
+    if (!buffer) return
+    const filename = normalizeXlsxFilename(props.file.name)
+    const pickerResult = await saveWithPicker(buffer, filename)
+    if (pickerResult === 'cancelled') return
+    if (pickerResult === 'unsupported') {
+      triggerDownload(buffer, filename)
+    }
+    const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    const savedFile = new File([buffer], filename, { type: mime, lastModified: Date.now() })
+    readerStore.setFile(savedFile)
+    isDirty.value = false
+    showSaveHint('已保存')
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function exportXlsx() {
+  if (!workbook) return
+  try {
+    const buffer = await getWorkbookBuffer()
+    if (!buffer) return
+    const base = props.file.name.replace(/\.xlsx$/i, '').replace(/\.xls$/i, '')
+    triggerDownload(buffer, `${base}-export.xlsx`)
+    showSaveHint('已导出')
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e)
   }
@@ -1260,6 +1363,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', onDocumentMouseDown)
   document.removeEventListener('keydown', onGlobalKeyDown)
+  if (saveHintTimer) clearTimeout(saveHintTimer)
 })
 </script>
 
@@ -1285,6 +1389,14 @@ onBeforeUnmount(() => {
 }
 .xlsx-reader__meta-hint {
   color: #9ca3af;
+}
+.xlsx-reader__meta-dirty {
+  color: #fbbf24;
+  font-size: 12px;
+}
+.xlsx-reader__meta-save-hint {
+  color: #86efac;
+  font-size: 12px;
 }
 .xlsx-reader__zoom {
   flex: 1;
