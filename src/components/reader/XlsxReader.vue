@@ -126,7 +126,7 @@
                     class="xlsx-reader__cell-edit"
                     contenteditable="true"
                     @keydown="onCellKeydown"
-                    @blur="commitEdit"
+                    @blur="onEditBlur"
                     v-text="formatCell(cell)"
                   ></span>
                   <template v-else>
@@ -175,7 +175,7 @@
                     class="xlsx-reader__cell-edit"
                     contenteditable="true"
                     @keydown="onCellKeydown"
-                    @blur="commitEdit"
+                    @blur="onEditBlur"
                     v-text="formatCell(cell)"
                   ></span>
                   <template v-else-if="cell && cell.richText">
@@ -804,6 +804,7 @@ const painting = ref(false)
 let paintFormat: CellFormat | null = null
 let lastClickX = 0
 let lastClickY = 0
+let navigatingEdit = false
 const FONT_FAMILIES = [
   'Calibri', 'Arial', 'Times New Roman', 'Microsoft YaHei', 'SimSun',
   'SimHei', 'KaiTi', 'FangSong', 'Verdana', 'Courier New', 'Georgia',
@@ -857,14 +858,70 @@ function startEdit() {
   editing.value = true
 }
 
-async function commitEdit() {
+function getEditElement(row: number, col: number) {
+  return scrollRef.value?.querySelector(`[data-r="${row}"][data-c="${col}"] .xlsx-reader__cell-edit`) as HTMLElement | null
+}
+
+function getCaretOffset(el: HTMLElement): number {
+  const selObj = window.getSelection()
+  if (!selObj || selObj.rangeCount === 0) return 0
+  const range = selObj.getRangeAt(0)
+  const preRange = range.cloneRange()
+  preRange.selectNodeContents(el)
+  preRange.setEnd(range.startContainer, range.startOffset)
+  return preRange.toString().length
+}
+
+function isCaretAtStart(el: HTMLElement): boolean {
+  return getCaretOffset(el) === 0
+}
+
+function isCaretAtEnd(el: HTMLElement): boolean {
+  return getCaretOffset(el) >= el.innerText.length
+}
+
+function placeCaretInElement(el: HTMLElement, atStart: boolean) {
+  const selObj = window.getSelection()
+  if (!selObj) return
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  range.collapse(atStart)
+  selObj.removeAllRanges()
+  selObj.addRange(range)
+}
+
+function placeCaretAtClick(el: HTMLElement) {
+  const selObj = window.getSelection()
+  if (!selObj) return
+  const range = document.createRange()
+  const doc = document as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+  }
+  let placed = false
+  if (typeof doc.caretRangeFromPoint === 'function') {
+    const r = doc.caretRangeFromPoint(lastClickX, lastClickY)
+    if (r) { range.setStart(r.startContainer, r.startOffset); range.collapse(true); placed = true }
+  } else if (typeof doc.caretPositionFromPoint === 'function') {
+    const pos = doc.caretPositionFromPoint(lastClickX, lastClickY)
+    if (pos) { range.setStart(pos.offsetNode, pos.offset); range.collapse(true); placed = true }
+  }
+  if (placed) {
+    selObj.removeAllRanges()
+    selObj.addRange(range)
+  } else {
+    placeCaretInElement(el, false)
+  }
+}
+
+async function saveEditContent() {
   if (!selected.value || !editing.value) return
   const { row, col } = selected.value
   const gridRow = getGridRow(row)
-  if (!gridRow) { editing.value = false; return }
+  if (!gridRow) return
   const cell = gridRow[col]
-  if (!cell) { editing.value = false; return }
-  const el = scrollRef.value?.querySelector(`[data-r="${row}"][data-c="${col}"] .xlsx-reader__cell-edit`) as HTMLElement | null
+  if (!cell) return
+  const el = getEditElement(row, col)
   const newText = el?.innerText ?? ''
   if (newText !== cell.text) {
     await saveUndoSnapshot()
@@ -874,57 +931,105 @@ async function commitEdit() {
     const ex = getExcelCell(row, col)
     if (ex) ex.value = newText
   }
+}
+
+async function commitEdit() {
+  if (!selected.value || !editing.value) return
+  await saveEditContent()
   editing.value = false
+}
+
+function onEditBlur() {
+  if (navigatingEdit) return
+  void commitEdit()
 }
 
 function cancelEdit() {
   editing.value = false
 }
 
+function maxGridCol() {
+  return Math.max(0, headerRow.value.length - 1)
+}
+
+function maxGridRow() {
+  return allBodyRows.value.length
+}
+
+async function navigateEdit(row: number, col: number, caretAtStart: boolean) {
+  if (row < 0 || col < 0 || row > maxGridRow() || col > maxGridCol()) return
+  navigatingEdit = true
+  await saveEditContent()
+  selected.value = { row, col }
+  const gridRow = getGridRow(row)
+  sel.value = { ...(gridRow?.[col]?.format ?? {}) }
+  editing.value = true
+  await nextTick()
+  const el = getEditElement(row, col)
+  if (el) {
+    el.focus()
+    placeCaretInElement(el, caretAtStart)
+  }
+  navigatingEdit = false
+}
+
 watch(editing, (val) => {
-  if (!val || !selected.value) return
+  if (!val || !selected.value || navigatingEdit) return
   nextTick(() => {
     const { row, col } = selected.value!
-    const el = scrollRef.value?.querySelector(`[data-r="${row}"][data-c="${col}"] .xlsx-reader__cell-edit`) as HTMLElement | null
+    const el = getEditElement(row, col)
     if (!el) return
     el.focus()
-    // place caret at click position instead of selecting all
-    const placeCaret = () => {
-      const selObj = window.getSelection()
-      if (!selObj) return
-      const range = document.createRange()
-      // try caretRangeFromPoint (Chromium)
-      const doc = document as Document & {
-        caretRangeFromPoint?: (x: number, y: number) => Range | null
-        caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
-      }
-      let placed = false
-      if (typeof doc.caretRangeFromPoint === 'function') {
-        const r = doc.caretRangeFromPoint(lastClickX, lastClickY)
-        if (r) { range.setStart(r.startContainer, r.startOffset); range.collapse(true); placed = true }
-      } else if (typeof doc.caretPositionFromPoint === 'function') {
-        const pos = doc.caretPositionFromPoint(lastClickX, lastClickY)
-        if (pos) { range.setStart(pos.offsetNode, pos.offset); range.collapse(true); placed = true }
-      }
-      if (placed) {
-        selObj.removeAllRanges()
-        selObj.addRange(range)
-      } else {
-        // fallback: place caret at end
-        range.selectNodeContents(el)
-        range.collapse(false)
-        selObj.removeAllRanges()
-        selObj.addRange(range)
-      }
-    }
-    placeCaret()
+    placeCaretAtClick(el)
   })
 })
 
 function onCellKeydown(e: KeyboardEvent) {
-  if (!editing.value) return
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEdit() }
-  else if (e.key === 'Escape') { e.preventDefault(); cancelEdit() }
+  if (!editing.value || !selected.value) return
+  const el = e.currentTarget as HTMLElement
+  const { row, col } = selected.value
+
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    void commitEdit()
+    return
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    cancelEdit()
+    return
+  }
+
+  if (e.key === 'ArrowLeft') {
+    if (isCaretAtStart(el) && col > 0) {
+      e.preventDefault()
+      void navigateEdit(row, col - 1, false)
+    }
+    return
+  }
+
+  if (e.key === 'ArrowRight') {
+    if (isCaretAtEnd(el) && col < maxGridCol()) {
+      e.preventDefault()
+      void navigateEdit(row, col + 1, true)
+    }
+    return
+  }
+
+  if (e.key === 'ArrowUp') {
+    if (isCaretAtStart(el) && row > 0) {
+      e.preventDefault()
+      void navigateEdit(row - 1, col, false)
+    }
+    return
+  }
+
+  if (e.key === 'ArrowDown') {
+    if (isCaretAtEnd(el) && row < maxGridRow()) {
+      e.preventDefault()
+      void navigateEdit(row + 1, col, true)
+    }
+  }
 }
 
 function cssToArgb(css?: string): string | undefined {
