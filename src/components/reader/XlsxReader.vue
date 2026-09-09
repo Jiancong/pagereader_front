@@ -5,18 +5,11 @@
       {{ loadError }}
     </div>
     <template v-else>
-      <div v-if="totalDataRows > 0 || editMode" class="xlsx-reader__meta">
-        <span v-if="totalDataRows > 0">{{ t('reader.xlsxTotalRows', { total: totalDataRows }) }}</span>
+      <div v-if="totalDataRows > 0" class="xlsx-reader__meta">
+        <span>{{ t('reader.xlsxTotalRows', { total: totalDataRows }) }}</span>
         <span v-if="hasMoreRows" class="xlsx-reader__meta-hint">{{ t('reader.xlsxScrollMore') }}</span>
         <div class="xlsx-reader__meta-actions">
           <button
-            type="button"
-            class="xlsx-reader__meta-btn"
-            :class="{ 'xlsx-reader__meta-btn--active': editMode }"
-            @click="toggleEditMode"
-          >{{ editMode ? '完成编辑' : '编辑' }}</button>
-          <button
-            v-if="editMode"
             type="button"
             class="xlsx-reader__meta-btn"
             @click="downloadXlsx"
@@ -24,7 +17,7 @@
         </div>
       </div>
 
-      <div v-if="editMode" class="xlsx-reader__toolbar">
+      <div class="xlsx-reader__toolbar">
         <select
           class="xlsx-reader__tb-select"
           :value="sel.fontName || ''"
@@ -82,6 +75,15 @@
           <option value="right">右对齐</option>
           <option value="justify">两端</option>
         </select>
+        <span class="xlsx-reader__tb-divider"></span>
+        <button
+          type="button"
+          class="xlsx-reader__tb-btn"
+          :class="{ 'is-active': painting }"
+          :disabled="!selected"
+          @click="startFormatPainter"
+          title="格式刷：复制当前单元格格式，再点击其他单元格应用"
+        >格式刷</button>
         <button
           v-if="selected"
           type="button"
@@ -99,23 +101,20 @@
                   v-for="(cell, colIndex) in headerRow"
                   :key="colIndex"
                   :class="[
-                    editMode ? 'xlsx-reader__th-editable' : 'xlsx-reader__th-sortable',
+                    'xlsx-reader__th-editable',
                     {
-                      'xlsx-reader__th-sortable--active': !editMode && sortColIndex === colIndex,
-                      'xlsx-reader__th-sortable--asc': !editMode && sortColIndex === colIndex && sortOrder === 'asc',
-                      'xlsx-reader__th-sortable--desc': !editMode && sortColIndex === colIndex && sortOrder === 'desc',
-                      'xlsx-reader__cell--selected': editMode && isSelected(0, colIndex),
+                      'xlsx-reader__cell--selected': isSelected(0, colIndex),
+                      'xlsx-reader__th--painting': painting,
                     },
                   ]"
                   :style="cellStyle(cell)"
-                  :title="editMode ? '' : headerSortTitle(colIndex)"
                   :data-r="0"
                   :data-c="colIndex"
-                  @click="editMode ? selectCell(0, colIndex) : onHeaderSort(colIndex)"
-                  @dblclick="editMode ? (selectCell(0, colIndex), startEdit()) : undefined"
+                  @click="onCellClick($event, 0, colIndex)"
+                  @dblclick="onCellDblClick($event, 0, colIndex)"
                 >
                   <span
-                    v-if="editMode && isSelected(0, colIndex) && editing"
+                    v-if="isSelected(0, colIndex) && editing"
                     class="xlsx-reader__cell-edit"
                     contenteditable="true"
                     @keydown="onCellKeydown"
@@ -133,7 +132,14 @@
                       </template>
                       <template v-else>{{ formatCell(cell) }}</template>
                     </span>
-                    <span v-if="!editMode" class="xlsx-reader__th-sort-icon" aria-hidden="true">{{ headerSortIcon(colIndex) }}</span>
+                    <span
+                      class="xlsx-reader__th-sort-icon"
+                      :class="{
+                        'xlsx-reader__th-sort-icon--active': sortColIndex === colIndex,
+                      }"
+                      :title="headerSortTitle(colIndex)"
+                      @click.stop="onHeaderSort(colIndex)"
+                    >{{ headerSortIcon(colIndex) }}</span>
                   </template>
                 </th>
               </tr>
@@ -145,19 +151,18 @@
                   :key="colIndex"
                   :class="{
                     'xlsx-reader__cell--body': isBodyColumn(colIndex),
-                    'xlsx-reader__cell--selected': editMode && isSelected(rowIndex + 1, colIndex),
-                    'xlsx-reader__cell--editable': editMode,
+                    'xlsx-reader__cell--selected': isSelected(rowIndex + 1, colIndex),
+                    'xlsx-reader__cell--editable': true,
+                    'xlsx-reader__th--painting': painting,
                   }"
                   :style="cellStyle(cell)"
                   :data-r="rowIndex + 1"
                   :data-c="colIndex"
-                  @click="editMode ? selectCell(rowIndex + 1, colIndex) : undefined"
-                  @dblclick="editMode ? (selectCell(rowIndex + 1, colIndex), startEdit()) : undefined"
-                  @mouseenter="!editMode ? onCellEnter($event, cell, colIndex) : undefined"
-                  @mouseleave="!editMode ? hideCellPopover : undefined"
+                  @click="onCellClick($event, rowIndex + 1, colIndex)"
+                  @dblclick="onCellDblClick($event, rowIndex + 1, colIndex)"
                 >
                   <span
-                    v-if="editMode && isSelected(rowIndex + 1, colIndex) && editing"
+                    v-if="isSelected(rowIndex + 1, colIndex) && editing"
                     class="xlsx-reader__cell-edit"
                     contenteditable="true"
                     @keydown="onCellKeydown"
@@ -560,15 +565,8 @@ function sortBodyByColumn(body: StyledCell[][], colIndex: number, order: SortOrd
 }
 
 function applySort() {
-  if (!editMode.value && sortColIndex.value >= 0) {
-    allBodyRows.value = sortBodyByColumn(
-      rawBodyRows.value,
-      sortColIndex.value,
-      sortOrder.value,
-    )
-  } else {
-    allBodyRows.value = rawBodyRows.value
-  }
+  // editing is always on; keep original row order so edits map to correct cells
+  allBodyRows.value = rawBodyRows.value
 }
 
 function defaultSortForColumn(colIndex: number): SortOrder {
@@ -680,25 +678,18 @@ function prev() { selectSheet(activeSheetIndex.value - 1) }
 function goToPage(page: number) { selectSheet(page - 1) }
 
 // ---- editing ----
-const editMode = ref(false)
 const selected = ref<{ row: number; col: number } | null>(null)
 const editing = ref(false)
 const sel = ref<CellFormat>({})
+const painting = ref(false)
+let paintFormat: CellFormat | null = null
+let lastClickX = 0
+let lastClickY = 0
 const FONT_FAMILIES = [
   'Calibri', 'Arial', 'Times New Roman', 'Microsoft YaHei', 'SimSun',
   'SimHei', 'KaiTi', 'FangSong', 'Verdana', 'Courier New', 'Georgia',
 ]
 const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72]
-
-function toggleEditMode() {
-  editMode.value = !editMode.value
-  if (!editMode.value) {
-    selected.value = null
-    editing.value = false
-  } else {
-    applySort()
-  }
-}
 
 function getGridRow(row: number): StyledCell[] | null {
   if (row === 0) return headerRow.value
@@ -713,7 +704,6 @@ function getExcelCell(gridRow: number, gridCol: number): ExcelJS.Cell | null {
 }
 
 function selectCell(row: number, col: number) {
-  if (!editMode.value) return
   editing.value = false
   selected.value = { row, col }
   const gridRow = getGridRow(row)
@@ -723,6 +713,23 @@ function selectCell(row: number, col: number) {
 
 function isSelected(row: number, col: number) {
   return selected.value?.row === row && selected.value?.col === col
+}
+
+function onCellClick(e: MouseEvent, row: number, col: number) {
+  if (painting.value && paintFormat) {
+    applyFormatToCell(row, col, paintFormat)
+    painting.value = false
+    paintFormat = null
+    return
+  }
+  selectCell(row, col)
+}
+
+function onCellDblClick(e: MouseEvent, row: number, col: number) {
+  lastClickX = e.clientX
+  lastClickY = e.clientY
+  selectCell(row, col)
+  startEdit()
 }
 
 function startEdit() {
@@ -756,14 +763,38 @@ watch(editing, (val) => {
   nextTick(() => {
     const { row, col } = selected.value!
     const el = scrollRef.value?.querySelector(`[data-r="${row}"][data-c="${col}"] .xlsx-reader__cell-edit`) as HTMLElement | null
-    if (el) {
-      el.focus()
-      const range = document.createRange()
-      range.selectNodeContents(el)
+    if (!el) return
+    el.focus()
+    // place caret at click position instead of selecting all
+    const placeCaret = () => {
       const selObj = window.getSelection()
-      selObj?.removeAllRanges()
-      selObj?.addRange(range)
+      if (!selObj) return
+      const range = document.createRange()
+      // try caretRangeFromPoint (Chromium)
+      const doc = document as Document & {
+        caretRangeFromPoint?: (x: number, y: number) => Range | null
+        caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+      }
+      let placed = false
+      if (typeof doc.caretRangeFromPoint === 'function') {
+        const r = doc.caretRangeFromPoint(lastClickX, lastClickY)
+        if (r) { range.setStart(r.startContainer, r.startOffset); range.collapse(true); placed = true }
+      } else if (typeof doc.caretPositionFromPoint === 'function') {
+        const pos = doc.caretPositionFromPoint(lastClickX, lastClickY)
+        if (pos) { range.setStart(pos.offsetNode, pos.offset); range.collapse(true); placed = true }
+      }
+      if (placed) {
+        selObj.removeAllRanges()
+        selObj.addRange(range)
+      } else {
+        // fallback: place caret at end
+        range.selectNodeContents(el)
+        range.collapse(false)
+        selObj.removeAllRanges()
+        selObj.addRange(range)
+      }
     }
+    placeCaret()
   })
 })
 
@@ -781,13 +812,35 @@ function cssToArgb(css?: string): string | undefined {
   return undefined
 }
 
-function applyFormat() {
-  if (!selected.value) return
-  const { row, col } = selected.value
+function applyFormatToCell(row: number, col: number, fmt: CellFormat) {
   const gridRow = getGridRow(row)
   const cell = gridRow?.[col]
   if (!cell) return
-  cell.format = { ...sel.value }
+  cell.format = { ...fmt }
+  rebuildStyle(cell)
+  const ex = getExcelCell(row, col)
+  if (ex) {
+    ex.font = {
+      ...(fmt.fontName ? { name: fmt.fontName } : {}),
+      ...(fmt.fontSize ? { size: fmt.fontSize } : {}),
+      bold: !!fmt.bold,
+      italic: !!fmt.italic,
+      underline: !!fmt.underline,
+      strike: !!fmt.strike,
+      ...(fmt.fontColor ? { color: { argb: cssToArgb(fmt.fontColor) } } : {}),
+    }
+    if (fmt.fillColor) {
+      ex.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cssToArgb(fmt.fillColor) } }
+    }
+    ex.alignment = {
+      ...(fmt.hAlign ? { horizontal: fmt.hAlign } : {}),
+      ...(fmt.vAlign ? { vertical: fmt.vAlign } : {}),
+      wrapText: true,
+    }
+  }
+}
+
+function rebuildStyle(cell: StyledCell) {
   const s: Record<string, string> = {}
   const f = cell.format
   if (f.bold) s['font-weight'] = '700'
@@ -803,33 +856,26 @@ function applyFormat() {
   if (f.hAlign) s['text-align'] = f.hAlign
   if (f.vAlign) s['vertical-align'] = f.vAlign
   s['white-space'] = 'pre-wrap'
-  // preserve borders
   if (cell.style['border-top']) s['border-top'] = cell.style['border-top']
   if (cell.style['border-bottom']) s['border-bottom'] = cell.style['border-bottom']
   if (cell.style['border-left']) s['border-left'] = cell.style['border-left']
   if (cell.style['border-right']) s['border-right'] = cell.style['border-right']
   cell.style = s
-  // write to exceljs
-  const ex = getExcelCell(row, col)
-  if (ex) {
-    ex.font = {
-      ...(f.fontName ? { name: f.fontName } : {}),
-      ...(f.fontSize ? { size: f.fontSize } : {}),
-      bold: !!f.bold,
-      italic: !!f.italic,
-      underline: !!f.underline,
-      strike: !!f.strike,
-      ...(f.fontColor ? { color: { argb: cssToArgb(f.fontColor) } } : {}),
-    }
-    if (f.fillColor) {
-      ex.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cssToArgb(f.fillColor) } }
-    }
-    ex.alignment = {
-      ...(f.hAlign ? { horizontal: f.hAlign } : {}),
-      ...(f.vAlign ? { vertical: f.vAlign } : {}),
-      wrapText: true,
-    }
-  }
+}
+
+function applyFormat() {
+  if (!selected.value) return
+  applyFormatToCell(selected.value.row, selected.value.col, { ...sel.value })
+}
+
+function startFormatPainter() {
+  if (!selected.value) return
+  const gridRow = getGridRow(selected.value.row)
+  const cell = gridRow?.[selected.value.col]
+  if (!cell) return
+  paintFormat = { ...cell.format }
+  painting.value = true
+  editing.value = false
 }
 
 function toggleBold() { sel.value.bold = !sel.value.bold; applyFormat() }
@@ -1186,6 +1232,10 @@ onMounted(async () => {
 .xlsx-reader__cell--editable {
   cursor: cell;
 }
+.xlsx-reader__th--painting,
+.xlsx-reader__cell--editable.xlsx-reader__th--painting {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><text y='14' font-size='14'>🖌</text></svg>") 2 18, copy;
+}
 .xlsx-reader__cell--selected {
   outline: 2px solid #4338ca;
   outline-offset: -2px;
@@ -1193,6 +1243,25 @@ onMounted(async () => {
 .xlsx-reader__th-editable {
   cursor: cell;
   user-select: none;
+}
+.xlsx-reader__th-sort-icon {
+  display: inline-block;
+  min-width: 12px;
+  font-size: 11px;
+  color: #9ca3af;
+  vertical-align: middle;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 3px;
+  transition: background 0.12s, color 0.12s;
+}
+.xlsx-reader__th-sort-icon:hover {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+.xlsx-reader__th-sort-icon--active {
+  color: #4338ca;
+  font-weight: 700;
 }
 .xlsx-reader__cell-edit {
   display: block;
