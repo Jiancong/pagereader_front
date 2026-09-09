@@ -112,6 +112,7 @@
                   :data-c="colIndex"
                   @click="onCellClick($event, 0, colIndex)"
                   @dblclick="onCellDblClick($event, 0, colIndex)"
+                  @contextmenu.prevent.stop="onCellContextMenu($event, 0, colIndex)"
                 >
                   <span
                     v-if="isSelected(0, colIndex) && editing"
@@ -160,6 +161,7 @@
                   :data-c="colIndex"
                   @click="onCellClick($event, rowIndex + 1, colIndex)"
                   @dblclick="onCellDblClick($event, rowIndex + 1, colIndex)"
+                  @contextmenu.prevent.stop="onCellContextMenu($event, rowIndex + 1, colIndex)"
                 >
                   <span
                     v-if="isSelected(rowIndex + 1, colIndex) && editing"
@@ -214,12 +216,48 @@
       >
         {{ cellPopover.text }}
       </div>
+      <div
+        v-if="ctxMenu.visible"
+        class="xlsx-reader__ctx"
+        :style="{ top: `${ctxMenu.y}px`, left: `${ctxMenu.x}px` }"
+        @mousedown.stop
+      >
+        <button type="button" class="xlsx-reader__ctx-item" @click="insertRowsAt(1)">插入 1 行</button>
+        <div class="xlsx-reader__ctx-row">
+          <span class="xlsx-reader__ctx-label">插入</span>
+          <input
+            v-model.number="ctxMenu.rowCount"
+            type="number"
+            min="1"
+            max="1000"
+            class="xlsx-reader__ctx-input"
+            @keydown.enter="insertRowsAt(parseCount(ctxMenu.rowCount))"
+          >
+          <span class="xlsx-reader__ctx-label">行</span>
+          <button type="button" class="xlsx-reader__ctx-btn" @click="insertRowsAt(parseCount(ctxMenu.rowCount))">确定</button>
+        </div>
+        <div class="xlsx-reader__ctx-divider"></div>
+        <button type="button" class="xlsx-reader__ctx-item" @click="insertColumnsAt(1)">插入 1 列</button>
+        <div class="xlsx-reader__ctx-row">
+          <span class="xlsx-reader__ctx-label">插入</span>
+          <input
+            v-model.number="ctxMenu.colCount"
+            type="number"
+            min="1"
+            max="1000"
+            class="xlsx-reader__ctx-input"
+            @keydown.enter="insertColumnsAt(parseCount(ctxMenu.colCount))"
+          >
+          <span class="xlsx-reader__ctx-label">列</span>
+          <button type="button" class="xlsx-reader__ctx-btn" @click="insertColumnsAt(parseCount(ctxMenu.colCount))">确定</button>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ExcelJS from 'exceljs'
 
@@ -614,6 +652,7 @@ function loadMoreRows() {
 function onScroll() {
   clearPopoverHideTimer()
   cellPopover.value.visible = false
+  closeCtxMenu()
   const el = scrollRef.value
   if (!el || !hasMoreRows.value) return
   const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 240
@@ -636,12 +675,37 @@ function buildGrid(sheet: ExcelJS.Worksheet): StyledCell[][] {
   return grid
 }
 
+function reloadCurrentSheet(preserveSelection?: { row: number; col: number }) {
+  const sheet = worksheets[activeSheetIndex.value]
+  if (!sheet) return
+  const grid = buildGrid(sheet)
+  const normalized = normalizeRows(grid)
+  if (normalized.length === 0) {
+    headerRow.value = []
+    bodyColIndex.value = -1
+    rawBodyRows.value = []
+    allBodyRows.value = []
+    return
+  }
+  const [header, ...body] = normalized
+  headerRow.value = header
+  bodyColIndex.value = findBodyColumnIndex(header)
+  rawBodyRows.value = body
+  applySort()
+  if (preserveSelection) {
+    selected.value = preserveSelection
+    const gridRow = getGridRow(preserveSelection.row)
+    sel.value = { ...(gridRow?.[preserveSelection.col]?.format ?? {}) }
+  }
+}
+
 function loadSheet(index: number) {
   if (!workbook) return
   const sheet = worksheets[index]
   if (!sheet) return
   selected.value = null
   editing.value = false
+  closeCtxMenu()
   const grid = buildGrid(sheet)
   const normalized = normalizeRows(grid)
   if (normalized.length === 0) {
@@ -883,6 +947,87 @@ function toggleItalic() { sel.value.italic = !sel.value.italic; applyFormat() }
 function toggleUnderline() { sel.value.underline = !sel.value.underline; applyFormat() }
 function toggleStrike() { sel.value.strike = !sel.value.strike; applyFormat() }
 
+// ---- context menu: insert rows/columns ----
+const ctxMenu = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  row: 0,
+  col: 0,
+  rowCount: 1,
+  colCount: 1,
+})
+
+function closeCtxMenu() {
+  ctxMenu.value.visible = false
+}
+
+function parseCount(n: unknown): number {
+  const v = Number(n)
+  if (!Number.isFinite(v) || v < 1) return 1
+  return Math.min(1000, Math.floor(v))
+}
+
+function clampMenuPosition(x: number, y: number, width = 220, height = 180) {
+  const margin = 8
+  let left = x
+  let top = y
+  if (left + width > window.innerWidth - margin) {
+    left = Math.max(margin, window.innerWidth - width - margin)
+  }
+  if (top + height > window.innerHeight - margin) {
+    top = Math.max(margin, window.innerHeight - height - margin)
+  }
+  return { x: left, y: top }
+}
+
+function onCellContextMenu(e: MouseEvent, row: number, col: number) {
+  e.preventDefault()
+  e.stopPropagation()
+  editing.value = false
+  selectCell(row, col)
+  const pos = clampMenuPosition(e.clientX, e.clientY)
+  ctxMenu.value = {
+    visible: true,
+    x: pos.x,
+    y: pos.y,
+    row,
+    col,
+    rowCount: 1,
+    colCount: 1,
+  }
+}
+
+function insertRowsAt(count: number) {
+  const sheet = worksheets[activeSheetIndex.value]
+  if (!sheet) return
+  const n = parseCount(count)
+  const { row, col } = ctxMenu.value
+  const excelRow = row + 1
+  sheet.insertRows(excelRow, Array.from({ length: n }, () => []))
+  reloadCurrentSheet({ row: row + n, col })
+  visibleCount.value = Math.max(visibleCount.value, allBodyRows.value.length)
+  closeCtxMenu()
+}
+
+function insertColumnsAt(count: number) {
+  const sheet = worksheets[activeSheetIndex.value]
+  if (!sheet) return
+  const n = parseCount(count)
+  const { row, col } = ctxMenu.value
+  const excelCol = col + 1
+  const emptyCols = Array.from({ length: n }, () => [])
+  sheet.spliceColumns(excelCol, 0, ...emptyCols)
+  reloadCurrentSheet({ row, col: col + n })
+  closeCtxMenu()
+}
+
+function onDocumentMouseDown(e: MouseEvent) {
+  const target = e.target as HTMLElement | null
+  if (target?.closest('.xlsx-reader__ctx')) return
+  closeCtxMenu()
+}
+
 async function downloadXlsx() {
   if (!workbook) return
   try {
@@ -905,6 +1050,7 @@ async function downloadXlsx() {
 defineExpose({ next, prev, goToPage })
 
 onMounted(async () => {
+  document.addEventListener('mousedown', onDocumentMouseDown)
   try {
     const buffer = await props.file.arrayBuffer()
     workbook = new ExcelJS.Workbook()
@@ -923,6 +1069,10 @@ onMounted(async () => {
     loadError.value = e instanceof Error ? e.message : String(e)
     loading.value = false
   }
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', onDocumentMouseDown)
 })
 </script>
 
@@ -1273,5 +1423,68 @@ onMounted(async () => {
 }
 .xlsx-reader__cell-edit:focus {
   box-shadow: inset 0 0 0 2px #c7d2fe;
+}
+/* context menu */
+.xlsx-reader__ctx {
+  position: fixed;
+  z-index: 10001;
+  min-width: 200px;
+  padding: 6px 0;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  font-size: 13px;
+  color: #111827;
+}
+.xlsx-reader__ctx-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: #111827;
+}
+.xlsx-reader__ctx-item:hover {
+  background: #f3f4f6;
+}
+.xlsx-reader__ctx-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+}
+.xlsx-reader__ctx-label {
+  color: #6b7280;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.xlsx-reader__ctx-input {
+  width: 56px;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+}
+.xlsx-reader__ctx-btn {
+  padding: 4px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.xlsx-reader__ctx-btn:hover {
+  background: #f3f4f6;
+}
+.xlsx-reader__ctx-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: #e5e7eb;
 }
 </style>
