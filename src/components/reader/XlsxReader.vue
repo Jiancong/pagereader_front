@@ -12,6 +12,13 @@
           <button
             type="button"
             class="xlsx-reader__meta-btn"
+            :disabled="!canUndo"
+            title="Ctrl+Z 撤销"
+            @click="undo"
+          >撤销</button>
+          <button
+            type="button"
+            class="xlsx-reader__meta-btn"
             @click="downloadXlsx"
           >下载</button>
         </div>
@@ -222,34 +229,44 @@
         :style="{ top: `${ctxMenu.y}px`, left: `${ctxMenu.x}px` }"
         @mousedown.stop
       >
-        <button type="button" class="xlsx-reader__ctx-item" @click="insertRowsAt(1)">插入 1 行</button>
+        <div class="xlsx-reader__ctx-section">行</div>
+        <button type="button" class="xlsx-reader__ctx-item" @click="insertRowsAt(1, 'above')">上方插入 1 行</button>
+        <button type="button" class="xlsx-reader__ctx-item" @click="insertRowsAt(1, 'below')">下方插入 1 行</button>
         <div class="xlsx-reader__ctx-row">
-          <span class="xlsx-reader__ctx-label">插入</span>
           <input
             v-model.number="ctxMenu.rowCount"
             type="number"
             min="1"
             max="1000"
             class="xlsx-reader__ctx-input"
-            @keydown.enter="insertRowsAt(parseCount(ctxMenu.rowCount))"
+            @keydown.enter="insertRowsAt(parseCount(ctxMenu.rowCount), ctxMenu.rowDir)"
           >
           <span class="xlsx-reader__ctx-label">行</span>
-          <button type="button" class="xlsx-reader__ctx-btn" @click="insertRowsAt(parseCount(ctxMenu.rowCount))">确定</button>
+          <select v-model="ctxMenu.rowDir" class="xlsx-reader__ctx-select">
+            <option value="above">上方</option>
+            <option value="below">下方</option>
+          </select>
+          <button type="button" class="xlsx-reader__ctx-btn" @click="insertRowsAt(parseCount(ctxMenu.rowCount), ctxMenu.rowDir)">插入</button>
         </div>
         <div class="xlsx-reader__ctx-divider"></div>
-        <button type="button" class="xlsx-reader__ctx-item" @click="insertColumnsAt(1)">插入 1 列</button>
+        <div class="xlsx-reader__ctx-section">列</div>
+        <button type="button" class="xlsx-reader__ctx-item" @click="insertColumnsAt(1, 'left')">左侧插入 1 列</button>
+        <button type="button" class="xlsx-reader__ctx-item" @click="insertColumnsAt(1, 'right')">右侧插入 1 列</button>
         <div class="xlsx-reader__ctx-row">
-          <span class="xlsx-reader__ctx-label">插入</span>
           <input
             v-model.number="ctxMenu.colCount"
             type="number"
             min="1"
             max="1000"
             class="xlsx-reader__ctx-input"
-            @keydown.enter="insertColumnsAt(parseCount(ctxMenu.colCount))"
+            @keydown.enter="insertColumnsAt(parseCount(ctxMenu.colCount), ctxMenu.colDir)"
           >
           <span class="xlsx-reader__ctx-label">列</span>
-          <button type="button" class="xlsx-reader__ctx-btn" @click="insertColumnsAt(parseCount(ctxMenu.colCount))">确定</button>
+          <select v-model="ctxMenu.colDir" class="xlsx-reader__ctx-select">
+            <option value="left">左侧</option>
+            <option value="right">右侧</option>
+          </select>
+          <button type="button" class="xlsx-reader__ctx-btn" @click="insertColumnsAt(parseCount(ctxMenu.colCount), ctxMenu.colDir)">插入</button>
         </div>
       </div>
     </Teleport>
@@ -313,6 +330,38 @@ const cellPopover = ref({ visible: false, text: '', x: 0, y: 0 })
 let popoverHideTimer: ReturnType<typeof setTimeout> | null = null
 let workbook: ExcelJS.Workbook | null = null
 let worksheets: ExcelJS.Worksheet[] = []
+
+// ---- undo ----
+const MAX_UNDO = 50
+const undoStack = ref<ArrayBuffer[]>([])
+const canUndo = computed(() => undoStack.value.length > 0)
+let undoSaving = false
+
+async function saveUndoSnapshot() {
+  if (!workbook || undoSaving) return
+  undoSaving = true
+  try {
+    const buf = await workbook.xlsx.writeBuffer()
+    undoStack.value.push(buf.slice(0))
+    if (undoStack.value.length > MAX_UNDO) undoStack.value.shift()
+  } finally {
+    undoSaving = false
+  }
+}
+
+async function undo() {
+  if (!workbook || undoStack.value.length === 0) return
+  const buf = undoStack.value.pop()!
+  const sheetIdx = activeSheetIndex.value
+  const selCopy = selected.value ? { ...selected.value } : null
+  editing.value = false
+  closeCtxMenu()
+  await workbook.xlsx.load(buf)
+  worksheets = workbook.worksheets
+  sheetNames.value = worksheets.map((w) => w.name)
+  activeSheetIndex.value = Math.min(sheetIdx, Math.max(0, sheetNames.value.length - 1))
+  reloadCurrentSheet(selCopy ?? undefined)
+}
 
 function clearPopoverHideTimer() {
   if (popoverHideTimer) {
@@ -693,9 +742,15 @@ function reloadCurrentSheet(preserveSelection?: { row: number; col: number }) {
   rawBodyRows.value = body
   applySort()
   if (preserveSelection) {
-    selected.value = preserveSelection
-    const gridRow = getGridRow(preserveSelection.row)
-    sel.value = { ...(gridRow?.[preserveSelection.col]?.format ?? {}) }
+    const maxRow = allBodyRows.value.length
+    const maxCol = Math.max(0, headerRow.value.length - 1)
+    if (preserveSelection.row <= maxRow && preserveSelection.col <= maxCol) {
+      selected.value = preserveSelection
+      const gridRow = getGridRow(preserveSelection.row)
+      sel.value = { ...(gridRow?.[preserveSelection.col]?.format ?? {}) }
+    } else {
+      selected.value = null
+    }
   }
 }
 
@@ -779,8 +834,9 @@ function isSelected(row: number, col: number) {
   return selected.value?.row === row && selected.value?.col === col
 }
 
-function onCellClick(e: MouseEvent, row: number, col: number) {
+async function onCellClick(e: MouseEvent, row: number, col: number) {
   if (painting.value && paintFormat) {
+    await saveUndoSnapshot()
     applyFormatToCell(row, col, paintFormat)
     painting.value = false
     paintFormat = null
@@ -801,7 +857,7 @@ function startEdit() {
   editing.value = true
 }
 
-function commitEdit() {
+async function commitEdit() {
   if (!selected.value || !editing.value) return
   const { row, col } = selected.value
   const gridRow = getGridRow(row)
@@ -810,11 +866,14 @@ function commitEdit() {
   if (!cell) { editing.value = false; return }
   const el = scrollRef.value?.querySelector(`[data-r="${row}"][data-c="${col}"] .xlsx-reader__cell-edit`) as HTMLElement | null
   const newText = el?.innerText ?? ''
-  cell.text = newText
-  cell.value = newText
-  cell.richText = undefined
-  const ex = getExcelCell(row, col)
-  if (ex) ex.value = newText
+  if (newText !== cell.text) {
+    await saveUndoSnapshot()
+    cell.text = newText
+    cell.value = newText
+    cell.richText = undefined
+    const ex = getExcelCell(row, col)
+    if (ex) ex.value = newText
+  }
   editing.value = false
 }
 
@@ -927,8 +986,9 @@ function rebuildStyle(cell: StyledCell) {
   cell.style = s
 }
 
-function applyFormat() {
+async function applyFormat() {
   if (!selected.value) return
+  await saveUndoSnapshot()
   applyFormatToCell(selected.value.row, selected.value.col, { ...sel.value })
 }
 
@@ -942,10 +1002,13 @@ function startFormatPainter() {
   editing.value = false
 }
 
-function toggleBold() { sel.value.bold = !sel.value.bold; applyFormat() }
-function toggleItalic() { sel.value.italic = !sel.value.italic; applyFormat() }
-function toggleUnderline() { sel.value.underline = !sel.value.underline; applyFormat() }
-function toggleStrike() { sel.value.strike = !sel.value.strike; applyFormat() }
+function toggleBold() { sel.value.bold = !sel.value.bold; void applyFormat() }
+function toggleItalic() { sel.value.italic = !sel.value.italic; void applyFormat() }
+function toggleUnderline() { sel.value.underline = !sel.value.underline; void applyFormat() }
+function toggleStrike() { sel.value.strike = !sel.value.strike; void applyFormat() }
+
+type RowInsertDir = 'above' | 'below'
+type ColInsertDir = 'left' | 'right'
 
 // ---- context menu: insert rows/columns ----
 const ctxMenu = ref({
@@ -956,6 +1019,8 @@ const ctxMenu = ref({
   col: 0,
   rowCount: 1,
   colCount: 1,
+  rowDir: 'above' as RowInsertDir,
+  colDir: 'left' as ColInsertDir,
 })
 
 function closeCtxMenu() {
@@ -968,7 +1033,7 @@ function parseCount(n: unknown): number {
   return Math.min(1000, Math.floor(v))
 }
 
-function clampMenuPosition(x: number, y: number, width = 220, height = 180) {
+function clampMenuPosition(x: number, y: number, width = 260, height = 320) {
   const margin = 8
   let left = x
   let top = y
@@ -995,31 +1060,46 @@ function onCellContextMenu(e: MouseEvent, row: number, col: number) {
     col,
     rowCount: 1,
     colCount: 1,
+    rowDir: 'above',
+    colDir: 'left',
   }
 }
 
-function insertRowsAt(count: number) {
+async function insertRowsAt(count: number, dir: RowInsertDir = 'above') {
   const sheet = worksheets[activeSheetIndex.value]
   if (!sheet) return
   const n = parseCount(count)
   const { row, col } = ctxMenu.value
-  const excelRow = row + 1
+  await saveUndoSnapshot()
+  const excelRow = dir === 'above' ? row + 1 : row + 2
   sheet.insertRows(excelRow, Array.from({ length: n }, () => []))
-  reloadCurrentSheet({ row: row + n, col })
+  const newSel = dir === 'above' ? { row: row + n, col } : { row, col }
+  reloadCurrentSheet(newSel)
   visibleCount.value = Math.max(visibleCount.value, allBodyRows.value.length)
   closeCtxMenu()
 }
 
-function insertColumnsAt(count: number) {
+async function insertColumnsAt(count: number, dir: ColInsertDir = 'left') {
   const sheet = worksheets[activeSheetIndex.value]
   if (!sheet) return
   const n = parseCount(count)
   const { row, col } = ctxMenu.value
-  const excelCol = col + 1
+  await saveUndoSnapshot()
+  const excelCol = dir === 'left' ? col + 1 : col + 2
   const emptyCols = Array.from({ length: n }, () => [])
   sheet.spliceColumns(excelCol, 0, ...emptyCols)
-  reloadCurrentSheet({ row, col: col + n })
+  const newSel = dir === 'left' ? { row, col: col + n } : { row, col }
+  reloadCurrentSheet(newSel)
   closeCtxMenu()
+}
+
+function onGlobalKeyDown(e: KeyboardEvent) {
+  if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z' || e.shiftKey) return
+  const target = e.target as HTMLElement
+  if (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
+  if (editing.value) return
+  e.preventDefault()
+  void undo()
 }
 
 function onDocumentMouseDown(e: MouseEvent) {
@@ -1051,6 +1131,7 @@ defineExpose({ next, prev, goToPage })
 
 onMounted(async () => {
   document.addEventListener('mousedown', onDocumentMouseDown)
+  document.addEventListener('keydown', onGlobalKeyDown)
   try {
     const buffer = await props.file.arrayBuffer()
     workbook = new ExcelJS.Workbook()
@@ -1073,6 +1154,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', onDocumentMouseDown)
+  document.removeEventListener('keydown', onGlobalKeyDown)
 })
 </script>
 
@@ -1277,6 +1359,10 @@ onBeforeUnmount(() => {
   background: #4338ca;
   border-color: #6366f1;
   color: #fff;
+}
+.xlsx-reader__meta-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 /* toolbar */
 .xlsx-reader__toolbar {
@@ -1486,5 +1572,22 @@ onBeforeUnmount(() => {
   height: 1px;
   margin: 4px 0;
   background: #e5e7eb;
+}
+.xlsx-reader__ctx-section {
+  padding: 4px 14px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.xlsx-reader__ctx-select {
+  padding: 4px 4px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 </style>
