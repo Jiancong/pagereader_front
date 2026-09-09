@@ -38,7 +38,7 @@
         <select
           class="xlsx-reader__tb-select"
           :value="sel.fontName || ''"
-          :disabled="!selected"
+          :disabled="!hasSelection"
           @change="sel.fontName = ($event.target as HTMLSelectElement).value; applyFormat()"
         >
           <option value="">默认字体</option>
@@ -47,35 +47,35 @@
         <select
           class="xlsx-reader__tb-select xlsx-reader__tb-select--sm"
           :value="sel.fontSize || ''"
-          :disabled="!selected"
+          :disabled="!hasSelection"
           @change="sel.fontSize = Number(($event.target as HTMLSelectElement).value) || undefined; applyFormat()"
         >
           <option value="">字号</option>
           <option v-for="s in FONT_SIZES" :key="s" :value="s">{{ s }}</option>
         </select>
         <span class="xlsx-reader__tb-divider"></span>
-        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.bold }" :disabled="!selected" @click="toggleBold" style="font-weight:700">B</button>
-        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.italic }" :disabled="!selected" @click="toggleItalic" style="font-style:italic">I</button>
-        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.underline }" :disabled="!selected" @click="toggleUnderline" style="text-decoration:underline">U</button>
-        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.strike }" :disabled="!selected" @click="toggleStrike" style="text-decoration:line-through">S</button>
+        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.bold }" :disabled="!hasSelection" @click="toggleBold" style="font-weight:700">B</button>
+        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.italic }" :disabled="!hasSelection" @click="toggleItalic" style="font-style:italic">I</button>
+        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.underline }" :disabled="!hasSelection" @click="toggleUnderline" style="text-decoration:underline">U</button>
+        <button type="button" class="xlsx-reader__tb-btn" :class="{ 'is-active': sel.strike }" :disabled="!hasSelection" @click="toggleStrike" style="text-decoration:line-through">S</button>
         <span class="xlsx-reader__tb-divider"></span>
-        <label class="xlsx-reader__tb-color" :class="{ 'is-disabled': !selected }">
+        <label class="xlsx-reader__tb-color" :class="{ 'is-disabled': !hasSelection }">
           <span class="xlsx-reader__tb-color-label">A</span>
           <input
             type="color"
             class="xlsx-reader__tb-color-input"
             :value="sel.fontColor || '#000000'"
-            :disabled="!selected"
+            :disabled="!hasSelection"
             @input="sel.fontColor = ($event.target as HTMLInputElement).value; applyFormat()"
           >
         </label>
-        <label class="xlsx-reader__tb-color" :class="{ 'is-disabled': !selected }">
+        <label class="xlsx-reader__tb-color" :class="{ 'is-disabled': !hasSelection }">
           <span class="xlsx-reader__tb-color-fill"></span>
           <input
             type="color"
             class="xlsx-reader__tb-color-input"
             :value="sel.fillColor || '#ffffff'"
-            :disabled="!selected"
+            :disabled="!hasSelection"
             @input="sel.fillColor = ($event.target as HTMLInputElement).value; applyFormat()"
           >
         </label>
@@ -83,7 +83,7 @@
         <select
           class="xlsx-reader__tb-select xlsx-reader__tb-select--sm"
           :value="sel.hAlign || ''"
-          :disabled="!selected"
+          :disabled="!hasSelection"
           @change="sel.hAlign = ($event.target as HTMLSelectElement).value || undefined; applyFormat()"
         >
           <option value="">对齐</option>
@@ -97,12 +97,12 @@
           type="button"
           class="xlsx-reader__tb-btn"
           :class="{ 'is-active': painting }"
-          :disabled="!selected"
+          :disabled="!hasSelection"
           @click="startFormatPainter"
           title="格式刷：复制当前单元格格式，再点击其他单元格应用"
         >格式刷</button>
         <button
-          v-if="selected"
+          v-if="hasSelection"
           type="button"
           class="xlsx-reader__tb-btn"
           @click="startEdit"
@@ -110,7 +110,12 @@
       </div>
 
       <div class="xlsx-reader__zoom" :style="{ zoom: scale ?? 1 }">
-        <div ref="scrollRef" class="xlsx-reader__scroll" @scroll="onScroll">
+        <div
+          ref="scrollRef"
+          class="xlsx-reader__scroll"
+          :class="{ 'xlsx-reader__scroll--drag-select': dragSelecting }"
+          @scroll="onScroll"
+        >
           <table v-if="headerRow.length" class="xlsx-reader__table">
             <thead>
               <tr>
@@ -121,18 +126,20 @@
                     'xlsx-reader__th-editable',
                     {
                       'xlsx-reader__cell--selected': isSelected(0, colIndex),
+                      'xlsx-reader__cell--primary': isPrimaryCell(0, colIndex),
                       'xlsx-reader__th--painting': painting,
                     },
                   ]"
                   :style="cellStyle(cell)"
                   :data-r="0"
                   :data-c="colIndex"
+                  @mousedown="onCellMouseDown($event, 0, colIndex)"
                   @click="onCellClick($event, 0, colIndex)"
                   @dblclick="onCellDblClick($event, 0, colIndex)"
                   @contextmenu.prevent.stop="onCellContextMenu($event, 0, colIndex)"
                 >
                   <span
-                    v-if="isSelected(0, colIndex) && editing"
+                    v-if="isPrimaryCell(0, colIndex) && editing"
                     class="xlsx-reader__cell-edit"
                     contenteditable="true"
                     @keydown="onCellKeydown"
@@ -156,6 +163,7 @@
                         'xlsx-reader__th-sort-icon--active': sortColIndex === colIndex,
                       }"
                       :title="headerSortTitle(colIndex)"
+                      @mousedown.stop
                       @click.stop="onHeaderSort(colIndex)"
                     >{{ headerSortIcon(colIndex) }}</span>
                   </template>
@@ -170,18 +178,20 @@
                   :class="{
                     'xlsx-reader__cell--body': isBodyColumn(colIndex),
                     'xlsx-reader__cell--selected': isSelected(rowIndex + 1, colIndex),
+                    'xlsx-reader__cell--primary': isPrimaryCell(rowIndex + 1, colIndex),
                     'xlsx-reader__cell--editable': true,
                     'xlsx-reader__th--painting': painting,
                   }"
                   :style="cellStyle(cell)"
                   :data-r="rowIndex + 1"
                   :data-c="colIndex"
+                  @mousedown="onCellMouseDown($event, rowIndex + 1, colIndex)"
                   @click="onCellClick($event, rowIndex + 1, colIndex)"
                   @dblclick="onCellDblClick($event, rowIndex + 1, colIndex)"
                   @contextmenu.prevent.stop="onCellContextMenu($event, rowIndex + 1, colIndex)"
                 >
                   <span
-                    v-if="isSelected(rowIndex + 1, colIndex) && editing"
+                    v-if="isPrimaryCell(rowIndex + 1, colIndex) && editing"
                     class="xlsx-reader__cell-edit"
                     contenteditable="true"
                     @keydown="onCellKeydown"
@@ -365,7 +375,12 @@ async function undo() {
   if (!workbook || undoStack.value.length === 0) return
   const buf = undoStack.value.pop()!
   const sheetIdx = activeSheetIndex.value
-  const selCopy = selected.value ? { ...selected.value } : null
+  const selCopy = selection.value
+    ? {
+        anchor: { ...selection.value.anchor },
+        focus: { ...selection.value.focus },
+      }
+    : null
   editing.value = false
   closeCtxMenu()
   await workbook.xlsx.load(buf)
@@ -736,7 +751,10 @@ function buildGrid(sheet: ExcelJS.Worksheet): StyledCell[][] {
   return grid
 }
 
-function reloadCurrentSheet(preserveSelection?: { row: number; col: number }) {
+type CellCoord = { row: number; col: number }
+type CellSelection = { anchor: CellCoord; focus: CellCoord }
+
+function reloadCurrentSheet(preserveSelection?: CellSelection) {
   const sheet = worksheets[activeSheetIndex.value]
   if (!sheet) return
   const grid = buildGrid(sheet)
@@ -756,12 +774,13 @@ function reloadCurrentSheet(preserveSelection?: { row: number; col: number }) {
   if (preserveSelection) {
     const maxRow = allBodyRows.value.length
     const maxCol = Math.max(0, headerRow.value.length - 1)
-    if (preserveSelection.row <= maxRow && preserveSelection.col <= maxCol) {
-      selected.value = preserveSelection
-      const gridRow = getGridRow(preserveSelection.row)
-      sel.value = { ...(gridRow?.[preserveSelection.col]?.format ?? {}) }
+    const r2 = Math.max(preserveSelection.anchor.row, preserveSelection.focus.row)
+    const c2 = Math.max(preserveSelection.anchor.col, preserveSelection.focus.col)
+    if (r2 <= maxRow && c2 <= maxCol) {
+      selection.value = preserveSelection
+      syncSelFromPrimary()
     } else {
-      selected.value = null
+      selection.value = null
     }
   }
 }
@@ -770,7 +789,7 @@ function loadSheet(index: number) {
   if (!workbook) return
   const sheet = worksheets[index]
   if (!sheet) return
-  selected.value = null
+  selection.value = null
   editing.value = false
   closeCtxMenu()
   const grid = buildGrid(sheet)
@@ -809,14 +828,17 @@ function prev() { selectSheet(activeSheetIndex.value - 1) }
 function goToPage(page: number) { selectSheet(page - 1) }
 
 // ---- editing ----
-const selected = ref<{ row: number; col: number } | null>(null)
+const selection = ref<CellSelection | null>(null)
+const hasSelection = computed(() => selection.value !== null)
 const editing = ref(false)
 const sel = ref<CellFormat>({})
 const painting = ref(false)
+const dragSelecting = ref(false)
 let paintFormat: CellFormat | null = null
 let lastClickX = 0
 let lastClickY = 0
 let navigatingEdit = false
+let dragMoved = false
 const FONT_FAMILIES = [
   'Calibri', 'Arial', 'Times New Roman', 'Microsoft YaHei', 'SimSun',
   'SimHei', 'KaiTi', 'FangSong', 'Verdana', 'Courier New', 'Georgia',
@@ -835,19 +857,122 @@ function getExcelCell(gridRow: number, gridCol: number): ExcelJS.Cell | null {
   return sheet.getCell(gridRow + 1, gridCol + 1)
 }
 
+function primaryCell(): CellCoord | null {
+  return selection.value?.anchor ?? null
+}
+
+function getSelectionBounds() {
+  if (!selection.value) return null
+  const { anchor, focus } = selection.value
+  return {
+    r1: Math.min(anchor.row, focus.row),
+    c1: Math.min(anchor.col, focus.col),
+    r2: Math.max(anchor.row, focus.row),
+    c2: Math.max(anchor.col, focus.col),
+  }
+}
+
+function syncSelFromPrimary() {
+  const p = primaryCell()
+  if (!p) {
+    sel.value = {}
+    return
+  }
+  const gridRow = getGridRow(p.row)
+  sel.value = { ...(gridRow?.[p.col]?.format ?? {}) }
+}
+
+function foreachSelectedCell(fn: (row: number, col: number) => void) {
+  const b = getSelectionBounds()
+  if (!b) return
+  for (let r = b.r1; r <= b.r2; r++) {
+    for (let c = b.c1; c <= b.c2; c++) {
+      fn(r, c)
+    }
+  }
+}
+
 function selectCell(row: number, col: number) {
   editing.value = false
-  selected.value = { row, col }
-  const gridRow = getGridRow(row)
-  const cell = gridRow?.[col]
-  sel.value = { ...(cell?.format ?? {}) }
+  selection.value = { anchor: { row, col }, focus: { row, col } }
+  syncSelFromPrimary()
 }
 
 function isSelected(row: number, col: number) {
-  return selected.value?.row === row && selected.value?.col === col
+  const b = getSelectionBounds()
+  if (!b) return false
+  return row >= b.r1 && row <= b.r2 && col >= b.c1 && col <= b.c2
+}
+
+function isPrimaryCell(row: number, col: number) {
+  const p = primaryCell()
+  return p?.row === row && p?.col === col
+}
+
+function cellFromPoint(x: number, y: number): CellCoord | null {
+  const el = document.elementFromPoint(x, y)?.closest('[data-r][data-c]') as HTMLElement | null
+  if (!el || !scrollRef.value?.contains(el)) return null
+  const row = Number(el.dataset.r)
+  const col = Number(el.dataset.c)
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return null
+  return { row, col }
+}
+
+function stopDragSelectListeners() {
+  document.removeEventListener('mousemove', onDocumentMouseMove)
+  document.removeEventListener('mouseup', onDocumentMouseUp)
+  dragSelecting.value = false
+}
+
+function onDocumentMouseMove(e: MouseEvent) {
+  if (!selection.value) return
+  const cell = cellFromPoint(e.clientX, e.clientY)
+  if (!cell) return
+  const { focus } = selection.value
+  if (cell.row !== focus.row || cell.col !== focus.col) {
+    dragMoved = true
+    selection.value = { ...selection.value, focus: cell }
+  }
+}
+
+function onDocumentMouseUp() {
+  stopDragSelectListeners()
+}
+
+function onCellMouseDown(e: MouseEvent, row: number, col: number) {
+  if (e.button !== 0) return
+  if ((e.target as HTMLElement).closest('.xlsx-reader__th-sort-icon')) return
+
+  if (painting.value && paintFormat) return
+
+  e.preventDefault()
+
+  if (editing.value) void commitEdit()
+
+  if (e.shiftKey && selection.value) {
+    selection.value = {
+      anchor: selection.value.anchor,
+      focus: { row, col },
+    }
+    syncSelFromPrimary()
+    editing.value = false
+    return
+  }
+
+  dragMoved = false
+  selection.value = { anchor: { row, col }, focus: { row, col } }
+  syncSelFromPrimary()
+  editing.value = false
+  dragSelecting.value = true
+  document.addEventListener('mousemove', onDocumentMouseMove)
+  document.addEventListener('mouseup', onDocumentMouseUp)
 }
 
 async function onCellClick(e: MouseEvent, row: number, col: number) {
+  if (dragMoved) {
+    dragMoved = false
+    return
+  }
   if (painting.value && paintFormat) {
     await saveUndoSnapshot()
     applyFormatToCell(row, col, paintFormat)
@@ -855,7 +980,6 @@ async function onCellClick(e: MouseEvent, row: number, col: number) {
     paintFormat = null
     return
   }
-  selectCell(row, col)
 }
 
 function onCellDblClick(e: MouseEvent, row: number, col: number) {
@@ -866,7 +990,7 @@ function onCellDblClick(e: MouseEvent, row: number, col: number) {
 }
 
 function startEdit() {
-  if (!selected.value) return
+  if (!primaryCell()) return
   editing.value = true
 }
 
@@ -890,6 +1014,38 @@ function isCaretAtStart(el: HTMLElement): boolean {
 
 function isCaretAtEnd(el: HTMLElement): boolean {
   return getCaretOffset(el) >= el.innerText.length
+}
+
+function getCaretRect(el: HTMLElement): DOMRect | null {
+  const selObj = window.getSelection()
+  if (!selObj || selObj.rangeCount === 0) return null
+  const range = selObj.getRangeAt(0)
+  if (!el.contains(range.startContainer)) return null
+  const rects = range.getClientRects()
+  if (rects.length > 0) return rects[0]
+  return range.getBoundingClientRect()
+}
+
+function isCaretAtFirstLine(el: HTMLElement): boolean {
+  if (isCaretAtStart(el)) return true
+  const caretRect = getCaretRect(el)
+  if (!caretRect) return isCaretAtStart(el)
+  const probe = document.createRange()
+  probe.selectNodeContents(el)
+  probe.collapse(true)
+  const firstRect = probe.getClientRects()[0] ?? probe.getBoundingClientRect()
+  return Math.abs(caretRect.top - firstRect.top) <= 4
+}
+
+function isCaretAtLastLine(el: HTMLElement): boolean {
+  if (isCaretAtEnd(el)) return true
+  const caretRect = getCaretRect(el)
+  if (!caretRect) return isCaretAtEnd(el)
+  const probe = document.createRange()
+  probe.selectNodeContents(el)
+  probe.collapse(false)
+  const lastRect = probe.getClientRects()[0] ?? probe.getBoundingClientRect()
+  return Math.abs(caretRect.top - lastRect.top) <= 4
 }
 
 function placeCaretInElement(el: HTMLElement, atStart: boolean) {
@@ -927,8 +1083,9 @@ function placeCaretAtClick(el: HTMLElement) {
 }
 
 async function saveEditContent() {
-  if (!selected.value || !editing.value) return
-  const { row, col } = selected.value
+  const p = primaryCell()
+  if (!p || !editing.value) return
+  const { row, col } = p
   const gridRow = getGridRow(row)
   if (!gridRow) return
   const cell = gridRow[col]
@@ -946,7 +1103,7 @@ async function saveEditContent() {
 }
 
 async function commitEdit() {
-  if (!selected.value || !editing.value) return
+  if (!primaryCell() || !editing.value) return
   await saveEditContent()
   editing.value = false
 }
@@ -972,9 +1129,8 @@ async function navigateEdit(row: number, col: number, caretAtStart: boolean) {
   if (row < 0 || col < 0 || row > maxGridRow() || col > maxGridCol()) return
   navigatingEdit = true
   await saveEditContent()
-  selected.value = { row, col }
-  const gridRow = getGridRow(row)
-  sel.value = { ...(gridRow?.[col]?.format ?? {}) }
+  selection.value = { anchor: { row, col }, focus: { row, col } }
+  syncSelFromPrimary()
   editing.value = true
   await nextTick()
   const el = getEditElement(row, col)
@@ -986,9 +1142,10 @@ async function navigateEdit(row: number, col: number, caretAtStart: boolean) {
 }
 
 watch(editing, (val) => {
-  if (!val || !selected.value || navigatingEdit) return
+  const p = primaryCell()
+  if (!val || !p || navigatingEdit) return
   nextTick(() => {
-    const { row, col } = selected.value!
+    const { row, col } = p
     const el = getEditElement(row, col)
     if (!el) return
     el.focus()
@@ -997,22 +1154,26 @@ watch(editing, (val) => {
 })
 
 function onCellKeydown(e: KeyboardEvent) {
-  if (!editing.value || !selected.value) return
+  const p = primaryCell()
+  if (!editing.value || !p) return
   const el = e.currentTarget as HTMLElement
-  const { row, col } = selected.value
+  const { row, col } = p
 
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
+    e.stopPropagation()
     void commitEdit()
     return
   }
   if (e.key === 'Escape') {
     e.preventDefault()
+    e.stopPropagation()
     cancelEdit()
     return
   }
 
   if (e.key === 'ArrowLeft') {
+    e.stopPropagation()
     if (isCaretAtStart(el) && col > 0) {
       e.preventDefault()
       void navigateEdit(row, col - 1, false)
@@ -1021,6 +1182,7 @@ function onCellKeydown(e: KeyboardEvent) {
   }
 
   if (e.key === 'ArrowRight') {
+    e.stopPropagation()
     if (isCaretAtEnd(el) && col < maxGridCol()) {
       e.preventDefault()
       void navigateEdit(row, col + 1, true)
@@ -1029,7 +1191,8 @@ function onCellKeydown(e: KeyboardEvent) {
   }
 
   if (e.key === 'ArrowUp') {
-    if (isCaretAtStart(el) && row > 0) {
+    e.stopPropagation()
+    if (isCaretAtFirstLine(el) && row > 0) {
       e.preventDefault()
       void navigateEdit(row - 1, col, false)
     }
@@ -1037,7 +1200,8 @@ function onCellKeydown(e: KeyboardEvent) {
   }
 
   if (e.key === 'ArrowDown') {
-    if (isCaretAtEnd(el) && row < maxGridRow()) {
+    e.stopPropagation()
+    if (isCaretAtLastLine(el) && row < maxGridRow()) {
       e.preventDefault()
       void navigateEdit(row + 1, col, true)
     }
@@ -1104,15 +1268,18 @@ function rebuildStyle(cell: StyledCell) {
 }
 
 async function applyFormat() {
-  if (!selected.value) return
+  if (!selection.value) return
   await saveUndoSnapshot()
-  applyFormatToCell(selected.value.row, selected.value.col, { ...sel.value })
+  foreachSelectedCell((row, col) => {
+    applyFormatToCell(row, col, { ...sel.value })
+  })
 }
 
 function startFormatPainter() {
-  if (!selected.value) return
-  const gridRow = getGridRow(selected.value.row)
-  const cell = gridRow?.[selected.value.col]
+  const p = primaryCell()
+  if (!p) return
+  const gridRow = getGridRow(p.row)
+  const cell = gridRow?.[p.col]
   if (!cell) return
   paintFormat = { ...cell.format }
   painting.value = true
@@ -1361,6 +1528,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  stopDragSelectListeners()
   document.removeEventListener('mousedown', onDocumentMouseDown)
   document.removeEventListener('keydown', onGlobalKeyDown)
   if (saveHintTimer) clearTimeout(saveHintTimer)
@@ -1689,7 +1857,16 @@ onBeforeUnmount(() => {
 .xlsx-reader__cell--editable.xlsx-reader__th--painting {
   cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><text y='14' font-size='14'>🖌</text></svg>") 2 18, copy;
 }
+.xlsx-reader__scroll--drag-select {
+  user-select: none;
+  cursor: cell;
+}
 .xlsx-reader__cell--selected {
+  box-shadow: inset 0 0 0 9999px rgba(67, 56, 202, 0.1);
+  outline: 1px solid #a5b4fc;
+  outline-offset: -1px;
+}
+.xlsx-reader__cell--primary {
   outline: 2px solid #4338ca;
   outline-offset: -2px;
 }

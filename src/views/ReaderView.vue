@@ -192,6 +192,9 @@ function prevPage() {
 }
 
 function onKeyDown(e: KeyboardEvent) {
+  // XLSX uses arrow keys for in-cell cursor and cell navigation while editing.
+  if (isXlsx.value) return
+
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
     e.preventDefault()
     nextPage()
