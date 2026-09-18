@@ -43,7 +43,7 @@
         </div>
 
         <button
-          v-if="canTts"
+          v-if="showTtsControls"
           class="rv-btn rv-btn--sm rv-btn--tts"
           :class="{ 'rv-btn--tts-active': speaking && !paused, 'rv-btn--loading': ttsLoading }"
           :disabled="ttsLoading || ttsBusy"
@@ -58,7 +58,7 @@
         </button>
 
         <select
-          v-if="canTts && ttsVoices.length > 1"
+          v-if="showTtsControls && ttsVoices.length > 1"
           class="rv-btn rv-btn--sm rv-tts-voice-select"
           :value="ttsSelectedVoiceURI"
           :title="t('reader.ttsVoice')"
@@ -70,7 +70,7 @@
         </select>
 
         <button
-          v-if="canTts"
+          v-if="showTtsControls"
           class="rv-btn rv-btn--sm rv-btn--auto-advance"
           :class="{ 'rv-btn--auto-advance--on': ttsAutoAdvance }"
           :title="t('reader.ttsAutoAdvanceHint')"
@@ -151,6 +151,48 @@
       <button class="rv-btn rv-btn--primary" @click="goBack">{{ t('reader.back') }}</button>
     </div>
 
+    <!-- 移动端固定底栏：翻页 + 朗读（华为等 WebView 顶部控件可能被挤出视口） -->
+    <footer
+      v-if="hasSource && (isPdf || isEpub || isMobi)"
+      class="reader-view__mobile-bar"
+    >
+      <button
+        type="button"
+        class="reader-view__mobile-bar-btn"
+        :disabled="!canGoPrev"
+        :aria-label="t('reader.prev')"
+        @click="prevPage"
+      >
+        ‹ {{ t('reader.prev') }}
+      </button>
+      <div class="reader-view__mobile-bar-center">
+        <button
+          v-if="showTtsControls"
+          type="button"
+          class="reader-view__mobile-bar-btn reader-view__mobile-bar-btn--tts"
+          :class="{ 'reader-view__mobile-bar-btn--tts-active': speaking && !paused }"
+          :disabled="ttsLoading || ttsBusy"
+          :aria-label="t('reader.ttsStart')"
+          @click="onToggleTts"
+        >
+          <Loader2 v-if="ttsLoading" class="h-5 w-5 animate-spin" />
+          <Pause v-else-if="speaking && !paused" class="h-5 w-5" />
+          <Play v-else-if="paused" class="h-5 w-5" />
+          <Volume2 v-else class="h-5 w-5" />
+        </button>
+        <span class="reader-view__mobile-bar-page">{{ currentPage }} / {{ pageCount || '—' }}</span>
+      </div>
+      <button
+        type="button"
+        class="reader-view__mobile-bar-btn"
+        :disabled="!canGoNext"
+        :aria-label="t('reader.next')"
+        @click="nextPage"
+      >
+        {{ t('reader.next') }} ›
+      </button>
+    </footer>
+
   </div>
 </template>
 
@@ -205,7 +247,17 @@ let ttsAutoTurning = false
 const pageReadySignal = ref(0)
 let speakFollowTimer: ReturnType<typeof setTimeout> | null = null
 
-const canTts = computed(() => ttsSupported && hasSource.value && (isPdf.value || isEpub.value || isMobi.value))
+const showTtsControls = computed(
+  () => hasSource.value && (isPdf.value || isEpub.value || isMobi.value),
+)
+
+const canGoPrev = computed(() => currentPage.value > 1)
+
+const canGoNext = computed(() => {
+  if (isReaderAtEnd()) return false
+  if (pageCount.value > 0) return currentPage.value < pageCount.value
+  return true
+})
 
 async function getCurrentPageText(): Promise<string> {
   if (isPdf.value) return (await pdfReaderRef.value?.getPageText?.()) || ''
@@ -293,7 +345,7 @@ async function advanceTtsToNextPage(token: number) {
 
 /** 朗读当前页，读完自动翻页并继续朗读下一页（递归链式） */
 async function speakCurrentPage() {
-  if (!canTts.value) return
+  if (!showTtsControls.value) return
   const token = ttsAdvanceToken
   ttsBusy.value = true
   ttsLoading.value = true
@@ -334,7 +386,7 @@ async function speakCurrentPage() {
 }
 
 async function onToggleTts() {
-  if (!canTts.value || ttsBusy.value) return
+  if (!showTtsControls.value || ttsBusy.value) return
 
   if (!ttsSupported) {
     ElMessage.warning(t('reader.ttsUnsupported'))
@@ -740,7 +792,74 @@ onBeforeUnmount(() => {
   word-break: break-all;
 }
 
+.reader-view__mobile-bar {
+  display: none;
+}
+
 @media (max-width: 767px) {
+  .reader-view__mobile-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 10px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    background: #1f2937;
+    border-top: 1px solid #111827;
+    color: #e5e7eb;
+    z-index: 10;
+  }
+  .reader-view__mobile-bar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 48px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #374151;
+    background: #111827;
+    color: #e5e7eb;
+    font-size: 14px;
+    cursor: pointer;
+    flex: 1;
+    max-width: 120px;
+  }
+  .reader-view__mobile-bar-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .reader-view__mobile-bar-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .reader-view__mobile-bar-btn--tts {
+    min-width: 52px;
+    min-height: 52px;
+    max-width: none;
+    flex: none;
+    border-radius: 50%;
+    padding: 0;
+  }
+  .reader-view__mobile-bar-btn--tts-active {
+    border-color: #6366f1;
+    color: #a5b4fc;
+    background: #1e1b4b;
+  }
+  .reader-view__mobile-bar-page {
+    font-size: 12px;
+    color: #9ca3af;
+    white-space: nowrap;
+  }
+  /* 使用统一底栏，隐藏 EPUB 组件内重复翻页栏 */
+  .reader-view--epub :deep(.epub-reader__nav) {
+    display: none;
+  }
+
   .reader-view__toolbar {
     flex-direction: column;
     align-items: stretch;
