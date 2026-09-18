@@ -348,4 +348,35 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+@media (max-width: 767px) {
+  .epub-reader__stage {
+    padding: 0;
+  }
+  .epub-reader__zoom {
+    width: 100%;
+  }
+  .epub-reader__viewer {
+    max-width: none;
+    box-shadow: none;
+  }
+  .epub-reader__nav {
+    gap: 10px;
+    padding: 10px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .er-btn {
+    flex: 1;
+    min-height: 48px;
+    justify-content: center;
+    font-size: 14px;
+    padding: 10px 12px;
+  }
+  .epub-reader__page {
+    min-width: auto;
+    flex-shrink: 0;
+    font-size: 13px;
+    padding: 0 4px;
+  }
+}
 </style>

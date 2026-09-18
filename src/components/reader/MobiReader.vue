@@ -188,4 +188,16 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd })
 .mobi-reader__overlay--error {
   color: #dc2626;
 }
+
+@media (max-width: 767px) {
+  .mobi-reader {
+    padding: 0;
+  }
+  .mobi-reader__zoom-wrap {
+    width: 100%;
+  }
+  .mobi-reader__container {
+    width: 100%;
+  }
+}
 </style>

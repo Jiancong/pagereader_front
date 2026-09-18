@@ -266,6 +266,17 @@ defineExpose({
 .pdf-reader__canvas {
   display: block;
 }
+@media (max-width: 767px) {
+  .pdf-reader__scroll {
+    padding: 8px 0;
+    gap: 8px;
+  }
+  .pdf-reader__page {
+    max-width: none;
+    padding: 0 4px;
+  }
+}
+
 .pdf-reader__placeholder {
   flex: 1;
   display: flex;

@@ -1,13 +1,23 @@
 <template>
-  <div class="reader-view" @contextmenu="onContextMenu" @wheel="onWheel">
+  <div
+    class="reader-view"
+    :class="{
+      'reader-view--epub': isEpub,
+      'reader-view--mobi': isMobi,
+      'reader-view--pdf': isPdf,
+    }"
+    @contextmenu="onContextMenu"
+    @wheel="onWheel"
+  >
     <!-- 顶部工具栏 -->
     <header class="reader-view__toolbar">
-      <button class="rv-btn" @click="goBack">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-        {{ t('reader.back') }}
-      </button>
-
-      <div class="reader-view__title" :title="headerTitle">{{ headerTitle }}</div>
+      <div class="reader-view__head">
+        <button class="rv-btn rv-btn--back" @click="goBack" :aria-label="t('reader.back')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          <span class="rv-btn__label">{{ t('reader.back') }}</span>
+        </button>
+        <div class="reader-view__title" :title="headerTitle">{{ headerTitle }}</div>
+      </div>
 
       <div class="reader-view__controls">
         <div v-if="hasSource && (isPdf || isEpub || isMobi || isXlsx)" class="rv-field rv-field--pages">
@@ -459,6 +469,9 @@ onMounted(() => {
     router.replace({ name: 'reader' })
     return
   }
+  if (window.innerWidth < 768) {
+    scale.value = 1
+  }
   window.addEventListener('keydown', onKeyDown)
 })
 
@@ -484,6 +497,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   background: #3a3a3a;
+  overflow: hidden;
 }
 .reader-view__toolbar {
   display: flex;
@@ -494,6 +508,13 @@ onBeforeUnmount(() => {
   color: #e5e7eb;
   border-bottom: 1px solid #111827;
   flex-shrink: 0;
+}
+.reader-view__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 .reader-view__title {
   flex: 1;
@@ -508,6 +529,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-shrink: 0;
+}
+.rv-btn--back {
   flex-shrink: 0;
 }
 .rv-field {
@@ -714,5 +738,75 @@ onBeforeUnmount(() => {
   font-size: 13px;
   color: #d1d5db;
   word-break: break-all;
+}
+
+@media (max-width: 767px) {
+  .reader-view__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 10px;
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+  .reader-view__head {
+    flex: none;
+  }
+  .reader-view__title {
+    font-size: 13px;
+  }
+  .reader-view__controls {
+    flex: none;
+    width: 100%;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .reader-view__controls::-webkit-scrollbar {
+    display: none;
+  }
+  .rv-btn--back .rv-btn__label {
+    display: none;
+  }
+  .rv-btn--back {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px;
+    justify-content: center;
+  }
+  .rv-btn--sm {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+  .rv-page-input {
+    width: 48px;
+    min-height: 36px;
+    font-size: 14px;
+  }
+  /* EPUB 底部已有翻页栏，顶部隐藏重复页码控件 */
+  .reader-view--epub .rv-field--pages {
+    display: none;
+  }
+  .rv-btn--tts-label,
+  .rv-btn--auto-advance-label,
+  .rv-btn--workspace-label {
+    display: none;
+  }
+  .rv-btn--tts,
+  .rv-btn--auto-advance,
+  .rv-btn--workspace {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px;
+    justify-content: center;
+  }
+  .rv-tts-voice-select {
+    max-width: 120px;
+    min-height: 44px;
+  }
 }
 </style>
