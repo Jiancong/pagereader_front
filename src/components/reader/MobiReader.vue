@@ -23,6 +23,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'page-change': [page: number]
   'page-count': [count: number]
+  'page-ready': []
   zoom: [delta: number]
 }>()
 
@@ -34,6 +35,7 @@ const loadError = ref('')
 
 let view: any = null
 let pageTotal = 0
+let atEnd = false
 
 const trackedDocs = new Set<Document>()
 
@@ -74,6 +76,7 @@ function detachFromDoc(doc: Document) {
 function onLoad(e: Event) {
   const doc = (e as CustomEvent).detail?.doc
   if (doc) attachToDoc(doc)
+  emit('page-ready')
 }
 
 function onRelocate(e: Event) {
@@ -82,8 +85,10 @@ function onRelocate(e: Event) {
   if (!location || location.total <= 0) return
   pageTotal = location.total
   const page = location.current + 1
+  atEnd = page >= location.total
   emit('page-change', page)
   emit('page-count', location.total)
+  emit('page-ready')
 }
 
 onMounted(async () => {
@@ -140,7 +145,7 @@ function getPageText(): string {
   }
 }
 
-defineExpose({ next, prev, goToPage, getPageText })
+defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd })
 </script>
 
 <style scoped>

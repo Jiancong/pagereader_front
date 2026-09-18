@@ -96,6 +96,7 @@
       :scale="scale"
       @page-change="onPageChange"
       @page-count="onPageCount"
+      @page-ready="onReaderPageReady"
     />
 
     <!-- EPUB 阅读器 -->
@@ -106,6 +107,7 @@
       :scale="scale"
       @page-change="onPageChange"
       @page-count="onPageCount"
+      @page-ready="onReaderPageReady"
       @zoom="applyZoomDelta"
     />
 
@@ -117,6 +119,7 @@
       :scale="scale"
       @page-change="onPageChange"
       @page-count="onPageCount"
+      @page-ready="onReaderPageReady"
       @zoom="applyZoomDelta"
     />
 
@@ -183,10 +186,14 @@ const { speaking, paused, supported: ttsSupported, voices: ttsVoices, selectedVo
 const ttsLoading = ref(false)
 const ttsBusy = ref(false)
 const ttsAutoAdvance = ref(true)
-// 用于取消过期的自动翻页（用户手动翻页时递增）
+const ttsSessionActive = ref(false)
+// 用于取消过期的自动翻页/跟随朗读
 let ttsAdvanceToken = 0
 // 标记当前翻页是否由 TTS 自动触发（避免 onPageChange 误停 TTS）
 let ttsAutoTurning = false
+// 页面渲染完成信号（EPUB/MOBI 异步翻页）
+const pageReadySignal = ref(0)
+let speakFollowTimer: ReturnType<typeof setTimeout> | null = null
 
 const canTts = computed(() => ttsSupported && hasSource.value && (isPdf.value || isEpub.value || isMobi.value))
 
@@ -197,9 +204,81 @@ async function getCurrentPageText(): Promise<string> {
   return ''
 }
 
+function onReaderPageReady() {
+  pageReadySignal.value++
+}
+
+function isReaderAtEnd(): boolean {
+  if (isPdf.value) return pdfReaderRef.value?.isAtEnd?.() ?? false
+  if (isEpub.value) return epubReaderRef.value?.isAtEnd?.() ?? false
+  if (isMobi.value) return mobiReaderRef.value?.isAtEnd?.() ?? false
+  return pageCount.value > 0 && currentPage.value >= pageCount.value
+}
+
+function waitForPageReady(fromSignal: number, timeoutMs = 5000): Promise<boolean> {
+  if (pageReadySignal.value > fromSignal) return Promise.resolve(true)
+  return new Promise((resolve) => {
+    const start = Date.now()
+    const timer = setInterval(() => {
+      if (pageReadySignal.value > fromSignal) {
+        clearInterval(timer)
+        resolve(true)
+        return
+      }
+      if (Date.now() - start >= timeoutMs) {
+        clearInterval(timer)
+        resolve(false)
+      }
+    }, 50)
+  })
+}
+
+async function waitForPageTextReady(maxAttempts = 20, intervalMs = 120): Promise<string> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const text = await getCurrentPageText()
+    if (text.trim()) return text
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return ''
+}
+
 function onSelectTtsVoice(e: Event) {
   const target = e.target as HTMLSelectElement
   ttsSetSelectedVoice(target.value)
+}
+
+function scheduleSpeakFollow(delayMs = 250) {
+  if (speakFollowTimer) clearTimeout(speakFollowTimer)
+  const token = ttsAdvanceToken
+  speakFollowTimer = setTimeout(async () => {
+    if (token !== ttsAdvanceToken || !ttsSessionActive.value) return
+    await speakCurrentPage()
+  }, delayMs)
+}
+
+async function advanceTtsToNextPage(token: number) {
+  if (token !== ttsAdvanceToken || !ttsAutoAdvance.value) return
+  if (isReaderAtEnd()) {
+    ttsSessionActive.value = false
+    return
+  }
+
+  const beforePage = currentPage.value
+  const readySignal = pageReadySignal.value
+  ttsAutoTurning = true
+  nextPage()
+
+  await waitForPageReady(readySignal)
+  await waitForPageTextReady()
+  ttsAutoTurning = false
+
+  if (token !== ttsAdvanceToken) return
+  // 页码未变化说明已到末尾
+  if (currentPage.value <= beforePage) {
+    ttsSessionActive.value = false
+    return
+  }
+  await speakCurrentPage()
 }
 
 /** 朗读当前页，读完自动翻页并继续朗读下一页（递归链式） */
@@ -209,40 +288,33 @@ async function speakCurrentPage() {
   ttsBusy.value = true
   ttsLoading.value = true
   try {
-    const text = await getCurrentPageText()
-    if (!text || !text.trim()) {
-      ElMessage.warning(t('reader.ttsNoText'))
+    const text = await waitForPageTextReady()
+    if (!text.trim()) {
+      if (ttsSessionActive.value) ElMessage.warning(t('reader.ttsNoText'))
       return
     }
     ttsSpeak(text, {
       lang: 'zh-CN',
       onEnd: () => {
-        // 如果已被取消（用户手动翻页/停止），不再继续
         if (token !== ttsAdvanceToken) return
-        // 自动翻页关闭或已到最后一页 → 停止
-        if (!ttsAutoAdvance.value || currentPage.value >= pageCount.value) {
+        if (!ttsAutoAdvance.value) {
+          ttsSessionActive.value = false
           return
         }
-        // 自动翻到下一页
-        ttsAutoTurning = true
-        nextPage()
-        // 等待页面渲染后朗读下一页
-        setTimeout(async () => {
-          ttsAutoTurning = false
-          // 检查是否被取消
-          if (token !== ttsAdvanceToken) return
-          await speakCurrentPage()
-        }, 800)
+        void advanceTtsToNextPage(token)
       },
       onError: () => {
         ttsAutoTurning = false
+        ttsSessionActive.value = false
       },
     })
     if (!speaking.value) {
       ElMessage.warning(t('reader.ttsNoText'))
+      ttsSessionActive.value = false
     }
   } catch {
     ElMessage.error(t('reader.ttsError'))
+    ttsSessionActive.value = false
   } finally {
     ttsLoading.value = false
     setTimeout(() => {
@@ -270,6 +342,7 @@ async function onToggleTts() {
     return
   }
   // 未开始 → 朗读当前页（带自动翻页链）
+  ttsSessionActive.value = true
   await speakCurrentPage()
 }
 
@@ -306,12 +379,13 @@ function onWheel(e: WheelEvent) {
 function onPageChange(page: number) {
   const changed = currentPage.value !== page
   currentPage.value = page
-  // TTS 自动翻页时不停止朗读
+  // TTS 自动翻页时不打断
   if (ttsAutoTurning) return
-  // 用户手动翻页时：取消待执行的自动翻页并停止当前朗读
-  if (changed && (speaking.value || paused.value)) {
+  // 用户手动翻页：停止当前朗读，并跟随到新页面继续
+  if (changed && ttsSessionActive.value && (speaking.value || paused.value)) {
     ttsAdvanceToken++
     stopTts()
+    scheduleSpeakFollow()
   }
 }
 function onPageCount(count: number) {
@@ -391,7 +465,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
   ttsAdvanceToken++
+  if (speakFollowTimer) clearTimeout(speakFollowTimer)
   stopTts()
+  ttsSessionActive.value = false
   if (!store.preserveFileOnLeave) {
     store.revoke()
   } else {

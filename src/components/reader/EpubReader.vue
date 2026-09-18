@@ -41,6 +41,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'page-change': [page: number]
   'page-count': [count: number]
+  'page-ready': []
   zoom: [delta: number]
 }>()
 
@@ -190,6 +191,7 @@ onMounted(async () => {
           }
         })
       }
+      emit('page-ready')
     })
 
     await rendition.display()
@@ -258,7 +260,7 @@ function getPageText(): string {
   }
 }
 
-defineExpose({ next, prev, goToPage, getPageText })
+defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
 </script>
 
 <style scoped>

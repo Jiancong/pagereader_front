@@ -36,6 +36,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'page-change', page: number): void
   (event: 'page-count', count: number): void
+  (event: 'page-ready'): void
 }>()
 
 const { t } = useI18n()
@@ -72,6 +73,7 @@ onMounted(async () => {
     }
     emit('page-count', numPages)
     emit('page-change', currentPageNum.value)
+    emit('page-ready')
     loading.value = false
     await nextTick()
     setupObservers()
@@ -137,6 +139,7 @@ function setupObservers() {
       if (bestPage !== currentPageNum.value) {
         currentPageNum.value = bestPage
         emit('page-change', bestPage)
+        emit('page-ready')
       }
     },
     { root: scrollRef.value, threshold: [0.1, 0.25, 0.5, 0.75] },
@@ -203,6 +206,7 @@ function goToPage(page: number) {
   scrollRef.value!.scrollTop = pageEl.offsetTop
   currentPageNum.value = target
   emit('page-change', target)
+  emit('page-ready')
 }
 
 async function getPageText(pageNum?: number): Promise<string> {
@@ -223,7 +227,11 @@ async function getPageText(pageNum?: number): Promise<string> {
   }
 }
 
-defineExpose({ goToPage, getPageText })
+defineExpose({
+  goToPage,
+  getPageText,
+  isAtEnd: () => currentPageNum.value >= pageSlots.length,
+})
 </script>
 
 <style scoped>
