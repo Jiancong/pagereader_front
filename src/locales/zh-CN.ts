@@ -778,6 +778,9 @@ export default {
     nextSection: "下一章",
     autoAdvanceHint: "读至本章末尾自动进入下一章",
     autoAdvanced: "已进入下一章",
+    ttsStart: "语音朗读",
+    ttsPause: "暂停朗读",
+    ttsResume: "继续朗读",
   },
   community: {
     bookSource: "书籍来源",

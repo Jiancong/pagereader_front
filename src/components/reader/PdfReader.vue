@@ -205,7 +205,25 @@ function goToPage(page: number) {
   emit('page-change', target)
 }
 
-defineExpose({ goToPage })
+async function getPageText(pageNum?: number): Promise<string> {
+  if (!pdfDoc) return ''
+  const num = pageNum || currentPageNum.value
+  if (num < 1 || num > pdfDoc.numPages) return ''
+  try {
+    const page = await pdfDoc.getPage(num)
+    const content = await page.getTextContent()
+    const text = content.items
+      .map((item: any) => ('str' in item ? item.str : ''))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    return text
+  } catch {
+    return ''
+  }
+}
+
+defineExpose({ goToPage, getPageText })
 </script>
 
 <style scoped>

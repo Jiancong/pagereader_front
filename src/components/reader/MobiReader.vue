@@ -129,7 +129,18 @@ function goToPage(page: number) {
   void view.goToFraction(fraction)
 }
 
-defineExpose({ next, prev, goToPage })
+function getPageText(): string {
+  if (!view) return ''
+  try {
+    const doc: Document | undefined = view.renderer?.getContents?.()?.doc
+    if (!doc) return ''
+    return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim()
+  } catch {
+    return ''
+  }
+}
+
+defineExpose({ next, prev, goToPage, getPageText })
 </script>
 
 <style scoped>

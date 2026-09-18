@@ -31,6 +31,19 @@
           <span class="rv-zoom-value">{{ Math.round(scale * 100) }}%</span>
           <button class="rv-btn rv-btn--sm" @click="zoomIn" :disabled="scale >= 3">+</button>
         </div>
+
+        <button
+          v-if="canTts"
+          class="rv-btn rv-btn--sm rv-btn--tts"
+          :class="{ 'rv-btn--tts-active': speaking && !paused }"
+          :title="speaking ? (paused ? t('reader.ttsResume') : t('reader.ttsPause')) : t('reader.ttsStart')"
+          @click="onToggleTts"
+        >
+          <Pause v-if="speaking && !paused" class="h-4 w-4" />
+          <Play v-else-if="paused" class="h-4 w-4" />
+          <Volume2 v-else class="h-4 w-4" />
+          <span class="rv-btn--tts-label">{{ speaking ? (paused ? t('reader.ttsResume') : t('reader.ttsPause')) : t('reader.ttsStart') }}</span>
+        </button>
       </div>
     </header>
 
@@ -96,11 +109,12 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play } from 'lucide-vue-next'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
 import MobiReader from '@/components/reader/MobiReader.vue'
 import { useReaderFileStore } from '@/stores/reader'
+import { useBrowserTts } from '@/composables/useBrowserTts'
 
 const XlsxReader = defineAsyncComponent(() => import('@/components/reader/XlsxReader.vue'))
 
@@ -125,6 +139,47 @@ const xlsxReaderRef = ref<InstanceType<typeof XlsxReader> | null>(null)
 const currentPage = ref(1)
 const pageCount = ref(0)
 const pageInput = ref(1)
+
+const { speaking, paused, supported: ttsSupported, speak: ttsSpeak, pause: ttsPause, resume: ttsResume, stop: stopTts } = useBrowserTts()
+
+const canTts = computed(() => ttsSupported && hasSource.value && (isPdf.value || isEpub.value || isMobi.value))
+
+async function getCurrentPageText(): Promise<string> {
+  if (isPdf.value) return (await pdfReaderRef.value?.getPageText?.()) || ''
+  if (isEpub.value) return epubReaderRef.value?.getPageText?.() || ''
+  if (isMobi.value) return mobiReaderRef.value?.getPageText?.() || ''
+  return ''
+}
+
+async function onToggleTts() {
+  if (!canTts.value) return
+  // 正在朗读且未暂停 → 暂停
+  if (speaking.value && !paused.value) {
+    ttsPause()
+    return
+  }
+  // 暂停中 → 继续
+  if (paused.value) {
+    ttsResume()
+    return
+  }
+  // 未开始 → 提取当前页文本并朗读
+  const text = await getCurrentPageText()
+  if (!text) return
+  ttsSpeak(text, {
+    lang: 'zh-CN',
+    onEnd: () => {
+      // 读完当前页自动翻到下一页并继续
+      if (currentPage.value < pageCount.value) {
+        nextPage()
+        setTimeout(async () => {
+          const nextText = await getCurrentPageText()
+          if (nextText) ttsSpeak(nextText, { lang: 'zh-CN' })
+        }, 600)
+      }
+    },
+  })
+}
 
 function clampScale(value: number) {
   return Math.min(3, Math.max(0.5, +value.toFixed(2)))
@@ -223,6 +278,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
+  stopTts()
   store.revoke()
 })
 </script>
@@ -323,6 +379,29 @@ onBeforeUnmount(() => {
   background: #6366f1;
   border-color: #6366f1;
   color: #fff;
+}
+.rv-btn--tts {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.rv-btn--tts:hover:not(:disabled) {
+  background: #1f2937;
+}
+.rv-btn--tts-active {
+  border-color: #6366f1;
+  color: #a5b4fc;
+}
+.rv-btn--tts-label {
+  white-space: nowrap;
 }
 .reader-view__empty {
   flex: 1;

@@ -235,7 +235,19 @@ function goToPage(page: number) {
   if (cfi) rendition.display(cfi)
 }
 
-defineExpose({ next, prev, goToPage })
+function getPageText(): string {
+  if (!rendition) return ''
+  try {
+    const view: any = rendition.views()?.[0]
+    const doc: Document | undefined = view?.document
+    if (!doc) return ''
+    return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim()
+  } catch {
+    return ''
+  }
+}
+
+defineExpose({ next, prev, goToPage, getPageText })
 </script>
 
 <style scoped>

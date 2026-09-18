@@ -797,6 +797,9 @@ export default {
     nextSection: "Next",
     autoAdvanceHint: "Auto-advances at chapter end",
     autoAdvanced: "Next chapter",
+    ttsStart: "Read aloud",
+    ttsPause: "Pause",
+    ttsResume: "Resume",
   },
   community: {
     bookSource: "Book source",
