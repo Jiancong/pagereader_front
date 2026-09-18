@@ -229,6 +229,27 @@ export async function shareToCommunity(
   )
 }
 
+/** 上传原始书籍并直接分享到社区（multipart，需登录） */
+export async function shareBookToCommunity(
+  file: File,
+  meta: {
+    title: string
+    author?: string
+    description?: string
+    categoryId?: string
+    disclaimerAccepted: boolean
+  },
+): Promise<ShareToCommunityResult> {
+  const form = new FormData()
+  form.append("file", file)
+  form.append("title", meta.title)
+  if (meta.author) form.append("author", meta.author)
+  if (meta.description) form.append("description", meta.description)
+  if (meta.categoryId) form.append("categoryId", meta.categoryId)
+  form.append("disclaimerAccepted", String(meta.disclaimerAccepted))
+  return postForm<ShareToCommunityResult>(`/project/book/share`, form)
+}
+
 // 更新探索主题分类（需登录且为 owner；已分享至社区时同步 Feed 索引）
 export async function updateProjectCategory(
   id: string,

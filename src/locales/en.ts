@@ -805,6 +805,26 @@ export default {
     ttsUnsupported: "Your browser doesn't support speech synthesis",
     ttsNoText: "No readable text found on this page",
     ttsError: "Failed to start reading aloud, please retry",
+
+    // Share book to community
+    shareBook: "Share",
+    shareBookTitle: "Share Book to Community",
+    shareBookNameLabel: "Book title",
+    shareBookNamePlaceholder: "Enter the book title",
+    shareBookAuthorLabel: "Author",
+    shareBookAuthorPlaceholder: "Author name (optional)",
+    shareBookDescLabel: "Description",
+    shareBookDescPlaceholder: "Briefly describe this book (optional)",
+    shareBookCategoryLabel: "Category",
+    shareBookCategoryNone: "No category",
+    shareBookDisclaimerAccept: "I have read and agree to the disclaimer below",
+    shareBookDisclaimerBody:
+      "This book was uploaded and shared by a user for online reading and educational purposes only. This platform does not store or distribute copies of the book file, nor does it claim any copyright. If this book infringes your legitimate rights, please report it via the report function or contact customer service, and we will remove it upon verification.",
+    shareBookSubmit: "Share to Community",
+    shareBookSharing: "Sharing…",
+    shareBookSuccess: "Shared successfully!",
+    shareBookError: "Failed to share, please retry",
+    shareBookLoginRequired: "Please log in before sharing a book",
   },
   community: {
     bookSource: "Book source",

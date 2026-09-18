@@ -58,6 +58,16 @@
             {{ v.name }} ({{ v.lang }})
           </option>
         </select>
+
+        <button
+          v-if="hasSource && (isPdf || isEpub || isMobi)"
+          class="rv-btn rv-btn--sm rv-btn--share"
+          :title="t('reader.shareBookTitle')"
+          @click="onOpenShareDialog"
+        >
+          <Share2 class="h-4 w-4" />
+          <span class="rv-btn--share-label">{{ t('reader.shareBook') }}</span>
+        </button>
       </div>
     </header>
 
@@ -116,6 +126,15 @@
       <p v-if="file" class="reader-view__unsupported-file">{{ file.name }}</p>
       <button class="rv-btn rv-btn--primary" @click="goBack">{{ t('reader.back') }}</button>
     </div>
+
+    <!-- 分享书籍弹窗 -->
+    <ShareBookDialog
+      :open="shareDialogOpen"
+      :file="file"
+      @close="shareDialogOpen = false"
+      @shared="onBookShared"
+      @login-required="onShareLoginRequired"
+    />
   </div>
 </template>
 
@@ -123,13 +142,16 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play, Loader2 } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play, Loader2, Share2 } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
 import MobiReader from '@/components/reader/MobiReader.vue'
+import ShareBookDialog from '@/components/reader/ShareBookDialog.vue'
 import { useReaderFileStore } from '@/stores/reader'
 import { useBrowserTts } from '@/composables/useBrowserTts'
+import { isLoggedIn } from '@/api'
+import type { ShareToCommunityResult } from '@/api/types'
 
 const XlsxReader = defineAsyncComponent(() => import('@/components/reader/XlsxReader.vue'))
 
@@ -172,6 +194,32 @@ async function getCurrentPageText(): Promise<string> {
 function onSelectTtsVoice(e: Event) {
   const target = e.target as HTMLSelectElement
   ttsSetSelectedVoice(target.value)
+}
+
+// ── 分享书籍 ──
+const shareDialogOpen = ref(false)
+
+function onOpenShareDialog() {
+  if (!isLoggedIn()) {
+    ElMessage.warning(t('reader.shareBookLoginRequired'))
+    router.push({ name: 'reader' })
+    return
+  }
+  shareDialogOpen.value = true
+}
+
+function onBookShared(result: ShareToCommunityResult) {
+  ElMessage.success(t('reader.shareBookSuccess'))
+  // 跳转到社区项目页
+  if (result.projectId) {
+    router.push({ name: 'project-community', params: { projectId: result.projectId } })
+  }
+}
+
+function onShareLoginRequired() {
+  shareDialogOpen.value = false
+  ElMessage.warning(t('reader.shareBookLoginRequired'))
+  router.push({ name: 'reader' })
 }
 
 async function onToggleTts() {
@@ -488,6 +536,25 @@ onBeforeUnmount(() => {
 .rv-tts-voice-select option {
   background: #111827;
   color: #e5e7eb;
+}
+.rv-btn--share {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.rv-btn--share:hover {
+  background: #1f2937;
+  border-color: #6366f1;
+  color: #a5b4fc;
 }
 .reader-view__empty {
   flex: 1;

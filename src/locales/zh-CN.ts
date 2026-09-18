@@ -786,6 +786,26 @@ export default {
     ttsUnsupported: "当前浏览器不支持语音朗读功能",
     ttsNoText: "当前页面未提取到可朗读的文本",
     ttsError: "语音朗读启动失败，请重试",
+
+    // 分享书籍到社区
+    shareBook: "分享",
+    shareBookTitle: "分享书籍到社区",
+    shareBookNameLabel: "书名",
+    shareBookNamePlaceholder: "请输入书名",
+    shareBookAuthorLabel: "作者",
+    shareBookAuthorPlaceholder: "作者名（选填）",
+    shareBookDescLabel: "简介",
+    shareBookDescPlaceholder: "简单介绍一下这本书（选填）",
+    shareBookCategoryLabel: "分类",
+    shareBookCategoryNone: "不选择分类",
+    shareBookDisclaimerAccept: "我已阅读并同意下方免责声明",
+    shareBookDisclaimerBody:
+      "本书籍由用户上传分享，仅供在线阅读学习交流使用。本平台不存储、不传播书籍文件副本，亦不主张任何版权。如本书籍侵犯了您的合法权益，请通过举报功能或联系客服告知，我们将在确认后立即下架处理。",
+    shareBookSubmit: "分享到社区",
+    shareBookSharing: "分享中…",
+    shareBookSuccess: "分享成功！",
+    shareBookError: "分享失败，请重试",
+    shareBookLoginRequired: "请先登录后再分享书籍",
   },
   community: {
     bookSource: "书籍来源",
