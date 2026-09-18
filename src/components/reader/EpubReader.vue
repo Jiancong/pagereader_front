@@ -61,6 +61,7 @@ let resizeObserver: ResizeObserver | null = null
 let originalAddEventListener: typeof window.addEventListener | null = null
 let renderedWidth = 0
 let renderedHeight = 0
+let currentViewDoc: Document | null = null
 
 const trackedDocs = new Set<Document>()
 
@@ -176,7 +177,10 @@ onMounted(async () => {
 
     rendition.on('rendered', (_section: any, view: any) => {
       const doc = view?.document as Document | undefined
-      if (doc) attachToDoc(doc)
+      if (doc) {
+        currentViewDoc = doc
+        attachToDoc(doc)
+      }
 
       if (book && book.locations.length() === 0) {
         void book.locations.generate(200).then(() => {
@@ -236,9 +240,16 @@ function goToPage(page: number) {
 }
 
 function getPageText(): string {
+  // 优先使用 rendered 事件缓存的文档
+  if (currentViewDoc) {
+    const text = (currentViewDoc.body?.textContent || '').replace(/\s+/g, ' ').trim()
+    if (text) return text
+  }
+  // 回退：尝试从 rendition.views() 获取
   if (!rendition) return ''
   try {
-    const view: any = rendition.views()?.[0]
+    const views = rendition.views()
+    const view: any = Array.isArray(views) ? views[0] : (views as any)?._views?.[0]
     const doc: Document | undefined = view?.document
     if (!doc) return ''
     return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim()

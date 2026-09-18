@@ -29,24 +29,30 @@ export function useBrowserTts() {
   }
 
   function speak(text: string, opts?: { lang?: string; onEnd?: () => void }) {
-    if (!supported || !text.trim()) return
+    if (!supported || !text.trim()) return false
     stop()
-    const u = new SpeechSynthesisUtterance(text.trim())
-    u.lang = opts?.lang || (navigator.language || 'zh-CN')
-    u.onend = () => {
+    try {
+      const u = new SpeechSynthesisUtterance(text.trim())
+      u.lang = opts?.lang || (navigator.language || 'zh-CN')
+      u.onend = () => {
+        speaking.value = false
+        paused.value = false
+        currentUtterance.value = null
+        opts?.onEnd?.()
+      }
+      u.onerror = () => {
+        speaking.value = false
+        paused.value = false
+        currentUtterance.value = null
+      }
+      currentUtterance.value = u
+      speaking.value = true
+      window.speechSynthesis.speak(u)
+      return true
+    } catch {
       speaking.value = false
-      paused.value = false
-      currentUtterance.value = null
-      opts?.onEnd?.()
+      return false
     }
-    u.onerror = () => {
-      speaking.value = false
-      paused.value = false
-      currentUtterance.value = null
-    }
-    currentUtterance.value = u
-    speaking.value = true
-    window.speechSynthesis.speak(u)
   }
 
   function toggle(text: string, opts?: { lang?: string; onEnd?: () => void }) {

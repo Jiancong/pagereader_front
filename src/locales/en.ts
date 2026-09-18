@@ -801,6 +801,9 @@ export default {
     ttsPause: "Pause",
     ttsResume: "Resume",
     ttsLoading: "Loading…",
+    ttsUnsupported: "Your browser doesn't support speech synthesis",
+    ttsNoText: "No readable text found on this page",
+    ttsError: "Failed to start reading aloud, please retry",
   },
   community: {
     bookSource: "Book source",

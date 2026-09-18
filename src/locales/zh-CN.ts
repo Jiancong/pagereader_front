@@ -782,6 +782,9 @@ export default {
     ttsPause: "暂停朗读",
     ttsResume: "继续朗读",
     ttsLoading: "准备中…",
+    ttsUnsupported: "当前浏览器不支持语音朗读功能",
+    ttsNoText: "当前页面未提取到可朗读的文本",
+    ttsError: "语音朗读启动失败，请重试",
   },
   community: {
     bookSource: "书籍来源",

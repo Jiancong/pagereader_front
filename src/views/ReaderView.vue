@@ -112,6 +112,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent 
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { FileWarning, Volume2, Pause, Play, Loader2 } from 'lucide-vue-next'
+import { ElMessage } from 'element-plus'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
 import MobiReader from '@/components/reader/MobiReader.vue'
@@ -158,6 +159,13 @@ async function getCurrentPageText(): Promise<string> {
 
 async function onToggleTts() {
   if (!canTts.value || ttsBusy.value) return
+
+  // 浏览器不支持 speechSynthesis
+  if (!ttsSupported) {
+    ElMessage.warning(t('reader.ttsUnsupported'))
+    return
+  }
+
   // 正在朗读且未暂停 → 暂停
   if (speaking.value && !paused.value) {
     ttsPause()
@@ -173,7 +181,10 @@ async function onToggleTts() {
   ttsLoading.value = true
   try {
     const text = await getCurrentPageText()
-    if (!text) return
+    if (!text || !text.trim()) {
+      ElMessage.warning(t('reader.ttsNoText'))
+      return
+    }
     ttsSpeak(text, {
       lang: 'zh-CN',
       onEnd: () => {
@@ -182,11 +193,17 @@ async function onToggleTts() {
           nextPage()
           setTimeout(async () => {
             const nextText = await getCurrentPageText()
-            if (nextText) ttsSpeak(nextText, { lang: 'zh-CN' })
+            if (nextText && nextText.trim()) ttsSpeak(nextText, { lang: 'zh-CN' })
           }, 600)
         }
       },
     })
+    // 确认 speechSynthesis 确实开始
+    if (!speaking.value) {
+      ElMessage.warning(t('reader.ttsNoText'))
+    }
+  } catch {
+    ElMessage.error(t('reader.ttsError'))
   } finally {
     ttsLoading.value = false
     // 短暂锁防止抖动（双击/快速连点）
