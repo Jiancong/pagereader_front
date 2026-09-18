@@ -46,6 +46,18 @@
           <Volume2 v-else class="h-4 w-4" />
           <span class="rv-btn--tts-label">{{ ttsLoading ? t('reader.ttsLoading') : (speaking ? (paused ? t('reader.ttsResume') : t('reader.ttsPause')) : t('reader.ttsStart')) }}</span>
         </button>
+
+        <select
+          v-if="canTts && ttsVoices.length > 1"
+          class="rv-btn rv-btn--sm rv-tts-voice-select"
+          :value="ttsSelectedVoiceURI"
+          :title="t('reader.ttsVoice')"
+          @change="onSelectTtsVoice"
+        >
+          <option v-for="v in ttsVoices" :key="v.voiceURI" :value="v.voiceURI">
+            {{ v.name }} ({{ v.lang }})
+          </option>
+        </select>
       </div>
     </header>
 
@@ -143,7 +155,7 @@ const currentPage = ref(1)
 const pageCount = ref(0)
 const pageInput = ref(1)
 
-const { speaking, paused, supported: ttsSupported, speak: ttsSpeak, pause: ttsPause, resume: ttsResume, stop: stopTts } = useBrowserTts()
+const { speaking, paused, supported: ttsSupported, voices: ttsVoices, selectedVoiceURI: ttsSelectedVoiceURI, speak: ttsSpeak, pause: ttsPause, resume: ttsResume, stop: stopTts, setSelectedVoice: ttsSetSelectedVoice } = useBrowserTts()
 
 const ttsLoading = ref(false)
 const ttsBusy = ref(false)
@@ -155,6 +167,11 @@ async function getCurrentPageText(): Promise<string> {
   if (isEpub.value) return epubReaderRef.value?.getPageText?.() || ''
   if (isMobi.value) return mobiReaderRef.value?.getPageText?.() || ''
   return ''
+}
+
+function onSelectTtsVoice(e: Event) {
+  const target = e.target as HTMLSelectElement
+  ttsSetSelectedVoice(target.value)
 }
 
 async function onToggleTts() {
@@ -444,6 +461,26 @@ onBeforeUnmount(() => {
 }
 .rv-btn--tts-label {
   white-space: nowrap;
+}
+.rv-tts-voice-select {
+  max-width: 180px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rv-tts-voice-select:hover {
+  background: #1f2937;
+}
+.rv-tts-voice-select option {
+  background: #111827;
+  color: #e5e7eb;
 }
 .reader-view__empty {
   flex: 1;

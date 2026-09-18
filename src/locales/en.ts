@@ -801,6 +801,7 @@ export default {
     ttsPause: "Pause",
     ttsResume: "Resume",
     ttsLoading: "Loading…",
+    ttsVoice: "Choose voice",
     ttsUnsupported: "Your browser doesn't support speech synthesis",
     ttsNoText: "No readable text found on this page",
     ttsError: "Failed to start reading aloud, please retry",
