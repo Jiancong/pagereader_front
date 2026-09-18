@@ -60,6 +60,11 @@ const routes = [
   {
     path: "/reader",
     name: "reader",
+    component: () => import("./views/ReaderHubView.vue"),
+  },
+  {
+    path: "/reader/open",
+    name: "reader-open",
     component: () => import("./views/ReaderView.vue"),
   },
   {

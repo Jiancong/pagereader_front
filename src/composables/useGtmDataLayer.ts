@@ -51,6 +51,7 @@ export function gtmPageTypeFromRoute(
   if (n === "about" || n === "terms" || n === "privacy" || n === "contact") return "legal"
   if (n === "translate") return "translate"
   if (n === "reader") return "reader"
+  if (n === "reader-open") return "reader_open"
   if (path.includes("/explore/project/") && path.endsWith("/read")) return "project_reader"
   if (path.includes("/explore/project/")) return "project_community"
   return n || "other"

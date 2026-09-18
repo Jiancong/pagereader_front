@@ -34,11 +34,10 @@
       </div>
     </header>
 
-    <!-- 无内容兜底：继续阅读 + 返回上传 -->
+    <!-- 无文件：回阅读中心 -->
     <div v-if="!hasSource" class="reader-view__empty">
-      <ReadingHistoryPanel variant="dark" class="reader-view__history" />
-      <p class="reader-view__empty-hint">{{ t('reader.noFile') }}</p>
-      <button class="rv-btn rv-btn--primary" @click="goBack">{{ t('reader.back') }}</button>
+      <p>{{ t('reader.noFile') }}</p>
+      <button class="rv-btn rv-btn--primary" @click="goBack">{{ t('reader.backToHub') }}</button>
     </div>
 
     <!-- PDF 阅读器 -->
@@ -102,7 +101,6 @@ import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
 import MobiReader from '@/components/reader/MobiReader.vue'
 import { useReaderFileStore } from '@/stores/reader'
-import ReadingHistoryPanel from '@/components/reader/ReadingHistoryPanel.vue'
 
 const XlsxReader = defineAsyncComponent(() => import('@/components/reader/XlsxReader.vue'))
 
@@ -212,14 +210,14 @@ function onContextMenu(e: MouseEvent) {
 }
 
 function goBack() {
-  if (window.history.length > 1) {
-    router.back()
-  } else {
-    router.push({ name: 'landing' })
-  }
+  router.push({ name: 'reader' })
 }
 
 onMounted(() => {
+  if (!store.file) {
+    router.replace({ name: 'reader' })
+    return
+  }
   window.addEventListener('keydown', onKeyDown)
 })
 
@@ -336,14 +334,6 @@ onBeforeUnmount(() => {
   padding: 24px 16px;
   color: #d1d5db;
   font-size: 14px;
-}
-.reader-view__history {
-  margin-bottom: 8px;
-}
-.reader-view__empty-hint {
-  text-align: center;
-  max-width: 420px;
-  line-height: 1.5;
 }
 .reader-view__unsupported {
   flex: 1;

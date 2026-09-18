@@ -1151,7 +1151,7 @@ const clearReaderFile = () => {
 const startReading = () => {
   if (!selectedReaderFile.value) return
   readerFileStore.setFile(selectedReaderFile.value)
-  router.push({ name: "reader" })
+  router.push({ name: "reader-open" })
 }
 
 const startImmersiveTranslation = async () => {
