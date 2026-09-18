@@ -249,7 +249,14 @@ function onWheel(e: WheelEvent) {
   applyZoomDelta(e.deltaY > 0 ? -0.1 : 0.1)
 }
 function onPageChange(page: number) {
+  const changed = currentPage.value !== page
   currentPage.value = page
+  // 用户手动翻页时，若 TTS 正在朗读或暂停中，停止当前朗读，
+  // 这样再次点击按钮会从新页面开始朗读，而不是继续旧位置。
+  // 自动翻页场景下 onend 已把 speaking/paused 置为 false，不会触发 stop。
+  if (changed && (speaking.value || paused.value)) {
+    stopTts()
+  }
 }
 function onPageCount(count: number) {
   pageCount.value = count
