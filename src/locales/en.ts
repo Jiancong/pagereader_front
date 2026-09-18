@@ -800,6 +800,7 @@ export default {
     ttsStart: "Read aloud",
     ttsPause: "Pause",
     ttsResume: "Resume",
+    ttsLoading: "Loading…",
   },
   community: {
     bookSource: "Book source",

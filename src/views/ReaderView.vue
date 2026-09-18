@@ -35,14 +35,16 @@
         <button
           v-if="canTts"
           class="rv-btn rv-btn--sm rv-btn--tts"
-          :class="{ 'rv-btn--tts-active': speaking && !paused }"
-          :title="speaking ? (paused ? t('reader.ttsResume') : t('reader.ttsPause')) : t('reader.ttsStart')"
+          :class="{ 'rv-btn--tts-active': speaking && !paused, 'rv-btn--loading': ttsLoading }"
+          :disabled="ttsLoading || ttsBusy"
+          :title="ttsLoading ? t('reader.ttsLoading') : (speaking ? (paused ? t('reader.ttsResume') : t('reader.ttsPause')) : t('reader.ttsStart'))"
           @click="onToggleTts"
         >
-          <Pause v-if="speaking && !paused" class="h-4 w-4" />
+          <Loader2 v-if="ttsLoading" class="h-4 w-4 animate-spin" />
+          <Pause v-else-if="speaking && !paused" class="h-4 w-4" />
           <Play v-else-if="paused" class="h-4 w-4" />
           <Volume2 v-else class="h-4 w-4" />
-          <span class="rv-btn--tts-label">{{ speaking ? (paused ? t('reader.ttsResume') : t('reader.ttsPause')) : t('reader.ttsStart') }}</span>
+          <span class="rv-btn--tts-label">{{ ttsLoading ? t('reader.ttsLoading') : (speaking ? (paused ? t('reader.ttsResume') : t('reader.ttsPause')) : t('reader.ttsStart')) }}</span>
         </button>
       </div>
     </header>
@@ -109,7 +111,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play, Loader2 } from 'lucide-vue-next'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
 import MobiReader from '@/components/reader/MobiReader.vue'
@@ -142,6 +144,9 @@ const pageInput = ref(1)
 
 const { speaking, paused, supported: ttsSupported, speak: ttsSpeak, pause: ttsPause, resume: ttsResume, stop: stopTts } = useBrowserTts()
 
+const ttsLoading = ref(false)
+const ttsBusy = ref(false)
+
 const canTts = computed(() => ttsSupported && hasSource.value && (isPdf.value || isEpub.value || isMobi.value))
 
 async function getCurrentPageText(): Promise<string> {
@@ -152,7 +157,7 @@ async function getCurrentPageText(): Promise<string> {
 }
 
 async function onToggleTts() {
-  if (!canTts.value) return
+  if (!canTts.value || ttsBusy.value) return
   // 正在朗读且未暂停 → 暂停
   if (speaking.value && !paused.value) {
     ttsPause()
@@ -164,21 +169,31 @@ async function onToggleTts() {
     return
   }
   // 未开始 → 提取当前页文本并朗读
-  const text = await getCurrentPageText()
-  if (!text) return
-  ttsSpeak(text, {
-    lang: 'zh-CN',
-    onEnd: () => {
-      // 读完当前页自动翻到下一页并继续
-      if (currentPage.value < pageCount.value) {
-        nextPage()
-        setTimeout(async () => {
-          const nextText = await getCurrentPageText()
-          if (nextText) ttsSpeak(nextText, { lang: 'zh-CN' })
-        }, 600)
-      }
-    },
-  })
+  ttsBusy.value = true
+  ttsLoading.value = true
+  try {
+    const text = await getCurrentPageText()
+    if (!text) return
+    ttsSpeak(text, {
+      lang: 'zh-CN',
+      onEnd: () => {
+        // 读完当前页自动翻到下一页并继续
+        if (currentPage.value < pageCount.value) {
+          nextPage()
+          setTimeout(async () => {
+            const nextText = await getCurrentPageText()
+            if (nextText) ttsSpeak(nextText, { lang: 'zh-CN' })
+          }, 600)
+        }
+      },
+    })
+  } finally {
+    ttsLoading.value = false
+    // 短暂锁防止抖动（双击/快速连点）
+    setTimeout(() => {
+      ttsBusy.value = false
+    }, 400)
+  }
 }
 
 function clampScale(value: number) {
@@ -383,6 +398,7 @@ onBeforeUnmount(() => {
 .rv-btn--tts {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   padding: 4px 10px;
   border-radius: 6px;
@@ -391,10 +407,19 @@ onBeforeUnmount(() => {
   color: #e5e7eb;
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  min-width: 92px;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
 }
 .rv-btn--tts:hover:not(:disabled) {
   background: #1f2937;
+}
+.rv-btn--tts:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.rv-btn--tts-loading {
+  cursor: progress;
 }
 .rv-btn--tts-active {
   border-color: #6366f1;

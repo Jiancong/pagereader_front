@@ -781,6 +781,7 @@ export default {
     ttsStart: "语音朗读",
     ttsPause: "暂停朗读",
     ttsResume: "继续朗读",
+    ttsLoading: "准备中…",
   },
   community: {
     bookSource: "书籍来源",
