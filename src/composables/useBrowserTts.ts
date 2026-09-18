@@ -24,7 +24,6 @@ const FEMALE_NAME_HINTS = [
   'woman',
   '女声',
   '女',
-  'female',
 ]
 
 /** 中文男声名字关键词（用于排除） */
@@ -41,6 +40,28 @@ function isChineseVoice(v: SpeechSynthesisVoice): boolean {
   return lang.startsWith('zh') || lang.startsWith('cmn')
 }
 
+/** 将长文本按句子拆分成小段，避免 Chrome ~15s 截断 bug */
+export function splitTextIntoChunks(text: string, maxLen = 200): string[] {
+  const clean = text.replace(/\s+/g, ' ').trim()
+  if (!clean) return []
+  if (clean.length <= maxLen) return [clean]
+  // 按句号/问号/感叹号/分号/换行拆分
+  const sentences = clean.split(/(?<=[。！？；\n!?;])/)
+  const chunks: string[] = []
+  let buf = ''
+  for (const s of sentences) {
+    if (!s) continue
+    if ((buf + s).length > maxLen && buf) {
+      chunks.push(buf)
+      buf = s
+    } else {
+      buf += s
+    }
+  }
+  if (buf) chunks.push(buf)
+  return chunks
+}
+
 export function useBrowserTts() {
   const supported =
     typeof window !== 'undefined' && typeof window.speechSynthesis !== 'undefined'
@@ -51,6 +72,14 @@ export function useBrowserTts() {
 
   const voices = ref<SpeechSynthesisVoice[]>([])
   const selectedVoiceURI = ref<string>('')
+
+  // 内部状态：分块朗读队列
+  let chunkQueue: string[] = []
+  let chunkLang = 'zh-CN'
+  let chunkOnEnd: (() => void) | null = null
+  let chunkOnError: (() => void) | null = null
+  let isChunkSequence = false
+  let keepAliveTimer: ReturnType<typeof setInterval> | null = null
 
   function loadVoices() {
     if (!supported) return
@@ -65,16 +94,12 @@ export function useBrowserTts() {
   function pickPreferredFemaleVoice(list: SpeechSynthesisVoice[]): string {
     const zh = list.filter(isChineseVoice)
     const pool = zh.length ? zh : list
-
-    // 1) 名字里明确带女声关键词
     const female = pool.find((v) => isFemaleVoice(v.name || ''))
     if (female) return female.voiceURI
-
-    // 2) 没有"女声"标记时，挑 zh-CN 中第一个非男声的（多数系统默认女声）
-    const notMale = pool.find((v) => !MALE_NAME_HINTS.some((k) => (v.name || '').toLowerCase().includes(k)))
+    const notMale = pool.find(
+      (v) => !MALE_NAME_HINTS.some((k) => (v.name || '').toLowerCase().includes(k)),
+    )
     if (notMale) return notMale.voiceURI
-
-    // 3) 退回第一个中文音色
     if (pool[0]) return pool[0].voiceURI
     return ''
   }
@@ -86,12 +111,36 @@ export function useBrowserTts() {
   onMounted(() => {
     if (!supported) return
     loadVoices()
-    // Chrome 异步加载 voices
     window.speechSynthesis.onvoiceschanged = () => loadVoices()
   })
 
+  /** Chrome keep-alive：定期 pause+resume 防止长文本被截断 */
+  function startKeepAlive() {
+    if (keepAliveTimer) return
+    keepAliveTimer = setInterval(() => {
+      if (!supported) return
+      if (speaking.value && !paused.value) {
+        // Chrome bug workaround
+        window.speechSynthesis.pause()
+        window.speechSynthesis.resume()
+      }
+    }, 10000)
+  }
+
+  function stopKeepAlive() {
+    if (keepAliveTimer) {
+      clearInterval(keepAliveTimer)
+      keepAliveTimer = null
+    }
+  }
+
   function stop() {
     if (!supported) return
+    chunkQueue = []
+    isChunkSequence = false
+    chunkOnEnd = null
+    chunkOnError = null
+    stopKeepAlive()
     window.speechSynthesis.cancel()
     speaking.value = false
     paused.value = false
@@ -110,45 +159,117 @@ export function useBrowserTts() {
     paused.value = false
   }
 
-  function speak(text: string, opts?: { lang?: string; onEnd?: () => void }) {
+  function applyVoice(u: SpeechSynthesisUtterance, lang: string) {
+    const list = voices.value.length
+      ? voices.value
+      : window.speechSynthesis.getVoices()
+    const voice =
+      (selectedVoiceURI.value &&
+        list.find((v) => v.voiceURI === selectedVoiceURI.value)) ||
+      list.find((v) => isFemaleVoice(v.name || '') && isChineseVoice(v)) ||
+      list.find((v) => isChineseVoice(v))
+    if (voice) {
+      u.voice = voice
+      u.lang = voice.lang || lang
+    } else {
+      u.lang = lang
+    }
+    u.pitch = 1.15
+    u.rate = 0.95
+  }
+
+  /** 朗读单段文本（不分块） */
+  function speakSingle(text: string, lang: string, onEnd?: () => void, onError?: () => void) {
+    const u = new SpeechSynthesisUtterance(text.trim())
+    applyVoice(u, lang)
+    u.onend = () => {
+      currentUtterance.value = null
+      onEnd?.()
+    }
+    u.onerror = () => {
+      currentUtterance.value = null
+      onError?.()
+    }
+    currentUtterance.value = u
+    window.speechSynthesis.speak(u)
+  }
+
+  /** 朗读队列中的下一块 */
+  function speakNextChunk() {
+    if (!supported || chunkQueue.length === 0) {
+      isChunkSequence = false
+      stopKeepAlive()
+      speaking.value = false
+      chunkOnEnd?.()
+      chunkOnEnd = null
+      return
+    }
+    const chunk = chunkQueue.shift()!
+    speakSingle(
+      chunk,
+      chunkLang,
+      () => {
+        // 当前块读完，继续下一块
+        if (isChunkSequence && chunkQueue.length > 0) {
+          speakNextChunk()
+        } else {
+          isChunkSequence = false
+          stopKeepAlive()
+          speaking.value = false
+          currentUtterance.value = null
+          chunkOnEnd?.()
+          chunkOnEnd = null
+        }
+      },
+      () => {
+        isChunkSequence = false
+        stopKeepAlive()
+        speaking.value = false
+        currentUtterance.value = null
+        chunkOnError?.()
+        chunkOnError = null
+      },
+    )
+  }
+
+  /**
+   * 朗读文本，自动分块以避免 Chrome 截断。
+   * onEnd 在整段文本全部读完时触发。
+   */
+  function speak(text: string, opts?: { lang?: string; onEnd?: () => void; onError?: () => void }) {
     if (!supported || !text.trim()) return false
     stop()
     try {
-      const u = new SpeechSynthesisUtterance(text.trim())
-      const lang = opts?.lang || (navigator.language || 'zh-CN')
-      u.lang = lang
-      // 选择女声
-      const list = voices.value.length
-        ? voices.value
-        : window.speechSynthesis.getVoices()
-      const voice =
-        (selectedVoiceURI.value &&
-          list.find((v) => v.voiceURI === selectedVoiceURI.value)) ||
-        list.find((v) => isFemaleVoice(v.name || '') && isChineseVoice(v)) ||
-        list.find((v) => isChineseVoice(v))
-      if (voice) {
-        u.voice = voice
-        u.lang = voice.lang || lang
+      const lang = opts?.lang || navigator.language || 'zh-CN'
+      const chunks = splitTextIntoChunks(text)
+      if (chunks.length === 0) return false
+
+      chunkLang = lang
+      chunkOnEnd = opts?.onEnd || null
+      chunkOnError = opts?.onError || null
+
+      if (chunks.length === 1) {
+        // 单块直接朗读
+        speaking.value = true
+        isChunkSequence = false
+        startKeepAlive()
+        speakSingle(chunks[0], lang, () => {
+          stopKeepAlive()
+          speaking.value = false
+          currentUtterance.value = null
+          opts?.onEnd?.()
+        })
+      } else {
+        // 多块队列朗读
+        speaking.value = true
+        isChunkSequence = true
+        chunkQueue = chunks
+        startKeepAlive()
+        speakNextChunk()
       }
-      // 稍微提高音调让声音更柔和甜美
-      u.pitch = 1.15
-      u.rate = 0.95
-      u.onend = () => {
-        speaking.value = false
-        paused.value = false
-        currentUtterance.value = null
-        opts?.onEnd?.()
-      }
-      u.onerror = () => {
-        speaking.value = false
-        paused.value = false
-        currentUtterance.value = null
-      }
-      currentUtterance.value = u
-      speaking.value = true
-      window.speechSynthesis.speak(u)
       return true
     } catch {
+      stopKeepAlive()
       speaking.value = false
       return false
     }

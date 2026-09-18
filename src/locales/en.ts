@@ -802,6 +802,8 @@ export default {
     ttsResume: "Resume",
     ttsLoading: "Loading…",
     ttsVoice: "Choose voice",
+    ttsAutoAdvance: "Auto-page",
+    ttsAutoAdvanceHint: "Automatically turn to the next page after reading finishes",
     ttsUnsupported: "Your browser doesn't support speech synthesis",
     ttsNoText: "No readable text found on this page",
     ttsError: "Failed to start reading aloud, please retry",

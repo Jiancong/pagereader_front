@@ -60,6 +60,17 @@
         </select>
 
         <button
+          v-if="canTts"
+          class="rv-btn rv-btn--sm rv-btn--auto-advance"
+          :class="{ 'rv-btn--auto-advance--on': ttsAutoAdvance }"
+          :title="t('reader.ttsAutoAdvanceHint')"
+          @click="ttsAutoAdvance = !ttsAutoAdvance"
+        >
+          <Repeat class="h-4 w-4" />
+          <span class="rv-btn--auto-advance-label">{{ t('reader.ttsAutoAdvance') }}</span>
+        </button>
+
+        <button
           v-if="hasSource && (isPdf || isEpub || isMobi)"
           class="rv-btn rv-btn--sm rv-btn--share"
           :title="t('reader.shareBookTitle')"
@@ -142,7 +153,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play, Loader2, Share2 } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play, Loader2, Share2, Repeat } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
@@ -181,6 +192,11 @@ const { speaking, paused, supported: ttsSupported, voices: ttsVoices, selectedVo
 
 const ttsLoading = ref(false)
 const ttsBusy = ref(false)
+const ttsAutoAdvance = ref(true)
+// 用于取消过期的自动翻页（用户手动翻页时递增）
+let ttsAdvanceToken = 0
+// 标记当前翻页是否由 TTS 自动触发（避免 onPageChange 误停 TTS）
+let ttsAutoTurning = false
 
 const canTts = computed(() => ttsSupported && hasSource.value && (isPdf.value || isEpub.value || isMobi.value))
 
@@ -194,6 +210,77 @@ async function getCurrentPageText(): Promise<string> {
 function onSelectTtsVoice(e: Event) {
   const target = e.target as HTMLSelectElement
   ttsSetSelectedVoice(target.value)
+}
+
+/** 朗读当前页，读完自动翻页并继续朗读下一页（递归链式） */
+async function speakCurrentPage() {
+  if (!canTts.value) return
+  const token = ttsAdvanceToken
+  ttsBusy.value = true
+  ttsLoading.value = true
+  try {
+    const text = await getCurrentPageText()
+    if (!text || !text.trim()) {
+      ElMessage.warning(t('reader.ttsNoText'))
+      return
+    }
+    ttsSpeak(text, {
+      lang: 'zh-CN',
+      onEnd: () => {
+        // 如果已被取消（用户手动翻页/停止），不再继续
+        if (token !== ttsAdvanceToken) return
+        // 自动翻页关闭或已到最后一页 → 停止
+        if (!ttsAutoAdvance.value || currentPage.value >= pageCount.value) {
+          return
+        }
+        // 自动翻到下一页
+        ttsAutoTurning = true
+        nextPage()
+        // 等待页面渲染后朗读下一页
+        setTimeout(async () => {
+          ttsAutoTurning = false
+          // 检查是否被取消
+          if (token !== ttsAdvanceToken) return
+          await speakCurrentPage()
+        }, 800)
+      },
+      onError: () => {
+        ttsAutoTurning = false
+      },
+    })
+    if (!speaking.value) {
+      ElMessage.warning(t('reader.ttsNoText'))
+    }
+  } catch {
+    ElMessage.error(t('reader.ttsError'))
+  } finally {
+    ttsLoading.value = false
+    setTimeout(() => {
+      ttsBusy.value = false
+    }, 400)
+  }
+}
+
+async function onToggleTts() {
+  if (!canTts.value || ttsBusy.value) return
+
+  if (!ttsSupported) {
+    ElMessage.warning(t('reader.ttsUnsupported'))
+    return
+  }
+
+  // 正在朗读且未暂停 → 暂停
+  if (speaking.value && !paused.value) {
+    ttsPause()
+    return
+  }
+  // 暂停中 → 继续
+  if (paused.value) {
+    ttsResume()
+    return
+  }
+  // 未开始 → 朗读当前页（带自动翻页链）
+  await speakCurrentPage()
 }
 
 // ── 分享书籍 ──
@@ -222,62 +309,6 @@ function onShareLoginRequired() {
   router.push({ name: 'reader' })
 }
 
-async function onToggleTts() {
-  if (!canTts.value || ttsBusy.value) return
-
-  // 浏览器不支持 speechSynthesis
-  if (!ttsSupported) {
-    ElMessage.warning(t('reader.ttsUnsupported'))
-    return
-  }
-
-  // 正在朗读且未暂停 → 暂停
-  if (speaking.value && !paused.value) {
-    ttsPause()
-    return
-  }
-  // 暂停中 → 继续
-  if (paused.value) {
-    ttsResume()
-    return
-  }
-  // 未开始 → 提取当前页文本并朗读
-  ttsBusy.value = true
-  ttsLoading.value = true
-  try {
-    const text = await getCurrentPageText()
-    if (!text || !text.trim()) {
-      ElMessage.warning(t('reader.ttsNoText'))
-      return
-    }
-    ttsSpeak(text, {
-      lang: 'zh-CN',
-      onEnd: () => {
-        // 读完当前页自动翻到下一页并继续
-        if (currentPage.value < pageCount.value) {
-          nextPage()
-          setTimeout(async () => {
-            const nextText = await getCurrentPageText()
-            if (nextText && nextText.trim()) ttsSpeak(nextText, { lang: 'zh-CN' })
-          }, 600)
-        }
-      },
-    })
-    // 确认 speechSynthesis 确实开始
-    if (!speaking.value) {
-      ElMessage.warning(t('reader.ttsNoText'))
-    }
-  } catch {
-    ElMessage.error(t('reader.ttsError'))
-  } finally {
-    ttsLoading.value = false
-    // 短暂锁防止抖动（双击/快速连点）
-    setTimeout(() => {
-      ttsBusy.value = false
-    }, 400)
-  }
-}
-
 function clampScale(value: number) {
   return Math.min(3, Math.max(0.5, +value.toFixed(2)))
 }
@@ -299,10 +330,11 @@ function onWheel(e: WheelEvent) {
 function onPageChange(page: number) {
   const changed = currentPage.value !== page
   currentPage.value = page
-  // 用户手动翻页时，若 TTS 正在朗读或暂停中，停止当前朗读，
-  // 这样再次点击按钮会从新页面开始朗读，而不是继续旧位置。
-  // 自动翻页场景下 onend 已把 speaking/paused 置为 false，不会触发 stop。
+  // TTS 自动翻页时不停止朗读
+  if (ttsAutoTurning) return
+  // 用户手动翻页时：取消待执行的自动翻页并停止当前朗读
   if (changed && (speaking.value || paused.value)) {
+    ttsAdvanceToken++
     stopTts()
   }
 }
@@ -382,6 +414,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
+  ttsAdvanceToken++
   stopTts()
   store.revoke()
 })
@@ -536,6 +569,33 @@ onBeforeUnmount(() => {
 .rv-tts-voice-select option {
   background: #111827;
   color: #e5e7eb;
+}
+.rv-btn--auto-advance {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #6b7280;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.rv-btn--auto-advance:hover {
+  background: #1f2937;
+}
+.rv-btn--auto-advance--on {
+  border-color: #6366f1;
+  color: #a5b4fc;
+}
+.rv-btn--auto-advance--on:hover {
+  background: #1e1b4b;
+}
+.rv-btn--auto-advance-label {
+  white-space: nowrap;
 }
 .rv-btn--share {
   display: inline-flex;
