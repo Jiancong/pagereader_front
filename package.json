@@ -28,6 +28,7 @@
     "ios:clean": "npx cap clean ios"
   },
   "dependencies": {
+    "@capacitor-community/text-to-speech": "^5.0.0",
     "@capacitor/android": "^6.2.1",
     "@capacitor/core": "^6.2.1",
     "@capacitor/ios": "^6.2.1",

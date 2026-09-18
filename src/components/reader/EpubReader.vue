@@ -1,7 +1,10 @@
 <template>
   <div class="epub-reader" ref="rootRef">
     <div class="epub-reader__stage">
-      <div class="epub-reader__zoom" :style="{ zoom: scale ?? 1 }">
+      <div
+        class="epub-reader__zoom"
+        :style="epubZoomStyle"
+      >
         <div ref="viewerRef" class="epub-reader__viewer"></div>
       </div>
       <div v-if="loading" class="epub-reader__overlay">{{ t('reader.loading') }}</div>
@@ -29,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ePub, { type Book, type Rendition } from 'epubjs'
 
@@ -55,6 +58,15 @@ const currentPage = ref(1)
 const pageTotal = ref(0)
 const atStart = ref(true)
 const atEnd = ref(false)
+
+const epubZoomStyle = computed(() => {
+  const s = props.scale ?? 1
+  // iOS Safari 不支持 zoom 属性，用 transform scale 兜底
+  if (typeof CSS !== 'undefined' && CSS.supports && !CSS.supports('zoom', '1')) {
+    return { transform: `scale(${s})`, transformOrigin: 'top center' }
+  }
+  return { zoom: s }
+})
 
 let book: Book | null = null
 let rendition: Rendition | null = null
@@ -139,19 +151,42 @@ function uninstallUnloadShim() {
 
 onMounted(async () => {
   try {
-    const data = await props.file.arrayBuffer()
+    // iOS Safari 旧版本 File.arrayBuffer() 可能缺失，用 slice+FileReader 兜底
+    let data: ArrayBuffer
+    if (typeof props.file.arrayBuffer === 'function') {
+      data = await props.file.arrayBuffer()
+    } else {
+      data = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as ArrayBuffer)
+        reader.onerror = () => reject(reader.error || new Error('FileReader error'))
+        reader.readAsArrayBuffer(props.file)
+      })
+    }
+
     book = ePub(data)
     await book.ready
 
-    const rect = viewerRef.value!.getBoundingClientRect()
+    // 等待 DOM 就绪（iOS Safari 有时 onMounted 时 ref 还未挂载）
+    await nextTick()
+    if (!viewerRef.value) {
+      throw new Error('Viewer element not ready')
+    }
+
+    const rect = viewerRef.value.getBoundingClientRect()
     const scale = currentScale()
-    const w = Math.max(1, Math.floor(rect.width / scale))
-    const h = Math.max(1, Math.floor(rect.height / scale))
+    // iOS Safari 有时返回 0 尺寸，用父容器兜底
+    const parentEl = viewerRef.value.parentElement
+    const parentRect = parentEl?.getBoundingClientRect()
+    const fallbackW = parentRect?.width || window.innerWidth || 800
+    const fallbackH = parentRect?.height || window.innerHeight || 600
+    const w = Math.max(1, Math.floor((rect.width || fallbackW) / scale))
+    const h = Math.max(1, Math.floor((rect.height || fallbackH) / scale))
     renderedWidth = w
     renderedHeight = h
 
     installUnloadShim()
-    rendition = book.renderTo(viewerRef.value!, {
+    rendition = book.renderTo(viewerRef.value, {
       width: w,
       height: h,
       flow: 'paginated',
@@ -219,6 +254,22 @@ onMounted(async () => {
   }
 })
 
+// iOS Safari 14 以下没有 ResizeObserver，用 window resize 兜底
+if (typeof ResizeObserver === 'undefined') {
+  window.addEventListener('resize', () => {
+    if (rendition && viewerRef.value) {
+      const s = currentScale()
+      const rect = viewerRef.value.getBoundingClientRect()
+      const width = Math.max(1, Math.floor(rect.width / s))
+      const height = Math.max(1, Math.floor(rect.height / s))
+      if (width === renderedWidth && height === renderedHeight) return
+      renderedWidth = width
+      renderedHeight = height
+      rendition.resize(width, height)
+    }
+  })
+}
+
 onBeforeUnmount(() => {
   uninstallUnloadShim()
   for (const doc of trackedDocs) detachFromDoc(doc)
@@ -285,6 +336,10 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   min-height: 0;
   display: flex;
   justify-content: center;
+  /* iOS Safari 不支持 CSS zoom 属性，用 transform 兜底 */
+  @supports not (zoom: 1) {
+    transform-origin: top center;
+  }
 }
 .epub-reader__viewer {
   flex: 1;

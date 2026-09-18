@@ -1,4 +1,6 @@
 import { ref, onBeforeUnmount, onMounted } from 'vue'
+import { Capacitor } from '@capacitor/core'
+import { TextToSpeech } from '@capacitor-community/text-to-speech'
 
 /** 中文女声名字关键词（按优先级排序） */
 const FEMALE_NAME_HINTS = [
@@ -45,7 +47,6 @@ export function splitTextIntoChunks(text: string, maxLen = 200): string[] {
   const clean = text.replace(/\s+/g, ' ').trim()
   if (!clean) return []
   if (clean.length <= maxLen) return [clean]
-  // 按句号/问号/感叹号/分号/换行拆分
   const sentences = clean.split(/(?<=[。！？；\n!?;])/)
   const chunks: string[] = []
   let buf = ''
@@ -63,8 +64,13 @@ export function splitTextIntoChunks(text: string, maxLen = 200): string[] {
 }
 
 export function useBrowserTts() {
-  const supported =
+  const webSupported =
     typeof window !== 'undefined' && typeof window.speechSynthesis !== 'undefined'
+
+  // Capacitor 原生 TTS 在 App 环境可用
+  const nativeTtsAvailable = Capacitor.isNativePlatform()
+
+  const supported = webSupported || nativeTtsAvailable
 
   const speaking = ref(false)
   const paused = ref(false)
@@ -82,7 +88,7 @@ export function useBrowserTts() {
   let keepAliveTimer: ReturnType<typeof setInterval> | null = null
 
   function loadVoices() {
-    if (!supported) return
+    if (!webSupported) return
     const list = window.speechSynthesis.getVoices()
     if (!list || !list.length) return
     voices.value = list
@@ -109,18 +115,18 @@ export function useBrowserTts() {
   }
 
   onMounted(() => {
-    if (!supported) return
-    loadVoices()
-    window.speechSynthesis.onvoiceschanged = () => loadVoices()
+    if (webSupported) {
+      loadVoices()
+      window.speechSynthesis.onvoiceschanged = () => loadVoices()
+    }
   })
 
   /** Chrome keep-alive：定期 pause+resume 防止长文本被截断 */
   function startKeepAlive() {
     if (keepAliveTimer) return
     keepAliveTimer = setInterval(() => {
-      if (!supported) return
+      if (!webSupported) return
       if (speaking.value && !paused.value) {
-        // Chrome bug workaround
         window.speechSynthesis.pause()
         window.speechSynthesis.resume()
       }
@@ -135,34 +141,50 @@ export function useBrowserTts() {
   }
 
   function stop() {
-    if (!supported) return
     chunkQueue = []
     isChunkSequence = false
     chunkOnEnd = null
     chunkOnError = null
     stopKeepAlive()
-    window.speechSynthesis.cancel()
+    if (webSupported) {
+      window.speechSynthesis.cancel()
+    }
+    if (nativeTtsAvailable) {
+      void TextToSpeech.stop()
+    }
     speaking.value = false
     paused.value = false
     currentUtterance.value = null
   }
 
-  function pause() {
+  async function pause() {
     if (!supported || !speaking.value) return
-    window.speechSynthesis.pause()
+    if (webSupported) {
+      window.speechSynthesis.pause()
+    }
+    if (nativeTtsAvailable) {
+      await TextToSpeech.pause()
+    }
     paused.value = true
   }
 
-  function resume() {
+  async function resume() {
     if (!supported || !paused.value) return
-    window.speechSynthesis.resume()
+    if (webSupported) {
+      window.speechSynthesis.resume()
+    }
+    if (nativeTtsAvailable) {
+      await TextToSpeech.resume()
+    }
     paused.value = false
   }
 
   function applyVoice(u: SpeechSynthesisUtterance, lang: string) {
     const list = voices.value.length
       ? voices.value
-      : window.speechSynthesis.getVoices()
+      : webSupported
+        ? window.speechSynthesis.getVoices()
+        : []
     const voice =
       (selectedVoiceURI.value &&
         list.find((v) => v.voiceURI === selectedVoiceURI.value)) ||
@@ -178,7 +200,7 @@ export function useBrowserTts() {
     u.rate = 0.95
   }
 
-  /** 朗读单段文本（不分块） */
+  /** 朗读单段文本（不分块）— Web speechSynthesis */
   function speakSingle(text: string, lang: string, onEnd?: () => void, onError?: () => void) {
     const u = new SpeechSynthesisUtterance(text.trim())
     applyVoice(u, lang)
@@ -194,6 +216,22 @@ export function useBrowserTts() {
     window.speechSynthesis.speak(u)
   }
 
+  /** 朗读单段文本 — Capacitor 原生 TTS */
+  async function speakSingleNative(text: string, lang: string, onEnd?: () => void, onError?: () => void) {
+    try {
+      await TextToSpeech.speak({
+        text: text.trim(),
+        lang: lang,
+        rate: 0.95,
+        pitch: 1.15,
+        category: 'playback',
+      })
+      onEnd?.()
+    } catch {
+      onError?.()
+    }
+  }
+
   /** 朗读队列中的下一块 */
   function speakNextChunk() {
     if (!supported || chunkQueue.length === 0) {
@@ -205,31 +243,32 @@ export function useBrowserTts() {
       return
     }
     const chunk = chunkQueue.shift()!
-    speakSingle(
-      chunk,
-      chunkLang,
-      () => {
-        // 当前块读完，继续下一块
-        if (isChunkSequence && chunkQueue.length > 0) {
-          speakNextChunk()
-        } else {
-          isChunkSequence = false
-          stopKeepAlive()
-          speaking.value = false
-          currentUtterance.value = null
-          chunkOnEnd?.()
-          chunkOnEnd = null
-        }
-      },
-      () => {
+    const onChunkEnd = () => {
+      if (isChunkSequence && chunkQueue.length > 0) {
+        speakNextChunk()
+      } else {
         isChunkSequence = false
         stopKeepAlive()
         speaking.value = false
         currentUtterance.value = null
-        chunkOnError?.()
-        chunkOnError = null
-      },
-    )
+        chunkOnEnd?.()
+        chunkOnEnd = null
+      }
+    }
+    const onChunkError = () => {
+      isChunkSequence = false
+      stopKeepAlive()
+      speaking.value = false
+      currentUtterance.value = null
+      chunkOnError?.()
+      chunkOnError = null
+    }
+
+    if (nativeTtsAvailable) {
+      void speakSingleNative(chunk, chunkLang, onChunkEnd, onChunkError)
+    } else if (webSupported) {
+      speakSingle(chunk, chunkLang, onChunkEnd, onChunkError)
+    }
   }
 
   /**
@@ -249,18 +288,26 @@ export function useBrowserTts() {
       chunkOnError = opts?.onError || null
 
       if (chunks.length === 1) {
-        // 单块直接朗读
         speaking.value = true
         isChunkSequence = false
         startKeepAlive()
-        speakSingle(chunks[0], lang, () => {
+        const onEnd = () => {
           stopKeepAlive()
           speaking.value = false
           currentUtterance.value = null
           opts?.onEnd?.()
-        })
+        }
+        const onError = () => {
+          stopKeepAlive()
+          speaking.value = false
+          currentUtterance.value = null
+        }
+        if (nativeTtsAvailable) {
+          void speakSingleNative(chunks[0], lang, onEnd, onError)
+        } else if (webSupported) {
+          speakSingle(chunks[0], lang, onEnd, onError)
+        }
       } else {
-        // 多块队列朗读
         speaking.value = true
         isChunkSequence = true
         chunkQueue = chunks
@@ -275,11 +322,11 @@ export function useBrowserTts() {
     }
   }
 
-  function toggle(text: string, opts?: { lang?: string; onEnd?: () => void }) {
+  async function toggle(text: string, opts?: { lang?: string; onEnd?: () => void }) {
     if (speaking.value && !paused.value) {
-      pause()
+      await pause()
     } else if (paused.value) {
-      resume()
+      await resume()
     } else {
       speak(text, opts)
     }

@@ -392,7 +392,6 @@ async function onToggleTts() {
     ElMessage.warning(t('reader.ttsUnsupported'))
     return
   }
-
   // 正在朗读且未暂停 → 暂停
   if (speaking.value && !paused.value) {
     ttsPause()

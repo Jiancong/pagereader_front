@@ -56,6 +56,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { BookOpen, X } from 'lucide-vue-next'
+import { ElMessage } from 'element-plus'
 import { useReaderFileStore } from '@/stores/reader'
 
 const props = withDefaults(
@@ -102,6 +103,11 @@ function clearFile() {
 
 function startReading() {
   if (!selectedFile.value) return
+  // iOS Safari: 确保 File 对象有效
+  if (selectedFile.value.size === 0) {
+    ElMessage.warning(t('reader.localStart'))
+    return
+  }
   readerFileStore.setFile(selectedFile.value)
   emit('start', selectedFile.value)
   if (props.autoOpen) {
