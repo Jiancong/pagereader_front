@@ -10,6 +10,8 @@ interface ReaderFileState {
   file: File | null
   objectUrl: string
   format: ReaderFormat | ""
+  /** 跳转到工作区时保留文件，避免 onBeforeUnmount revoke */
+  preserveFileOnLeave: boolean
 }
 
 function detectFormat(file: File): ReaderFormat | "" {
@@ -26,6 +28,7 @@ export const useReaderFileStore = defineStore("reader-file", {
     file: null,
     objectUrl: "",
     format: "",
+    preserveFileOnLeave: false,
   }),
   actions: {
     setFile(file: File) {
@@ -34,6 +37,9 @@ export const useReaderFileStore = defineStore("reader-file", {
       this.format = detectFormat(file)
       this.objectUrl = URL.createObjectURL(file)
     },
+    setPreserveOnLeave(value: boolean) {
+      this.preserveFileOnLeave = value
+    },
     revoke() {
       if (this.objectUrl) {
         URL.revokeObjectURL(this.objectUrl)
@@ -41,6 +47,7 @@ export const useReaderFileStore = defineStore("reader-file", {
       }
       this.file = null
       this.format = ""
+      this.preserveFileOnLeave = false
     },
   },
 })

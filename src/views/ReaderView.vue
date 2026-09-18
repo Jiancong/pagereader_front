@@ -72,12 +72,12 @@
 
         <button
           v-if="hasSource && (isPdf || isEpub || isMobi)"
-          class="rv-btn rv-btn--sm rv-btn--share"
-          :title="t('reader.shareBookTitle')"
-          @click="onOpenShareDialog"
+          class="rv-btn rv-btn--sm rv-btn--workspace"
+          :title="t('reader.saveBookWorkspaceTitle')"
+          @click="onSaveToWorkspace"
         >
-          <Share2 class="h-4 w-4" />
-          <span class="rv-btn--share-label">{{ t('reader.shareBook') }}</span>
+          <FolderInput class="h-4 w-4" />
+          <span class="rv-btn--workspace-label">{{ t('reader.saveBookWorkspace') }}</span>
         </button>
       </div>
     </header>
@@ -138,14 +138,6 @@
       <button class="rv-btn rv-btn--primary" @click="goBack">{{ t('reader.back') }}</button>
     </div>
 
-    <!-- 分享书籍弹窗 -->
-    <ShareBookDialog
-      :open="shareDialogOpen"
-      :file="file"
-      @close="shareDialogOpen = false"
-      @shared="onBookShared"
-      @login-required="onShareLoginRequired"
-    />
   </div>
 </template>
 
@@ -153,16 +145,14 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play, Loader2, Share2, Repeat } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
 import MobiReader from '@/components/reader/MobiReader.vue'
-import ShareBookDialog from '@/components/reader/ShareBookDialog.vue'
 import { useReaderFileStore } from '@/stores/reader'
 import { useBrowserTts } from '@/composables/useBrowserTts'
 import { isLoggedIn } from '@/api'
-import type { ShareToCommunityResult } from '@/api/types'
 
 const XlsxReader = defineAsyncComponent(() => import('@/components/reader/XlsxReader.vue'))
 
@@ -283,30 +273,16 @@ async function onToggleTts() {
   await speakCurrentPage()
 }
 
-// ── 分享书籍 ──
-const shareDialogOpen = ref(false)
-
-function onOpenShareDialog() {
+function onSaveToWorkspace() {
+  if (!file.value) return
   if (!isLoggedIn()) {
-    ElMessage.warning(t('reader.shareBookLoginRequired'))
+    ElMessage.warning(t('reader.saveBookWorkspaceLoginRequired'))
     router.push({ name: 'reader' })
     return
   }
-  shareDialogOpen.value = true
-}
-
-function onBookShared(result: ShareToCommunityResult) {
-  ElMessage.success(t('reader.shareBookSuccess'))
-  // 跳转到社区项目页
-  if (result.projectId) {
-    router.push({ name: 'project-community', params: { projectId: result.projectId } })
-  }
-}
-
-function onShareLoginRequired() {
-  shareDialogOpen.value = false
-  ElMessage.warning(t('reader.shareBookLoginRequired'))
-  router.push({ name: 'reader' })
+  store.setPreserveOnLeave(true)
+  ElMessage.success(t('reader.saveBookWorkspaceSuccess'))
+  router.push({ name: 'workspace', query: { tab: 'read', fromReader: '1' } })
 }
 
 function clampScale(value: number) {
@@ -416,7 +392,11 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
   ttsAdvanceToken++
   stopTts()
-  store.revoke()
+  if (!store.preserveFileOnLeave) {
+    store.revoke()
+  } else {
+    store.setPreserveOnLeave(false)
+  }
 })
 </script>
 
@@ -597,7 +577,7 @@ onBeforeUnmount(() => {
 .rv-btn--auto-advance-label {
   white-space: nowrap;
 }
-.rv-btn--share {
+.rv-btn--workspace {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -611,7 +591,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   transition: background 0.15s, border-color 0.15s;
 }
-.rv-btn--share:hover {
+.rv-btn--workspace:hover {
   background: #1f2937;
   border-color: #6366f1;
   color: #a5b4fc;

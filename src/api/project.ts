@@ -12,7 +12,6 @@ export {
   incrementProjectView,
   getMyProjects,
   shareToCommunity,
-  shareBookToCommunity,
   updateProjectCategory,
   forkProject,
   listComments,

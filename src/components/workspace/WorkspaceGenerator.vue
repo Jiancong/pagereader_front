@@ -509,8 +509,8 @@
 
 
 <script setup lang="ts">
-import { ref, computed, reactive, watch, onBeforeUnmount } from "vue"
-import { RouterLink, useRouter } from "vue-router"
+import { ref, computed, reactive, watch, onMounted, onBeforeUnmount } from "vue"
+import { RouterLink, useRouter, useRoute } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages, Globe, BookOpen } from "lucide-vue-next"
@@ -627,6 +627,7 @@ const ragTask = reactive<GeneratorTask>(createTask("DOCUMENT"))
 const youtubeTask = reactive<GeneratorTask>(createTask("DOCUMENT"))
 
 const router = useRouter()
+const route = useRoute()
 const translateFileStore = useTranslateFileStore()
 const readerFileStore = useReaderFileStore()
 
@@ -1150,6 +1151,26 @@ const startReading = () => {
   readerFileStore.setFile(selectedReaderFile.value)
   router.push({ name: "reader-open" })
 }
+
+function importReaderBookFromQuery() {
+  const fromReader = String(route.query.fromReader || "") === "1"
+  const tab = String(route.query.tab || "")
+  if (!fromReader || tab !== "read" || !readerFileStore.file) return
+  activeTab.value = "read"
+  selectedReaderFile.value = readerFileStore.file
+  router.replace({ name: "workspace" })
+}
+
+onMounted(() => {
+  importReaderBookFromQuery()
+})
+
+watch(
+  () => route.query.fromReader,
+  () => {
+    importReaderBookFromQuery()
+  },
+)
 
 const startImmersiveTranslation = async () => {
   translateError.value = ""
