@@ -28,6 +28,7 @@ import type {
   ProjectReadingStatsVo,
   ProjectCommunityStatsVo,
   ProjectRelatedResult,
+  MyReadingItemVo,
 } from "./types"
 
 // Feed 流分页（匿名可访问，登录后返回 likedByMe）
@@ -297,6 +298,14 @@ export async function reportReadingProgress(
 // 阅读统计（readerCount / finishedCount / viewCount / likeCount + myReading*）
 export async function getReadingStats(id: string): Promise<ProjectReadingStatsVo> {
   return get<ProjectReadingStatsVo>(`/project/${encodeURIComponent(id)}/reading/stats`)
+}
+
+/** 我的阅读记录（需登录）；page 为 0 基，按最近阅读倒序 */
+export async function getMyReadingProjects(
+  page = 0,
+  size = 20,
+): Promise<Page<MyReadingItemVo>> {
+  return get<Page<MyReadingItemVo>>(`/project/reading/my`, { query: { page, size } })
 }
 
 // 社区页聚合接口：一次拿齐 reading + book + recommend

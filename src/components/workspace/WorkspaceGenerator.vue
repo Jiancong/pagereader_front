@@ -358,6 +358,8 @@
             <BookOpen class="h-5 w-5" />
             {{ t('workspace.readStart') }}
           </button>
+
+          <ReadingHistoryPanel variant="light" class="mt-8" />
         </div>
 
         <!-- YouTube 视频生成 PPT -->
@@ -516,6 +518,7 @@ import { ElMessage } from "element-plus"
 import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages, Globe, BookOpen } from "lucide-vue-next"
 import { useTranslateFileStore } from "@/stores/translateFile"
 import { useReaderFileStore } from "@/stores/reader"
+import ReadingHistoryPanel from "@/components/reader/ReadingHistoryPanel.vue"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
 import WorkspaceNovelResult from "@/components/workspace/WorkspaceNovelResult.vue"

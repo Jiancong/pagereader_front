@@ -1,5 +1,6 @@
 import { onBeforeUnmount } from "vue"
 import { projectApi } from "@/api"
+import { patchCachedReadingListItem } from "@/utils/readingProgressCache"
 
 const DEVICE_ID_KEY = "pr_device_id"
 const THROTTLE_MS = 8000 // 进度节流：同页 8s 内最多上报一次
@@ -66,7 +67,7 @@ export function useReadingProgressReporter(
     return payload
   }
 
-  function reportEnter(id: string) {
+  function reportEnter(id: string, resumeUnitIndex?: number) {
     if (!id) return
     // 切项目前先结算上一段
     if (sessionProjectId && sessionProjectId !== id) {
@@ -74,10 +75,15 @@ export function useReadingProgressReporter(
     }
     sessionProjectId = id
     sessionStartTs = Date.now()
-    lastReportedSlide = -1
     lastReportedTs = 0
-    // 进入即上报一次（进度 0，addMinutes 0，让后端记录读者 UV）
-    void safeReport(id, buildPayload(0, 0))
+    const resumeIndex =
+      resumeUnitIndex != null && Number.isFinite(resumeUnitIndex)
+        ? Math.max(0, Math.trunc(resumeUnitIndex))
+        : -1
+    lastReportedSlide = resumeIndex
+    const percent = resumeIndex >= 0 ? currentPercent(resumeIndex) : 0
+    // 续读时带上当前进度，避免后端把进度重置为 0
+    void safeReport(id, buildPayload(percent, 0))
   }
 
   function reportSlideChange(slideIndex: number) {
@@ -122,7 +128,11 @@ export function useReadingProgressReporter(
 
   async function safeReport(id: string, payload: Parameters<typeof projectApi.reportReadingProgress>[1]) {
     try {
-      await projectApi.reportReadingProgress(id, payload)
+      const stats = await projectApi.reportReadingProgress(id, payload)
+      patchCachedReadingListItem(id, {
+        myProgressPercent: stats.myProgressPercent ?? payload.progressPercent,
+        myReadingStatus: stats.myReadingStatus,
+      })
     } catch {
       // 静默：阅读进度失败不应影响阅读体验
     }

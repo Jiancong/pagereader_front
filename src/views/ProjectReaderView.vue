@@ -46,11 +46,12 @@
             </p>
           </div>
 
-          <div v-if="pptData">
+          <div v-if="pptData && pptResumeReady">
             <p class="mb-2 text-xs text-muted-foreground">{{ t('community.interactiveHint') }}</p>
             <PptViewer
               ref="pptViewerRef"
               :ppt-data="pptData"
+              :initial-slide="initialPptSlide"
               :project-id="projectId"
               :markdown="projectMarkdown"
               :ppt-data-url="pptDataUrl"
@@ -67,11 +68,15 @@
               @close="() => {}"
             />
           </div>
-          <div v-else-if="novelResult" class="mb-2 min-w-0">
+          <div v-else-if="novelResult && novelResumeReady" class="mb-2 min-w-0">
             <WorkspaceNovelResult
+              ref="novelViewerRef"
               :result="novelResult"
               :project-id="projectId"
+              :initial-section-id="initialNovelSectionId"
+              sequential-reader
               @close="() => {}"
+              @section-change="onNovelSectionChange"
               @cover-uploaded="onCoverUploaded"
             />
           </div>
@@ -138,6 +143,13 @@ import {
 } from '@/utils/projectTitle'
 import { gtmForkProject } from '@/composables/useGtmDataLayer'
 import { useReadingProgressReporter } from '@/composables/useReadingProgressReporter'
+import { buildNovelGuideOutline } from '@/utils/novelGuideSections'
+import {
+  resolveResumeSectionIndex,
+  resolveResumeSlideIndex,
+  saveLocalReadingPosition,
+  unitIndexToPercent,
+} from '@/utils/readingProgressCache'
 
 const route = useRoute()
 const router = useRouter()
@@ -162,16 +174,101 @@ const forking = ref(false)
 const sessionEntries = ref([])
 const pendingForkAfterLogin = ref(false)
 const pptViewerRef = ref(null)
+const novelViewerRef = ref(null)
+const serverReadingStats = ref(null)
+const initialPptSlide = ref(0)
+const initialNovelSectionId = ref('')
+const pptResumeReady = ref(false)
+const novelResumeReady = ref(false)
 
-// 阅读进度上报（仅在 PptViewer 场景生效）
+// 阅读进度上报（PPT 幻灯片 / 小说章节）
 const {
   reportEnter,
   reportSlideChange,
   reportLeave,
 } = useReadingProgressReporter(() => projectId.value, {
-  getTotalSlides: () => pptViewerRef.value?.totalSlides?.() ?? 0,
+  getTotalSlides: () => {
+    const pptTotal = pptViewerRef.value?.totalSlides?.()
+    if (pptTotal && pptTotal > 0) return pptTotal
+    const novelTotal = novelViewerRef.value?.totalSections?.()
+    if (novelTotal && novelTotal > 0) return novelTotal
+    return 0
+  },
   getIsLoggedIn: () => logged.value,
 })
+
+function resetResumeState() {
+  serverReadingStats.value = null
+  initialPptSlide.value = 0
+  initialNovelSectionId.value = ''
+  pptResumeReady.value = false
+  novelResumeReady.value = false
+}
+
+function persistReadingUnit(projectId, unitIndex, totalUnits, extra = {}) {
+  if (!projectId || totalUnits <= 0 || unitIndex < 0) return
+  saveLocalReadingPosition(projectId, {
+    ...extra,
+    progressPercent: unitIndexToPercent(unitIndex, totalUnits),
+  })
+}
+
+function applyNovelResume(id) {
+  const outline = buildNovelGuideOutline({
+    markdown: novelResult.value?.markdown,
+    novelNodes: novelResult.value?.novelNodes,
+    title: novelResult.value?.title,
+  })
+  const sections = outline.sections ?? []
+  if (!sections.length) {
+    novelResumeReady.value = true
+    reportEnter(id)
+    return
+  }
+  const sectionIds = sections.map((section) => section.id)
+  const { index, sectionId } = resolveResumeSectionIndex(
+    id,
+    serverReadingStats.value?.myProgressPercent,
+    sections.length,
+    sectionIds,
+  )
+  initialNovelSectionId.value = sectionId
+  novelResumeReady.value = true
+  reportEnter(id, index)
+  persistReadingUnit(id, index, sections.length, {
+    sectionIndex: index,
+    sectionId,
+  })
+}
+
+function applyPptResume(id) {
+  const slides = pptData.value?.slides
+  const total = Array.isArray(slides) ? slides.length : 0
+  if (total <= 0) {
+    pptResumeReady.value = true
+    reportEnter(id)
+    return
+  }
+  initialPptSlide.value = resolveResumeSlideIndex(
+    id,
+    serverReadingStats.value?.myProgressPercent,
+    total,
+  )
+  pptResumeReady.value = true
+  reportEnter(id, initialPptSlide.value)
+  persistReadingUnit(id, initialPptSlide.value, total, {
+    slideIndex: initialPptSlide.value,
+  })
+}
+
+function onNovelSectionChange(index, sectionId) {
+  reportSlideChange(index)
+  const total = novelViewerRef.value?.totalSections?.() ?? 0
+  persistReadingUnit(projectId.value, index, total, {
+    sectionIndex: index,
+    sectionId: String(sectionId || ''),
+  })
+}
 
 const generatedDeckTitle = computed(() => {
   const deckTitle = pickPptDataTitle(pptData.value)
@@ -292,20 +389,27 @@ const load = async (id) => {
   outlineResult.value = null
   deckMarkdown.value = ''
   sessionEntries.value = []
+  resetResumeState()
   try {
-    const [proj, hist] = await Promise.all([
+    const [proj, hist, stats] = await Promise.all([
       projectApi.getProject(id),
       projectApi.getProjectConversationHistory(id).catch(() => []),
+      projectApi.getReadingStats(id).catch(() => null),
     ])
     project.value = proj
     history.value = hist
+    serverReadingStats.value = stats
     projectApi.incrementProjectView(id).catch(() => {})
-    reportEnter(id)
     const loadedNovel = await loadNovelGuide(id, hist, proj)
-    if (!loadedNovel) {
+    if (loadedNovel) {
+      applyNovelResume(id)
+    } else {
       const loadedOutline = await loadOutlineGuide(hist, proj)
-      if (!loadedOutline) {
+      if (loadedOutline) {
+        reportEnter(id)
+      } else {
         await loadPptDeck(id, proj, hist)
+        applyPptResume(id)
       }
     }
   } catch (e) {
@@ -321,6 +425,8 @@ watch(
   (idx, prev) => {
     if (idx == null || idx === prev) return
     reportSlideChange(idx)
+    const total = pptViewerRef.value?.totalSlides?.() ?? 0
+    persistReadingUnit(projectId.value, idx, total, { slideIndex: idx })
   },
 )
 

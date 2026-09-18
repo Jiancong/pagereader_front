@@ -905,6 +905,15 @@ function syncMobileChrome() {
 
 watch(showChatHistoryRail, () => syncMobileChrome());
 const currentSlide = ref(props.initialSlide ?? 0);
+
+watch(
+  () => props.initialSlide,
+  (next) => {
+    if (next == null || !Number.isFinite(next)) return
+    const target = Math.max(0, Math.trunc(next))
+    if (target !== currentSlide.value) currentSlide.value = target
+  },
+);
 const viewerRef = ref<HTMLElement | null>(null);
 const slideWrapperRef = ref<HTMLElement | null>(null);
 const exporting = ref(false);

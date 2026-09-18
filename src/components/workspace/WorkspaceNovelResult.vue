@@ -93,6 +93,7 @@
           </button>
 
           <button
+            v-if="!sequentialReader"
             type="button"
             class="novel-guide-close-btn"
             :title="t('workspace.novelResultClose')"
@@ -134,43 +135,71 @@
         </button>
       </nav>
 
-      <article
-        ref="articleRef"
-        class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-card px-4 py-5 sm:px-6 sm:py-7"
-        :style="contentFontStyle"
-        @contextmenu.prevent="onNovelContextMenu"
-        @click="onNovelContentClick"
-      >
-        <h1 v-if="activeSection" class="mb-6 text-2xl font-semibold leading-snug text-foreground sm:text-3xl">
-          {{ activeSection.label }}
-        </h1>
-        <div v-if="activeSection" class="novel-guide-content space-y-4">
-          <NovelGuideOutlineList
-            v-if="activeSection.kind === 'outline' && activeSection.outlineItems?.length"
-            :items="activeSection.outlineItems"
-            :jumpable-titles="chapterTitleSet"
-            @jump="jumpToChapterFromOutline"
-          />
-          <template v-else>
-            <div
-              v-for="(turn, turnIndex) in activeSectionTurns"
-              :key="`${activeSection.id}-${turnIndex}`"
-              class="novel-speaker-turn"
-            >
-              <ChatMarkdownBody
-                :content="turn"
-                root-class="novel-guide-markdown"
-              />
-            </div>
-            <p
-              v-if="!activeSectionTurns.length"
-              class="py-8 text-center text-sm text-muted-foreground"
-            >
-              {{ t("workspace.novelResultEmpty") }}
-            </p>
-          </template>
-        </div>
-      </article>
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+        <article
+          ref="articleRef"
+          class="min-h-0 flex-1 overflow-y-auto bg-card px-4 py-5 sm:px-6 sm:py-7"
+          :style="contentFontStyle"
+          @contextmenu.prevent="onNovelContextMenu"
+          @click="onNovelContentClick"
+        >
+          <h1 v-if="activeSection" class="mb-6 text-2xl font-semibold leading-snug text-foreground sm:text-3xl">
+            {{ activeSection.label }}
+          </h1>
+          <div v-if="activeSection" class="novel-guide-content space-y-4">
+            <NovelGuideOutlineList
+              v-if="activeSection.kind === 'outline' && activeSection.outlineItems?.length"
+              :items="activeSection.outlineItems"
+              :jumpable-titles="chapterTitleSet"
+              @jump="jumpToChapterFromOutline"
+            />
+            <template v-else>
+              <div
+                v-for="(turn, turnIndex) in activeSectionTurns"
+                :key="`${activeSection.id}-${turnIndex}`"
+                class="novel-speaker-turn"
+              >
+                <ChatMarkdownBody
+                  :content="turn"
+                  root-class="novel-guide-markdown"
+                />
+              </div>
+              <p
+                v-if="!activeSectionTurns.length"
+                class="py-8 text-center text-sm text-muted-foreground"
+              >
+                {{ t("workspace.novelResultEmpty") }}
+              </p>
+            </template>
+          </div>
+        </article>
+
+        <footer
+          v-if="sequentialReader && outline.sections.length > 1"
+          class="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-secondary/20 px-4 py-3 sm:px-6"
+        >
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+            :disabled="activeSectionIndex <= 0"
+            @click="goPrevSection"
+          >
+            ‹ {{ t('reader.prevSection') }}
+          </button>
+          <span class="text-xs text-muted-foreground">
+            <span class="tabular-nums">{{ activeSectionIndex + 1 }} / {{ outline.sections.length }}</span>
+            <span class="mt-0.5 block text-[10px] opacity-80">{{ t('reader.autoAdvanceHint') }}</span>
+          </span>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+            :disabled="activeSectionIndex >= outline.sections.length - 1"
+            @click="goNextSection"
+          >
+            {{ t('reader.nextSection') }} ›
+          </button>
+        </footer>
+      </div>
 
       <ChatHistoryRail
         v-if="projectId"
@@ -267,16 +296,23 @@ const props = withDefaults(
     result: NovelResult
     projectId?: string
     canUploadCover?: boolean
+    /** 阅读页：从上次章节续读 */
+    initialSectionId?: string
+    /** 阅读页：显示上一章/下一章，支持键盘翻页 */
+    sequentialReader?: boolean
   }>(),
   {
     projectId: "",
     canUploadCover: true,
+    initialSectionId: "",
+    sequentialReader: false,
   },
 )
 
 const emit = defineEmits<{
   close: []
   "cover-uploaded": [payload: { thumbnailUrl?: string; coverImageUrl?: string }]
+  "section-change": [index: number, sectionId: string]
 }>()
 
 const { t } = useI18n()
@@ -462,8 +498,170 @@ function navItemClass(sectionId: string) {
 }
 
 function selectSection(sectionId: string) {
+  clearAutoAdvanceTimers()
   activeSectionId.value = sectionId
   stopPlayback()
+  scrollArticleToTop()
+  resetAutoAdvanceState()
+}
+
+function scrollArticleToTop() {
+  const article = articleRef.value
+  if (article) article.scrollTop = 0
+}
+
+const AUTO_ADVANCE_SCROLL_DELAY_MS = 900
+const AUTO_ADVANCE_DWELL_MS = 5500
+const AUTO_ADVANCE_BOTTOM_THRESHOLD_PX = 72
+
+let autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null
+let dwellAdvanceTimer: ReturnType<typeof setTimeout> | null = null
+let scrollBottomArmed = true
+
+function clearAutoAdvanceTimers() {
+  if (autoAdvanceTimer) {
+    clearTimeout(autoAdvanceTimer)
+    autoAdvanceTimer = null
+  }
+  if (dwellAdvanceTimer) {
+    clearTimeout(dwellAdvanceTimer)
+    dwellAdvanceTimer = null
+  }
+}
+
+function canAutoAdvanceSection(): boolean {
+  return (
+    props.sequentialReader &&
+    !ttsPlayAllActive.value &&
+    activeSectionIndex.value < outline.value.sections.length - 1
+  )
+}
+
+function isArticleAtBottom(article: HTMLElement): boolean {
+  return (
+    article.scrollTop + article.clientHeight >=
+    article.scrollHeight - AUTO_ADVANCE_BOTTOM_THRESHOLD_PX
+  )
+}
+
+function isArticleScrollable(article: HTMLElement): boolean {
+  return article.scrollHeight > article.clientHeight + 12
+}
+
+function resetAutoAdvanceState() {
+  clearAutoAdvanceTimers()
+  scrollBottomArmed = true
+  if (!canAutoAdvanceSection()) return
+  void nextTick(() => scheduleDwellAdvanceIfNeeded())
+}
+
+function scheduleAutoAdvanceToNext() {
+  if (!canAutoAdvanceSection()) return
+  clearAutoAdvanceTimers()
+  autoAdvanceTimer = setTimeout(() => {
+    autoAdvanceTimer = null
+    if (!canAutoAdvanceSection()) return
+    goNextSection({ auto: true })
+  }, AUTO_ADVANCE_SCROLL_DELAY_MS)
+}
+
+function scheduleDwellAdvanceIfNeeded() {
+  if (!canAutoAdvanceSection()) return
+  const article = articleRef.value
+  if (!article || isArticleScrollable(article)) return
+
+  if (dwellAdvanceTimer) clearTimeout(dwellAdvanceTimer)
+  dwellAdvanceTimer = setTimeout(() => {
+    dwellAdvanceTimer = null
+    if (!canAutoAdvanceSection()) return
+    const current = articleRef.value
+    if (current && isArticleScrollable(current)) return
+    goNextSection({ auto: true })
+  }, AUTO_ADVANCE_DWELL_MS)
+}
+
+function onArticleScroll() {
+  if (!canAutoAdvanceSection()) return
+  const article = articleRef.value
+  if (!article) return
+
+  if (dwellAdvanceTimer) {
+    clearTimeout(dwellAdvanceTimer)
+    dwellAdvanceTimer = null
+  }
+
+  if (!isArticleAtBottom(article)) {
+    scrollBottomArmed = true
+    if (autoAdvanceTimer) {
+      clearTimeout(autoAdvanceTimer)
+      autoAdvanceTimer = null
+    }
+    return
+  }
+
+  if (!scrollBottomArmed) return
+  scrollBottomArmed = false
+  scheduleAutoAdvanceToNext()
+}
+
+function bindArticleScrollListener() {
+  const article = articleRef.value
+  if (!article || article.dataset.novelAutoScrollBound === "1") return
+  article.dataset.novelAutoScrollBound = "1"
+  article.addEventListener("scroll", onArticleScroll, { passive: true })
+}
+
+function unbindArticleScrollListener() {
+  const article = articleRef.value
+  if (!article || article.dataset.novelAutoScrollBound !== "1") return
+  article.removeEventListener("scroll", onArticleScroll)
+  delete article.dataset.novelAutoScrollBound
+}
+
+function goPrevSection() {
+  const idx = activeSectionIndex.value
+  if (idx <= 0) return
+  const section = outline.value.sections[idx - 1]
+  if (section) selectSection(section.id)
+}
+
+function goNextSection(opts?: { auto?: boolean }) {
+  const idx = activeSectionIndex.value
+  const sections = outline.value.sections
+  if (idx >= sections.length - 1) return
+  const section = sections[idx + 1]
+  if (!section) return
+
+  if (opts?.auto) {
+    activeSectionId.value = section.id
+    scrollArticleToTop()
+    resetAutoAdvanceState()
+    ElMessage.success({
+      message: t("reader.autoAdvanced"),
+      duration: 1400,
+      showClose: false,
+    })
+    return
+  }
+
+  selectSection(section.id)
+}
+
+function onNovelReaderKeydown(e: KeyboardEvent) {
+  if (!props.sequentialReader) return
+  const target = e.target
+  if (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+  ) {
+    return
+  }
+  const isPrev = e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+  const isNext = e.key === 'ArrowRight' || e.key === 'ArrowDown'
+  if (!isPrev && !isNext) return
+  e.preventDefault()
+  if (isPrev) goPrevSection()
+  else goNextSection()
 }
 
 // ===== 划线 / 想法：菜单与持久化 =====
@@ -729,11 +927,33 @@ watch(
       activeSectionId.value = ""
       return
     }
+    const initialId = String(props.initialSectionId || "").trim()
+    if (initialId && sections.some((section) => section.id === initialId)) {
+      activeSectionId.value = initialId
+      return
+    }
     if (!sections.some((section) => section.id === activeSectionId.value)) {
       activeSectionId.value = sections[0].id
     }
   },
   { immediate: true },
+)
+
+watch(activeSectionIndex, (index) => {
+  if (index < 0) return
+  const section = outline.value.sections[index]
+  emit("section-change", index, section?.id ?? "")
+})
+
+watch(
+  () => props.initialSectionId,
+  (sectionId) => {
+    const id = String(sectionId || "").trim()
+    if (!id) return
+    if (outline.value.sections.some((section) => section.id === id)) {
+      activeSectionId.value = id
+    }
+  },
 )
 
 // 切换章节时加载该章节的划线并恢复高亮（等 markdown 渲染完成）
@@ -748,8 +968,22 @@ watch(
     await nextTick()
     await waitForNovelGuideLayout()
     applySectionHighlights()
+    if (props.sequentialReader) resetAutoAdvanceState()
   },
   { immediate: true },
+)
+
+watch(
+  () => props.sequentialReader,
+  (enabled) => {
+    if (enabled) {
+      bindArticleScrollListener()
+      resetAutoAdvanceState()
+    } else {
+      clearAutoAdvanceTimers()
+      unbindArticleScrollListener()
+    }
+  },
 )
 
 function parseNovelChatMetadata(row: ConversationHistoryVo): Record<string, unknown> | undefined {
@@ -954,18 +1188,38 @@ async function askNovelAgent(question: string) {
   }
 }
 
+defineExpose({
+  activeSectionIndex,
+  totalSections: () => outline.value.sections.length,
+})
+
 onMounted(() => {
   void ensureExportFontsReady("SimSun")
   void loadNovelChatHistory()
   window.addEventListener("pointerdown", onAnnotMenuPointerDown, true)
   window.addEventListener("scroll", closeAnnotMenuOnScroll, true)
   window.addEventListener("resize", closeAnnotMenu)
+  window.addEventListener("resize", onSequentialReaderResize)
+  window.addEventListener("keydown", onNovelReaderKeydown)
+  if (props.sequentialReader) {
+    bindArticleScrollListener()
+    resetAutoAdvanceState()
+  }
 })
 
+function onSequentialReaderResize() {
+  if (!props.sequentialReader) return
+  resetAutoAdvanceState()
+}
+
 onBeforeUnmount(() => {
+  clearAutoAdvanceTimers()
+  unbindArticleScrollListener()
   window.removeEventListener("pointerdown", onAnnotMenuPointerDown, true)
   window.removeEventListener("scroll", closeAnnotMenuOnScroll, true)
   window.removeEventListener("resize", closeAnnotMenu)
+  window.removeEventListener("resize", onSequentialReaderResize)
+  window.removeEventListener("keydown", onNovelReaderKeydown)
 })
 
 function closeAnnotMenuOnScroll() {

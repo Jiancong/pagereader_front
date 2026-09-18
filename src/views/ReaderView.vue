@@ -34,9 +34,10 @@
       </div>
     </header>
 
-    <!-- 无内容兜底 -->
+    <!-- 无内容兜底：继续阅读 + 返回上传 -->
     <div v-if="!hasSource" class="reader-view__empty">
-      <p>{{ t('reader.noFile') }}</p>
+      <ReadingHistoryPanel variant="dark" class="reader-view__history" />
+      <p class="reader-view__empty-hint">{{ t('reader.noFile') }}</p>
       <button class="rv-btn rv-btn--primary" @click="goBack">{{ t('reader.back') }}</button>
     </div>
 
@@ -101,6 +102,7 @@ import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
 import MobiReader from '@/components/reader/MobiReader.vue'
 import { useReaderFileStore } from '@/stores/reader'
+import ReadingHistoryPanel from '@/components/reader/ReadingHistoryPanel.vue'
 
 const XlsxReader = defineAsyncComponent(() => import('@/components/reader/XlsxReader.vue'))
 
@@ -331,8 +333,17 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 16px;
+  padding: 24px 16px;
   color: #d1d5db;
   font-size: 14px;
+}
+.reader-view__history {
+  margin-bottom: 8px;
+}
+.reader-view__empty-hint {
+  text-align: center;
+  max-width: 420px;
+  line-height: 1.5;
 }
 .reader-view__unsupported {
   flex: 1;

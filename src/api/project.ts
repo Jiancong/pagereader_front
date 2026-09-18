@@ -19,6 +19,7 @@ export {
   toggleCommentLike,
   reportReadingProgress,
   getReadingStats,
+  getMyReadingProjects,
   getCommunityStats,
   getRelatedProjects,
   deleteProject,

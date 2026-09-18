@@ -272,6 +272,24 @@ export interface ProjectReadingStatsVo {
   myFinishedAt?: string | null
 }
 
+/** GET /project/reading/my 单条（项目 + 个人阅读进度） */
+export interface MyReadingItemVo {
+  projectId?: string
+  id?: string
+  title?: string
+  name?: string
+  thumbnailUrl?: string
+  sourceBookTitle?: string | null
+  sourceBookAuthor?: string | null
+  myReadingStatus?: ReadingStatus
+  myProgressPercent?: number | null
+  myReadingMinutes?: number
+  myLastReadTime?: string | null
+  myFirstReadTime?: string | null
+  project?: ProjectVo
+  [key: string]: unknown
+}
+
 /** GET /project/{id}/community-stats → recommend 块 */
 export interface ProjectRecommendStatsVo {
   projectId: string
