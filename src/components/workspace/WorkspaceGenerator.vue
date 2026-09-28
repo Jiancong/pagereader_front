@@ -15,7 +15,7 @@
               <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
           </button>
-          <button :class="tabClass('prompt')" @click="activeTab = 'prompt'">
+          <button v-if="debugEnabled" :class="tabClass('prompt')" @click="activeTab = 'prompt'">
             <MessageSquare class="h-4 w-4" />
             {{ t('workspace.tabQuick') }}
             <span
@@ -39,11 +39,11 @@
               <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
           </button>
-          <button :class="tabClass('translate')" @click="activeTab = 'translate'">
+          <button v-if="debugEnabled" :class="tabClass('translate')" @click="activeTab = 'translate'">
             <Languages class="h-4 w-4" />
             {{ t('workspace.tabTranslate') }}
           </button>
-          <button :class="tabClass('read')" @click="activeTab = 'read'">
+          <button v-if="debugEnabled" :class="tabClass('read')" @click="activeTab = 'read'">
             <BookOpen class="h-4 w-4" />
             {{ t('workspace.tabRead') }}
           </button>
@@ -569,6 +569,7 @@ import {
   gtmAssetAttach,
   gtmFileExt,
 } from "@/composables/useGtmDataLayer"
+import { isAppDebugEnabled } from "@/config/appDebug"
 
 const emit = defineEmits<{
   "project-started": [projectId: string]
@@ -631,7 +632,18 @@ const route = useRoute()
 const translateFileStore = useTranslateFileStore()
 const readerFileStore = useReaderFileStore()
 
+const debugEnabled = computed(() => isAppDebugEnabled())
+
 const activeTab = ref<"prompt" | "upload" | "youtube" | "translate" | "read">("upload")
+
+function ensureDebugOnlyTabsHidden() {
+  if (
+    !debugEnabled.value &&
+    (activeTab.value === "prompt" || activeTab.value === "translate" || activeTab.value === "read")
+  ) {
+    activeTab.value = "upload"
+  }
+}
 const input = ref(props.initialPrompt || "")
 const youtubeUrl = ref("")
 const youtubePrompt = ref("")
@@ -1156,12 +1168,17 @@ function importReaderBookFromQuery() {
   const fromReader = String(route.query.fromReader || "") === "1"
   const tab = String(route.query.tab || "")
   if (!fromReader || tab !== "read" || !readerFileStore.file) return
+  if (!debugEnabled.value) {
+    router.replace({ name: "workspace" })
+    return
+  }
   activeTab.value = "read"
   selectedReaderFile.value = readerFileStore.file
   router.replace({ name: "workspace" })
 }
 
 onMounted(() => {
+  ensureDebugOnlyTabsHidden()
   importReaderBookFromQuery()
 })
 

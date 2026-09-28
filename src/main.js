@@ -11,7 +11,9 @@ import { fetchCustomChineseFontsCatalog } from './composables/useCustomChineseFo
 import { setRuntimeCustomFontCatalog } from './utils/runtimeCustomFontRegistry'
 import '../font-styles-export/styles/index.css'
 import './style.css'
+import { initAppDebugFromUrl } from './config/appDebug'
 
+initAppDebugFromUrl()
 applyDocumentI18n(getSavedLocale())
 initGtm(import.meta.env.VITE_GTM_ID)
 

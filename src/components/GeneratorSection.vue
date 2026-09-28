@@ -387,6 +387,7 @@ import {
 } from '@/composables/useGtmDataLayer'
 import { useTranslateFileStore } from '@/stores/translateFile'
 import { useReaderFileStore } from '@/stores/reader'
+import { isAppDebugEnabled } from '@/config/appDebug'
 
 type TabId = 'upload' | 'quick' | 'youtube' | 'translate' | 'read'
 type QueueMode = 'CARD' | 'DOCUMENT' | 'NOVEL'
@@ -415,13 +416,25 @@ const selectedReaderFile = ref<File | null>(null)
 const readerFileInput = ref<HTMLInputElement | null>(null)
 const isDraggingReader = ref(false)
 
-const tabs = computed(() => [
-  { id: 'upload' as TabId, label: t('landing.tabUpload'), icon: markRaw(Upload) },
-  { id: 'quick' as TabId, label: t('landing.tabQuick'), icon: markRaw(MessageSquare) },
-  { id: 'youtube' as TabId, label: t('landing.tabYoutube'), icon: markRaw(Youtube) },
-  { id: 'translate' as TabId, label: t('landing.tabTranslate'), icon: markRaw(Languages) },
-  { id: 'read' as TabId, label: t('landing.tabRead'), icon: markRaw(BookOpen) },
-])
+const debugEnabled = computed(() => isAppDebugEnabled())
+
+const tabs = computed(() => {
+  const list = [
+    { id: 'upload' as TabId, label: t('landing.tabUpload'), icon: markRaw(Upload) },
+    { id: 'quick' as TabId, label: t('landing.tabQuick'), icon: markRaw(MessageSquare) },
+    { id: 'youtube' as TabId, label: t('landing.tabYoutube'), icon: markRaw(Youtube) },
+    { id: 'translate' as TabId, label: t('landing.tabTranslate'), icon: markRaw(Languages) },
+    { id: 'read' as TabId, label: t('landing.tabRead'), icon: markRaw(BookOpen) },
+  ]
+  if (debugEnabled.value) return list
+  return list.filter((tab) => tab.id !== 'quick' && tab.id !== 'translate' && tab.id !== 'read')
+})
+
+function ensureDebugOnlyTabsHidden() {
+  if (!debugEnabled.value && (activeTab.value === 'quick' || activeTab.value === 'translate' || activeTab.value === 'read')) {
+    activeTab.value = 'upload'
+  }
+}
 
 const QUICK_EXAMPLE_IDS = [
   'math6', 'aiHealthcare', 'santiBook', 'newtonLaws', 'xiaomiSu7',
@@ -654,6 +667,7 @@ function onLandingWatchDemo() {
 }
 
 onMounted(() => {
+  ensureDebugOnlyTabsHidden()
   window.addEventListener(LANDING_WATCH_DEMO_EVENT, onLandingWatchDemo)
 })
 
