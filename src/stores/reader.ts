@@ -4,7 +4,7 @@
 
 import { defineStore } from "pinia"
 
-export type ReaderFormat = "pdf" | "epub" | "mobi" | "xlsx"
+export type ReaderFormat = "pdf" | "epub" | "mobi" | "xlsx" | "markdown"
 
 interface ReaderFileState {
   file: File | null
@@ -20,6 +20,7 @@ function detectFormat(file: File): ReaderFormat | "" {
   if (name.endsWith(".epub")) return "epub"
   if (name.endsWith(".mobi") || name.endsWith(".azw") || name.endsWith(".azw3")) return "mobi"
   if (name.endsWith(".xlsx") || name.endsWith(".xls")) return "xlsx"
+  if (name.endsWith(".md") || name.endsWith(".markdown") || name.endsWith(".mdown") || name.endsWith(".mkd")) return "markdown"
   return ""
 }
 

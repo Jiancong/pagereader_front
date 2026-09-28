@@ -20,7 +20,7 @@
       </div>
 
       <div class="reader-view__controls">
-        <div v-if="hasSource && (isPdf || isEpub || isMobi || isXlsx)" class="rv-field rv-field--pages">
+        <div v-if="hasSource && (isPdf || isEpub || isMobi || isXlsx || isMarkdown)" class="rv-field rv-field--pages">
           <button class="rv-btn rv-btn--sm" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">‹</button>
           <input
             v-model.number="pageInput"
@@ -36,7 +36,7 @@
           <button class="rv-btn rv-btn--sm" :disabled="!pageCount || currentPage >= pageCount" @click="goToPage(currentPage + 1)">›</button>
         </div>
 
-        <div v-if="hasSource && (isPdf || isEpub || isMobi || isXlsx)" class="rv-field rv-field--zoom">
+        <div v-if="hasSource && (isPdf || isEpub || isMobi || isXlsx || isMarkdown)" class="rv-field rv-field--zoom">
           <button class="rv-btn rv-btn--sm" @click="zoomOut" :disabled="scale <= 0.5">−</button>
           <span class="rv-zoom-value">{{ Math.round(scale * 100) }}%</span>
           <button class="rv-btn rv-btn--sm" @click="zoomIn" :disabled="scale >= 3">+</button>
@@ -81,7 +81,7 @@
         </button>
 
         <button
-          v-if="hasSource && (isPdf || isEpub || isMobi)"
+          v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown)"
           class="rv-btn rv-btn--sm rv-btn--workspace"
           :title="t('reader.saveBookWorkspaceTitle')"
           @click="onSaveToWorkspace"
@@ -143,6 +143,16 @@
       @page-count="onPageCount"
     />
 
+    <!-- Markdown 阅读器 -->
+    <MarkdownReader
+      v-else-if="isMarkdown && file"
+      ref="markdownReaderRef"
+      :file="file"
+      :scale="scale"
+      @page-change="onPageChange"
+      @page-count="onPageCount"
+    />
+
     <!-- 未知格式 -->
     <div v-else class="reader-view__unsupported">
       <FileWarning class="reader-view__unsupported-icon" />
@@ -153,7 +163,7 @@
 
     <!-- 移动端固定底栏：翻页 + 朗读（华为等 WebView 顶部控件可能被挤出视口） -->
     <footer
-      v-if="hasSource && (isPdf || isEpub || isMobi)"
+      v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown)"
       class="reader-view__mobile-bar"
     >
       <button
@@ -210,6 +220,7 @@ import { useBrowserTts } from '@/composables/useBrowserTts'
 import { isLoggedIn } from '@/api'
 
 const XlsxReader = defineAsyncComponent(() => import('@/components/reader/XlsxReader.vue'))
+const MarkdownReader = defineAsyncComponent(() => import('@/components/reader/MarkdownReader.vue'))
 
 const router = useRouter()
 const { t } = useI18n()
@@ -221,6 +232,7 @@ const isPdf = computed(() => store.format === 'pdf')
 const isEpub = computed(() => store.format === 'epub')
 const isMobi = computed(() => store.format === 'mobi')
 const isXlsx = computed(() => store.format === 'xlsx')
+const isMarkdown = computed(() => store.format === 'markdown')
 const hasSource = computed(() => Boolean(store.file))
 const headerTitle = computed(() => store.file?.name ?? '')
 
@@ -229,6 +241,7 @@ const pdfReaderRef = ref<InstanceType<typeof PdfReader> | null>(null)
 const epubReaderRef = ref<InstanceType<typeof EpubReader> | null>(null)
 const mobiReaderRef = ref<InstanceType<typeof MobiReader> | null>(null)
 const xlsxReaderRef = ref<InstanceType<typeof XlsxReader> | null>(null)
+const markdownReaderRef = ref<InstanceType<typeof MarkdownReader> | null>(null)
 const currentPage = ref(1)
 const pageCount = ref(0)
 const pageInput = ref(1)
@@ -248,7 +261,7 @@ const pageReadySignal = ref(0)
 let speakFollowTimer: ReturnType<typeof setTimeout> | null = null
 
 const showTtsControls = computed(
-  () => hasSource.value && (isPdf.value || isEpub.value || isMobi.value),
+  () => hasSource.value && (isPdf.value || isEpub.value || isMobi.value || isMarkdown.value),
 )
 
 const canGoPrev = computed(() => currentPage.value > 1)
@@ -263,6 +276,7 @@ async function getCurrentPageText(): Promise<string> {
   if (isPdf.value) return (await pdfReaderRef.value?.getPageText?.()) || ''
   if (isEpub.value) return epubReaderRef.value?.getPageText?.() || ''
   if (isMobi.value) return mobiReaderRef.value?.getPageText?.() || ''
+  if (isMarkdown.value) return markdownReaderRef.value?.getPageText?.() || ''
   return ''
 }
 
@@ -274,6 +288,7 @@ function isReaderAtEnd(): boolean {
   if (isPdf.value) return pdfReaderRef.value?.isAtEnd?.() ?? false
   if (isEpub.value) return epubReaderRef.value?.isAtEnd?.() ?? false
   if (isMobi.value) return mobiReaderRef.value?.isAtEnd?.() ?? false
+  if (isMarkdown.value) return markdownReaderRef.value?.isAtEnd?.() ?? false
   return pageCount.value > 0 && currentPage.value >= pageCount.value
 }
 
@@ -433,7 +448,7 @@ function applyZoomDelta(delta: number) {
 }
 function onWheel(e: WheelEvent) {
   if (!e.ctrlKey && !e.metaKey) return
-  if (!isPdf.value && !isEpub.value && !isMobi.value && !isXlsx.value) return
+  if (!isPdf.value && !isEpub.value && !isMobi.value && !isXlsx.value && !isMarkdown.value) return
   e.preventDefault()
   applyZoomDelta(e.deltaY > 0 ? -0.1 : 0.1)
 }
@@ -464,6 +479,8 @@ function goToPage(page: number) {
     mobiReaderRef.value?.goToPage(target)
   } else if (isXlsx.value) {
     xlsxReaderRef.value?.goToPage(target)
+  } else if (isMarkdown.value) {
+    markdownReaderRef.value?.goToPage(target)
   }
 }
 watch(currentPage, (page) => {
@@ -479,6 +496,8 @@ function nextPage() {
     mobiReaderRef.value?.next()
   } else if (isXlsx.value) {
     xlsxReaderRef.value?.next()
+  } else if (isMarkdown.value) {
+    markdownReaderRef.value?.next()
   }
 }
 function prevPage() {
@@ -490,6 +509,8 @@ function prevPage() {
     mobiReaderRef.value?.prev()
   } else if (isXlsx.value) {
     xlsxReaderRef.value?.prev()
+  } else if (isMarkdown.value) {
+    markdownReaderRef.value?.prev()
   }
 }
 
