@@ -22,7 +22,6 @@
       :mobile-open="mobileSidebarOpen"
       @new="onSidebarNav(returnToGenerator)"
       @explore="onSidebarNav(() => (view = 'explore'))"
-      @open-experts="onSidebarNav(() => (view = 'experts'))"
       @open-project="(id) => onSidebarNav(() => openProject(id))"
       @delete-project="onDeleteProject"
       @logout="handleLogout"
@@ -50,21 +49,18 @@
         v-show="view === 'new'"
         :key="genKey"
         :initial-prompt="genPrompt"
+        :user-id="userId"
+        :active-expert-id="activeExpert ? activeExpert.expert_id : null"
         @project-started="onProjectStarted"
         @project-complete="onProjectComplete"
+        @open-distill="distillOpen = true"
+        @select-expert="onSelectExpert"
       />
       <ExploreGrid
         v-if="view === 'explore'"
         :user-id="userId"
         @open="openExploreItem"
         @deleted="onExploreProjectDeleted"
-      />
-      <BookExpertPanel
-        v-else-if="view === 'experts'"
-        :user-id="userId ? String(userId) : null"
-        :active-expert-id="activeExpert ? activeExpert.expert_id : null"
-        @open-distill="distillOpen = true"
-        @select-expert="onSelectExpert"
       />
       <BookExpertChat
         v-else-if="view === 'expert-chat' && activeExpert"
@@ -104,7 +100,6 @@ import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar.vue'
 import WorkspaceGenerator from '../components/workspace/WorkspaceGenerator.vue'
 import ExploreGrid from '../components/ExploreGrid.vue'
 import ProjectPreview from '../components/workspace/ProjectPreview.vue'
-import BookExpertPanel from '../components/workspace/BookExpertPanel.vue'
 import BookExpertChat from '../components/workspace/BookExpertChat.vue'
 import BookExpertDistillDialog from '../components/workspace/BookExpertDistillDialog.vue'
 import { useBookExpertStore } from '@/stores/bookExpert'
@@ -325,7 +320,7 @@ function onExitExpert() {
   activeExpert.value = null
   expertProjectId.value = ''
   bookExpertStore.clearActiveExpert()
-  view.value = 'experts'
+  view.value = 'new'
 }
 
 const handleLogout = () => {

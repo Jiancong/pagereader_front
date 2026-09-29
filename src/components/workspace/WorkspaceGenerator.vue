@@ -39,6 +39,10 @@
               <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
           </button>
+          <button :class="tabClass('expert')" @click="activeTab = 'expert'">
+            <Sparkles class="h-4 w-4" />
+            {{ t('bookExpert.navTitle') }}
+          </button>
           <button v-if="debugEnabled" :class="tabClass('translate')" @click="activeTab = 'translate'">
             <Languages class="h-4 w-4" />
             {{ t('workspace.tabTranslate') }}
@@ -89,6 +93,14 @@
     </div>
 
     <template v-else>
+      <BookExpertPanel
+        v-if="activeTab === 'expert'"
+        :user-id="props.userId != null ? String(props.userId) : null"
+        :active-expert-id="props.activeExpertId ?? null"
+        @open-distill="$emit('open-distill')"
+        @select-expert="(expert) => $emit('select-expert', expert)"
+      />
+      <template v-else>
       <div v-if="activeTab !== 'translate'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
@@ -503,6 +515,7 @@
           </div>
         </div>
       </div>
+      </template>
     </template>
   </div>
 </template>
@@ -520,6 +533,8 @@ import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
 import WorkspaceNovelResult from "@/components/workspace/WorkspaceNovelResult.vue"
 import WorkspaceOutlineResult from "@/components/workspace/WorkspaceOutlineResult.vue"
+import BookExpertPanel from "@/components/workspace/BookExpertPanel.vue"
+import type { BookExpertSummary } from "@/api/types"
 import {
   isBookCardStreamPayload,
   parseBookCardStreamPayload,
@@ -574,11 +589,17 @@ import { isAppDebugEnabled } from "@/config/appDebug"
 const emit = defineEmits<{
   "project-started": [projectId: string]
   "project-complete": [projectId: string]
+  "open-distill": []
+  "select-expert": [expert: BookExpertSummary]
 }>()
 
 const { t } = useI18n()
 
-const props = defineProps<{ initialPrompt?: string }>()
+const props = defineProps<{
+  initialPrompt?: string
+  userId?: string | number | null
+  activeExpertId?: string | null
+}>()
 
 type GeneratorTask = {
   isGenerating: boolean
@@ -634,7 +655,7 @@ const readerFileStore = useReaderFileStore()
 
 const debugEnabled = computed(() => isAppDebugEnabled())
 
-const activeTab = ref<"prompt" | "upload" | "youtube" | "translate" | "read">("upload")
+const activeTab = ref<"prompt" | "upload" | "youtube" | "translate" | "read" | "expert">("upload")
 
 function ensureDebugOnlyTabsHidden() {
   if (
@@ -788,7 +809,7 @@ const activeElapsedDisplay = computed(() => {
   return null
 })
 
-const tabClass = (tab: "prompt" | "upload" | "youtube" | "translate" | "read") => [
+const tabClass = (tab: "prompt" | "upload" | "youtube" | "translate" | "read" | "expert") => [
   "flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm",
   activeTab.value === tab ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground",
 ]

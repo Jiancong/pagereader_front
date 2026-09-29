@@ -11,8 +11,9 @@
         <span>{{ t('landing.heroBadge') }}</span>
       </div>
 
-      <h1 class="mb-6 text-balance text-4xl font-bold leading-[2] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-        {{ t('landing.heroTitle') }}
+      <h1 class="mb-6 text-balance text-4xl font-bold leading-[1.4] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+        <span class="block">{{ t('landing.heroTitleLine1') }}</span>
+        <span class="block">{{ t('landing.heroTitleLine2') }}</span>
         <span class="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
           {{ t('landing.heroTitleHighlight') }}
         </span>

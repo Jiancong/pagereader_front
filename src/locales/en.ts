@@ -105,6 +105,8 @@ export default {
     productHuntBadgeAlt: "{brand} on Product Hunt",
     heroBadge: "AI-powered presentation generation",
     heroTitle: "Because life's too short for a book you're not in the mood for.",
+    heroTitleLine1: "Because life's too short",
+    heroTitleLine2: "for a book you're not in the mood for.",
     heroTitleHighlight: "",
     heroSubtitle:
       "Upload books, papers, or notes and let AI structure them into a deck—or describe your topic in one sentence and get polished slides in seconds.",

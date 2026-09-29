@@ -105,6 +105,8 @@ export default {
     productHuntBadgeAlt: "{brand} | Product Hunt",
     heroBadge: "AI 驱动的智能演示文稿生成",
     heroTitle: "人生太短，不该浪费在一本没心情读的书上。",
+    heroTitleLine1: "人生太短，不该浪费在",
+    heroTitleLine2: "一本没心情读的书上。",
     heroTitleHighlight: "",
     heroSubtitle:
       "上传图书、论文、资料，AI 自动提取核心内容并生成结构化演示文稿。或者只需输入一句话，即刻获得精美 PPT。",

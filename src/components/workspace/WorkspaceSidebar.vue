@@ -65,14 +65,6 @@
         <span v-if="!isCollapsed" class="truncate">{{ t('workspace.explore') }}</span>
       </button>
       <button
-        :title="t('bookExpert.navTitle')"
-        :class="navBtnClass(view === 'experts')"
-        @click="$emit('open-experts')"
-      >
-        <BookOpen class="h-4 w-4 flex-shrink-0" />
-        <span v-if="!isCollapsed" class="truncate">{{ t('bookExpert.navTitle') }}</span>
-      </button>
-      <button
         :title="t('workspace.assets.nav')"
         :class="navBtnClass(assetsOpen)"
         @click="assetsOpen = !assetsOpen"
@@ -244,7 +236,6 @@ import {
   Images,
   PanelLeftClose,
   PanelLeftOpen,
-  BookOpen,
   X,
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
@@ -269,7 +260,7 @@ const props = defineProps({
   deletingProjectId: { type: String, default: null },
   mobileOpen: { type: Boolean, default: false },
 })
-const emit = defineEmits(['new', 'explore', 'open-experts', 'open-project', 'delete-project', 'logout', 'select-document', 'close-mobile', 'load-more-projects'])
+const emit = defineEmits(['new', 'explore', 'open-project', 'delete-project', 'logout', 'select-document', 'close-mobile', 'load-more-projects'])
 
 const assetsOpen = ref(false)
 const collapsed = ref(false)
