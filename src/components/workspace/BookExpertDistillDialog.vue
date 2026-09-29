@@ -110,6 +110,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { X, Upload, FileText, Loader2, Sparkles } from 'lucide-vue-next'
 import { fileApi, bookExpertApi, ApiError, isCreditsInsufficient } from '@/api'
+import { extractCreatedExpert } from '@/api/bookExpert'
 import { useBookExpertStore } from '@/stores/bookExpert'
 import { getOrCreateSessionId } from '@/api/agent'
 import { getSavedLocale } from '@/composables/useAppLocale'
@@ -231,13 +232,11 @@ async function onSubmit() {
       },
       {
         onExpertCreated: (data) => {
-          const expert: BookExpertSummary = {
-            expert_id: data.expert_id,
-            expert_name: data.expert_name,
-            book_title: data.book_title,
-            visibility: data.visibility,
-            owner_user_id: props.userId as string,
-          }
+          // Python 把专家摘要嵌在 expert 字段下（顶层无 expert_name 等字段）
+          const expert: BookExpertSummary = extractCreatedExpert(data, {
+            ownerId: props.userId as string,
+            name: expertName.value.trim(),
+          })
           lastCreatedExpert.value = expert
           lastCreatedName.value = expert.expert_name
           store.onDistillSuccess(expert)

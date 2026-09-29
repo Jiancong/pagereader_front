@@ -225,8 +225,46 @@
             <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
               <Sparkles class="h-6 w-6 text-primary" />
             </div>
-            <p class="mt-4 font-medium text-foreground">{{ t('bookExpert.distillDone') }}</p>
-            <p v-if="expertDoneName" class="mt-1 text-sm text-muted-foreground">{{ expertDoneName }}</p>
+            <p class="mt-4 text-sm text-muted-foreground">{{ t('bookExpert.distillDone') }}</p>
+            <p v-if="expertDoneName" class="mt-1 text-lg font-bold text-foreground">{{ expertDoneName }}</p>
+            <p v-if="expertCreated?.book_title" class="mt-1 text-xs text-muted-foreground">《{{ expertCreated.book_title }}》</p>
+
+            <!-- 方法论速览 -->
+            <div
+              v-if="expertPreviewLoading"
+              class="mx-auto mt-5 flex max-w-md items-center justify-center gap-2 rounded-xl border border-border bg-secondary/30 px-4 py-3 text-xs text-muted-foreground"
+            >
+              <Loader2 class="h-3.5 w-3.5 animate-spin" />
+              {{ t('bookExpert.previewLoading') }}
+            </div>
+            <div
+              v-else-if="expertPreview"
+              class="mx-auto mt-5 max-w-md rounded-xl border border-border bg-secondary/30 p-4 text-left"
+            >
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {{ t('bookExpert.previewTitle') }}
+              </p>
+              <p v-if="expertPreview.problem" class="mt-2 text-sm leading-relaxed text-foreground">
+                {{ expertPreview.problem }}
+              </p>
+              <div v-if="expertPreview.viewpoints.length" class="mt-3">
+                <p class="text-[11px] font-semibold text-muted-foreground">{{ t('bookExpert.previewViewpoints') }}</p>
+                <ul class="mt-1 list-disc space-y-1 pl-4">
+                  <li v-for="(v, i) in expertPreview.viewpoints" :key="`vp-${i}`" class="text-xs leading-relaxed text-muted-foreground">
+                    {{ v }}
+                  </li>
+                </ul>
+              </div>
+              <div v-if="expertPreview.principles.length" class="mt-3">
+                <p class="text-[11px] font-semibold text-muted-foreground">{{ t('bookExpert.previewPrinciples') }}</p>
+                <ul class="mt-1 list-disc space-y-1 pl-4">
+                  <li v-for="(p, i) in expertPreview.principles" :key="`jp-${i}`" class="text-xs leading-relaxed text-muted-foreground">
+                    {{ p }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+
             <div class="mt-6 flex gap-3">
               <button
                 type="button"
@@ -685,6 +723,7 @@ import { validatePptDocumentFile } from "@/utils/pptDocumentRag"
 import { isSrtFileName, readSrtFile, parseSrtContent, type SrtParseResult } from "@/utils/srtParser"
 import { formatBytes } from "@/utils/userAssets"
 import { bookExpertApi } from "@/api"
+import { extractCreatedExpert } from "@/api/bookExpert"
 import { getOrCreateSessionId } from "@/api/agent"
 import { getSavedLocale } from "@/composables/useAppLocale"
 import { useBookExpertStore } from "@/stores/bookExpert"
@@ -816,7 +855,37 @@ const expertName = ref("")
 const expertBookTitle = ref("")
 const expertDoneName = ref("")
 const expertCreated = ref<BookExpertSummary | null>(null)
+const expertPreview = ref<{ problem: string; viewpoints: string[]; principles: string[] } | null>(null)
+const expertPreviewLoading = ref(false)
 let expertAbort: AbortController | null = null
+
+/** 创建完成后拉取详情，展示方法论速览（核心问题 / 观点 / 原则）。失败静默降级。 */
+async function loadExpertPreview(expertId: string) {
+  if (!expertId || !props.userId) return
+  expertPreview.value = null
+  expertPreviewLoading.value = true
+  try {
+    const res = await bookExpertApi.getExpert(expertId, String(props.userId))
+    const raw = res?.expert?.methodology_preview
+    if (raw && typeof raw === "string") {
+      expertPreview.value = { problem: raw, viewpoints: [], principles: [] }
+    } else if (raw && typeof raw === "object") {
+      const o = raw as { core_problem?: unknown; core_viewpoints?: unknown; judgment_principles?: unknown }
+      const arr = (v: unknown): string[] =>
+        Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 5) : []
+      const problem = typeof o.core_problem === "string" ? o.core_problem : ""
+      const viewpoints = arr(o.core_viewpoints)
+      const principles = arr(o.judgment_principles)
+      if (problem || viewpoints.length || principles.length) {
+        expertPreview.value = { problem, viewpoints, principles }
+      }
+    }
+  } catch {
+    // 预览拉取失败不影响主流程，完成页仅显示名称
+  } finally {
+    expertPreviewLoading.value = false
+  }
+}
 
 function onExpertFileChange(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]
@@ -870,18 +939,18 @@ async function onExpertSubmit() {
       },
       {
         onExpertCreated: (data) => {
-          const expert: BookExpertSummary = {
-            expert_id: data.expert_id,
-            expert_name: data.expert_name,
-            book_title: data.book_title,
-            visibility: data.visibility,
-            owner_user_id: String(props.userId),
-          }
+          // Python 把专家摘要嵌在 expert 字段下（顶层只有 status/ok/points_charged），
+          // 此前直接读 data.expert_name 恒为 undefined，导致完成页名字不显示。
+          const expert: BookExpertSummary = extractCreatedExpert(data, {
+            ownerId: String(props.userId),
+            name: expertName.value.trim(),
+          })
           expertCreated.value = expert
           expertDoneName.value = expert.expert_name
           bookExpertStore.onDistillSuccess(expert)
           expertStep.value = "done"
           ElMessage.success(t("bookExpert.distillDoneToast"))
+          void loadExpertPreview(expert.expert_id)
         },
         onError: (msg) => {
           bookExpertStore.onDistillError(msg)
@@ -916,6 +985,8 @@ function resetExpertFlow() {
   expertBookTitle.value = ""
   expertDoneName.value = ""
   expertCreated.value = null
+  expertPreview.value = null
+  expertPreviewLoading.value = false
   bookExpertStore.resetDistill()
   if (expertFileInput.value) expertFileInput.value.value = ""
 }

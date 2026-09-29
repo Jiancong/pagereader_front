@@ -11,6 +11,7 @@ import type {
   BookExpertPublishReq,
   BookExpertPublishResult,
   BookExpertDeleteResult,
+  BookExpertSummary,
   DistillRequest,
   DistillExpertCreatedEvent,
   DistillErrorEvent,
@@ -27,6 +28,24 @@ export function parseExpertIdFromSkillName(skillName: string): string | null {
   if (!skillName || !skillName.startsWith(BOOK_EXPERT_SKILL_PREFIX)) return null
   const id = skillName.slice(BOOK_EXPERT_SKILL_PREFIX.length)
   return id || null
+}
+
+/**
+ * 从蒸馏 `expert_created` 事件提取专家摘要。
+ * Python 把摘要在 `expert` 字段下；顶层字段仅作兼容回退。
+ */
+export function extractCreatedExpert(
+  data: DistillExpertCreatedEvent,
+  fallback: { ownerId: string; name?: string },
+): BookExpertSummary {
+  const s = data.expert
+  return {
+    expert_id: s?.expert_id ?? data.expert_id ?? "",
+    expert_name: s?.expert_name ?? data.expert_name ?? fallback.name ?? "",
+    book_title: s?.book_title ?? data.book_title,
+    visibility: s?.visibility ?? data.visibility ?? "private",
+    owner_user_id: s?.owner_user_id ?? fallback.ownerId,
+  }
 }
 
 // ===== REST（经 BFF，非标准 R<T> 信封，顶层 ok 判断） =====

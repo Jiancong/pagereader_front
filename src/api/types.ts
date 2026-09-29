@@ -740,8 +740,15 @@ export interface BookExpertSummary {
   visibility: BookExpertVisibility
   owner_user_id: string
   created_at?: string
-  /** 详情接口才返回的方法论预览 */
-  methodology_preview?: string
+  /** 详情接口才返回的方法论预览（Python 返回对象；历史信封可能为字符串） */
+  methodology_preview?: string | BookExpertMethodologyPreview
+}
+
+/** 详情接口返回的方法论预览（截断版） */
+export interface BookExpertMethodologyPreview {
+  core_problem: string
+  core_viewpoints: string[]
+  judgment_principles: string[]
 }
 
 export interface BookExpertListResult {
@@ -790,11 +797,20 @@ export interface DistillRequest {
   tenantId?: string
 }
 
+/**
+ * Python `expert_created` SSE 事件实际信封：
+ * `{ status, ok, expert: <expert_summary>, billing_event_id, points_charged }`
+ * —— 专家摘要在 `expert` 字段下，顶层并无 expert_name 等字段。
+ * 顶层字段仅保留为可选兼容（供直接构造/旧信封使用）。
+ */
 export interface DistillExpertCreatedEvent {
-  expert_id: string
-  expert_name: string
+  status?: string
+  ok?: boolean
+  expert?: BookExpertSummary
+  expert_id?: string
+  expert_name?: string
   book_title?: string
-  visibility: BookExpertVisibility
+  visibility?: BookExpertVisibility
   points_charged?: number
 }
 
