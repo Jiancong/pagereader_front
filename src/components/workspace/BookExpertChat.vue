@@ -188,7 +188,7 @@ watch(() => props.expert.expert_id, () => {
   --be-primary-fg: #ffffff;
 
   display: flex; flex-direction: column; height: 100%; min-height: 0;
-  max-width: 48rem; margin: 0 auto; width: 100%;
+  max-width: 72rem; margin: 0 auto; width: 100%;
 }
 .book-expert-chat__shell {
   flex: 1; display: flex; flex-direction: column; min-height: min(720px, calc(100dvh - 7rem));
@@ -199,7 +199,7 @@ watch(() => props.expert.expert_id, () => {
   overflow: hidden;
 }
 .be-chat__header {
-  flex-shrink: 0; padding: 16px 20px 14px;
+  flex-shrink: 0; padding: 16px 24px 14px;
   border-bottom: 1px solid var(--be-border);
   background: linear-gradient(
     180deg,
@@ -222,12 +222,12 @@ watch(() => props.expert.expert_id, () => {
 .be-chat__title { font-size: 18px; font-weight: 700; color: var(--be-fg); margin: 0; }
 .be-chat__book { margin-top: 4px; font-size: 13px; color: var(--be-fg-muted); }
 .be-chat__messages {
-  flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px;
+  flex: 1; min-height: 0; overflow-y: auto; padding: 20px 28px;
   display: flex; flex-direction: column; gap: 12px;
   background: var(--be-bg);
 }
 .be-chat__empty {
-  margin: auto; max-width: 22rem; text-align: center;
+  margin: auto; max-width: 26rem; text-align: center;
   font-size: 14px; line-height: 1.6;
   padding: 20px 18px; border-radius: 12px;
   color: rgba(var(--be-fg-rgb), 0.78);
@@ -239,10 +239,13 @@ watch(() => props.expert.expert_id, () => {
 .be-chat__msg--user { justify-content: flex-end; }
 .be-chat__msg--assistant { justify-content: flex-start; }
 .be-chat__msg-bubble {
-  max-width: 80%; padding: 10px 14px; border-radius: 14px;
+  max-width: 92%; padding: 10px 16px; border-radius: 14px;
   font-size: 14px; line-height: 1.6; word-break: break-word;
 }
-.be-chat__msg--user .be-chat__msg-bubble { background: var(--be-primary); color: var(--be-primary-fg); border-bottom-right-radius: 4px; }
+.be-chat__msg--user .be-chat__msg-bubble {
+  background: var(--be-primary); color: var(--be-primary-fg);
+  border-bottom-right-radius: 4px; max-width: 72%;
+}
 .be-chat__msg--assistant .be-chat__msg-bubble {
   background: var(--be-card); color: var(--be-fg);
   border: 1px solid var(--be-border);
@@ -254,7 +257,7 @@ watch(() => props.expert.expert_id, () => {
 .be-chat__input-bar {
   flex-shrink: 0;
   display: flex; gap: 8px; align-items: flex-end;
-  margin: 0; padding: 14px 16px;
+  margin: 0; padding: 14px 24px;
   border-top: 1px solid var(--be-border);
   background: var(--be-card);
 }
