@@ -235,14 +235,14 @@
             <!-- 方法论速览 -->
             <div
               v-if="expertPreviewLoading"
-              class="mx-auto mt-5 flex max-w-md items-center justify-center gap-2 rounded-xl border border-border bg-secondary/30 px-4 py-3 text-xs text-muted-foreground"
+              class="mx-auto mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-xl border border-border bg-secondary/30 px-4 py-3 text-xs text-muted-foreground"
             >
               <Loader2 class="h-3.5 w-3.5 animate-spin" />
               {{ t('bookExpert.previewLoading') }}
             </div>
             <div
               v-else-if="expertPreview"
-              class="mx-auto mt-5 max-w-md rounded-xl border border-border bg-secondary/30 p-4 text-left"
+              class="mx-auto mt-5 w-full max-w-xl rounded-xl border border-border bg-secondary/30 p-4 text-left sm:p-5"
             >
               <p class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {{ t('bookExpert.previewTitle') }}
@@ -252,16 +252,16 @@
               </p>
               <div v-if="expertPreview.viewpoints.length" class="mt-3">
                 <p class="text-[11px] font-semibold text-muted-foreground">{{ t('bookExpert.previewViewpoints') }}</p>
-                <ul class="mt-1 list-disc space-y-1 pl-4">
-                  <li v-for="(v, i) in expertPreview.viewpoints" :key="`vp-${i}`" class="text-xs leading-relaxed text-muted-foreground">
+                <ul class="mt-1.5 list-disc space-y-1.5 pl-5">
+                  <li v-for="(v, i) in expertPreview.viewpoints" :key="`vp-${i}`" class="text-[13px] leading-relaxed text-muted-foreground">
                     {{ v }}
                   </li>
                 </ul>
               </div>
               <div v-if="expertPreview.principles.length" class="mt-3">
                 <p class="text-[11px] font-semibold text-muted-foreground">{{ t('bookExpert.previewPrinciples') }}</p>
-                <ul class="mt-1 list-disc space-y-1 pl-4">
-                  <li v-for="(p, i) in expertPreview.principles" :key="`jp-${i}`" class="text-xs leading-relaxed text-muted-foreground">
+                <ul class="mt-1.5 list-disc space-y-1.5 pl-5">
+                  <li v-for="(p, i) in expertPreview.principles" :key="`jp-${i}`" class="text-[13px] leading-relaxed text-muted-foreground">
                     {{ p }}
                   </li>
                 </ul>
@@ -863,6 +863,11 @@ const expertPreviewLoading = ref(false)
 let expertAbort: AbortController | null = null
 
 /** 创建完成后拉取详情，展示方法论速览（核心问题 / 观点 / 原则）。失败静默降级。 */
+/** Python 条目自带「1. 」序号前缀，与 list-disc 圆点叠加成双重编号，剥掉前缀 */
+function stripLeadingNumber(s: string): string {
+  return s.replace(/^\s*\d+\s*[.、)）]\s*/, "").trim()
+}
+
 async function loadExpertPreview(expertId: string) {
   if (!expertId || !props.userId) return
   expertPreview.value = null
@@ -875,7 +880,13 @@ async function loadExpertPreview(expertId: string) {
     } else if (raw && typeof raw === "object") {
       const o = raw as { core_problem?: unknown; core_viewpoints?: unknown; judgment_principles?: unknown }
       const arr = (v: unknown): string[] =>
-        Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 5) : []
+        Array.isArray(v)
+          ? v
+              .filter((x): x is string => typeof x === "string")
+              .map(stripLeadingNumber)
+              .filter((s) => s.length > 0)
+              .slice(0, 5)
+          : []
       const problem = typeof o.core_problem === "string" ? o.core_problem : ""
       const viewpoints = arr(o.core_viewpoints)
       const principles = arr(o.judgment_principles)
