@@ -93,13 +93,13 @@
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
           <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
-            <input v-model="activeTask.queue" type="radio" value="CARD" class="accent-primary" />
+            <input v-model="queueSelection" type="radio" value="CARD" class="accent-primary" />
             <span>{{ t('workspace.queueCard') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageCardCredits') }})</span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueCardHint') }}</span>
           </label>
           <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
-            <input v-model="activeTask.queue" type="radio" value="DOCUMENT" class="accent-primary" />
+            <input v-model="queueSelection" type="radio" value="DOCUMENT" class="accent-primary" />
             <span>{{ t('workspace.queueDocument') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageDocumentCredits') }})</span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueDocumentHint') }}</span>
@@ -108,7 +108,7 @@
             v-if="activeTab === 'upload' || activeTab === 'expert'"
             class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
           >
-            <input v-model="activeTask.queue" type="radio" value="NOVEL" class="accent-primary" />
+            <input v-model="queueSelection" type="radio" value="NOVEL" class="accent-primary" />
             <span>{{ t('workspace.queueNovel') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageNovelCredits') }})</span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueNovelHint') }}</span>
@@ -117,7 +117,7 @@
             v-if="activeTab === 'youtube'"
             class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
           >
-            <input v-model="activeTask.queue" type="radio" value="OUTLINE" class="accent-primary" />
+            <input v-model="queueSelection" type="radio" value="OUTLINE" class="accent-primary" />
             <span>{{ t('workspace.queueOutline') }}</span>
             <span class="text-muted-foreground">({{ t('pricing.usageOutlineCredits') }})</span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueOutlineHint') }}</span>
@@ -125,9 +125,8 @@
           <label
             v-if="activeTab === 'upload' || activeTab === 'expert'"
             class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
-            @click="activeTab = 'expert'"
           >
-            <input type="radio" class="accent-primary" :checked="activeTab === 'expert'" @click.stop="activeTab = 'expert'" />
+            <input v-model="queueSelection" type="radio" value="EXPERT" class="accent-primary" />
             <span>{{ t('bookExpert.navTitle') }}</span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('bookExpert.panelSubtitle') }}</span>
           </label>
@@ -758,6 +757,21 @@ function onStartDistill() {
 }
 
 const hasAttachedDoc = computed(() => Boolean(uploadedFile.value || cloudDocument.value))
+
+/** 生成模式 radio group 的桥接值：EXPERT 映射到 tab 切换，不写入 queue 字段 */
+const queueSelection = computed<string>({
+  get() {
+    return activeTab.value === "expert" ? "EXPERT" : activeTask.value.queue
+  },
+  set(val: string) {
+    if (val === "EXPERT") {
+      activeTab.value = "expert"
+    } else {
+      if (activeTab.value === "expert") activeTab.value = "upload"
+      activeTask.value.queue = val as PptQueue
+    }
+  },
+})
 const isAttachedSrt = computed(() => {
   if (uploadedFile.value) return isSrtFileName(uploadedFile.value.name, uploadedFile.value.type)
   const doc = cloudDocument.value
