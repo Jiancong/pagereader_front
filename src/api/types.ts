@@ -498,6 +498,10 @@ export interface ChatStreamReq {
   stream_request_id?: string
   streamRequestId?: string
   locale?: string
+  /** 召唤技能（如书籍专家）：true 时后端按 skillName 路由到对应技能 */
+  skill?: boolean
+  /** 技能名，如 book_expert:<expertId>；skill=true 时必传 */
+  skillName?: string
 }
 
 /** BFF YouTube PPT：/api2/agent/ppt/youtube-stream | youtube-transcript */

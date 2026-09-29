@@ -108,10 +108,10 @@ async function onSend() {
         projectId: props.projectId,
         sessionId,
         isAgent: true,
-        streamRequestId: `expert-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        // @ts-expect-error skillName passed through buildChatStreamBody passthrough
+        skill: true,
         skillName: toBookExpertSkillName(props.expert.expert_id),
-      } as Parameters<typeof agentApi.chatStream>[0],
+        streamRequestId: `expert-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      },
       {
         onEvent: (event, data) => {
           if (event === 'knowledge_response' || event === 'complete') {

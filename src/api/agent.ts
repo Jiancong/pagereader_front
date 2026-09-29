@@ -74,6 +74,9 @@ export function buildChatStreamBody(req: ChatStreamReq): Record<string, unknown>
     body.locale = getSavedLocale() === "en" ? "en" : "zh-CN"
   }
 
+  if (req.skill != null) body.skill = req.skill
+  if (req.skillName) body.skillName = req.skillName
+
   return body
 }
 
