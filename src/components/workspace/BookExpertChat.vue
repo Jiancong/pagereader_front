@@ -208,7 +208,7 @@ watch(() => props.expert.expert_id, () => {
 }
 .be-chat__input {
   flex: 1; resize: none; padding: 10px 12px; border-radius: 10px;
-  border: 1px solid hsl(var(--foreground) / 0.15);
+  border: 1px solid hsl(var(--foreground) / 0.35);
   background: hsl(var(--background));
   font-size: 14px; color: hsl(var(--foreground)); line-height: 1.5;
 }

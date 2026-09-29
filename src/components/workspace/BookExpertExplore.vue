@@ -148,7 +148,7 @@ onMounted(load)
   width: 100%;
   padding: 8px 12px 8px 32px;
   border-radius: 10px;
-  border: 1px solid hsl(var(--foreground) / 0.15);
+  border: 1px solid hsl(var(--foreground) / 0.35);
   background: hsl(var(--background));
   font-size: 13px;
   color: hsl(var(--foreground));

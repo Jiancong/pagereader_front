@@ -2087,7 +2087,7 @@ defineExpose({ attachCloudDocument })
 .be-distill__input {
   width: 100%;
   border-radius: 12px;
-  border: 1px solid hsl(var(--foreground) / 0.15);
+  border: 1px solid hsl(var(--foreground) / 0.35);
   background: hsl(var(--background));
   padding: 10px 16px;
   font-size: 14px;
