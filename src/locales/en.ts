@@ -98,6 +98,9 @@ export default {
     thinking: "Thinking…",
     noResponse: "No response",
     chatFailed: "Chat failed. Please try again later.",
+    exploreTitle: "Explore Experts",
+    exploreSubtitle: "Pick a book expert from the plaza and ask it questions.",
+    exploreEmpty: "No experts yet. Distill one from New deck.",
   },
   landing: {
     productHuntBannerShort: "🎉 We're on Product Hunt. Upvote us.",
@@ -506,6 +509,8 @@ export default {
   workspace: {
     newGenerate: "New deck",
     explore: "Explore",
+    exploreArticles: "Explore Articles",
+    exploreExperts: "Explore Experts",
     sidebar: {
       collapse: "Collapse sidebar",
       expand: "Expand sidebar",

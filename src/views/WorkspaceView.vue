@@ -22,6 +22,7 @@
       :mobile-open="mobileSidebarOpen"
       @new="onSidebarNav(returnToGenerator)"
       @explore="onSidebarNav(() => (view = 'explore'))"
+      @explore-experts="onSidebarNav(() => (view = 'explore-experts'))"
       @open-project="(id) => onSidebarNav(() => openProject(id))"
       @delete-project="onDeleteProject"
       @logout="handleLogout"
@@ -61,6 +62,11 @@
         @open="openExploreItem"
         @deleted="onExploreProjectDeleted"
       />
+      <BookExpertExplore
+        v-else-if="view === 'explore-experts'"
+        :user-id="userId ? String(userId) : null"
+        @select-expert="onSelectExpert"
+      />
       <BookExpertChat
         v-else-if="view === 'expert-chat' && activeExpert"
         :expert="activeExpert"
@@ -93,6 +99,7 @@ import WorkspaceGenerator from '../components/workspace/WorkspaceGenerator.vue'
 import ExploreGrid from '../components/ExploreGrid.vue'
 import ProjectPreview from '../components/workspace/ProjectPreview.vue'
 import BookExpertChat from '../components/workspace/BookExpertChat.vue'
+import BookExpertExplore from '../components/workspace/BookExpertExplore.vue'
 import { useBookExpertStore } from '@/stores/bookExpert'
 import { authApi, feedApi, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'

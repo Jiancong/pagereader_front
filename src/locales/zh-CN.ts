@@ -98,6 +98,9 @@ export default {
     thinking: "正在思考…",
     noResponse: "暂无回复",
     chatFailed: "对话失败，请稍后重试",
+    exploreTitle: "探索专家",
+    exploreSubtitle: "从书籍专家广场挑选一位，向它提问。",
+    exploreEmpty: "还没有专家，去「新建生成」蒸馏一个吧。",
   },
   landing: {
     productHuntBannerShort: "🎉 我们上了 Product Hunt，欢迎来支持！",
@@ -496,6 +499,8 @@ export default {
   workspace: {
     newGenerate: "新建生成",
     explore: "探索 Explore",
+    exploreArticles: "探索文章",
+    exploreExperts: "探索专家",
     sidebar: {
       collapse: "收起侧边栏",
       expand: "展开侧边栏",

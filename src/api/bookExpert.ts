@@ -75,6 +75,21 @@ export async function listExperts(userId: string): Promise<BookExpertListResult>
   return rawRequest<BookExpertListResult>("GET", "/book-experts", { query: { userId } })
 }
 
+/** 仅我拥有的专家（私有 + 我发布的公共） */
+export async function listMyExperts(userId: string): Promise<BookExpertListResult> {
+  return rawRequest<BookExpertListResult>("GET", "/book-experts/mine", { query: { userId } })
+}
+
+/** 公共专家广场；excludeOwn=true 时排除我自己发布的（推荐流） */
+export async function listPublicExperts(
+  userId: string,
+  excludeOwn = false,
+): Promise<BookExpertListResult> {
+  return rawRequest<BookExpertListResult>("GET", "/book-experts/public", {
+    query: excludeOwn ? { userId, exclude_own: 1 } : { userId },
+  })
+}
+
 export async function getExpert(
   expertId: string,
   userId: string,
