@@ -117,7 +117,7 @@ import { formatBytes } from '@/utils/userAssets'
 import { validatePptDocumentFile } from '@/utils/pptDocumentRag'
 import type { DistillUploadedDocument, BookExpertSummary } from '@/api/types'
 
-const props = defineProps<{ open: boolean; userId: string | null }>()
+const props = defineProps<{ open: boolean; userId: string | null; initialFile?: File | null }>()
 const emit = defineEmits<{
   'update:open': [value: boolean]
   created: [expert: BookExpertSummary]
@@ -143,7 +143,14 @@ const lastCreatedName = ref('')
 const lastCreatedExpert = ref<BookExpertSummary | null>(null)
 let abortController: AbortController | null = null
 
-watch(() => props.open, (open) => { if (open) reset() })
+watch(() => props.open, (open) => {
+  if (!open) return
+  reset()
+  if (props.initialFile) {
+    localFile.value = props.initialFile
+    goToName()
+  }
+})
 
 function reset() {
   step.value = 'upload'

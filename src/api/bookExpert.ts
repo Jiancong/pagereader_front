@@ -1,7 +1,7 @@
 // 书籍专家（Book Expert）API：经 Java BFF 调用 Python 蒸馏 / 召唤
 // @author hc @date 2026-09-29
 
-import { buildUrl, ApiError, get, postJson, del } from "./client"
+import { buildUrl, ApiError } from "./client"
 import { getToken } from "./token"
 import { getApiContextHeaders } from "@/utils/apiRequestContext"
 import { getSavedLocale } from "@/composables/useAppLocale"
@@ -29,17 +29,57 @@ export function parseExpertIdFromSkillName(skillName: string): string | null {
   return id || null
 }
 
-// ===== REST（经 BFF） =====
+// ===== REST（经 BFF，非标准 R<T> 信封，顶层 ok 判断） =====
+
+function authJsonHeaders(): Headers {
+  const headers = new Headers()
+  headers.set("Accept", "application/json")
+  const token = getToken()
+  if (token) headers.set("Authorization", token)
+  Object.entries(getApiContextHeaders()).forEach(([key, value]) => {
+    if (value) headers.set(key, value)
+  })
+  return headers
+}
+
+async function rawRequest<T>(
+  method: string,
+  path: string,
+  opts: { query?: Record<string, unknown>; body?: unknown } = {},
+): Promise<T> {
+  const headers = authJsonHeaders()
+  let body: BodyInit | undefined
+  if (opts.body !== undefined) {
+    headers.set("Content-Type", "application/json")
+    body = JSON.stringify(opts.body)
+  }
+  const res = await fetch(buildUrl(path, opts.query), { method, headers, body })
+  if (res.status === 401) {
+    throw new ApiError(401, "未登录或登录已过期")
+  }
+  let parsed: unknown
+  try {
+    parsed = await res.json()
+  } catch {
+    throw new ApiError(res.status, `请求失败：${res.status}`)
+  }
+  const payload = parsed as { ok?: boolean; message?: string; msg?: string; error?: string } & T
+  if (!res.ok || payload?.ok === false) {
+    const msg = payload?.message || payload?.msg || payload?.error || `请求失败：${res.status}`
+    throw new ApiError(res.status, msg)
+  }
+  return payload as T
+}
 
 export async function listExperts(userId: string): Promise<BookExpertListResult> {
-  return get<BookExpertListResult>("/book-experts", { query: { userId } })
+  return rawRequest<BookExpertListResult>("GET", "/book-experts", { query: { userId } })
 }
 
 export async function getExpert(
   expertId: string,
   userId: string,
 ): Promise<BookExpertDetailResult> {
-  return get<BookExpertDetailResult>(`/book-experts/${encodeURIComponent(expertId)}`, {
+  return rawRequest<BookExpertDetailResult>("GET", `/book-experts/${encodeURIComponent(expertId)}`, {
     query: { userId },
   })
 }
@@ -48,9 +88,10 @@ export async function publishExpert(
   expertId: string,
   req: BookExpertPublishReq,
 ): Promise<BookExpertPublishResult> {
-  return postJson<BookExpertPublishResult>(
+  return rawRequest<BookExpertPublishResult>(
+    "POST",
     `/book-experts/${encodeURIComponent(expertId)}/publish`,
-    req,
+    { body: req },
   )
 }
 
@@ -58,7 +99,7 @@ export async function deleteExpert(
   expertId: string,
   userId: string,
 ): Promise<BookExpertDeleteResult> {
-  return del<BookExpertDeleteResult>(`/book-experts/${encodeURIComponent(expertId)}`, {
+  return rawRequest<BookExpertDeleteResult>("DELETE", `/book-experts/${encodeURIComponent(expertId)}`, {
     query: { userId },
   })
 }

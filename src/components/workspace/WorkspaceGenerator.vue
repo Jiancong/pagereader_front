@@ -105,7 +105,7 @@
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueDocumentHint') }}</span>
           </label>
           <label
-            v-if="activeTab === 'upload'"
+            v-if="activeTab === 'upload' || activeTab === 'expert'"
             class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
           >
             <input v-model="activeTask.queue" type="radio" value="NOVEL" class="accent-primary" />
@@ -135,13 +135,47 @@
         <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.queueHint') }}</p>
       </div>
 
-      <BookExpertPanel
-        v-if="activeTab === 'expert'"
-        :user-id="props.userId != null ? String(props.userId) : null"
-        :active-expert-id="props.activeExpertId ?? null"
-        @open-distill="$emit('open-distill')"
-        @select-expert="(expert) => $emit('select-expert', expert)"
-      />
+      <div v-if="activeTab === 'expert'" class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        <div class="p-6 sm:p-8">
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold text-foreground">{{ t('bookExpert.panelTitle') }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t('bookExpert.panelSubtitle') }}</p>
+          </div>
+          <div
+            class="cursor-pointer rounded-xl border-2 border-dashed border-border bg-secondary/30 p-8 text-center transition-colors hover:border-primary/50"
+            @click="expertFileInput?.click()"
+          >
+            <input
+              ref="expertFileInput"
+              type="file"
+              accept=".pdf,.epub,.mobi,.azw,.azw3,.doc,.docx,.txt,.md"
+              class="hidden"
+              @change="onExpertFileChange"
+            />
+            <template v-if="expertPickedFile">
+              <FileText class="mx-auto h-10 w-10 text-primary" />
+              <p class="mt-3 break-words font-medium text-foreground">{{ expertPickedFile.name }}</p>
+              <p class="mt-1 text-sm text-muted-foreground">{{ formatBytes(expertPickedFile.size) }}</p>
+            </template>
+            <template v-else>
+              <Upload class="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <p class="mt-4 font-medium text-foreground">{{ t('bookExpert.distillPickFile') }}</p>
+              <p class="mt-1 text-sm text-muted-foreground">{{ t('bookExpert.distillFormats') }}</p>
+            </template>
+          </div>
+          <p v-if="expertFileError" class="mt-3 text-sm text-red-400">{{ expertFileError }}</p>
+          <button
+            type="button"
+            :disabled="!expertPickedFile || expertStarting"
+            class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="onStartDistill"
+          >
+            <Loader2 v-if="expertStarting" class="h-5 w-5 animate-spin" />
+            <Sparkles v-else class="h-5 w-5" />
+            {{ expertStarting ? t('common.loading') : t('bookExpert.createExpert') }}
+          </button>
+        </div>
+      </div>
       <div v-else class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <!-- RAG 上传分析 -->
         <div v-if="activeTab === 'upload'" class="p-6 sm:p-8">
@@ -536,7 +570,6 @@ import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
 import WorkspaceNovelResult from "@/components/workspace/WorkspaceNovelResult.vue"
 import WorkspaceOutlineResult from "@/components/workspace/WorkspaceOutlineResult.vue"
-import BookExpertPanel from "@/components/workspace/BookExpertPanel.vue"
 import type { BookExpertSummary } from "@/api/types"
 import {
   isBookCardStreamPayload,
@@ -593,6 +626,7 @@ const emit = defineEmits<{
   "project-started": [projectId: string]
   "project-complete": [projectId: string]
   "open-distill": []
+  "start-distill": [file: File]
   "select-expert": [expert: BookExpertSummary]
 }>()
 
@@ -693,6 +727,35 @@ const uploadPrompt = ref("")
 const uploadFileError = ref("")
 const srtPreview = ref<SrtParseResult | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+
+// ===== 专家蒸馏：内联上传 =====
+const expertFileInput = ref<HTMLInputElement | null>(null)
+const expertPickedFile = ref<File | null>(null)
+const expertFileError = ref("")
+const expertStarting = ref(false)
+
+function onExpertFileChange(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]
+  if (f) pickExpertFile(f)
+}
+function pickExpertFile(f: File) {
+  expertFileError.value = ""
+  const v = validatePptDocumentFile(f)
+  if (v === "unsupported") { expertFileError.value = t("workspace.uploadUnsupportedType"); return }
+  if (v === "too_large") { expertFileError.value = t("workspace.uploadTooLarge"); return }
+  expertPickedFile.value = f
+}
+function onStartDistill() {
+  if (!expertPickedFile.value || expertStarting.value) return
+  expertStarting.value = true
+  try {
+    emit("start-distill", expertPickedFile.value)
+  } finally {
+    expertStarting.value = false
+    expertPickedFile.value = null
+    if (expertFileInput.value) expertFileInput.value.value = ""
+  }
+}
 
 const hasAttachedDoc = computed(() => Boolean(uploadedFile.value || cloudDocument.value))
 const isAttachedSrt = computed(() => {
