@@ -10,7 +10,6 @@
     <main class="pt-16">
       <HeroSection />
       <TrustedByMarquee />
-      <GeneratorSection @start="onStart" />
       <EbookShowcaseSection @start="onStart" />
       <PricingSection :user-id="userId" @select-plan="onPricingPlan" @subscribed="refresh" />
     </main>
@@ -34,7 +33,6 @@ import AppHeader from '../components/AppHeader.vue'
 import ProductHuntBanner from '../components/ProductHuntBanner.vue'
 import HeroSection from '../components/HeroSection.vue'
 import TrustedByMarquee from '../components/TrustedByMarquee.vue'
-import GeneratorSection from '../components/GeneratorSection.vue'
 import EbookShowcaseSection from '../components/EbookShowcaseSection.vue'
 import PricingSection from '../components/PricingSection.vue'
 import AppFooter from '../components/AppFooter.vue'
