@@ -28,21 +28,32 @@
           {{ t('bookExpert.myExperts') }}
         </h3>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-          <button
-            v-for="expert in myExperts"
-            :key="expert.expert_id"
-            type="button"
-            class="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-lg"
-            @click="$emit('select-expert', expert)"
-          >
-            <div class="flex h-24 items-center justify-center bg-primary/10 sm:h-28">
-              <BookOpen class="h-8 w-8 text-primary" />
-            </div>
-            <div class="flex flex-1 flex-col p-3">
-              <p class="line-clamp-2 text-sm font-medium text-foreground">{{ expert.expert_name }}</p>
-              <p v-if="expert.book_title" class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ expert.book_title }}</p>
-            </div>
-          </button>
+          <div v-for="expert in myExperts" :key="expert.expert_id" class="group relative">
+            <button
+              type="button"
+              class="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-lg"
+              @click="$emit('select-expert', expert)"
+            >
+              <div class="flex h-24 items-center justify-center bg-primary/10 sm:h-28">
+                <BookOpen class="h-8 w-8 text-primary" />
+              </div>
+              <div class="flex flex-1 flex-col p-3">
+                <p class="line-clamp-2 text-sm font-medium text-foreground">{{ expert.expert_name }}</p>
+                <p v-if="expert.book_title" class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ expert.book_title }}</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              class="absolute right-2 top-2 z-10 rounded-lg bg-background/90 p-1.5 text-muted-foreground opacity-100 shadow-sm backdrop-blur transition-all hover:bg-red-500/10 hover:text-red-400 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+              :title="t('bookExpert.delete')"
+              :aria-label="t('bookExpert.delete')"
+              :disabled="deletingId === expert.expert_id"
+              @click.stop="onDelete(expert)"
+            >
+              <Loader2 v-if="deletingId === expert.expert_id" class="h-4 w-4 animate-spin" />
+              <Trash2 v-else class="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </section>
 
@@ -80,7 +91,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Search, Loader2, BookOpen } from 'lucide-vue-next'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Loader2, BookOpen, Trash2 } from 'lucide-vue-next'
 import { bookExpertApi } from '@/api'
 import type { BookExpertSummary } from '@/api/types'
 
@@ -94,6 +106,7 @@ const publicRaw = ref<BookExpertSummary[]>([])
 const loading = ref(false)
 const loadError = ref('')
 const keyword = ref('')
+const deletingId = ref<string | null>(null)
 
 async function load() {
   if (!props.userId) return
@@ -121,6 +134,30 @@ function filterByKeyword(list: BookExpertSummary[]): BookExpertSummary[] {
       e.expert_name.toLowerCase().includes(kw) ||
       (e.book_title ?? '').toLowerCase().includes(kw),
   )
+}
+
+async function onDelete(expert: BookExpertSummary) {
+  if (!props.userId || deletingId.value) return
+  try {
+    await ElMessageBox.confirm(
+      t('bookExpert.deleteConfirm', { name: expert.expert_name }),
+      t('bookExpert.delete'),
+      { type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  deletingId.value = expert.expert_id
+  try {
+    await bookExpertApi.deleteExpert(expert.expert_id, String(props.userId))
+    myRaw.value = myRaw.value.filter((e) => e.expert_id !== expert.expert_id)
+    publicRaw.value = publicRaw.value.filter((e) => e.expert_id !== expert.expert_id)
+    ElMessage.success(t('bookExpert.deleted'))
+  } catch (e: unknown) {
+    ElMessage.error(e instanceof Error ? e.message : t('common.actionFailed'))
+  } finally {
+    deletingId.value = null
+  }
 }
 
 const myExperts = computed(() => filterByKeyword(myRaw.value))
