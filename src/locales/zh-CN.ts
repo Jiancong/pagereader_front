@@ -93,7 +93,7 @@ export default {
     distillFailed: "蒸馏失败，请稍后重试",
     expertBadge: "书籍专家",
     exitExpert: "退出专家",
-    chatEmpty: "向这位专家提问吧，它会基于书中的方法论作答。",
+    chatEmpty: "在下方输入框向这位专家提问，它会基于书中的方法论作答。",
     inputPlaceholder: "向 {name} 提问",
     thinking: "正在思考…",
     noResponse: "暂无回复",

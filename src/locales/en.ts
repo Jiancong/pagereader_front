@@ -93,7 +93,7 @@ export default {
     distillFailed: "Distillation failed. Please try again later.",
     expertBadge: "Book Expert",
     exitExpert: "Exit expert",
-    chatEmpty: "Ask this expert a question and it will answer based on the book's methodology.",
+    chatEmpty: "Type in the input box below to ask this expert a question; it answers based on the book's methodology.",
     inputPlaceholder: "Ask {name}",
     thinking: "Thinking…",
     noResponse: "No response",

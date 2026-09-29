@@ -198,16 +198,24 @@ watch(() => props.expert.expert_id, () => {
 .be-chat__msg--assistant .be-chat__msg-bubble { background: hsl(var(--secondary)); color: hsl(var(--foreground)); border-bottom-left-radius: 4px; }
 .be-chat__msg-bubble--loading { display: inline-flex; align-items: center; gap: 8px; color: hsl(var(--muted-foreground)); }
 .be-chat__msg-text { margin: 0; white-space: pre-wrap; }
-.be-chat__input-bar { display: flex; gap: 8px; align-items: flex-end; padding-top: 12px; border-top: 1px solid hsl(var(--border)); }
+.be-chat__input-bar {
+  display: flex; gap: 8px; align-items: flex-end;
+  margin-top: 12px; padding: 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 16px;
+  background: hsl(var(--card));
+  box-shadow: 0 4px 16px hsl(var(--foreground) / 0.06);
+}
 .be-chat__input {
-  flex: 1; resize: none; padding: 10px 12px; border-radius: 12px;
-  border: 1px solid hsl(var(--border)); background: hsl(var(--secondary) / 0.4);
+  flex: 1; resize: none; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid hsl(var(--border)); background: hsl(var(--secondary) / 0.6);
   font-size: 14px; color: hsl(var(--foreground)); line-height: 1.5;
 }
+.be-chat__input::placeholder { color: hsl(var(--muted-foreground)); }
 .be-chat__input:focus { outline: none; border-color: hsl(var(--primary)); box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2); }
 .be-chat__send {
   flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; border-radius: 12px; border: none;
+  width: 40px; height: 40px; border-radius: 10px; border: none;
   background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); cursor: pointer;
   transition: background 0.15s, opacity 0.15s;
 }
