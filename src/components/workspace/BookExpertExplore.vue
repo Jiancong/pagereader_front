@@ -148,11 +148,12 @@ onMounted(load)
   width: 100%;
   padding: 8px 12px 8px 32px;
   border-radius: 10px;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--secondary) / 0.4);
+  border: 1px solid hsl(var(--foreground) / 0.15);
+  background: hsl(var(--background));
   font-size: 13px;
   color: hsl(var(--foreground));
 }
+.be-explore__search-input::placeholder { color: hsl(var(--muted-foreground)); }
 .be-explore__search-input:focus {
   outline: none;
   border-color: hsl(var(--primary));

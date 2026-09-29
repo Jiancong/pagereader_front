@@ -2087,13 +2087,13 @@ defineExpose({ attachCloudDocument })
 .be-distill__input {
   width: 100%;
   border-radius: 12px;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--secondary) / 0.5);
+  border: 1px solid hsl(var(--foreground) / 0.15);
+  background: hsl(var(--background));
   padding: 10px 16px;
   font-size: 14px;
   color: hsl(var(--foreground));
 }
-.be-distill__input::placeholder { color: hsl(var(--muted-foreground) / 0.6); }
+.be-distill__input::placeholder { color: hsl(var(--muted-foreground)); }
 .be-distill__input:focus {
   outline: none;
   border-color: hsl(var(--primary));
