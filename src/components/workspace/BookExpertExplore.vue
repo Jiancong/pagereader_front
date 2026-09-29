@@ -34,13 +34,38 @@
               class="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-lg"
               @click="$emit('select-expert', expert)"
             >
-              <div class="flex h-24 items-center justify-center bg-primary/10 sm:h-28">
-                <BookOpen class="h-8 w-8 text-primary" />
+              <div class="relative h-24 w-full overflow-hidden bg-primary/10 sm:h-28">
+                <img
+                  v-if="expert.cover_url"
+                  :src="expert.cover_url"
+                  :alt="expert.expert_name"
+                  class="h-full w-full object-cover"
+                  loading="lazy"
+                />
+                <div v-else class="flex h-full items-center justify-center">
+                  <BookOpen class="h-8 w-8 text-primary" />
+                </div>
+                <span
+                  v-if="expert.visibility === 'public'"
+                  class="absolute bottom-1 right-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium text-primary backdrop-blur"
+                >{{ t('bookExpert.publicBadge') }}</span>
               </div>
               <div class="flex flex-1 flex-col p-3">
                 <p class="line-clamp-2 text-sm font-medium text-foreground">{{ expert.expert_name }}</p>
                 <p v-if="expert.book_title" class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ expert.book_title }}</p>
               </div>
+            </button>
+            <button
+              type="button"
+              class="absolute left-2 top-2 z-10 rounded-lg bg-background/90 p-1.5 text-muted-foreground opacity-100 shadow-sm backdrop-blur transition-all hover:bg-primary/10 hover:text-primary md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+              :title="expert.visibility === 'public' ? t('bookExpert.unpublish') : t('bookExpert.publish')"
+              :aria-label="expert.visibility === 'public' ? t('bookExpert.unpublish') : t('bookExpert.publish')"
+              :disabled="publishingId === expert.expert_id"
+              @click.stop="onTogglePublish(expert)"
+            >
+              <Loader2 v-if="publishingId === expert.expert_id" class="h-4 w-4 animate-spin" />
+              <Globe v-else-if="expert.visibility === 'public'" class="h-4 w-4" />
+              <Lock v-else class="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -70,8 +95,17 @@
             class="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-lg"
             @click="$emit('select-expert', expert)"
           >
-            <div class="flex h-24 items-center justify-center bg-accent/10 sm:h-28">
-              <BookOpen class="h-8 w-8 text-accent" />
+            <div class="relative h-24 w-full overflow-hidden bg-accent/10 sm:h-28">
+              <img
+                v-if="expert.cover_url"
+                :src="expert.cover_url"
+                :alt="expert.expert_name"
+                class="h-full w-full object-cover"
+                loading="lazy"
+              />
+              <div v-else class="flex h-full items-center justify-center">
+                <BookOpen class="h-8 w-8 text-accent" />
+              </div>
             </div>
             <div class="flex flex-1 flex-col p-3">
               <p class="line-clamp-2 text-sm font-medium text-foreground">{{ expert.expert_name }}</p>
@@ -92,7 +126,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Loader2, BookOpen, Trash2 } from 'lucide-vue-next'
+import { Search, Loader2, BookOpen, Trash2, Globe, Lock } from 'lucide-vue-next'
 import { bookExpertApi } from '@/api'
 import type { BookExpertSummary } from '@/api/types'
 
@@ -107,6 +141,7 @@ const loading = ref(false)
 const loadError = ref('')
 const keyword = ref('')
 const deletingId = ref<string | null>(null)
+const publishingId = ref<string | null>(null)
 
 async function load() {
   if (!props.userId) return
@@ -157,6 +192,28 @@ async function onDelete(expert: BookExpertSummary) {
     ElMessage.error(e instanceof Error ? e.message : t('common.actionFailed'))
   } finally {
     deletingId.value = null
+  }
+}
+
+/** 发布/取消发布（Globe=已公开，点击取消；Lock=私有，点击发布） */
+async function onTogglePublish(expert: BookExpertSummary) {
+  if (!props.userId || publishingId.value) return
+  const makePublic = expert.visibility !== 'public'
+  publishingId.value = expert.expert_id
+  try {
+    const res = await bookExpertApi.publishExpert(expert.expert_id, {
+      userId: String(props.userId),
+      public: makePublic,
+    })
+    const visibility = res?.visibility ?? (makePublic ? 'public' : 'private')
+    myRaw.value = myRaw.value.map((e) =>
+      e.expert_id === expert.expert_id ? { ...e, visibility } : e,
+    )
+    ElMessage.success(makePublic ? t('bookExpert.published') : t('bookExpert.unpublished'))
+  } catch (e: unknown) {
+    ElMessage.error(e instanceof Error ? e.message : t('common.actionFailed'))
+  } finally {
+    publishingId.value = null
   }
 }
 

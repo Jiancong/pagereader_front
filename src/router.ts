@@ -43,6 +43,11 @@ const routes = [
     component: () => import("./views/ProjectCommunityView.vue"),
   },
   {
+    path: "/explore/expert/:expertId",
+    name: "expert-community",
+    component: () => import("./views/ExploreExpertView.vue"),
+  },
+  {
     path: "/explore/project/:projectId/read",
     name: "project-reader",
     component: () => import("./views/ProjectReaderView.vue"),

@@ -73,6 +73,7 @@
         :user-id="userId ? String(userId) : null"
         :project-id="expertProjectId"
         @exit="onExitExpert"
+        @expert-updated="onExpertUpdated"
       />
       <ProjectPreview
         v-else-if="view === 'project' && activeProjectId"
@@ -101,7 +102,7 @@ import ProjectPreview from '../components/workspace/ProjectPreview.vue'
 import BookExpertChat from '../components/workspace/BookExpertChat.vue'
 import BookExpertExplore from '../components/workspace/BookExpertExplore.vue'
 import { useBookExpertStore } from '@/stores/bookExpert'
-import { authApi, feedApi, getLocalAvatar } from '../api'
+import { authApi, feedApi, getLocalAvatar, bookExpertApi } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
 
@@ -220,6 +221,21 @@ onMounted(async () => {
     openProject(target)
     router.replace({ name: 'workspace' })
   }
+
+  // 公开专家页 CTA：/workspace?expert=<expertId> 直接进入专家会话
+  const expertTarget = String(route.query.expert || '').trim()
+  if (expertTarget) {
+    try {
+      const res = await bookExpertApi.getExpert(
+        expertTarget,
+        userId.value ? String(userId.value) : undefined,
+      )
+      if (res?.expert) onSelectExpert(res.expert)
+    } catch {
+      /* 专家不存在或未公开则忽略 */
+    }
+    router.replace({ name: 'workspace' })
+  }
 })
 
 const onDeleteProject = async (projectId) => {
@@ -311,6 +327,13 @@ function onSelectExpert(expert) {
   activeExpert.value = expert
   expertProjectId.value = newExpertProjectId()
   view.value = 'expert-chat'
+}
+
+/** 聊天页内发布 / 封面上传后回写，保持 header 与卡片封面同步 */
+function onExpertUpdated(expert) {
+  if (activeExpert.value && expert?.expert_id === activeExpert.value.expert_id) {
+    activeExpert.value = { ...activeExpert.value, ...expert }
+  }
 }
 
 function onExitExpert() {

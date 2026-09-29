@@ -740,6 +740,8 @@ export interface BookExpertSummary {
   visibility: BookExpertVisibility
   owner_user_id: string
   created_at?: string
+  /** 封面图（OSS URL；旧专家可能为空） */
+  cover_url?: string
   /** 详情接口才返回的方法论预览（Python 返回对象；历史信封可能为字符串） */
   methodology_preview?: string | BookExpertMethodologyPreview
 }
@@ -776,6 +778,39 @@ export interface BookExpertPublishResult {
 export interface BookExpertDeleteResult {
   ok: boolean
   expert_id: string
+}
+
+export interface BookExpertCoverUploadResult {
+  ok: boolean
+  cover_url?: string
+  expert?: BookExpertSummary
+}
+
+/** 专家聊天会话摘要（GET /book-experts/{id}/sessions） */
+export interface BookExpertSessionSummary {
+  sessionId: string
+  updatedAt?: string
+  title?: string
+  messageCount?: number
+}
+
+export interface BookExpertSessionListResult {
+  ok: boolean
+  sessions: BookExpertSessionSummary[]
+  count: number
+}
+
+export interface BookExpertSessionMessage {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp?: string
+}
+
+export interface BookExpertSessionMessagesResult {
+  ok: boolean
+  sessionId: string
+  updatedAt?: string
+  messages: BookExpertSessionMessage[]
 }
 
 export interface DistillUploadedDocument {

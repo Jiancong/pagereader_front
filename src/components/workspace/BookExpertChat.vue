@@ -6,11 +6,120 @@
         <ArrowLeft class="h-4 w-4" /> {{ t('bookExpert.exitExpert') }}
       </button>
       <div class="be-chat__title-row">
-        <span class="be-chat__badge">{{ t('bookExpert.expertBadge') }}</span>
-        <h2 class="be-chat__title">{{ expert.expert_name }}</h2>
+        <img
+          v-if="expert.cover_url"
+          :src="expert.cover_url"
+          :alt="expert.expert_name"
+          class="be-chat__cover"
+        />
+        <div class="be-chat__title-col">
+          <div class="be-chat__title-line">
+            <span class="be-chat__badge">{{ t('bookExpert.expertBadge') }}</span>
+            <h2 class="be-chat__title">{{ expert.expert_name }}</h2>
+          </div>
+          <p v-if="expert.book_title" class="be-chat__book">{{ expert.book_title }}</p>
+        </div>
       </div>
-      <p v-if="expert.book_title" class="be-chat__book">{{ expert.book_title }}</p>
+
+      <!-- 工具条：历史 / 封面 / 分享（复用 PPT 分享下拉的交互模式） -->
+      <div class="be-chat__actions">
+        <button
+          v-if="isOwner"
+          type="button"
+          class="be-chat__action"
+          :title="t('bookExpert.historyTitle')"
+          @click="toggleHistory"
+        >
+          <Loader2 v-if="historyLoading" class="h-4 w-4 animate-spin" />
+          <History v-else class="h-4 w-4" />
+          <span>{{ t('bookExpert.history') }}</span>
+        </button>
+
+        <template v-if="isOwner">
+          <input
+            ref="coverInputRef"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            class="hidden"
+            @change="onCoverFileSelected"
+          />
+          <button
+            type="button"
+            class="be-chat__action"
+            :disabled="coverUploading"
+            :title="t('bookExpert.cover')"
+            @click="triggerCoverUpload"
+          >
+            <Loader2 v-if="coverUploading" class="h-4 w-4 animate-spin" />
+            <ImagePlus v-else class="h-4 w-4" />
+            <span>{{ coverUploading ? t('bookExpert.coverUploading') : t('bookExpert.cover') }}</span>
+          </button>
+        </template>
+
+        <div class="be-chat__share-wrap">
+          <button
+            type="button"
+            class="be-chat__action be-chat__action--trigger"
+            :aria-expanded="shareMenuOpen"
+            @click="shareMenuOpen = !shareMenuOpen"
+          >
+            <Share2 class="h-4 w-4" />
+            <span>{{ t('bookExpert.share') }}</span>
+            <ChevronDown class="h-3 w-3" :class="{ 'be-chat__chevron--open': shareMenuOpen }" />
+          </button>
+          <div v-if="shareMenuOpen" class="be-chat__share-menu" role="menu">
+            <button type="button" class="be-chat__share-item" role="menuitem" @click="runShare('link')">
+              <Link2 class="h-4 w-4" />
+              <span>{{ t('bookExpert.shareViaLink') }}</span>
+            </button>
+            <button type="button" class="be-chat__share-item" role="menuitem" @click="runShare('facebook')">
+              <Facebook class="h-4 w-4" />
+              <span>{{ t('bookExpert.shareFacebook') }}</span>
+            </button>
+            <button type="button" class="be-chat__share-item" role="menuitem" @click="runShare('x')">
+              <Twitter class="h-4 w-4" />
+              <span>{{ t('bookExpert.shareX') }}</span>
+            </button>
+            <button type="button" class="be-chat__share-item" role="menuitem" @click="runShare('linkedin')">
+              <Linkedin class="h-4 w-4" />
+              <span>{{ t('bookExpert.shareLinkedIn') }}</span>
+            </button>
+          </div>
+          <div v-if="shareMenuOpen" class="be-chat__share-backdrop" @click="shareMenuOpen = false" />
+        </div>
+      </div>
     </header>
+
+    <!-- 历史会话抽屉 -->
+    <transition name="be-chat__drawer">
+      <aside v-if="historyOpen" class="be-chat__history">
+        <div class="be-chat__history-head">
+          <span>{{ t('bookExpert.historyTitle') }}</span>
+          <button type="button" class="be-chat__history-close" @click="historyOpen = false">
+            <X class="h-4 w-4" />
+          </button>
+        </div>
+        <div class="be-chat__history-body">
+          <p v-if="historyError" class="be-chat__history-error">{{ historyError }}</p>
+          <p v-else-if="!historyLoading && !sessions.length" class="be-chat__history-empty">
+            {{ t('bookExpert.historyEmpty') }}
+          </p>
+          <button
+            v-for="s in sessions"
+            :key="s.sessionId"
+            type="button"
+            class="be-chat__history-item"
+            @click="onRestoreSession(s)"
+          >
+            <span class="be-chat__history-item-title">{{ s.title || s.sessionId }}</span>
+            <span class="be-chat__history-item-meta">
+              {{ t('bookExpert.historyMessageCount', { n: s.messageCount ?? 0 }) }}
+              <template v-if="s.updatedAt"> · {{ formatSessionTime(s.updatedAt) }}</template>
+            </span>
+          </button>
+        </div>
+      </aside>
+    </transition>
 
     <div ref="scrollRef" class="be-chat__messages">
       <div v-if="!messages.length" class="be-chat__empty">{{ t('bookExpert.chatEmpty') }}</div>
@@ -51,18 +160,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, nextTick, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
-import { ArrowLeft, Loader2, Send } from 'lucide-vue-next'
-import { agentApi, ApiError, isCreditsInsufficient } from '@/api'
-import { toBookExpertSkillName } from '@/api/bookExpert'
-import { getOrCreateSessionId } from '@/api/agent'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  ArrowLeft, Loader2, Send, History, ImagePlus, Share2, ChevronDown,
+  Link2, Facebook, Twitter, Linkedin, X,
+} from 'lucide-vue-next'
+import { agentApi, ApiError, isCreditsInsufficient, bookExpertApi } from '@/api'
+import {
+  toBookExpertSkillName,
+  getOrCreateExpertSessionId,
+  setActiveExpertSessionId,
+} from '@/api/bookExpert'
+import { buildExploreExpertShareUrl } from '@/utils/feedOpen'
 import ChatMarkdownBody from '@/components/editor/chat/ChatMarkdownBody.vue'
-import type { BookExpertSummary } from '@/api/types'
+import type {
+  BookExpertSummary,
+  BookExpertSessionSummary,
+} from '@/api/types'
 
 const props = defineProps<{ expert: BookExpertSummary; userId: string | null; projectId: string }>()
-const emit = defineEmits<{ exit: [] }>()
+const emit = defineEmits<{
+  exit: []
+  'expert-updated': [expert: BookExpertSummary]
+}>()
 
 const { t } = useI18n()
 
@@ -72,7 +194,27 @@ const input = ref('')
 const generating = ref(false)
 const scrollRef = ref<HTMLElement | null>(null)
 let abortController: AbortController | null = null
-const sessionId = getOrCreateSessionId()
+
+/** 专家会话独立 sessionId：be-<expertId>-<uuid>（Python 按前缀反查历史） */
+const sessionId = ref('')
+
+/** 历史抽屉 */
+const historyOpen = ref(false)
+const historyLoading = ref(false)
+const historyError = ref('')
+const sessions = ref<BookExpertSessionSummary[]>([])
+
+/** 封面上传 */
+const coverInputRef = ref<HTMLInputElement | null>(null)
+const coverUploading = ref(false)
+const COVER_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+
+/** 分享菜单 */
+const shareMenuOpen = ref(false)
+
+const isOwner = computed(
+  () => Boolean(props.userId) && String(props.expert.owner_user_id || '') === String(props.userId),
+)
 
 function newId() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -86,6 +228,158 @@ function scrollToBottom() {
     if (el) el.scrollTop = el.scrollHeight
   })
 }
+
+// ── 历史会话 ──────────────────────────────────────────────
+
+function toggleHistory() {
+  historyOpen.value = !historyOpen.value
+  if (historyOpen.value && !sessions.value.length) loadHistory()
+}
+
+async function loadHistory() {
+  if (!props.userId || historyLoading.value) return
+  historyLoading.value = true
+  historyError.value = ''
+  try {
+    const res = await bookExpertApi.listExpertSessions(
+      props.expert.expert_id,
+      String(props.userId),
+    )
+    sessions.value = res?.sessions ?? []
+  } catch (e: unknown) {
+    historyError.value = e instanceof Error ? e.message : t('bookExpert.historyError')
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function onRestoreSession(s: BookExpertSessionSummary) {
+  if (!props.userId || historyLoading.value) return
+  historyLoading.value = true
+  try {
+    const res = await bookExpertApi.getExpertSessionMessages(
+      props.expert.expert_id,
+      s.sessionId,
+      String(props.userId),
+    )
+    const restored: ChatMessage[] = (res?.messages ?? [])
+      .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .map((m) => ({ id: newId(), role: m.role, content: m.content }))
+    messages.value = restored
+    setActiveExpertSessionId(props.expert.expert_id, s.sessionId)
+    sessionId.value = s.sessionId
+    historyOpen.value = false
+    ElMessage.success(t('bookExpert.historyRestored'))
+    scrollToBottom()
+  } catch {
+    ElMessage.error(t('bookExpert.historyRestoreFailed'))
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function formatSessionTime(v: string): string {
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return v
+  return d.toLocaleString()
+}
+
+// ── 封面上传（复用项目封面 uploadProjectCover 的校验/流程模式） ──
+
+function triggerCoverUpload() {
+  if (coverUploading.value) return
+  coverInputRef.value?.click()
+}
+
+async function onCoverFileSelected(event: Event) {
+  const el = event.target as HTMLInputElement
+  const file = el.files?.[0]
+  el.value = ''
+  if (!file || !props.userId || coverUploading.value) return
+
+  const mime = (file.type || '').toLowerCase()
+  if (mime && !COVER_IMAGE_TYPES.has(mime)) {
+    ElMessage.warning(t('bookExpert.coverInvalidType'))
+    return
+  }
+
+  coverUploading.value = true
+  try {
+    const result = await bookExpertApi.uploadExpertCover(
+      props.expert.expert_id,
+      file,
+      String(props.userId),
+    )
+    const coverUrl =
+      String(result?.cover_url ?? result?.expert?.cover_url ?? '').trim() || undefined
+    emit('expert-updated', { ...props.expert, cover_url: coverUrl ?? props.expert.cover_url })
+    ElMessage.success(t('bookExpert.coverSuccess'))
+  } catch (e: unknown) {
+    ElMessage.error(
+      e instanceof ApiError || e instanceof Error
+        ? e.message
+        : t('bookExpert.coverFailed'),
+    )
+  } finally {
+    coverUploading.value = false
+  }
+}
+
+// ── 分享（私有专家先引导发布；公开页 /explore/expert/{id}） ──
+
+async function ensurePublicForShare(): Promise<boolean> {
+  if (props.expert.visibility === 'public') return true
+  if (!isOwner.value) return false
+  try {
+    await ElMessageBox.confirm(t('bookExpert.shareNeedsPublish'), t('bookExpert.share'), {
+      type: 'info',
+      confirmButtonText: t('bookExpert.publish'),
+      cancelButtonText: t('common.cancel'),
+    })
+  } catch {
+    return false
+  }
+  try {
+    const res = await bookExpertApi.publishExpert(props.expert.expert_id, {
+      userId: String(props.userId),
+      public: true,
+    })
+    emit('expert-updated', { ...props.expert, visibility: res?.visibility ?? 'public' })
+    ElMessage.success(t('bookExpert.published'))
+    return true
+  } catch {
+    ElMessage.error(t('bookExpert.sharePublishFailed'))
+    return false
+  }
+}
+
+type ShareAction = 'link' | 'facebook' | 'x' | 'linkedin'
+
+async function runShare(action: ShareAction) {
+  shareMenuOpen.value = false
+  if (!(await ensurePublicForShare())) return
+  const url = buildExploreExpertShareUrl(props.expert.expert_id)
+  const text = props.expert.expert_name || ''
+  try {
+    if (action === 'link') {
+      await navigator.clipboard.writeText(url)
+      ElMessage.success(t('bookExpert.shareCopied'))
+      return
+    }
+    const encoded = encodeURIComponent(url)
+    const target =
+      action === 'facebook'
+        ? `https://www.facebook.com/sharer/sharer.php?u=${encoded}`
+        : action === 'x'
+          ? `https://twitter.com/intent/tweet?url=${encoded}&text=${encodeURIComponent(text)}`
+          : `https://www.linkedin.com/sharing/share-offsite/?url=${encoded}`
+    window.open(target, '_blank', 'noopener,noreferrer')
+  } catch {
+    ElMessage.error(t('bookExpert.shareCopyFailed'))
+  }
+}
+
+// ── 发送（SSE） ───────────────────────────────────────────
 
 async function onSend() {
   const text = input.value.trim()
@@ -108,7 +402,7 @@ async function onSend() {
         message: text,
         userId: props.userId,
         projectId: props.projectId,
-        sessionId,
+        sessionId: sessionId.value,
         isAgent: true,
         skill: true,
         skillName: toBookExpertSkillName(props.expert.expert_id),
@@ -141,6 +435,8 @@ async function onSend() {
           }
           if (!assistantMsg.content) assistantMsg.content = t('bookExpert.noResponse')
           scrollToBottom()
+          // 新消息落库后刷新抽屉列表
+          if (historyOpen.value) loadHistory()
         },
       },
       abortController.signal,
@@ -164,10 +460,13 @@ onBeforeUnmount(() => {
   abortController?.abort()
 })
 
-watch(() => props.expert.expert_id, () => {
+watch(() => props.expert.expert_id, (id) => {
   messages.value = []
   input.value = ''
-})
+  historyOpen.value = false
+  sessions.value = []
+  sessionId.value = getOrCreateExpertSessionId(id)
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -191,6 +490,7 @@ watch(() => props.expert.expert_id, () => {
   max-width: 72rem; margin: 0 auto; width: 100%;
 }
 .book-expert-chat__shell {
+  position: relative;
   flex: 1; display: flex; flex-direction: column; min-height: min(720px, calc(100dvh - 7rem));
   border: 1px solid var(--be-border);
   border-radius: 1rem;
@@ -214,13 +514,95 @@ watch(() => props.expert.expert_id, () => {
   transition: color 0.15s;
 }
 .be-chat__back:hover { color: var(--be-fg); }
-.be-chat__title-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.be-chat__title-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.be-chat__cover {
+  width: 56px; height: 56px; flex-shrink: 0; object-fit: cover;
+  border-radius: 12px; border: 1px solid var(--be-border);
+}
+.be-chat__title-col { display: flex; flex-direction: column; min-width: 0; }
+.be-chat__title-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .be-chat__badge {
   font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 9999px;
   background: rgba(var(--be-primary-rgb), 0.14); color: var(--be-primary);
 }
 .be-chat__title { font-size: 18px; font-weight: 700; color: var(--be-fg); margin: 0; }
 .be-chat__book { margin-top: 4px; font-size: 13px; color: var(--be-fg-muted); }
+
+/* 工具条：历史 / 封面 / 分享 */
+.be-chat__actions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px;
+}
+.be-chat__action {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 9999px;
+  border: 1px solid var(--be-border); background: rgba(var(--be-bg-rgb), 0.6);
+  font-size: 12px; color: var(--be-fg-muted); cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.be-chat__action:hover:not(:disabled) {
+  color: var(--be-fg); border-color: rgba(var(--be-primary-rgb), 0.55);
+  background: rgba(var(--be-primary-rgb), 0.08);
+}
+.be-chat__action:disabled { opacity: 0.6; cursor: not-allowed; }
+.be-chat__share-wrap { position: relative; }
+.be-chat__chevron--open { transform: rotate(180deg); }
+.be-chat__share-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+  min-width: 200px; padding: 6px;
+  border-radius: 12px; border: 1px solid var(--be-border);
+  background: var(--be-card); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+.be-chat__share-item {
+  display: flex; width: 100%; align-items: center; gap: 10px;
+  padding: 8px 10px; border: none; border-radius: 8px;
+  background: transparent; font-size: 13px; color: var(--be-fg);
+  cursor: pointer; text-align: left;
+  transition: background 0.15s;
+}
+.be-chat__share-item:hover { background: rgba(var(--be-primary-rgb), 0.12); }
+.be-chat__share-backdrop { position: fixed; inset: 0; z-index: 20; }
+
+/* 历史抽屉 */
+.be-chat__history {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 25;
+  width: min(320px, 88%); display: flex; flex-direction: column;
+  border-left: 1px solid var(--be-border);
+  background: var(--be-card);
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
+}
+.be-chat__history-head {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; font-size: 13px; font-weight: 600; color: var(--be-fg);
+  border-bottom: 1px solid var(--be-border);
+}
+.be-chat__history-close {
+  border: none; background: transparent; color: var(--be-fg-muted); cursor: pointer;
+  padding: 4px; border-radius: 6px; display: inline-flex;
+}
+.be-chat__history-close:hover { color: var(--be-fg); background: rgba(var(--be-fg-rgb), 0.08); }
+.be-chat__history-body {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 10px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.be-chat__history-empty, .be-chat__history-error {
+  margin: 12px 6px; font-size: 12px; line-height: 1.6;
+  color: var(--be-fg-muted); text-align: center;
+}
+.be-chat__history-error { color: #f87171; }
+.be-chat__history-item {
+  display: flex; flex-direction: column; gap: 4px; width: 100%;
+  padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--be-border); background: rgba(var(--be-bg-rgb), 0.6);
+  cursor: pointer; text-align: left; transition: border-color 0.15s;
+}
+.be-chat__history-item:hover { border-color: rgba(var(--be-primary-rgb), 0.55); }
+.be-chat__history-item-title {
+  font-size: 13px; color: var(--be-fg);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.be-chat__history-item-meta { font-size: 11px; color: var(--be-fg-muted); }
+.be-chat__drawer-enter-active, .be-chat__drawer-leave-active { transition: transform 0.2s ease; }
+.be-chat__drawer-enter-from, .be-chat__drawer-leave-to { transform: translateX(100%); }
 .be-chat__messages {
   flex: 1; min-height: 0; overflow-y: auto; padding: 20px 28px;
   display: flex; flex-direction: column; gap: 12px;

@@ -11,6 +11,9 @@ import type {
   BookExpertPublishReq,
   BookExpertPublishResult,
   BookExpertDeleteResult,
+  BookExpertCoverUploadResult,
+  BookExpertSessionListResult,
+  BookExpertSessionMessagesResult,
   BookExpertSummary,
   DistillRequest,
   DistillExpertCreatedEvent,
@@ -64,11 +67,14 @@ function authJsonHeaders(): Headers {
 async function rawRequest<T>(
   method: string,
   path: string,
-  opts: { query?: Record<string, unknown>; body?: unknown } = {},
+  opts: { query?: Record<string, unknown>; body?: unknown; form?: FormData } = {},
 ): Promise<T> {
   const headers = authJsonHeaders()
   let body: BodyInit | undefined
-  if (opts.body !== undefined) {
+  if (opts.form) {
+    // multipart：由浏览器补 boundary，勿手动设 Content-Type
+    body = opts.form
+  } else if (opts.body !== undefined) {
     headers.set("Content-Type", "application/json")
     body = JSON.stringify(opts.body)
   }
@@ -111,10 +117,10 @@ export async function listPublicExperts(
 
 export async function getExpert(
   expertId: string,
-  userId: string,
+  userId?: string,
 ): Promise<BookExpertDetailResult> {
   return rawRequest<BookExpertDetailResult>("GET", `/book-experts/${encodeURIComponent(expertId)}`, {
-    query: { userId },
+    query: userId ? { userId } : undefined,
   })
 }
 
@@ -136,6 +142,78 @@ export async function deleteExpert(
   return rawRequest<BookExpertDeleteResult>("DELETE", `/book-experts/${encodeURIComponent(expertId)}`, {
     query: { userId },
   })
+}
+
+// ===== 封面 / 会话历史（Java BFF 代理 Python；详见 docs spec） =====
+
+const EXPERT_SESSION_KEY_PREFIX = "book_expert_session:"
+
+/**
+ * 专家会话独立 sessionId：`be-<expertId>-<uuid>`（区别于浏览器全局 sessionId）。
+ * Python 端按该前缀反查 sessions 表，实现按专家隔离的会话历史。
+ */
+export function getOrCreateExpertSessionId(expertId: string): string {
+  const eid = String(expertId || "").trim()
+  if (typeof window === "undefined" || !eid) return ""
+  const key = `${EXPERT_SESSION_KEY_PREFIX}${eid}`
+  const prefix = `be-${eid}-`
+  let id = window.localStorage.getItem(key) || ""
+  if (!id.startsWith(prefix)) {
+    const uuid =
+      window.crypto?.randomUUID?.() ??
+      `s-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    id = `${prefix}${uuid}`
+    window.localStorage.setItem(key, id)
+  }
+  return id
+}
+
+/** 恢复历史会话后，把该会话设为当前专家的默认会话（继续追问同一线程） */
+export function setActiveExpertSessionId(expertId: string, sessionId: string): void {
+  const eid = String(expertId || "").trim()
+  const sid = String(sessionId || "").trim()
+  if (typeof window === "undefined" || !eid || !sid.startsWith(`be-${eid}-`)) return
+  window.localStorage.setItem(`${EXPERT_SESSION_KEY_PREFIX}${eid}`, sid)
+}
+
+/** 上传专家封面（multipart；BFF 负责转 OSS，Python 只存 cover_url） */
+export async function uploadExpertCover(
+  expertId: string,
+  file: File,
+  userId: string,
+): Promise<BookExpertCoverUploadResult> {
+  const form = new FormData()
+  form.append("file", file)
+  return rawRequest<BookExpertCoverUploadResult>(
+    "POST",
+    `/book-experts/${encodeURIComponent(expertId)}/cover`,
+    { query: { userId }, form },
+  )
+}
+
+/** 该专家的历史会话列表（owner only） */
+export async function listExpertSessions(
+  expertId: string,
+  userId: string,
+): Promise<BookExpertSessionListResult> {
+  return rawRequest<BookExpertSessionListResult>(
+    "GET",
+    `/book-experts/${encodeURIComponent(expertId)}/sessions`,
+    { query: { userId } },
+  )
+}
+
+/** 单个历史会话的消息（owner only；已清洗为 role/content/timestamp） */
+export async function getExpertSessionMessages(
+  expertId: string,
+  sessionId: string,
+  userId: string,
+): Promise<BookExpertSessionMessagesResult> {
+  return rawRequest<BookExpertSessionMessagesResult>(
+    "GET",
+    `/book-experts/${encodeURIComponent(expertId)}/sessions/${encodeURIComponent(sessionId)}`,
+    { query: { userId } },
+  )
 }
 
 // ===== 蒸馏 SSE =====

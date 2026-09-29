@@ -34,3 +34,11 @@ export function buildExploreProjectShareUrl(projectId: string): string {
   const path = `${base.replace(/\/?$/, "/")}explore/project/${encodeURIComponent(pid)}`
   return new URL(path, window.location.origin).href
 }
+
+/** 公开专家分享页（/explore/expert/{expertId}，未登录可访问） */
+export function buildExploreExpertShareUrl(expertId: string): string {
+  const eid = String(expertId ?? "").trim()
+  const base = import.meta.env.BASE_URL || "/"
+  const path = `${base.replace(/\/?$/, "/")}explore/expert/${encodeURIComponent(eid)}`
+  return new URL(path, window.location.origin).href
+}
