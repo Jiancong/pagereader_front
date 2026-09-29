@@ -172,55 +172,68 @@ watch(() => props.expert.expert_id, () => {
 
 <style scoped>
 .book-expert-chat {
+  /* 调色板对齐 tailwind.config.js（项目无 shadcn CSS 变量，hsl(var(--x)) 全部无效，
+     此前「边框不显眼」的根因即在此） */
+  --be-bg: #0f1419;
+  --be-bg-rgb: 15, 20, 25;
+  --be-fg: #e7e9ea;
+  --be-fg-rgb: 231, 233, 234;
+  --be-fg-muted: #71767b;
+  --be-card: #16202a;
+  --be-card-rgb: 22, 32, 42;
+  --be-border: #2f3336;
+  --be-border-rgb: 47, 51, 54;
+  --be-primary: #1d9bf0;
+  --be-primary-rgb: 29, 155, 240;
+  --be-primary-fg: #ffffff;
+
   display: flex; flex-direction: column; height: 100%; min-height: 0;
   max-width: 48rem; margin: 0 auto; width: 100%;
 }
 .book-expert-chat__shell {
   flex: 1; display: flex; flex-direction: column; min-height: min(720px, calc(100dvh - 7rem));
-  border: 1px solid hsl(var(--border)); border-radius: 1rem;
-  background: hsl(var(--card));
-  box-shadow: 0 25px 50px -12px hsl(var(--foreground) / 0.18);
+  border: 1px solid var(--be-border);
+  border-radius: 1rem;
+  background: var(--be-card);
+  box-shadow: 0 25px 50px -12px rgba(var(--be-fg-rgb), 0.18);
   overflow: hidden;
 }
 .be-chat__header {
   flex-shrink: 0; padding: 16px 20px 14px;
-  border-bottom: 1px solid hsl(var(--border));
+  border-bottom: 1px solid var(--be-border);
   background: linear-gradient(
     180deg,
-    hsl(var(--card)) 0%,
-    hsl(var(--card) / 0.92) 100%
+    rgb(var(--be-card-rgb)) 0%,
+    rgba(var(--be-card-rgb), 0.92) 100%
   );
 }
 .be-chat__back {
   display: inline-flex; align-items: center; gap: 4px;
   border: none; background: transparent; padding: 4px 0;
-  font-size: 13px; color: hsl(var(--muted-foreground)); cursor: pointer;
+  font-size: 13px; color: var(--be-fg-muted); cursor: pointer;
   transition: color 0.15s;
 }
-.be-chat__back:hover { color: hsl(var(--foreground)); }
+.be-chat__back:hover { color: var(--be-fg); }
 .be-chat__title-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .be-chat__badge {
   font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 9999px;
-  background: hsl(var(--primary) / 0.1); color: hsl(var(--primary));
+  background: rgba(var(--be-primary-rgb), 0.14); color: var(--be-primary);
 }
-.be-chat__title { font-size: 18px; font-weight: 700; color: hsl(var(--foreground)); margin: 0; }
-.be-chat__book { margin-top: 4px; font-size: 13px; color: hsl(var(--muted-foreground)); }
+.be-chat__title { font-size: 18px; font-weight: 700; color: var(--be-fg); margin: 0; }
+.be-chat__book { margin-top: 4px; font-size: 13px; color: var(--be-fg-muted); }
 .be-chat__messages {
   flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px;
   display: flex; flex-direction: column; gap: 12px;
-  background: hsl(var(--foreground) / 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.06);
+  background: var(--be-bg);
 }
 .be-chat__empty {
   margin: auto; max-width: 22rem; text-align: center;
   font-size: 14px; line-height: 1.6;
   padding: 20px 18px; border-radius: 12px;
-  color: hsl(var(--foreground) / 0.78);
-  border: 1px dashed hsl(var(--border));
-  background: hsl(var(--background) / 0.88);
-  box-shadow: 0 4px 24px hsl(var(--foreground) / 0.08);
+  color: rgba(var(--be-fg-rgb), 0.78);
+  border: 1px dashed var(--be-border);
+  background: rgba(var(--be-bg-rgb), 0.88);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 .be-chat__msg { display: flex; }
 .be-chat__msg--user { justify-content: flex-end; }
@@ -229,37 +242,40 @@ watch(() => props.expert.expert_id, () => {
   max-width: 80%; padding: 10px 14px; border-radius: 14px;
   font-size: 14px; line-height: 1.6; word-break: break-word;
 }
-.be-chat__msg--user .be-chat__msg-bubble { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-bottom-right-radius: 4px; }
+.be-chat__msg--user .be-chat__msg-bubble { background: var(--be-primary); color: var(--be-primary-fg); border-bottom-right-radius: 4px; }
 .be-chat__msg--assistant .be-chat__msg-bubble {
-  background: hsl(var(--background)); color: hsl(var(--foreground));
-  border: 1px solid hsl(var(--border));
+  background: var(--be-card); color: var(--be-fg);
+  border: 1px solid var(--be-border);
   border-bottom-left-radius: 4px;
-  box-shadow: 0 2px 8px hsl(var(--foreground) / 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
-.be-chat__msg-bubble--loading { display: inline-flex; align-items: center; gap: 8px; color: hsl(var(--muted-foreground)); }
+.be-chat__msg-bubble--loading { display: inline-flex; align-items: center; gap: 8px; color: var(--be-fg-muted); }
 .be-chat__msg-text { margin: 0; white-space: pre-wrap; }
 .be-chat__input-bar {
   flex-shrink: 0;
   display: flex; gap: 8px; align-items: flex-end;
   margin: 0; padding: 14px 16px;
-  border-top: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
-  box-shadow: 0 -8px 24px hsl(var(--foreground) / 0.06);
+  border-top: 1px solid var(--be-border);
+  background: var(--be-card);
 }
 .be-chat__input {
   flex: 1; resize: none; padding: 10px 12px; border-radius: 10px;
-  border: 1px solid hsl(var(--foreground) / 0.35);
-  background: hsl(var(--background));
-  font-size: 14px; color: hsl(var(--foreground)); line-height: 1.5;
+  border: 1px solid rgba(var(--be-fg-rgb), 0.35);
+  background: var(--be-bg);
+  font-size: 14px; color: var(--be-fg); line-height: 1.5;
 }
-.be-chat__input::placeholder { color: hsl(var(--muted-foreground)); }
-.be-chat__input:focus { outline: none; border-color: hsl(var(--primary)); box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2); }
+.be-chat__input::placeholder { color: var(--be-fg-muted); }
+.be-chat__input:focus {
+  outline: none;
+  border-color: var(--be-primary);
+  box-shadow: 0 0 0 3px rgba(var(--be-primary-rgb), 0.25);
+}
 .be-chat__send {
   flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
   width: 40px; height: 40px; border-radius: 10px; border: none;
-  background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); cursor: pointer;
+  background: var(--be-primary); color: var(--be-primary-fg); cursor: pointer;
   transition: background 0.15s, opacity 0.15s;
 }
-.be-chat__send:hover:not(:disabled) { background: hsl(var(--primary) / 0.9); }
+.be-chat__send:hover:not(:disabled) { background: rgba(var(--be-primary-rgb), 0.88); }
 .be-chat__send:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
