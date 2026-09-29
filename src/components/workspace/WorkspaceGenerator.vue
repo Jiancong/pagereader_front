@@ -181,8 +181,11 @@
           <!-- 步骤 2：命名 -->
           <div v-else-if="expertStep === 'name'" class="space-y-4">
             <div>
-              <label class="mb-1.5 block text-sm font-medium text-foreground">{{ t('bookExpert.expertNameLabel') }}</label>
+              <label class="mb-1.5 block text-sm font-medium text-foreground">
+                {{ t('bookExpert.expertNameLabel') }}<span class="ml-0.5 text-red-400">*</span>
+              </label>
               <input v-model="expertName" type="text" maxlength="40" class="be-distill__input" :placeholder="t('bookExpert.expertNamePlaceholder')" />
+              <p v-if="!expertName.trim()" class="mt-1 text-xs text-muted-foreground">{{ t('bookExpert.expertNameRequiredHint') }}</p>
             </div>
             <div>
               <label class="mb-1.5 block text-sm font-medium text-foreground">{{ t('bookExpert.bookTitleLabel') }}</label>
@@ -200,7 +203,7 @@
               <button
                 type="button"
                 :disabled="!expertName.trim() || expertSubmitting"
-                class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
                 @click="onExpertSubmit"
               >
                 <Loader2 v-if="expertSubmitting" class="h-5 w-5 animate-spin" />

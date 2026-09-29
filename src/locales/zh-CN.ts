@@ -82,6 +82,7 @@ export default {
     distillFormats: "支持 PDF、EPUB、MOBI、Word、TXT、Markdown",
     expertNameLabel: "专家名称",
     expertNamePlaceholder: "如：毛选方法论",
+    expertNameRequiredHint: "请先填写专家名称，填写后即可开始蒸馏",
     bookTitleLabel: "书名（可选）",
     bookTitlePlaceholder: "如：毛泽东选集",
     distillSubmit: "开始蒸馏",

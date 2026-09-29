@@ -82,6 +82,7 @@ export default {
     distillFormats: "Supports PDF, EPUB, MOBI, Word, TXT, Markdown",
     expertNameLabel: "Expert name",
     expertNamePlaceholder: "e.g. Mao's Selected Works Methodology",
+    expertNameRequiredHint: "Enter an expert name first to start distilling",
     bookTitleLabel: "Book title (optional)",
     bookTitlePlaceholder: "e.g. Selected Works of Mao Zedong",
     distillSubmit: "Start distilling",
