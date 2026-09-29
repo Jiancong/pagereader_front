@@ -53,8 +53,6 @@
         :active-expert-id="activeExpert ? activeExpert.expert_id : null"
         @project-started="onProjectStarted"
         @project-complete="onProjectComplete"
-        @open-distill="distillOpen = true"
-        @start-distill="onStartDistill"
         @select-expert="onSelectExpert"
       />
       <ExploreGrid
@@ -79,14 +77,6 @@
       />
       </main>
     </div>
-
-    <BookExpertDistillDialog
-      :open="distillOpen"
-      :user-id="userId ? String(userId) : null"
-      :initial-file="distillInitialFile"
-      @update:open="onDistillOpenChange"
-      @enter-expert="onSelectExpert"
-    />
   </div>
 </template>
 
@@ -103,7 +93,6 @@ import WorkspaceGenerator from '../components/workspace/WorkspaceGenerator.vue'
 import ExploreGrid from '../components/ExploreGrid.vue'
 import ProjectPreview from '../components/workspace/ProjectPreview.vue'
 import BookExpertChat from '../components/workspace/BookExpertChat.vue'
-import BookExpertDistillDialog from '../components/workspace/BookExpertDistillDialog.vue'
 import { useBookExpertStore } from '@/stores/bookExpert'
 import { authApi, feedApi, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
@@ -131,8 +120,6 @@ const genPrompt = ref('')
 const genKey = ref(0)
 const projectRefreshKey = ref(0)
 const generatorRef = ref(null)
-const distillOpen = ref(false)
-const distillInitialFile = ref(null)
 const activeExpert = ref(null)
 const expertProjectId = ref('')
 const bookExpertStore = useBookExpertStore()
@@ -324,16 +311,6 @@ function onExitExpert() {
   expertProjectId.value = ''
   bookExpertStore.clearActiveExpert()
   view.value = 'new'
-}
-
-function onStartDistill(file) {
-  distillInitialFile.value = file instanceof File ? file : null
-  distillOpen.value = true
-}
-
-function onDistillOpenChange(open) {
-  distillOpen.value = open
-  if (!open) distillInitialFile.value = null
 }
 
 const handleLogout = () => {

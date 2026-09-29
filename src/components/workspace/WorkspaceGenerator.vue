@@ -140,39 +140,111 @@
             <h3 class="text-lg font-semibold text-foreground">{{ t('bookExpert.panelTitle') }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t('bookExpert.panelSubtitle') }}</p>
           </div>
-          <div
-            class="cursor-pointer rounded-xl border-2 border-dashed border-border bg-secondary/30 p-8 text-center transition-colors hover:border-primary/50"
-            @click="expertFileInput?.click()"
-          >
-            <input
-              ref="expertFileInput"
-              type="file"
-              accept=".pdf,.epub,.mobi,.azw,.azw3,.doc,.docx,.txt,.md"
-              class="hidden"
-              @change="onExpertFileChange"
-            />
-            <template v-if="expertPickedFile">
-              <FileText class="mx-auto h-10 w-10 text-primary" />
-              <p class="mt-3 break-words font-medium text-foreground">{{ expertPickedFile.name }}</p>
-              <p class="mt-1 text-sm text-muted-foreground">{{ formatBytes(expertPickedFile.size) }}</p>
-            </template>
-            <template v-else>
-              <Upload class="mx-auto h-12 w-12 text-muted-foreground/50" />
-              <p class="mt-4 font-medium text-foreground">{{ t('bookExpert.distillPickFile') }}</p>
-              <p class="mt-1 text-sm text-muted-foreground">{{ t('bookExpert.distillFormats') }}</p>
-            </template>
+
+          <!-- 步骤 1：上传 -->
+          <div v-if="expertStep === 'upload'">
+            <div
+              class="cursor-pointer rounded-xl border-2 border-dashed border-border bg-secondary/30 p-8 text-center transition-colors hover:border-primary/50"
+              @click="expertFileInput?.click()"
+            >
+              <input
+                ref="expertFileInput"
+                type="file"
+                accept=".pdf,.epub,.mobi,.azw,.azw3,.doc,.docx,.txt,.md"
+                class="hidden"
+                @change="onExpertFileChange"
+              />
+              <template v-if="expertPickedFile">
+                <FileText class="mx-auto h-10 w-10 text-primary" />
+                <p class="mt-3 break-words font-medium text-foreground">{{ expertPickedFile.name }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ formatBytes(expertPickedFile.size) }}</p>
+              </template>
+              <template v-else>
+                <Upload class="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <p class="mt-4 font-medium text-foreground">{{ t('bookExpert.distillPickFile') }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ t('bookExpert.distillFormats') }}</p>
+              </template>
+            </div>
+            <p v-if="expertFileError" class="mt-3 text-sm text-red-400">{{ expertFileError }}</p>
+            <button
+              type="button"
+              :disabled="!expertPickedFile || expertUploading"
+              class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="onExpertNext"
+            >
+              <Loader2 v-if="expertUploading" class="h-5 w-5 animate-spin" />
+              <Sparkles v-else class="h-5 w-5" />
+              {{ expertUploading ? t('common.loading') : t('common.next') }}
+            </button>
           </div>
-          <p v-if="expertFileError" class="mt-3 text-sm text-red-400">{{ expertFileError }}</p>
-          <button
-            type="button"
-            :disabled="!expertPickedFile || expertStarting"
-            class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-            @click="onStartDistill"
-          >
-            <Loader2 v-if="expertStarting" class="h-5 w-5 animate-spin" />
-            <Sparkles v-else class="h-5 w-5" />
-            {{ expertStarting ? t('common.loading') : t('bookExpert.createExpert') }}
-          </button>
+
+          <!-- 步骤 2：命名 -->
+          <div v-else-if="expertStep === 'name'" class="space-y-4">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-foreground">{{ t('bookExpert.expertNameLabel') }}</label>
+              <input v-model="expertName" type="text" maxlength="40" class="be-distill__input" :placeholder="t('bookExpert.expertNamePlaceholder')" />
+            </div>
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-foreground">{{ t('bookExpert.bookTitleLabel') }}</label>
+              <input v-model="expertBookTitle" type="text" maxlength="120" class="be-distill__input" :placeholder="t('bookExpert.bookTitlePlaceholder')" />
+            </div>
+            <p v-if="expertError" class="text-sm text-red-400">{{ expertError }}</p>
+            <div class="flex gap-3">
+              <button
+                type="button"
+                class="flex-1 rounded-xl border border-border bg-transparent py-3.5 font-semibold text-foreground transition-colors hover:bg-secondary"
+                @click="expertStep = 'upload'"
+              >
+                {{ t('common.cancel') }}
+              </button>
+              <button
+                type="button"
+                :disabled="!expertName.trim() || expertSubmitting"
+                class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                @click="onExpertSubmit"
+              >
+                <Loader2 v-if="expertSubmitting" class="h-5 w-5 animate-spin" />
+                <Sparkles v-else class="h-5 w-5" />
+                {{ t('bookExpert.distillSubmit') }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 步骤 3：蒸馏中 -->
+          <div v-else-if="expertStep === 'progress'" class="py-8 text-center">
+            <Loader2 class="mx-auto h-8 w-8 animate-spin text-primary" />
+            <p class="mt-4 text-sm font-medium text-foreground">{{ t('bookExpert.distillRunning') }}</p>
+            <p class="mt-1 text-xs text-muted-foreground">{{ t('bookExpert.distillRunningHint') }}</p>
+            <div class="relative mx-auto mt-5 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-secondary">
+              <div class="be-distill__indeterminate" />
+            </div>
+          </div>
+
+          <!-- 步骤 4：完成 -->
+          <div v-else-if="expertStep === 'done'" class="py-8 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Sparkles class="h-6 w-6 text-primary" />
+            </div>
+            <p class="mt-4 font-medium text-foreground">{{ t('bookExpert.distillDone') }}</p>
+            <p v-if="expertDoneName" class="mt-1 text-sm text-muted-foreground">{{ expertDoneName }}</p>
+            <div class="mt-6 flex gap-3">
+              <button
+                type="button"
+                class="flex-1 rounded-xl border border-border bg-transparent py-3.5 font-semibold text-foreground transition-colors hover:bg-secondary"
+                @click="resetExpertFlow"
+              >
+                {{ t('common.close') }}
+              </button>
+              <button
+                type="button"
+                class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90"
+                @click="onEnterExpert"
+              >
+                <Sparkles class="h-5 w-5" />
+                {{ t('bookExpert.distillEnterExpert') }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       <div v-else class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
@@ -612,6 +684,11 @@ import type { UploadedDocument } from "@/utils/pptDocumentRag"
 import { validatePptDocumentFile } from "@/utils/pptDocumentRag"
 import { isSrtFileName, readSrtFile, parseSrtContent, type SrtParseResult } from "@/utils/srtParser"
 import { formatBytes } from "@/utils/userAssets"
+import { bookExpertApi } from "@/api"
+import { getOrCreateSessionId } from "@/api/agent"
+import { getSavedLocale } from "@/composables/useAppLocale"
+import { useBookExpertStore } from "@/stores/bookExpert"
+import type { DistillUploadedDocument } from "@/api/types"
 import {
   gtmGenerateStart,
   gtmGenerateComplete,
@@ -624,8 +701,6 @@ import { isAppDebugEnabled } from "@/config/appDebug"
 const emit = defineEmits<{
   "project-started": [projectId: string]
   "project-complete": [projectId: string]
-  "open-distill": []
-  "start-distill": [file: File]
   "select-expert": [expert: BookExpertSummary]
 }>()
 
@@ -727,11 +802,21 @@ const uploadFileError = ref("")
 const srtPreview = ref<SrtParseResult | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
-// ===== 专家蒸馏：内联上传 =====
+// ===== 专家蒸馏：内联流程 =====
+const bookExpertStore = useBookExpertStore()
 const expertFileInput = ref<HTMLInputElement | null>(null)
+const expertStep = ref<"upload" | "name" | "progress" | "done">("upload")
 const expertPickedFile = ref<File | null>(null)
+const expertUploadedDoc = ref<DistillUploadedDocument | null>(null)
 const expertFileError = ref("")
-const expertStarting = ref(false)
+const expertUploading = ref(false)
+const expertSubmitting = ref(false)
+const expertError = ref("")
+const expertName = ref("")
+const expertBookTitle = ref("")
+const expertDoneName = ref("")
+const expertCreated = ref<BookExpertSummary | null>(null)
+let expertAbort: AbortController | null = null
 
 function onExpertFileChange(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]
@@ -743,17 +828,101 @@ function pickExpertFile(f: File) {
   if (v === "unsupported") { expertFileError.value = t("workspace.uploadUnsupportedType"); return }
   if (v === "too_large") { expertFileError.value = t("workspace.uploadTooLarge"); return }
   expertPickedFile.value = f
+  expertUploadedDoc.value = null
 }
-function onStartDistill() {
-  if (!expertPickedFile.value || expertStarting.value) return
-  expertStarting.value = true
+
+async function onExpertNext() {
+  if (!expertPickedFile.value || expertUploading.value) return
+  expertUploading.value = true
+  expertFileError.value = ""
   try {
-    emit("start-distill", expertPickedFile.value)
+    expertUploadedDoc.value = await fileApi.uploadDocument(expertPickedFile.value)
+    if (!expertBookTitle.value.trim()) {
+      expertBookTitle.value = expertUploadedDoc.value.name.replace(/\.[^.]+$/, "")
+    }
+    expertStep.value = "name"
+  } catch (e: unknown) {
+    expertFileError.value = e instanceof Error ? e.message : t("workspace.uploadingDoc")
   } finally {
-    expertStarting.value = false
-    expertPickedFile.value = null
-    if (expertFileInput.value) expertFileInput.value.value = ""
+    expertUploading.value = false
   }
+}
+
+async function onExpertSubmit() {
+  if (!expertUploadedDoc.value || !expertName.value.trim() || !props.userId) return
+  expertSubmitting.value = true
+  expertError.value = ""
+  expertStep.value = "progress"
+  bookExpertStore.startDistill()
+  expertAbort?.abort()
+  expertAbort = new AbortController()
+  try {
+    const streamRequestId = `distill-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    await bookExpertApi.distillExpert(
+      {
+        uploaded_documents: [expertUploadedDoc.value],
+        expert_name: expertName.value.trim(),
+        book_title: expertBookTitle.value.trim() || undefined,
+        userId: String(props.userId),
+        sessionId: getOrCreateSessionId(),
+        streamRequestId,
+        uiLocale: getSavedLocale() === "en" ? "en" : "zh",
+      },
+      {
+        onExpertCreated: (data) => {
+          const expert: BookExpertSummary = {
+            expert_id: data.expert_id,
+            expert_name: data.expert_name,
+            book_title: data.book_title,
+            visibility: data.visibility,
+            owner_user_id: String(props.userId),
+          }
+          expertCreated.value = expert
+          expertDoneName.value = expert.expert_name
+          bookExpertStore.onDistillSuccess(expert)
+          expertStep.value = "done"
+          ElMessage.success(t("bookExpert.distillDoneToast"))
+        },
+        onError: (msg) => {
+          bookExpertStore.onDistillError(msg)
+          expertError.value = msg
+          expertStep.value = "name"
+        },
+        onComplete: () => {
+          if (expertStep.value !== "done") expertStep.value = "done"
+        },
+      },
+      expertAbort.signal,
+    )
+  } catch (e: unknown) {
+    const msg = e instanceof ApiError ? e.message : (e as Error)?.message || t("bookExpert.distillFailed")
+    expertError.value = isCreditsInsufficient(e) ? t("workspace.creditsInsufficient") : msg
+    bookExpertStore.onDistillError(msg)
+    expertStep.value = "name"
+  } finally {
+    expertSubmitting.value = false
+  }
+}
+
+function resetExpertFlow() {
+  expertStep.value = "upload"
+  expertPickedFile.value = null
+  expertUploadedDoc.value = null
+  expertFileError.value = ""
+  expertUploading.value = false
+  expertSubmitting.value = false
+  expertError.value = ""
+  expertName.value = ""
+  expertBookTitle.value = ""
+  expertDoneName.value = ""
+  expertCreated.value = null
+  bookExpertStore.resetDistill()
+  if (expertFileInput.value) expertFileInput.value.value = ""
+}
+
+function onEnterExpert() {
+  if (expertCreated.value) emit("select-expert", expertCreated.value)
+  resetExpertFlow()
 }
 
 const hasAttachedDoc = computed(() => Boolean(uploadedFile.value || cloudDocument.value))
@@ -1913,6 +2082,34 @@ defineExpose({ attachCloudDocument })
   background: linear-gradient(90deg, transparent, #1d9bf0, #1d9bf0, transparent);
   animation: ppt-indeterminate 1.4s ease-in-out infinite;
 }
+
+/* 专家蒸馏内联 */
+.be-distill__input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--secondary) / 0.5);
+  padding: 10px 16px;
+  font-size: 14px;
+  color: hsl(var(--foreground));
+}
+.be-distill__input::placeholder { color: hsl(var(--muted-foreground) / 0.6); }
+.be-distill__input:focus {
+  outline: none;
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
+}
+.be-distill__indeterminate {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: hsl(var(--primary));
+  border-radius: 9999px;
+  animation: be-indeterminate 1.4s ease-in-out infinite;
+}
+@keyframes be-indeterminate { 0% { left: -40%; } 100% { left: 100%; } }
 
 .queue-mode-option {
   position: relative;
