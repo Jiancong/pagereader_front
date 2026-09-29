@@ -39,10 +39,6 @@
               <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
           </button>
-          <button :class="tabClass('expert')" @click="activeTab = 'expert'">
-            <Sparkles class="h-4 w-4" />
-            {{ t('bookExpert.navTitle') }}
-          </button>
           <button v-if="debugEnabled" :class="tabClass('translate')" @click="activeTab = 'translate'">
             <Languages class="h-4 w-4" />
             {{ t('workspace.tabTranslate') }}
@@ -93,15 +89,7 @@
     </div>
 
     <template v-else>
-      <BookExpertPanel
-        v-if="activeTab === 'expert'"
-        :user-id="props.userId != null ? String(props.userId) : null"
-        :active-expert-id="props.activeExpertId ?? null"
-        @open-distill="$emit('open-distill')"
-        @select-expert="(expert) => $emit('select-expert', expert)"
-      />
-      <template v-else>
-      <div v-if="activeTab !== 'translate'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
+      <div v-if="activeTab !== 'translate' && activeTab !== 'read'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
           <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
@@ -134,11 +122,27 @@
             <span class="text-muted-foreground">({{ t('pricing.usageOutlineCredits') }})</span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueOutlineHint') }}</span>
           </label>
+          <label
+            v-if="activeTab === 'upload' || activeTab === 'expert'"
+            class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
+            @click="activeTab = 'expert'"
+          >
+            <input type="radio" class="accent-primary" :checked="activeTab === 'expert'" @click.stop="activeTab = 'expert'" />
+            <span>{{ t('bookExpert.navTitle') }}</span>
+            <span class="queue-mode-tooltip" role="tooltip">{{ t('bookExpert.panelSubtitle') }}</span>
+          </label>
         </div>
         <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.queueHint') }}</p>
       </div>
 
-      <div class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+      <BookExpertPanel
+        v-if="activeTab === 'expert'"
+        :user-id="props.userId != null ? String(props.userId) : null"
+        :active-expert-id="props.activeExpertId ?? null"
+        @open-distill="$emit('open-distill')"
+        @select-expert="(expert) => $emit('select-expert', expert)"
+      />
+      <div v-else class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <!-- RAG 上传分析 -->
         <div v-if="activeTab === 'upload'" class="p-6 sm:p-8">
           <div class="mb-6">
@@ -515,7 +519,6 @@
           </div>
         </div>
       </div>
-      </template>
     </template>
   </div>
 </template>
