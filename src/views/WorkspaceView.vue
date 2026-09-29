@@ -22,6 +22,7 @@
       :mobile-open="mobileSidebarOpen"
       @new="onSidebarNav(returnToGenerator)"
       @explore="onSidebarNav(() => (view = 'explore'))"
+      @open-experts="onSidebarNav(() => (view = 'experts'))"
       @open-project="(id) => onSidebarNav(() => openProject(id))"
       @delete-project="onDeleteProject"
       @logout="handleLogout"
@@ -58,6 +59,20 @@
         @open="openExploreItem"
         @deleted="onExploreProjectDeleted"
       />
+      <BookExpertPanel
+        v-else-if="view === 'experts'"
+        :user-id="userId ? String(userId) : null"
+        :active-expert-id="activeExpert ? activeExpert.expert_id : null"
+        @open-distill="distillOpen = true"
+        @select-expert="onSelectExpert"
+      />
+      <BookExpertChat
+        v-else-if="view === 'expert-chat' && activeExpert"
+        :expert="activeExpert"
+        :user-id="userId ? String(userId) : null"
+        :project-id="expertProjectId"
+        @exit="onExitExpert"
+      />
       <ProjectPreview
         v-else-if="view === 'project' && activeProjectId"
         :project-id="activeProjectId"
@@ -67,6 +82,13 @@
       />
       </main>
     </div>
+
+    <BookExpertDistillDialog
+      :open="distillOpen"
+      :user-id="userId ? String(userId) : null"
+      @update:open="distillOpen = $event"
+      @enter-expert="onSelectExpert"
+    />
   </div>
 </template>
 
@@ -82,6 +104,10 @@ import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar.vue'
 import WorkspaceGenerator from '../components/workspace/WorkspaceGenerator.vue'
 import ExploreGrid from '../components/ExploreGrid.vue'
 import ProjectPreview from '../components/workspace/ProjectPreview.vue'
+import BookExpertPanel from '../components/workspace/BookExpertPanel.vue'
+import BookExpertChat from '../components/workspace/BookExpertChat.vue'
+import BookExpertDistillDialog from '../components/workspace/BookExpertDistillDialog.vue'
+import { useBookExpertStore } from '@/stores/bookExpert'
 import { authApi, feedApi, getLocalAvatar } from '../api'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
@@ -108,6 +134,10 @@ const genPrompt = ref('')
 const genKey = ref(0)
 const projectRefreshKey = ref(0)
 const generatorRef = ref(null)
+const distillOpen = ref(false)
+const activeExpert = ref(null)
+const expertProjectId = ref('')
+const bookExpertStore = useBookExpertStore()
 
 const assetsRefreshBus = provideAssetsRefreshBus()
 
@@ -277,6 +307,25 @@ const openExploreItem = (item) => {
   }
   if (target.kind === 'project') openProject(target.projectId)
   else goNew(target.prompt)
+}
+
+function newExpertProjectId() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `expert-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function onSelectExpert(expert) {
+  activeExpert.value = expert
+  expertProjectId.value = newExpertProjectId()
+  view.value = 'expert-chat'
+}
+
+function onExitExpert() {
+  activeExpert.value = null
+  expertProjectId.value = ''
+  bookExpertStore.clearActiveExpert()
+  view.value = 'experts'
 }
 
 const handleLogout = () => {

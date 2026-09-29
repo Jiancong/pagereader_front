@@ -725,3 +725,80 @@ export type CreateProjectAnnotation = Pick<
 export type UpdateProjectAnnotation = Partial<
   Pick<ProjectAnnotation, "note" | "color">
 >
+
+// ===== Book Expert（书籍专家） =====
+export type BookExpertVisibility = "private" | "public"
+
+export interface BookExpertSummary {
+  expert_id: string
+  expert_name: string
+  book_title?: string
+  visibility: BookExpertVisibility
+  owner_user_id: string
+  created_at?: string
+  /** 详情接口才返回的方法论预览 */
+  methodology_preview?: string
+}
+
+export interface BookExpertListResult {
+  ok: boolean
+  experts: BookExpertSummary[]
+  count: number
+}
+
+export interface BookExpertDetailResult {
+  ok: boolean
+  expert: BookExpertSummary
+}
+
+export interface BookExpertPublishReq {
+  userId: string
+  public: boolean
+}
+
+export interface BookExpertPublishResult {
+  ok: boolean
+  expert_id: string
+  visibility: BookExpertVisibility
+}
+
+export interface BookExpertDeleteResult {
+  ok: boolean
+  expert_id: string
+}
+
+export interface DistillUploadedDocument {
+  url: string
+  name: string
+  type: string
+}
+
+export interface DistillRequest {
+  uploaded_documents: DistillUploadedDocument[]
+  expert_name: string
+  book_title?: string
+  userId: string
+  sessionId: string
+  streamRequestId: string
+  uiLocale: "zh" | "en"
+  billingCallbackUrl?: string
+  billingCallbackSecret?: string
+  tenantId?: string
+}
+
+export interface DistillExpertCreatedEvent {
+  expert_id: string
+  expert_name: string
+  book_title?: string
+  visibility: BookExpertVisibility
+  points_charged?: number
+}
+
+export interface DistillErrorEvent {
+  message: string
+  code?: string | number
+}
+
+export interface DistillCompleteEvent {
+  expert_id?: string
+}
