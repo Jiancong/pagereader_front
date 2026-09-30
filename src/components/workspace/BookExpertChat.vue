@@ -130,7 +130,11 @@
         :class="`be-chat__msg--${msg.role}`"
       >
         <div class="be-chat__msg-bubble">
-          <ChatMarkdownBody v-if="msg.role === 'assistant'" :content="msg.content" />
+          <ChatMarkdownBody
+            v-if="msg.role === 'assistant'"
+            :content="msg.content"
+            root-class="be-chat-markdown"
+          />
           <p v-else class="be-chat__msg-text">{{ msg.content }}</p>
         </div>
       </div>
@@ -227,6 +231,56 @@ function scrollToBottom() {
     const el = scrollRef.value
     if (el) el.scrollTop = el.scrollHeight
   })
+}
+
+/** 与 PPT/小说 RAG 一致：优先 markdown 字段，整包 knowledge_response 覆盖而非拼接 */
+function extractBookExpertAssistantText(o: Record<string, unknown>): string {
+  const md = o.markdown ?? o.markdown_content
+  if (typeof md === 'string' && md.trim()) return md
+  const resp = o.response ?? o.message ?? o.full_text ?? o.content
+  return typeof resp === 'string' ? resp : ''
+}
+
+function extractBookExpertStreamDelta(o: Record<string, unknown>): string {
+  if (o.delta != null) return String(o.delta)
+  if (o.text != null) return String(o.text)
+  if (o.chunk != null) return String(o.chunk)
+  return ''
+}
+
+function isKnowledgePayload(event: string, o: Record<string, unknown>): boolean {
+  const ev = event.toLowerCase()
+  const status = String(o.status ?? '').toLowerCase()
+  return ev === 'knowledge_response' || status === 'knowledge_response'
+}
+
+function applyBookExpertStreamEvent(
+  event: string,
+  o: Record<string, unknown>,
+  state: { text: string; msg: ChatMessage },
+) {
+  const ev = event.toLowerCase()
+
+  if (ev === 'llm_text_stream_delta') {
+    const field = String(o.field ?? o.stream_id ?? '').toLowerCase()
+    if (field && !field.includes('response') && !field.includes('summary') && !field.includes('markdown')) {
+      return
+    }
+    const delta = extractBookExpertStreamDelta(o)
+    if (!delta) return
+    state.text += delta
+    state.msg.content = state.text
+    scrollToBottom()
+    return
+  }
+
+  if (ev === 'llm_text_stream_end' || ev === 'chat_response' || isKnowledgePayload(ev, o)) {
+    const full = extractBookExpertAssistantText(o)
+    if (!full) return
+    state.text = full
+    state.msg.content = full
+    scrollToBottom()
+  }
 }
 
 // ── 历史会话 ──────────────────────────────────────────────
@@ -401,7 +455,7 @@ async function onSend() {
       {
         message: text,
         userId: props.userId,
-        projectId: props.projectId,
+        projectId: sessionId.value || props.projectId,
         sessionId: sessionId.value,
         isAgent: true,
         skill: true,
@@ -410,15 +464,9 @@ async function onSend() {
       },
       {
         onEvent: (event, data) => {
-          if (event === 'knowledge_response' || event === 'complete') {
-            const o = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
-            const response = typeof o.response === 'string' ? o.response : ''
-            if (response) {
-              assistantText += response
-              assistantMsg.content = assistantText
-              scrollToBottom()
-            }
-          }
+          const o = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
+          applyBookExpertStreamEvent(event, o, { text: assistantText, msg: assistantMsg })
+          assistantText = String(assistantMsg.content || assistantText)
         },
         onError: (msg) => {
           assistantMsg.content = assistantText || msg
@@ -428,10 +476,12 @@ async function onSend() {
         },
         onComplete: (data) => {
           const o = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
-          const response = typeof o.response === 'string' ? o.response : ''
-          if (response && !assistantText) {
-            assistantText = response
-            assistantMsg.content = response
+          const full = extractBookExpertAssistantText(o)
+          if (full) {
+            assistantText = full
+            assistantMsg.content = full
+          } else if (!assistantMsg.content && assistantText) {
+            assistantMsg.content = assistantText
           }
           if (!assistantMsg.content) assistantMsg.content = t('bookExpert.noResponse')
           scrollToBottom()
@@ -633,6 +683,42 @@ watch(() => props.expert.expert_id, (id) => {
   border: 1px solid var(--be-border);
   border-bottom-left-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+/* 助手 Markdown（与社区对话 feed 同级可读性） */
+.be-chat__msg--assistant :deep(.be-chat-markdown .markdown-body) {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--be-fg);
+}
+.be-chat__msg--assistant :deep(.be-chat-markdown .markdown-body p),
+.be-chat__msg--assistant :deep(.be-chat-markdown .markdown-body li) {
+  margin: 0.45em 0;
+}
+.be-chat__msg--assistant :deep(.be-chat-markdown .markdown-body h2) {
+  margin: 1.1em 0 0.45em;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--be-fg);
+  border-bottom: 1px solid rgba(var(--be-border-rgb), 0.85);
+  padding-bottom: 0.25em;
+}
+.be-chat__msg--assistant :deep(.be-chat-markdown .markdown-body h3) {
+  margin: 0.9em 0 0.35em;
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+.be-chat__msg--assistant :deep(.be-chat-markdown .markdown-body ol),
+.be-chat__msg--assistant :deep(.be-chat-markdown .markdown-body ul) {
+  margin: 0.35em 0 0.65em;
+  padding-left: 1.35em;
+}
+.be-chat__msg--assistant :deep(.be-chat-markdown .markdown-body strong) {
+  font-weight: 600;
+  color: var(--be-fg);
+}
+.be-chat__msg--assistant :deep(.be-chat-markdown .markdown-body ul ul) {
+  margin-top: 0.25em;
+  list-style-type: circle;
 }
 .be-chat__msg-bubble--loading { display: inline-flex; align-items: center; gap: 8px; color: var(--be-fg-muted); }
 .be-chat__msg-text { margin: 0; white-space: pre-wrap; }

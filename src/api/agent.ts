@@ -144,6 +144,14 @@ function resolveEffectiveEvent(wire: string, payload: unknown): string {
   if (state === "novel_complete") return "novel_complete"
   if (status === "error") return "error"
   if (status === "in_progress" || p.phase != null) return "progress"
+  if (
+    status === "knowledge_response" &&
+    (typeof p.response === "string" ||
+      typeof p.markdown === "string" ||
+      typeof p.markdown_content === "string")
+  ) {
+    return "knowledge_response"
+  }
 
   return w || wire
 }

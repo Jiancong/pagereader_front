@@ -41,6 +41,13 @@ export function markdownFragmentToChatHtml(mdFragment: string): string {
   return applyChatMarkdownMathSlots(postprocessMarkdownAnchors(html), slots);
 }
 
+/** LLM 偶发 ``## ## 标题``，去掉重复 # 以便正确渲染为单个 heading */
+export function normalizeChatMarkdownSource(md: string): string {
+  let s = String(md ?? "");
+  s = s.replace(/^(#{1,6})\s+(#{1,6})\s+/gm, "$1 ");
+  return s;
+}
+
 export function normalizeChatMessageContent(content: unknown): string {
   if (content == null) return "";
   if (typeof content === "object") {
@@ -50,5 +57,5 @@ export function normalizeChatMessageContent(content: unknown): string {
       return String(content);
     }
   }
-  return String(content);
+  return normalizeChatMarkdownSource(String(content));
 }
