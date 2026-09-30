@@ -235,14 +235,14 @@
             <!-- 方法论速览 -->
             <div
               v-if="expertPreviewLoading"
-              class="mx-auto mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-xl border border-border bg-secondary/30 px-4 py-3 text-xs text-muted-foreground"
+              class="mx-auto mt-5 flex w-full max-w-3xl items-center justify-center gap-2 rounded-xl border border-border bg-secondary/30 px-4 py-3 text-xs text-muted-foreground"
             >
               <Loader2 class="h-3.5 w-3.5 animate-spin" />
               {{ t('bookExpert.previewLoading') }}
             </div>
             <div
               v-else-if="expertPreview"
-              class="mx-auto mt-5 w-full max-w-xl rounded-xl border border-border bg-secondary/30 p-4 text-left sm:p-5"
+              class="mx-auto mt-5 w-full max-w-3xl rounded-xl border border-border bg-secondary/30 p-4 text-left sm:p-5"
             >
               <p class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {{ t('bookExpert.previewTitle') }}
