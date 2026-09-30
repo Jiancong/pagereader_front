@@ -110,6 +110,7 @@ export default {
     history: "History",
     historyTitle: "Chat history",
     historyEmpty: "No conversations with this expert yet",
+    historyLoading: "Restoring conversation…",
     historyError: "Failed to load chat history",
     historyRestored: "Conversation restored",
     historyRestoreFailed: "Failed to restore conversation",

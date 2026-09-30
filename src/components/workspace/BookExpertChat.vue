@@ -122,7 +122,11 @@
     </transition>
 
     <div ref="scrollRef" class="be-chat__messages">
-      <div v-if="!messages.length" class="be-chat__empty">{{ t('bookExpert.chatEmpty') }}</div>
+      <div v-if="sessionBootstrapping" class="be-chat__empty be-chat__empty--loading">
+        <Loader2 class="h-4 w-4 animate-spin" />
+        <span>{{ t('bookExpert.historyLoading') }}</span>
+      </div>
+      <div v-else-if="!messages.length" class="be-chat__empty">{{ t('bookExpert.chatEmpty') }}</div>
       <div
         v-for="msg in messages"
         :key="msg.id"
@@ -181,6 +185,7 @@ import { buildExploreExpertShareUrl } from '@/utils/feedOpen'
 import ChatMarkdownBody from '@/components/editor/chat/ChatMarkdownBody.vue'
 import type {
   BookExpertSummary,
+  BookExpertSessionMessage,
   BookExpertSessionSummary,
 } from '@/api/types'
 
@@ -207,6 +212,9 @@ const historyOpen = ref(false)
 const historyLoading = ref(false)
 const historyError = ref('')
 const sessions = ref<BookExpertSessionSummary[]>([])
+/** 进入页面时从服务端恢复当前 sessionId 的对话 */
+const sessionBootstrapping = ref(false)
+let sessionRestoreGeneration = 0
 
 /** 封面上传 */
 const coverInputRef = ref<HTMLInputElement | null>(null)
@@ -285,6 +293,79 @@ function applyBookExpertStreamEvent(
 
 // ── 历史会话 ──────────────────────────────────────────────
 
+function mapSessionMessages(raw: BookExpertSessionMessage[]): ChatMessage[] {
+  return raw
+    .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .map((m) => ({ id: newId(), role: m.role, content: m.content }))
+}
+
+/** 进入专家页 / 刷新后：用 localStorage 中的 be-* sessionId 拉取已持久化消息 */
+async function restoreSessionMessages(sid: string, opts?: { silent?: boolean; allowLatestFallback?: boolean }) {
+  if (!props.userId || !sid.trim()) return
+  const gen = ++sessionRestoreGeneration
+  sessionBootstrapping.value = true
+  try {
+    const res = await bookExpertApi.getExpertSessionMessages(
+      props.expert.expert_id,
+      sid,
+      String(props.userId),
+    )
+    if (gen !== sessionRestoreGeneration) return
+    const restored = mapSessionMessages(res?.messages ?? [])
+    if (restored.length) {
+      messages.value = restored
+      scrollToBottom()
+      return
+    }
+    if (opts?.allowLatestFallback !== false) {
+      await restoreLatestSessionFromList(gen)
+    }
+  } catch (e: unknown) {
+    if (gen !== sessionRestoreGeneration) return
+    const code = e instanceof ApiError ? e.code : 0
+    if (code === 404 && opts?.allowLatestFallback !== false) {
+      await restoreLatestSessionFromList(gen)
+      return
+    }
+    if (!opts?.silent) {
+      historyError.value = e instanceof Error ? e.message : t('bookExpert.historyError')
+    }
+  } finally {
+    if (gen === sessionRestoreGeneration) sessionBootstrapping.value = false
+  }
+}
+
+/** localStorage 的 session 在库中尚无记录时，回退到该专家最近一条会话 */
+async function restoreLatestSessionFromList(expectedGen: number) {
+  if (!props.userId) return
+  try {
+    const res = await bookExpertApi.listExpertSessions(
+      props.expert.expert_id,
+      String(props.userId),
+    )
+    if (expectedGen !== sessionRestoreGeneration) return
+    const latest = res?.sessions?.[0]
+    if (!latest?.sessionId) return
+    if (latest.sessionId === sessionId.value && !(latest.messageCount ?? 0)) return
+
+    const detail = await bookExpertApi.getExpertSessionMessages(
+      props.expert.expert_id,
+      latest.sessionId,
+      String(props.userId),
+    )
+    if (expectedGen !== sessionRestoreGeneration) return
+    const restored = mapSessionMessages(detail?.messages ?? [])
+    if (!restored.length) return
+
+    setActiveExpertSessionId(props.expert.expert_id, latest.sessionId)
+    sessionId.value = latest.sessionId
+    messages.value = restored
+    scrollToBottom()
+  } catch {
+    /* 新专家或无权限时静默 */
+  }
+}
+
 function toggleHistory() {
   historyOpen.value = !historyOpen.value
   if (historyOpen.value && !sessions.value.length) loadHistory()
@@ -316,9 +397,7 @@ async function onRestoreSession(s: BookExpertSessionSummary) {
       s.sessionId,
       String(props.userId),
     )
-    const restored: ChatMessage[] = (res?.messages ?? [])
-      .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-      .map((m) => ({ id: newId(), role: m.role, content: m.content }))
+    const restored = mapSessionMessages(res?.messages ?? [])
     messages.value = restored
     setActiveExpertSessionId(props.expert.expert_id, s.sessionId)
     sessionId.value = s.sessionId
@@ -510,13 +589,27 @@ onBeforeUnmount(() => {
   abortController?.abort()
 })
 
-watch(() => props.expert.expert_id, (id) => {
-  messages.value = []
-  input.value = ''
-  historyOpen.value = false
-  sessions.value = []
-  sessionId.value = getOrCreateExpertSessionId(id)
-}, { immediate: true })
+watch(
+  () => props.expert.expert_id,
+  (id) => {
+    messages.value = []
+    input.value = ''
+    historyOpen.value = false
+    sessions.value = []
+    historyError.value = ''
+    sessionId.value = getOrCreateExpertSessionId(id)
+    void restoreSessionMessages(sessionId.value, { silent: true })
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.userId,
+  (uid, prev) => {
+    if (!uid || uid === prev || !sessionId.value) return
+    void restoreSessionMessages(sessionId.value, { silent: true })
+  },
+)
 </script>
 
 <style scoped>
@@ -666,6 +759,9 @@ watch(() => props.expert.expert_id, (id) => {
   border: 1px dashed var(--be-border);
   background: rgba(var(--be-bg-rgb), 0.88);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+.be-chat__empty--loading {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
 }
 .be-chat__msg { display: flex; }
 .be-chat__msg--user { justify-content: flex-end; }

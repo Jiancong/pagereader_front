@@ -110,6 +110,7 @@ export default {
     history: "历史",
     historyTitle: "历史会话",
     historyEmpty: "还没有和这位专家的对话记录",
+    historyLoading: "正在恢复对话…",
     historyError: "历史会话加载失败，请稍后重试",
     historyRestored: "已恢复历史对话",
     historyRestoreFailed: "恢复失败，请稍后重试",
