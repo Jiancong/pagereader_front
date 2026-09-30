@@ -123,7 +123,7 @@
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueOutlineHint') }}</span>
           </label>
           <label
-            v-if="activeTab === 'upload' || activeTab === 'expert'"
+            v-if="debugEnabled && (activeTab === 'upload' || activeTab === 'expert')"
             class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
           >
             <input v-model="queueSelection" type="radio" value="EXPERT" class="accent-primary" />
@@ -134,7 +134,7 @@
         <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.queueHint') }}</p>
       </div>
 
-      <div v-if="activeTab === 'expert'" class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+      <div v-if="debugEnabled && activeTab === 'expert'" class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <div class="p-6 sm:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t('bookExpert.panelTitle') }}</h3>
@@ -813,7 +813,10 @@ const activeTab = ref<"prompt" | "upload" | "youtube" | "translate" | "read" | "
 function ensureDebugOnlyTabsHidden() {
   if (
     !debugEnabled.value &&
-    (activeTab.value === "prompt" || activeTab.value === "translate" || activeTab.value === "read")
+    (activeTab.value === "prompt" ||
+      activeTab.value === "translate" ||
+      activeTab.value === "read" ||
+      activeTab.value === "expert")
   ) {
     activeTab.value = "upload"
   }
@@ -1019,7 +1022,7 @@ const queueSelection = computed<string>({
   },
   set(val: string) {
     if (val === "EXPERT") {
-      activeTab.value = "expert"
+      if (debugEnabled.value) activeTab.value = "expert"
     } else {
       if (activeTab.value === "expert") activeTab.value = "upload"
       activeTask.value.queue = val as PptQueue
