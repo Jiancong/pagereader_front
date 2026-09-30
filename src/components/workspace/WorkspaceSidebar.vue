@@ -65,6 +65,7 @@
         <span v-if="!isCollapsed" class="truncate">{{ t('workspace.exploreArticles') }}</span>
       </button>
       <button
+        v-if="debugEnabled"
         :title="t('workspace.exploreExperts')"
         :class="navBtnClass(view === 'explore-experts')"
         @click="$emit('explore-experts')"
@@ -252,6 +253,7 @@ import AppBrandMark from '../AppBrandMark.vue'
 import LocaleSwitcher from '../LocaleSwitcher.vue'
 import WorkspaceCreditsBar from './WorkspaceCreditsBar.vue'
 import WorkspaceAssetsDrawer from './WorkspaceAssetsDrawer.vue'
+import { isAppDebugEnabled } from '@/config/appDebug'
 
 const SIDEBAR_COLLAPSED_KEY = 'workspace-sidebar-collapsed'
 
@@ -277,6 +279,7 @@ const historyScrollRef = ref(null)
 const historyLoadSentinelRef = ref(null)
 let historyScrollObserver = null
 const isCollapsed = computed(() => collapsed.value && !props.mobileOpen)
+const debugEnabled = computed(() => isAppDebugEnabled())
 
 const { t } = useI18n()
 
