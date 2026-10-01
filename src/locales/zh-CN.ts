@@ -545,6 +545,7 @@ export default {
     deleteProjectSuccess: "项目已删除",
     loading: "加载中...",
     noHistory: "暂无记录",
+    noExpertChatHistory: "暂无专家对话记录",
     unnamedProject: "未命名项目",
     loggedIn: "已登录",
     logout: "退出登录",

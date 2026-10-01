@@ -555,6 +555,7 @@ export default {
     deleteProjectSuccess: "Project deleted",
     loading: "Loading…",
     noHistory: "No projects yet",
+    noExpertChatHistory: "No expert conversations yet",
     unnamedProject: "Untitled project",
     loggedIn: "Signed in",
     logout: "Log out",

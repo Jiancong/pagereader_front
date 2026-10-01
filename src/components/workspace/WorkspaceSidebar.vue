@@ -92,7 +92,7 @@
       </p>
       <div ref="historyScrollRef" class="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
         <div
-          v-if="loadingProjects"
+          v-if="historyLoading"
           :class="[
             'flex items-center text-sm text-muted-foreground',
             isCollapsed ? 'justify-center py-2' : 'gap-2 px-2 py-2',
@@ -101,6 +101,53 @@
           <Loader2 class="h-4 w-4 animate-spin" />
           <span v-if="!isCollapsed">{{ t('workspace.loading') }}</span>
         </div>
+        <template v-else-if="historyMode === 'experts'">
+          <p
+            v-if="!expertChatHistory.length && !isCollapsed"
+            class="px-2 py-2 text-xs text-muted-foreground/70"
+          >
+            {{ t('workspace.noExpertChatHistory') }}
+          </p>
+          <div
+            v-for="item in expertChatHistory"
+            :key="item.sessionId"
+            :class="[
+              'group flex w-full items-center rounded-lg transition-colors',
+              isCollapsed ? 'justify-center p-1' : 'gap-1 pr-1',
+              activeExpertSessionId === item.sessionId ? 'bg-secondary' : 'hover:bg-secondary/60',
+            ]"
+          >
+            <button
+              :title="expertChatDisplayTitle(item)"
+              :class="[
+                'flex items-center rounded-lg text-sm transition-colors',
+                isCollapsed ? 'p-1.5' : 'min-w-0 flex-1 gap-2 px-2 py-2 text-left',
+                activeExpertSessionId === item.sessionId
+                  ? 'text-foreground'
+                  : 'text-muted-foreground group-hover:text-foreground',
+              ]"
+              @click="$emit('open-expert-session', item)"
+            >
+              <img
+                v-if="item.coverUrl"
+                :src="item.coverUrl"
+                alt=""
+                class="h-8 w-8 flex-shrink-0 rounded object-cover"
+                loading="lazy"
+              />
+              <BookOpen v-else :class="['flex-shrink-0', isCollapsed ? 'h-5 w-5' : 'h-4 w-4']" />
+              <span v-if="!isCollapsed" class="min-w-0 truncate">
+                <span class="block truncate">{{ expertChatDisplayTitle(item) }}</span>
+                <span
+                  v-if="item.expertName && item.title"
+                  class="block truncate text-xs text-muted-foreground/80"
+                >
+                  {{ item.expertName }}
+                </span>
+              </span>
+            </button>
+          </div>
+        </template>
         <template v-else>
           <p
             v-if="!myProjects.length && !isCollapsed"
@@ -261,17 +308,33 @@ const props = defineProps({
   view: { type: String, default: 'new' },
   userId: { type: [String, Number], default: null },
   activeProjectId: { type: String, default: null },
+  activeExpertSessionId: { type: String, default: null },
   nickName: { type: String, default: '' },
   avatar: { type: String, default: '' },
+  /** projects | experts — 与「探索文章 / 探索专家」导航联动 */
+  historyMode: { type: String, default: 'projects' },
   myProjects: { type: Array, default: () => [] },
+  expertChatHistory: { type: Array, default: () => [] },
   projectTitleMap: { type: Object, default: () => ({}) },
   loadingProjects: { type: Boolean, default: false },
+  loadingExpertChatHistory: { type: Boolean, default: false },
   loadingMoreProjects: { type: Boolean, default: false },
   hasMoreProjects: { type: Boolean, default: false },
   deletingProjectId: { type: String, default: null },
   mobileOpen: { type: Boolean, default: false },
 })
-const emit = defineEmits(['new', 'explore', 'explore-experts', 'open-project', 'delete-project', 'logout', 'select-document', 'close-mobile', 'load-more-projects'])
+const emit = defineEmits([
+  'new',
+  'explore',
+  'explore-experts',
+  'open-project',
+  'open-expert-session',
+  'delete-project',
+  'logout',
+  'select-document',
+  'close-mobile',
+  'load-more-projects',
+])
 
 const assetsOpen = ref(false)
 const collapsed = ref(false)
@@ -280,8 +343,19 @@ const historyLoadSentinelRef = ref(null)
 let historyScrollObserver = null
 const isCollapsed = computed(() => collapsed.value && !props.mobileOpen)
 const debugEnabled = computed(() => isAppDebugEnabled())
+const historyLoading = computed(() =>
+  props.historyMode === 'experts' ? props.loadingExpertChatHistory : props.loadingProjects,
+)
 
 const { t } = useI18n()
+
+function expertChatDisplayTitle(item) {
+  const title = item?.title?.trim()
+  if (title) return title
+  const expert = item?.expertName?.trim()
+  if (expert) return expert
+  return item?.sessionId || t('workspace.unnamedProject')
+}
 
 function setCollapsed(value) {
   collapsed.value = value
@@ -316,6 +390,7 @@ function setupHistoryScrollObserver() {
   historyScrollObserver = null
 
   if (
+    props.historyMode !== 'projects' ||
     props.loadingProjects ||
     !props.hasMoreProjects ||
     !historyScrollRef.value ||
@@ -337,6 +412,7 @@ function setupHistoryScrollObserver() {
 
 watch(
   () => [
+    props.historyMode,
     props.hasMoreProjects,
     props.loadingMoreProjects,
     props.loadingProjects,

@@ -216,6 +216,55 @@ export async function getExpertSessionMessages(
   )
 }
 
+/** 侧栏「探索专家」：汇总我所有专家下的 chat sessions（按 updatedAt 倒序） */
+export interface ExpertChatHistoryItem {
+  expertId: string
+  expertName: string
+  bookTitle?: string
+  coverUrl?: string
+  sessionId: string
+  title?: string
+  messageCount?: number
+  updatedAt?: string
+}
+
+export async function loadAggregatedExpertChatHistory(
+  userId: string,
+): Promise<ExpertChatHistoryItem[]> {
+  const uid = String(userId || "").trim()
+  if (!uid) return []
+  const mine = await listMyExperts(uid)
+  const experts = mine.experts ?? []
+  const nested = await Promise.all(
+    experts.map(async (ex) => {
+      const expertId = ex.expert_id
+      if (!expertId) return [] as ExpertChatHistoryItem[]
+      try {
+        const res = await listExpertSessions(expertId, uid)
+        return (res.sessions ?? []).map((s) => ({
+          expertId,
+          expertName: ex.expert_name || expertId,
+          bookTitle: ex.book_title,
+          coverUrl: ex.cover_url,
+          sessionId: s.sessionId,
+          title: s.title,
+          messageCount: s.messageCount,
+          updatedAt: s.updatedAt,
+        }))
+      } catch {
+        return [] as ExpertChatHistoryItem[]
+      }
+    }),
+  )
+  const flat = nested.flat()
+  flat.sort((a, b) => {
+    const ta = a.updatedAt ? Date.parse(a.updatedAt) : 0
+    const tb = b.updatedAt ? Date.parse(b.updatedAt) : 0
+    return tb - ta
+  })
+  return flat
+}
+
 // ===== 蒸馏 SSE =====
 
 export interface DistillStreamCallbacks {

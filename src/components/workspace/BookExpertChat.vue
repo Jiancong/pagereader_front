@@ -189,10 +189,17 @@ import type {
   BookExpertSessionSummary,
 } from '@/api/types'
 
-const props = defineProps<{ expert: BookExpertSummary; userId: string | null; projectId: string }>()
+const props = defineProps<{
+  expert: BookExpertSummary
+  userId: string | null
+  projectId: string
+  /** 从侧栏历史进入时指定 be-* session，否则用 localStorage 默认会话 */
+  initialSessionId?: string | null
+}>()
 const emit = defineEmits<{
   exit: []
   'expert-updated': [expert: BookExpertSummary]
+  'sessions-changed': []
 }>()
 
 const { t } = useI18n()
@@ -564,8 +571,9 @@ async function onSend() {
           }
           if (!assistantMsg.content) assistantMsg.content = t('bookExpert.noResponse')
           scrollToBottom()
-          // 新消息落库后刷新抽屉列表
+          // 新消息落库后刷新抽屉列表与侧栏历史
           if (historyOpen.value) loadHistory()
+          emit('sessions-changed')
         },
       },
       abortController.signal,
@@ -589,15 +597,25 @@ onBeforeUnmount(() => {
   abortController?.abort()
 })
 
+function resolveSessionIdForExpert(expertId: string): string {
+  const id = String(expertId || '').trim()
+  const initial = String(props.initialSessionId || '').trim()
+  if (initial && initial.startsWith(`be-${id}-`)) {
+    setActiveExpertSessionId(id, initial)
+    return initial
+  }
+  return getOrCreateExpertSessionId(id)
+}
+
 watch(
-  () => props.expert.expert_id,
-  (id) => {
+  () => [props.expert.expert_id, props.initialSessionId] as const,
+  ([id]) => {
     messages.value = []
     input.value = ''
     historyOpen.value = false
     sessions.value = []
     historyError.value = ''
-    sessionId.value = getOrCreateExpertSessionId(id)
+    sessionId.value = resolveSessionIdForExpert(id)
     void restoreSessionMessages(sessionId.value, { silent: true })
   },
   { immediate: true },
