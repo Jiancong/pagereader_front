@@ -1,29 +1,42 @@
 /**
- * 专家默认形象（thumbnail / cover_url）预设。
- * 生产可改为 GET /api2/book-experts/avatar-presets 下发；见 docs/book_expert_avatar_presets_spec.md。
+ * 专家封面预设：图片放在 public/book-expert/avatars/，清单见 manifest.json。
+ * 后端 spec：docs/book_expert_avatar_presets_spec.md
  */
 export interface BookExpertAvatarPreset {
   id: string
-  /** i18n key under bookExpert.avatarPresets.* */
-  labelKey: string
+  fileName: string
   url: string
 }
 
-const DICEBEAR = (seed: string) =>
-  `https://api.dicebear.com/7.x/notionists/png?seed=${encodeURIComponent(seed)}&size=256&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`
+export function bookExpertAvatarPublicBase(): string {
+  const base = import.meta.env.BASE_URL || "/"
+  const normalized = base.endsWith("/") ? base : `${base}/`
+  return `${normalized}book-expert/avatars/`
+}
 
-/** 稳定 HTTPS 地址，便于 Python 直接存 cover_url（若 BFF 支持 JSON）或 multipart 回传 OSS */
-export const BOOK_EXPERT_AVATAR_PRESETS: BookExpertAvatarPreset[] = [
-  { id: "scholar-m", labelKey: "scholarM", url: DICEBEAR("book-expert-scholar-m") },
-  { id: "scholar-f", labelKey: "scholarF", url: DICEBEAR("book-expert-scholar-f") },
-  { id: "mentor", labelKey: "mentor", url: DICEBEAR("book-expert-mentor") },
-  { id: "strategist", labelKey: "strategist", url: DICEBEAR("book-expert-strategist") },
-  { id: "historian", labelKey: "historian", url: DICEBEAR("book-expert-historian") },
-  { id: "scientist", labelKey: "scientist", url: DICEBEAR("book-expert-scientist") },
-  { id: "writer", labelKey: "writer", url: DICEBEAR("book-expert-writer") },
-  { id: "coach", labelKey: "coach", url: DICEBEAR("book-expert-coach") },
-  { id: "philosopher", labelKey: "philosopher", url: DICEBEAR("book-expert-philosopher") },
-  { id: "analyst", labelKey: "analyst", url: DICEBEAR("book-expert-analyst") },
-  { id: "guide", labelKey: "guide", url: DICEBEAR("book-expert-guide") },
-  { id: "curator", labelKey: "curator", url: DICEBEAR("book-expert-curator") },
-]
+export function bookExpertAvatarPublicUrl(fileName: string): string {
+  const name = String(fileName || "").trim()
+  return `${bookExpertAvatarPublicBase()}${encodeURIComponent(name)}`
+}
+
+interface AvatarManifest {
+  files?: string[]
+}
+
+/** 从 public/book-expert/avatars/manifest.json 读取可选封面列表 */
+export async function loadBookExpertAvatarPresets(): Promise<BookExpertAvatarPreset[]> {
+  const manifestUrl = `${bookExpertAvatarPublicBase()}manifest.json`
+  try {
+    const res = await fetch(manifestUrl, { cache: "no-cache" })
+    if (!res.ok) return []
+    const data = (await res.json()) as AvatarManifest
+    const files = (data.files ?? []).map((f) => String(f).trim()).filter(Boolean)
+    return files.map((fileName) => ({
+      id: fileName,
+      fileName,
+      url: bookExpertAvatarPublicUrl(fileName),
+    }))
+  } catch {
+    return []
+  }
+}

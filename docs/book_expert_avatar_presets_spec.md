@@ -11,7 +11,7 @@
 | Java BFF | `POST /api2/book-experts/{expertId}/cover` **仅** `multipart/form-data` 字段 `file` → OSS → 再 JSON 转发 Python |
 | 前端 | `setExpertCoverUrl`（`src/api/bookExpert.ts`）：先尝试 JSON；若 BFF 返回 415/400 等，则 **fetch 预设 URL → multipart 上传**（兼容现网） |
 
-预设图列表：`src/constants/bookExpertAvatarPresets.ts`（当前为 DiceBear PNG URL）；可改为 `public/book-expert/avatars/*` 或 BFF 清单 API。
+预设图列表：`public/book-expert/avatars/` + 同目录 `manifest.json` 的 `files` 数组；前端打开「封面」下拉时拉取清单（见该目录 README）。
 
 ## 1.（推荐）BFF：同路径支持 JSON 设封面 URL
 

@@ -23,14 +23,6 @@
 
       <!-- 工具条：历史 / 封面 / 分享（复用 PPT 分享下拉的交互模式） -->
       <div class="be-chat__actions">
-        <BookExpertAvatarPicker
-          v-if="isOwner && userId"
-          :expert-id="expert.expert_id"
-          :user-id="String(userId)"
-          :cover-url="expert.cover_url"
-          @saved="onAvatarPresetSaved"
-        />
-
         <button
           v-if="isOwner"
           type="button"
@@ -43,26 +35,13 @@
           <span>{{ t('bookExpert.history') }}</span>
         </button>
 
-        <template v-if="isOwner">
-          <input
-            ref="coverInputRef"
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            class="hidden"
-            @change="onCoverFileSelected"
-          />
-          <button
-            type="button"
-            class="be-chat__action"
-            :disabled="coverUploading"
-            :title="t('bookExpert.cover')"
-            @click="triggerCoverUpload"
-          >
-            <Loader2 v-if="coverUploading" class="h-4 w-4 animate-spin" />
-            <ImagePlus v-else class="h-4 w-4" />
-            <span>{{ coverUploading ? t('bookExpert.coverUploading') : t('bookExpert.cover') }}</span>
-          </button>
-        </template>
+        <BookExpertAvatarPicker
+          v-if="isOwner && userId"
+          :expert-id="expert.expert_id"
+          :user-id="String(userId)"
+          :cover-url="expert.cover_url"
+          @saved="onCoverPresetSaved"
+        />
 
         <div class="be-chat__share-wrap">
           <button
@@ -180,7 +159,7 @@ import { ref, computed, nextTick, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  ArrowLeft, Loader2, Send, History, ImagePlus, Share2, ChevronDown,
+  ArrowLeft, Loader2, Send, History, Share2, ChevronDown,
   Link2, Facebook, Twitter, Linkedin, X,
 } from 'lucide-vue-next'
 import { agentApi, ApiError, isCreditsInsufficient, bookExpertApi } from '@/api'
@@ -231,11 +210,6 @@ const sessions = ref<BookExpertSessionSummary[]>([])
 /** 进入页面时从服务端恢复当前 sessionId 的对话 */
 const sessionBootstrapping = ref(false)
 let sessionRestoreGeneration = 0
-
-/** 封面上传 */
-const coverInputRef = ref<HTMLInputElement | null>(null)
-const coverUploading = ref(false)
-const COVER_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 
 /** 分享菜单 */
 const shareMenuOpen = ref(false)
@@ -433,49 +407,10 @@ function formatSessionTime(v: string): string {
   return d.toLocaleString()
 }
 
-// ── 封面上传（复用项目封面 uploadProjectCover 的校验/流程模式） ──
+// ── 封面：从 public/book-expert/avatars 下拉选择 ──
 
-function onAvatarPresetSaved(coverUrl: string) {
+function onCoverPresetSaved(coverUrl: string) {
   emit('expert-updated', { ...props.expert, cover_url: coverUrl })
-}
-
-function triggerCoverUpload() {
-  if (coverUploading.value) return
-  coverInputRef.value?.click()
-}
-
-async function onCoverFileSelected(event: Event) {
-  const el = event.target as HTMLInputElement
-  const file = el.files?.[0]
-  el.value = ''
-  if (!file || !props.userId || coverUploading.value) return
-
-  const mime = (file.type || '').toLowerCase()
-  if (mime && !COVER_IMAGE_TYPES.has(mime)) {
-    ElMessage.warning(t('bookExpert.coverInvalidType'))
-    return
-  }
-
-  coverUploading.value = true
-  try {
-    const result = await bookExpertApi.uploadExpertCover(
-      props.expert.expert_id,
-      file,
-      String(props.userId),
-    )
-    const coverUrl =
-      String(result?.cover_url ?? result?.expert?.cover_url ?? '').trim() || undefined
-    emit('expert-updated', { ...props.expert, cover_url: coverUrl ?? props.expert.cover_url })
-    ElMessage.success(t('bookExpert.coverSuccess'))
-  } catch (e: unknown) {
-    ElMessage.error(
-      e instanceof ApiError || e instanceof Error
-        ? e.message
-        : t('bookExpert.coverFailed'),
-    )
-  } finally {
-    coverUploading.value = false
-  }
 }
 
 // ── 分享（私有专家先引导发布；公开页 /explore/expert/{id}） ──
