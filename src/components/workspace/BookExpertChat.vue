@@ -23,6 +23,14 @@
 
       <!-- 工具条：历史 / 封面 / 分享（复用 PPT 分享下拉的交互模式） -->
       <div class="be-chat__actions">
+        <BookExpertAvatarPicker
+          v-if="isOwner && userId"
+          :expert-id="expert.expert_id"
+          :user-id="String(userId)"
+          :cover-url="expert.cover_url"
+          @saved="onAvatarPresetSaved"
+        />
+
         <button
           v-if="isOwner"
           type="button"
@@ -183,6 +191,7 @@ import {
 } from '@/api/bookExpert'
 import { buildExploreExpertShareUrl } from '@/utils/feedOpen'
 import ChatMarkdownBody from '@/components/editor/chat/ChatMarkdownBody.vue'
+import BookExpertAvatarPicker from '@/components/workspace/BookExpertAvatarPicker.vue'
 import type {
   BookExpertSummary,
   BookExpertSessionMessage,
@@ -425,6 +434,10 @@ function formatSessionTime(v: string): string {
 }
 
 // ── 封面上传（复用项目封面 uploadProjectCover 的校验/流程模式） ──
+
+function onAvatarPresetSaved(coverUrl: string) {
+  emit('expert-updated', { ...props.expert, cover_url: coverUrl })
+}
 
 function triggerCoverUpload() {
   if (coverUploading.value) return

@@ -191,6 +191,48 @@ export async function uploadExpertCover(
   )
 }
 
+/**
+ * 将专家 cover_url 设为已有 HTTPS 图片（预设形象）。
+ * 优先 JSON 直存（Python 已支持；BFF 若未开放则回退为拉取图片后 multipart 上传 OSS）。
+ */
+export async function setExpertCoverUrl(
+  expertId: string,
+  userId: string,
+  coverUrl: string,
+): Promise<BookExpertCoverUploadResult> {
+  const url = String(coverUrl || "").trim()
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    throw new ApiError(400, "coverUrl 必须为 http(s) 地址")
+  }
+  const uid = String(userId || "").trim()
+  if (!uid) throw new ApiError(401, "未登录")
+
+  try {
+    return await rawRequest<BookExpertCoverUploadResult>(
+      "POST",
+      `/book-experts/${encodeURIComponent(expertId)}/cover`,
+      { query: { userId: uid }, body: { userId: uid, coverUrl: url } },
+    )
+  } catch (e) {
+    const code = e instanceof ApiError ? e.code : 0
+    const canFallback = code === 400 || code === 404 || code === 415 || code === 406
+    if (!canFallback) throw e
+  }
+
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new ApiError(res.status, `无法加载预设图片：${res.status}`)
+  }
+  const blob = await res.blob()
+  const mime = (blob.type || "image/png").toLowerCase()
+  if (mime && !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(mime)) {
+    throw new ApiError(400, "预设图片格式不受支持")
+  }
+  const ext = mime.includes("jpeg") ? "jpg" : mime.includes("webp") ? "webp" : mime.includes("gif") ? "gif" : "png"
+  const file = new File([blob], `expert-avatar.${ext}`, { type: mime || "image/png" })
+  return uploadExpertCover(expertId, file, uid)
+}
+
 /** 该专家的历史会话列表（owner only） */
 export async function listExpertSessions(
   expertId: string,
