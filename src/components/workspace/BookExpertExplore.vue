@@ -22,26 +22,7 @@
     <div v-else-if="loadError" class="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{{ loadError }}</div>
 
     <template v-else>
-      <!-- 我的专家（仅私有） -->
-      <section v-if="myPrivateExperts.length" class="mb-8">
-        <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {{ t('bookExpert.myExperts') }}
-        </h3>
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-          <ExpertOwnedCard
-            v-for="expert in myPrivateExperts"
-            :key="expert.expert_id"
-            :expert="expert"
-            :publishing-id="publishingId"
-            :deleting-id="deletingId"
-            @select="$emit('select-expert', $event)"
-            @toggle-publish="onTogglePublish"
-            @delete="onDelete"
-          />
-        </div>
-      </section>
-
-      <!-- 我已公开（仍归我所有，已从「我的专家」拆出） -->
+      <!-- 我已公开（探索页不展示私有专家，私有仅从侧栏「我的历史」进入） -->
       <section v-if="myPublishedExperts.length" class="mb-8">
         <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {{ t('bookExpert.myPublishedExperts') }}
@@ -95,10 +76,10 @@
       </section>
 
       <p
-        v-if="!myPrivateExperts.length && !myPublishedExperts.length && !publicExperts.length"
+        v-if="!myPublishedExperts.length && !publicExperts.length"
         class="py-12 text-center text-sm text-muted-foreground"
       >
-        {{ t('bookExpert.exploreEmpty') }}
+        {{ t('bookExpert.exploreEmptyPublic') }}
       </p>
     </template>
   </div>
@@ -114,7 +95,7 @@ import ExpertOwnedCard from '@/components/workspace/BookExpertOwnedCard.vue'
 import type { BookExpertSummary } from '@/api/types'
 
 const props = defineProps<{ userId: string | null }>()
-defineEmits<{ 'select-expert': [expert: BookExpertSummary] }>()
+const emit = defineEmits<{ 'select-expert': [expert: BookExpertSummary]; 'experts-changed': [] }>()
 
 const { t } = useI18n()
 
@@ -171,6 +152,7 @@ async function onDelete(expert: BookExpertSummary) {
     myRaw.value = myRaw.value.filter((e) => e.expert_id !== expert.expert_id)
     publicRaw.value = publicRaw.value.filter((e) => e.expert_id !== expert.expert_id)
     ElMessage.success(t('bookExpert.deleted'))
+    emit('experts-changed')
   } catch (e: unknown) {
     ElMessage.error(e instanceof Error ? e.message : t('common.actionFailed'))
   } finally {
@@ -193,6 +175,7 @@ async function onTogglePublish(expert: BookExpertSummary) {
       e.expert_id === expert.expert_id ? { ...e, visibility } : e,
     )
     ElMessage.success(makePublic ? t('bookExpert.published') : t('bookExpert.unpublished'))
+    emit('experts-changed')
   } catch (e: unknown) {
     ElMessage.error(e instanceof Error ? e.message : t('common.actionFailed'))
   } finally {
@@ -200,9 +183,6 @@ async function onTogglePublish(expert: BookExpertSummary) {
   }
 }
 
-const myPrivateExperts = computed(() =>
-  filterByKeyword(myRaw.value.filter((e) => e.visibility !== 'public')),
-)
 const myPublishedExperts = computed(() =>
   filterByKeyword(myRaw.value.filter((e) => e.visibility === 'public')),
 )

@@ -127,46 +127,43 @@
         </div>
         <template v-else-if="historyMode === 'experts'">
           <p
-            v-if="!expertChatHistory.length && !isCollapsed"
+            v-if="!myExpertHistory.length && !isCollapsed"
             class="px-2 py-2 text-xs text-muted-foreground/70"
           >
-            {{ t('workspace.noExpertChatHistory') }}
+            {{ t('workspace.noExpertHistory') }}
           </p>
           <div
-            v-for="item in expertChatHistory"
-            :key="item.sessionId"
+            v-for="expert in myExpertHistory"
+            :key="expert.expert_id"
             :class="[
               'group flex w-full items-center rounded-lg transition-colors',
               isCollapsed ? 'justify-center p-1' : 'gap-1 pr-1',
-              activeExpertSessionId === item.sessionId ? 'bg-secondary' : 'hover:bg-secondary/60',
+              activeExpertId === expert.expert_id ? 'bg-secondary' : 'hover:bg-secondary/60',
             ]"
           >
             <button
-              :title="expertChatDisplayTitle(item)"
+              :title="expertSidebarTitle(expert)"
               :class="[
                 'flex items-center rounded-lg text-sm transition-colors',
                 isCollapsed ? 'p-1.5' : 'min-w-0 flex-1 gap-2 px-2 py-2 text-left',
-                activeExpertSessionId === item.sessionId
+                activeExpertId === expert.expert_id
                   ? 'text-foreground'
                   : 'text-muted-foreground group-hover:text-foreground',
               ]"
-              @click="$emit('open-expert-session', item)"
+              @click="$emit('open-expert', expert)"
             >
               <img
-                v-if="item.coverUrl"
-                :src="item.coverUrl"
+                v-if="expert.cover_url"
+                :src="expert.cover_url"
                 alt=""
                 class="h-8 w-8 flex-shrink-0 rounded object-cover"
                 loading="lazy"
               />
               <BookOpen v-else :class="['flex-shrink-0', isCollapsed ? 'h-5 w-5' : 'h-4 w-4']" />
               <span v-if="!isCollapsed" class="min-w-0 truncate">
-                <span class="block truncate">{{ expertChatDisplayTitle(item) }}</span>
-                <span
-                  v-if="item.expertName && item.title"
-                  class="block truncate text-xs text-muted-foreground/80"
-                >
-                  {{ item.expertName }}
+                <span class="block truncate">{{ expert.expert_name }}</span>
+                <span class="block truncate text-xs text-muted-foreground/80">
+                  {{ expertSidebarSubtitle(expert) }}
                 </span>
               </span>
             </button>
@@ -332,16 +329,16 @@ const props = defineProps({
   view: { type: String, default: 'new' },
   userId: { type: [String, Number], default: null },
   activeProjectId: { type: String, default: null },
-  activeExpertSessionId: { type: String, default: null },
+  activeExpertId: { type: String, default: null },
   nickName: { type: String, default: '' },
   avatar: { type: String, default: '' },
   /** projects | experts — 与「探索文章 / 探索专家」导航联动 */
   historyMode: { type: String, default: 'projects' },
   myProjects: { type: Array, default: () => [] },
-  expertChatHistory: { type: Array, default: () => [] },
+  myExpertHistory: { type: Array, default: () => [] },
   projectTitleMap: { type: Object, default: () => ({}) },
   loadingProjects: { type: Boolean, default: false },
-  loadingExpertChatHistory: { type: Boolean, default: false },
+  loadingExpertHistory: { type: Boolean, default: false },
   loadingMoreProjects: { type: Boolean, default: false },
   hasMoreProjects: { type: Boolean, default: false },
   deletingProjectId: { type: String, default: null },
@@ -352,7 +349,7 @@ const emit = defineEmits([
   'explore',
   'explore-experts',
   'open-project',
-  'open-expert-session',
+  'open-expert',
   'delete-project',
   'logout',
   'select-document',
@@ -368,17 +365,21 @@ let historyScrollObserver = null
 const isCollapsed = computed(() => collapsed.value && !props.mobileOpen)
 const debugEnabled = computed(() => isAppDebugEnabled())
 const historyLoading = computed(() =>
-  props.historyMode === 'experts' ? props.loadingExpertChatHistory : props.loadingProjects,
+  props.historyMode === 'experts' ? props.loadingExpertHistory : props.loadingProjects,
 )
 
 const { t } = useI18n()
 
-function expertChatDisplayTitle(item) {
-  const title = item?.title?.trim()
-  if (title) return title
-  const expert = item?.expertName?.trim()
-  if (expert) return expert
-  return item?.sessionId || t('workspace.unnamedProject')
+function expertSidebarTitle(expert) {
+  return expert?.expert_name?.trim() || expert?.expert_id || t('workspace.unnamedProject')
+}
+
+function expertSidebarSubtitle(expert) {
+  const book = expert?.book_title?.trim()
+  if (book) return book
+  return expert?.visibility === 'public'
+    ? t('bookExpert.publicBadge')
+    : t('bookExpert.privateBadge')
 }
 
 function setCollapsed(value) {

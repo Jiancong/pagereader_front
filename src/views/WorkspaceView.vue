@@ -10,15 +10,15 @@
       :view="view"
       :user-id="userId"
       :active-project-id="activeProjectId"
-      :active-expert-session-id="activeExpertSessionId"
+      :active-expert-id="activeExpertId"
       :history-mode="sidebarHistoryMode"
       :nick-name="nickName"
       :avatar="avatar"
       :my-projects="myProjects"
-      :expert-chat-history="expertChatHistory"
+      :my-expert-history="myExpertHistory"
       :project-title-map="projectTitleMap"
       :loading-projects="loadingProjects"
-      :loading-expert-chat-history="loadingExpertChatHistory"
+      :loading-expert-history="loadingExpertHistory"
       :loading-more-projects="loadingMoreProjects"
       :has-more-projects="projectsHasMore"
       :deleting-project-id="deletingProjectId"
@@ -28,7 +28,7 @@
       @explore="onSidebarNav(onExploreArticles)"
       @explore-experts="onSidebarNav(onExploreExperts)"
       @open-project="(id) => onSidebarNav(() => openProject(id))"
-      @open-expert-session="(item) => onSidebarNav(() => openExpertChatSession(item))"
+      @open-expert="(expert) => onSidebarNav(() => onSelectExpert(expert))"
       @delete-project="onDeleteProject"
       @logout="handleLogout"
       @select-document="onSelectDocumentFromAssets"
@@ -71,6 +71,7 @@
         v-else-if="view === 'explore-experts'"
         :user-id="userId ? String(userId) : null"
         @select-expert="onSelectExpert"
+        @experts-changed="loadMyExpertHistory"
       />
       <BookExpertChat
         v-else-if="view === 'expert-chat' && activeExpert"
@@ -80,7 +81,7 @@
         :initial-session-id="pendingExpertSessionId"
         @exit="onExitExpert"
         @expert-updated="onExpertUpdated"
-        @sessions-changed="loadExpertChatHistory"
+        @sessions-changed="loadMyExpertHistory"
       />
       <ProjectPreview
         v-else-if="view === 'project' && activeProjectId"
@@ -110,10 +111,7 @@ import BookExpertChat from '../components/workspace/BookExpertChat.vue'
 import BookExpertExplore from '../components/workspace/BookExpertExplore.vue'
 import { useBookExpertStore } from '@/stores/bookExpert'
 import { authApi, feedApi, getLocalAvatar, bookExpertApi } from '../api'
-import {
-  getOrCreateExpertSessionId,
-  loadAggregatedExpertChatHistory,
-} from '@/api/bookExpert'
+import { getOrCreateExpertSessionId } from '@/api/bookExpert'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
 
@@ -141,10 +139,12 @@ const projectRefreshKey = ref(0)
 const generatorRef = ref(null)
 const activeExpert = ref(null)
 const expertProjectId = ref('')
-const expertChatHistory = ref([])
-const loadingExpertChatHistory = ref(false)
+const myExpertHistory = ref([])
+const loadingExpertHistory = ref(false)
 const activeExpertSessionId = ref(null)
 const pendingExpertSessionId = ref(null)
+
+const activeExpertId = computed(() => activeExpert.value?.expert_id ?? null)
 const bookExpertStore = useBookExpertStore()
 
 const sidebarHistoryMode = computed(() =>
@@ -187,18 +187,19 @@ const loadProjects = async () => {
   }
 }
 
-const loadExpertChatHistory = async () => {
+const loadMyExpertHistory = async () => {
   if (!userId.value) {
-    expertChatHistory.value = []
+    myExpertHistory.value = []
     return
   }
-  loadingExpertChatHistory.value = true
+  loadingExpertHistory.value = true
   try {
-    expertChatHistory.value = await loadAggregatedExpertChatHistory(String(userId.value))
+    const res = await bookExpertApi.listMyExperts(String(userId.value))
+    myExpertHistory.value = res?.experts ?? []
   } catch {
-    expertChatHistory.value = []
+    myExpertHistory.value = []
   } finally {
-    loadingExpertChatHistory.value = false
+    loadingExpertHistory.value = false
   }
 }
 
@@ -208,7 +209,7 @@ function onExploreArticles() {
 
 function onExploreExperts() {
   view.value = 'explore-experts'
-  void loadExpertChatHistory()
+  void loadMyExpertHistory()
 }
 
 const loadMoreProjects = async () => {
@@ -373,28 +374,7 @@ function onSelectExpert(expert) {
   const sid = getOrCreateExpertSessionId(expert.expert_id)
   activeExpertSessionId.value = sid || null
   view.value = 'expert-chat'
-  void loadExpertChatHistory()
-}
-
-async function openExpertChatSession(item) {
-  if (!item?.expertId || !item?.sessionId) return
-  try {
-    const res = await bookExpertApi.getExpert(
-      item.expertId,
-      userId.value ? String(userId.value) : undefined,
-    )
-    if (!res?.expert) {
-      ElMessage.error(t('common.actionFailed'))
-      return
-    }
-    activeExpert.value = res.expert
-    expertProjectId.value = newExpertProjectId()
-    pendingExpertSessionId.value = item.sessionId
-    activeExpertSessionId.value = item.sessionId
-    view.value = 'expert-chat'
-  } catch (e) {
-    ElMessage.error(e?.message || t('common.actionFailed'))
-  }
+  void loadMyExpertHistory()
 }
 
 /** 聊天页内发布 / 封面上传后回写，保持 header 与卡片封面同步 */
@@ -402,6 +382,7 @@ function onExpertUpdated(expert) {
   if (activeExpert.value && expert?.expert_id === activeExpert.value.expert_id) {
     activeExpert.value = { ...activeExpert.value, ...expert }
   }
+  void loadMyExpertHistory()
 }
 
 function onExitExpert() {
@@ -411,7 +392,7 @@ function onExitExpert() {
   activeExpertSessionId.value = null
   bookExpertStore.clearActiveExpert()
   view.value = 'explore-experts'
-  void loadExpertChatHistory()
+  void loadMyExpertHistory()
 }
 
 const handleLogout = () => {
@@ -420,7 +401,7 @@ const handleLogout = () => {
   view.value = 'new'
   activeProjectId.value = null
   myProjects.value = []
-  expertChatHistory.value = []
+  myExpertHistory.value = []
   activeExpertSessionId.value = null
   pendingExpertSessionId.value = null
   router.push('/')
