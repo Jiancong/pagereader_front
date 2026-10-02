@@ -59,6 +59,18 @@
               <Link2 class="h-4 w-4" />
               <span>{{ t('bookExpert.shareViaLink') }}</span>
             </button>
+            <button
+              v-if="isOwner"
+              type="button"
+              class="be-chat__share-item"
+              role="menuitem"
+              :disabled="sharingToCommunity"
+              @click="onShareToCommunity"
+            >
+              <Loader2 v-if="sharingToCommunity" class="h-4 w-4 animate-spin" />
+              <Users v-else class="h-4 w-4" />
+              <span>{{ shareToCommunityLabel }}</span>
+            </button>
             <button type="button" class="be-chat__share-item" role="menuitem" @click="runShare('facebook')">
               <Facebook class="h-4 w-4" />
               <span>{{ t('bookExpert.shareFacebook') }}</span>
@@ -160,7 +172,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft, Loader2, Send, History, Share2, ChevronDown,
-  Link2, Facebook, Twitter, Linkedin, X,
+  Link2, Facebook, Twitter, Linkedin, Users, X,
 } from 'lucide-vue-next'
 import { agentApi, ApiError, isCreditsInsufficient, bookExpertApi } from '@/api'
 import {
@@ -213,6 +225,13 @@ let sessionRestoreGeneration = 0
 
 /** 分享菜单 */
 const shareMenuOpen = ref(false)
+const sharingToCommunity = ref(false)
+
+const shareToCommunityLabel = computed(() =>
+  props.expert.visibility === 'public'
+    ? t('workspace.shareInCommunity')
+    : t('workspace.shareToCommunity'),
+)
 
 const isOwner = computed(
   () => Boolean(props.userId) && String(props.expert.owner_user_id || '') === String(props.userId),
@@ -442,6 +461,43 @@ async function ensurePublicForShare(): Promise<boolean> {
 }
 
 type ShareAction = 'link' | 'facebook' | 'x' | 'linkedin'
+
+/** 发布到公共专家广场（社区发现）；已公开则打开公开页 */
+async function onShareToCommunity() {
+  shareMenuOpen.value = false
+  if (!props.userId || !isOwner.value || sharingToCommunity.value) return
+
+  if (props.expert.visibility === 'public') {
+    window.open(buildExploreExpertShareUrl(props.expert.expert_id), '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(t('bookExpert.shareToCommunityConfirm'), t('workspace.shareToCommunity'), {
+      type: 'info',
+      confirmButtonText: t('bookExpert.publish'),
+      cancelButtonText: t('common.cancel'),
+    })
+  } catch {
+    return
+  }
+
+  sharingToCommunity.value = true
+  try {
+    const res = await bookExpertApi.publishExpert(props.expert.expert_id, {
+      userId: String(props.userId),
+      public: true,
+    })
+    emit('expert-updated', { ...props.expert, visibility: res?.visibility ?? 'public' })
+    ElMessage.success(t('workspace.shareToCommunitySuccess'))
+  } catch (e: unknown) {
+    ElMessage.error(
+      e instanceof ApiError || e instanceof Error ? e.message : t('bookExpert.sharePublishFailed'),
+    )
+  } finally {
+    sharingToCommunity.value = false
+  }
+}
 
 async function runShare(action: ShareAction) {
   shareMenuOpen.value = false

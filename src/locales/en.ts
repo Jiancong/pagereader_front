@@ -131,6 +131,8 @@ export default {
     shareCopied: "Share link copied",
     shareCopyFailed: "Copy failed. Please copy manually.",
     shareNeedsPublish: "This expert is private. Publish it first to create a public share page. Publish now?",
+    shareToCommunityConfirm:
+      "Your expert will appear in the public plaza so others can discover and chat with it. Continue?",
     sharePublishFailed: "Publish failed",
     publicBadge: "Public expert",
     publicCta: "Summon this expert",
