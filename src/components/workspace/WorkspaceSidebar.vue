@@ -70,8 +70,8 @@
         role="tablist"
         :aria-label="t('workspace.exploreSwitchLabel')"
         :class="[
-          'flex w-full gap-0.5 rounded-lg bg-secondary/50 p-0.5',
-          isCollapsed ? 'flex-col' : 'flex-row',
+          'w-full rounded-lg border border-border bg-secondary/40 p-0.5',
+          isCollapsed ? 'flex flex-col gap-0.5' : 'flex flex-row gap-0.5',
         ]"
       >
         <button
@@ -82,7 +82,7 @@
           :class="exploreSegmentClass('articles')"
           @click="selectExploreSegment('articles')"
         >
-          <Compass class="h-4 w-4 flex-shrink-0" />
+          <Compass class="h-3.5 w-3.5 flex-shrink-0" />
           <span v-if="!isCollapsed" class="truncate">{{ t('workspace.exploreArticles') }}</span>
         </button>
         <button
@@ -93,7 +93,7 @@
           :class="exploreSegmentClass('experts')"
           @click="selectExploreSegment('experts')"
         >
-          <BookOpen class="h-4 w-4 flex-shrink-0" />
+          <BookOpen class="h-3.5 w-3.5 flex-shrink-0" />
           <span v-if="!isCollapsed" class="truncate">{{ t('workspace.exploreExperts') }}</span>
         </button>
       </div>
@@ -406,11 +406,11 @@ const exploreSegment = computed(() => {
 function exploreSegmentClass(segment) {
   const active = exploreSegment.value === segment
   return [
-    'flex min-w-0 flex-1 items-center rounded-md text-sm font-medium transition-colors',
-    isCollapsed.value ? 'justify-center p-2.5' : 'justify-center gap-2 px-2 py-2.5',
+    'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-medium transition-colors',
+    isCollapsed.value ? 'px-0 py-2' : 'px-2 py-1.5',
     active
-      ? 'bg-primary text-primary-foreground shadow-sm'
-      : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+      ? 'bg-primary text-primary-foreground'
+      : 'text-muted-foreground hover:text-foreground',
   ]
 }
 
