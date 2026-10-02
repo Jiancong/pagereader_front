@@ -128,10 +128,11 @@ export async function publishExpert(
   expertId: string,
   req: BookExpertPublishReq,
 ): Promise<BookExpertPublishResult> {
+  const uid = String(req.userId || "").trim()
   return rawRequest<BookExpertPublishResult>(
     "POST",
     `/book-experts/${encodeURIComponent(expertId)}/publish`,
-    { body: req },
+    { query: uid ? { userId: uid } : undefined, body: req },
   )
 }
 

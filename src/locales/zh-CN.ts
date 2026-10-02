@@ -64,6 +64,7 @@ export default {
     panelSubtitle: "上传一本书，蒸馏出专属方法论顾问；选中后即可向它提问。",
     createExpert: "蒸馏书籍为专家",
     myExperts: "我的专家",
+    myPublishedExperts: "我已公开",
     publicExperts: "公共专家",
     searchPlaceholder: "搜索专家或书名",
     emptyHint: "还没有专家，点击「蒸馏书籍为专家」创建一个。",

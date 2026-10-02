@@ -64,6 +64,7 @@ export default {
     panelSubtitle: "Upload a book to distill a personal methodology advisor; pick one to ask it questions.",
     createExpert: "Distill a book into an expert",
     myExperts: "My experts",
+    myPublishedExperts: "Published by me",
     publicExperts: "Public experts",
     searchPlaceholder: "Search expert or book title",
     emptyHint: "No experts yet. Click \"Distill a book into an expert\" to create one.",

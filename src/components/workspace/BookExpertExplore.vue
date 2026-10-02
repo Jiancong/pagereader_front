@@ -22,67 +22,46 @@
     <div v-else-if="loadError" class="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{{ loadError }}</div>
 
     <template v-else>
-      <!-- 我的专家 -->
-      <section v-if="myExperts.length" class="mb-8">
+      <!-- 我的专家（仅私有） -->
+      <section v-if="myPrivateExperts.length" class="mb-8">
         <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {{ t('bookExpert.myExperts') }}
         </h3>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-          <div v-for="expert in myExperts" :key="expert.expert_id" class="group relative">
-            <button
-              type="button"
-              class="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-lg"
-              @click="$emit('select-expert', expert)"
-            >
-              <div class="relative h-24 w-full overflow-hidden bg-primary/10 sm:h-28">
-                <img
-                  v-if="expert.cover_url"
-                  :src="expert.cover_url"
-                  :alt="expert.expert_name"
-                  class="h-full w-full object-cover"
-                  loading="lazy"
-                />
-                <div v-else class="flex h-full items-center justify-center">
-                  <BookOpen class="h-8 w-8 text-primary" />
-                </div>
-                <span
-                  v-if="expert.visibility === 'public'"
-                  class="absolute bottom-1 right-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium text-primary backdrop-blur"
-                >{{ t('bookExpert.publicBadge') }}</span>
-              </div>
-              <div class="flex flex-1 flex-col p-3">
-                <p class="line-clamp-2 text-sm font-medium text-foreground">{{ expert.expert_name }}</p>
-                <p v-if="expert.book_title" class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ expert.book_title }}</p>
-              </div>
-            </button>
-            <button
-              type="button"
-              class="absolute left-2 top-2 z-10 rounded-lg bg-background/90 p-1.5 text-muted-foreground opacity-100 shadow-sm backdrop-blur transition-all hover:bg-primary/10 hover:text-primary md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
-              :title="expert.visibility === 'public' ? t('bookExpert.unpublish') : t('bookExpert.publish')"
-              :aria-label="expert.visibility === 'public' ? t('bookExpert.unpublish') : t('bookExpert.publish')"
-              :disabled="publishingId === expert.expert_id"
-              @click.stop="onTogglePublish(expert)"
-            >
-              <Loader2 v-if="publishingId === expert.expert_id" class="h-4 w-4 animate-spin" />
-              <Globe v-else-if="expert.visibility === 'public'" class="h-4 w-4" />
-              <Lock v-else class="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              class="absolute right-2 top-2 z-10 rounded-lg bg-background/90 p-1.5 text-muted-foreground opacity-100 shadow-sm backdrop-blur transition-all hover:bg-red-500/10 hover:text-red-400 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
-              :title="t('bookExpert.delete')"
-              :aria-label="t('bookExpert.delete')"
-              :disabled="deletingId === expert.expert_id"
-              @click.stop="onDelete(expert)"
-            >
-              <Loader2 v-if="deletingId === expert.expert_id" class="h-4 w-4 animate-spin" />
-              <Trash2 v-else class="h-4 w-4" />
-            </button>
-          </div>
+          <ExpertOwnedCard
+            v-for="expert in myPrivateExperts"
+            :key="expert.expert_id"
+            :expert="expert"
+            :publishing-id="publishingId"
+            :deleting-id="deletingId"
+            @select="$emit('select-expert', $event)"
+            @toggle-publish="onTogglePublish"
+            @delete="onDelete"
+          />
         </div>
       </section>
 
-      <!-- 公共专家（推荐流，排除自己） -->
+      <!-- 我已公开（仍归我所有，已从「我的专家」拆出） -->
+      <section v-if="myPublishedExperts.length" class="mb-8">
+        <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {{ t('bookExpert.myPublishedExperts') }}
+        </h3>
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+          <ExpertOwnedCard
+            v-for="expert in myPublishedExperts"
+            :key="expert.expert_id"
+            :expert="expert"
+            :publishing-id="publishingId"
+            :deleting-id="deletingId"
+            show-public-badge
+            @select="$emit('select-expert', $event)"
+            @toggle-publish="onTogglePublish"
+            @delete="onDelete"
+          />
+        </div>
+      </section>
+
+      <!-- 公共专家（他人发布，推荐流 exclude_own） -->
       <section v-if="publicExperts.length">
         <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {{ t('bookExpert.publicExperts') }}
@@ -115,7 +94,10 @@
         </div>
       </section>
 
-      <p v-if="!myExperts.length && !publicExperts.length" class="py-12 text-center text-sm text-muted-foreground">
+      <p
+        v-if="!myPrivateExperts.length && !myPublishedExperts.length && !publicExperts.length"
+        class="py-12 text-center text-sm text-muted-foreground"
+      >
         {{ t('bookExpert.exploreEmpty') }}
       </p>
     </template>
@@ -126,12 +108,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Loader2, BookOpen, Trash2, Globe, Lock } from 'lucide-vue-next'
+import { Search, Loader2, BookOpen } from 'lucide-vue-next'
 import { bookExpertApi } from '@/api'
+import ExpertOwnedCard from '@/components/workspace/BookExpertOwnedCard.vue'
 import type { BookExpertSummary } from '@/api/types'
 
 const props = defineProps<{ userId: string | null }>()
-const emit = defineEmits<{ 'select-expert': [expert: BookExpertSummary] }>()
+defineEmits<{ 'select-expert': [expert: BookExpertSummary] }>()
 
 const { t } = useI18n()
 
@@ -195,7 +178,6 @@ async function onDelete(expert: BookExpertSummary) {
   }
 }
 
-/** 发布/取消发布（Globe=已公开，点击取消；Lock=私有，点击发布） */
 async function onTogglePublish(expert: BookExpertSummary) {
   if (!props.userId || publishingId.value) return
   const makePublic = expert.visibility !== 'public'
@@ -205,7 +187,8 @@ async function onTogglePublish(expert: BookExpertSummary) {
       userId: String(props.userId),
       public: makePublic,
     })
-    const visibility = res?.visibility ?? (makePublic ? 'public' : 'private')
+    const visibility: BookExpertSummary['visibility'] =
+      res?.visibility ?? (makePublic ? 'public' : 'private')
     myRaw.value = myRaw.value.map((e) =>
       e.expert_id === expert.expert_id ? { ...e, visibility } : e,
     )
@@ -217,7 +200,12 @@ async function onTogglePublish(expert: BookExpertSummary) {
   }
 }
 
-const myExperts = computed(() => filterByKeyword(myRaw.value))
+const myPrivateExperts = computed(() =>
+  filterByKeyword(myRaw.value.filter((e) => e.visibility !== 'public')),
+)
+const myPublishedExperts = computed(() =>
+  filterByKeyword(myRaw.value.filter((e) => e.visibility === 'public')),
+)
 const publicExperts = computed(() => filterByKeyword(publicRaw.value))
 
 onMounted(load)
