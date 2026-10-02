@@ -326,13 +326,13 @@ async function restoreSessionMessages(sid: string, opts?: { silent?: boolean; al
       scrollToBottom()
       return
     }
-    if (opts?.allowLatestFallback !== false) {
+    if (opts?.allowLatestFallback !== false && isOwner.value) {
       await restoreLatestSessionFromList(gen)
     }
   } catch (e: unknown) {
     if (gen !== sessionRestoreGeneration) return
     const code = e instanceof ApiError ? e.code : 0
-    if (code === 404 && opts?.allowLatestFallback !== false) {
+    if (code === 404 && opts?.allowLatestFallback !== false && isOwner.value) {
       await restoreLatestSessionFromList(gen)
       return
     }
@@ -366,7 +366,7 @@ async function restoreLatestSessionFromList(expectedGen: number) {
     const restored = mapSessionMessages(detail?.messages ?? [])
     if (!restored.length) return
 
-    setActiveExpertSessionId(props.expert.expert_id, latest.sessionId)
+    setActiveExpertSessionId(props.expert.expert_id, latest.sessionId, String(props.userId))
     sessionId.value = latest.sessionId
     messages.value = restored
     scrollToBottom()
@@ -408,7 +408,7 @@ async function onRestoreSession(s: BookExpertSessionSummary) {
     )
     const restored = mapSessionMessages(res?.messages ?? [])
     messages.value = restored
-    setActiveExpertSessionId(props.expert.expert_id, s.sessionId)
+    setActiveExpertSessionId(props.expert.expert_id, s.sessionId, String(props.userId))
     sessionId.value = s.sessionId
     historyOpen.value = false
     ElMessage.success(t('bookExpert.historyRestored'))
@@ -603,12 +603,14 @@ onBeforeUnmount(() => {
 
 function resolveSessionIdForExpert(expertId: string): string {
   const id = String(expertId || '').trim()
+  const uid = props.userId ? String(props.userId) : ''
+  if (!uid) return ''
   const initial = String(props.initialSessionId || '').trim()
   if (initial && initial.startsWith(`be-${id}-`)) {
-    setActiveExpertSessionId(id, initial)
+    setActiveExpertSessionId(id, initial, uid)
     return initial
   }
-  return getOrCreateExpertSessionId(id)
+  return getOrCreateExpertSessionId(id, uid)
 }
 
 watch(
@@ -620,7 +622,13 @@ watch(
     sessions.value = []
     historyError.value = ''
     sessionId.value = resolveSessionIdForExpert(id)
-    void restoreSessionMessages(sessionId.value, { silent: true })
+    // 非本人专家（公共广场）：空白开聊，不拉取服务端历史
+    if (isOwner.value) {
+      void restoreSessionMessages(sessionId.value, {
+        silent: true,
+        allowLatestFallback: true,
+      })
+    }
   },
   { immediate: true },
 )
@@ -629,7 +637,12 @@ watch(
   () => props.userId,
   (uid, prev) => {
     if (!uid || uid === prev || !sessionId.value) return
-    void restoreSessionMessages(sessionId.value, { silent: true })
+    if (isOwner.value) {
+      void restoreSessionMessages(sessionId.value, {
+        silent: true,
+        allowLatestFallback: true,
+      })
+    }
   },
 )
 </script>

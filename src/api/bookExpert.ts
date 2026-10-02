@@ -149,32 +149,57 @@ export async function deleteExpert(
 
 const EXPERT_SESSION_KEY_PREFIX = "book_expert_session:"
 
+function expertSessionStorageKey(userId: string, expertId: string): string {
+  const uid = String(userId || "").trim()
+  const eid = String(expertId || "").trim()
+  return `${EXPERT_SESSION_KEY_PREFIX}${uid}:${eid}`
+}
+
+function newExpertSessionId(expertId: string): string {
+  const eid = String(expertId || "").trim()
+  const prefix = `be-${eid}-`
+  const uuid =
+    typeof window !== "undefined" && window.crypto?.randomUUID?.()
+      ? window.crypto.randomUUID()
+      : `s-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  return `${prefix}${uuid}`
+}
+
 /**
  * 专家会话独立 sessionId：`be-<expertId>-<uuid>`（区别于浏览器全局 sessionId）。
- * Python 端按该前缀反查 sessions 表，实现按专家隔离的会话历史。
+ * 按 **登录用户 + 专家** 存 localStorage，避免同浏览器换账号或聊他人公开专家时串会话。
  */
-export function getOrCreateExpertSessionId(expertId: string): string {
+export function getOrCreateExpertSessionId(expertId: string, userId: string): string {
   const eid = String(expertId || "").trim()
-  if (typeof window === "undefined" || !eid) return ""
-  const key = `${EXPERT_SESSION_KEY_PREFIX}${eid}`
+  const uid = String(userId || "").trim()
+  if (typeof window === "undefined" || !eid || !uid) return ""
+  const key = expertSessionStorageKey(uid, eid)
   const prefix = `be-${eid}-`
   let id = window.localStorage.getItem(key) || ""
   if (!id.startsWith(prefix)) {
-    const uuid =
-      window.crypto?.randomUUID?.() ??
-      `s-${Date.now()}-${Math.random().toString(16).slice(2)}`
-    id = `${prefix}${uuid}`
+    id = newExpertSessionId(eid)
     window.localStorage.setItem(key, id)
   }
   return id
 }
 
-/** 恢复历史会话后，把该会话设为当前专家的默认会话（继续追问同一线程） */
-export function setActiveExpertSessionId(expertId: string, sessionId: string): void {
+/** 强制新建一条会话（例如首次从公共广场进入他人专家） */
+export function createFreshExpertSessionId(expertId: string, userId: string): string {
   const eid = String(expertId || "").trim()
+  const uid = String(userId || "").trim()
+  if (typeof window === "undefined" || !eid || !uid) return ""
+  const id = newExpertSessionId(eid)
+  window.localStorage.setItem(expertSessionStorageKey(uid, eid), id)
+  return id
+}
+
+/** 恢复历史会话后，把该会话设为当前专家的默认会话（继续追问同一线程） */
+export function setActiveExpertSessionId(expertId: string, sessionId: string, userId: string): void {
+  const eid = String(expertId || "").trim()
+  const uid = String(userId || "").trim()
   const sid = String(sessionId || "").trim()
-  if (typeof window === "undefined" || !eid || !sid.startsWith(`be-${eid}-`)) return
-  window.localStorage.setItem(`${EXPERT_SESSION_KEY_PREFIX}${eid}`, sid)
+  if (typeof window === "undefined" || !eid || !uid || !sid.startsWith(`be-${eid}-`)) return
+  window.localStorage.setItem(expertSessionStorageKey(uid, eid), sid)
 }
 
 /** 上传专家封面（multipart；BFF 负责转 OSS，Python 只存 cover_url） */

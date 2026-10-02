@@ -111,7 +111,7 @@ import BookExpertChat from '../components/workspace/BookExpertChat.vue'
 import BookExpertExplore from '../components/workspace/BookExpertExplore.vue'
 import { useBookExpertStore } from '@/stores/bookExpert'
 import { authApi, feedApi, getLocalAvatar, bookExpertApi } from '../api'
-import { getOrCreateExpertSessionId } from '@/api/bookExpert'
+import { createFreshExpertSessionId, getOrCreateExpertSessionId } from '@/api/bookExpert'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
 
@@ -371,7 +371,14 @@ function onSelectExpert(expert) {
   activeExpert.value = expert
   expertProjectId.value = newExpertProjectId()
   pendingExpertSessionId.value = null
-  const sid = getOrCreateExpertSessionId(expert.expert_id)
+  const uid = userId.value ? String(userId.value) : ''
+  const owned = uid && String(expert.owner_user_id || '') === uid
+  // 公共广场里的他人专家：每次新开一条会话，不恢复任何历史（含他人或自己此前与该专家的线程）
+  const sid = uid
+    ? owned
+      ? getOrCreateExpertSessionId(expert.expert_id, uid)
+      : createFreshExpertSessionId(expert.expert_id, uid)
+    : ''
   activeExpertSessionId.value = sid || null
   view.value = 'expert-chat'
   void loadMyExpertHistory()
