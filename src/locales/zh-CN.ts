@@ -538,6 +538,7 @@ export default {
     explore: "探索 Explore",
     exploreArticles: "探索文章",
     exploreExperts: "探索专家",
+    exploreSwitchLabel: "探索模式",
     sidebar: {
       collapse: "收起侧边栏",
       expand: "展开侧边栏",

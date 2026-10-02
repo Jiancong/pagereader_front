@@ -548,6 +548,7 @@ export default {
     explore: "Explore",
     exploreArticles: "Explore Articles",
     exploreExperts: "Explore Experts",
+    exploreSwitchLabel: "Explore mode",
     sidebar: {
       collapse: "Collapse sidebar",
       expand: "Expand sidebar",

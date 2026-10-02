@@ -57,6 +57,7 @@
         <span v-if="!isCollapsed" class="truncate">{{ t('workspace.newGenerate') }}</span>
       </button>
       <button
+        v-if="!debugEnabled"
         :title="t('workspace.exploreArticles')"
         :class="navBtnClass(view === 'explore')"
         @click="$emit('explore')"
@@ -64,15 +65,38 @@
         <Compass class="h-4 w-4 flex-shrink-0" />
         <span v-if="!isCollapsed" class="truncate">{{ t('workspace.exploreArticles') }}</span>
       </button>
-      <button
-        v-if="debugEnabled"
-        :title="t('workspace.exploreExperts')"
-        :class="navBtnClass(view === 'explore-experts')"
-        @click="$emit('explore-experts')"
+      <div
+        v-else
+        role="tablist"
+        :aria-label="t('workspace.exploreSwitchLabel')"
+        :class="[
+          'flex w-full gap-0.5 rounded-lg bg-secondary/50 p-0.5',
+          isCollapsed ? 'flex-col' : 'flex-row',
+        ]"
       >
-        <BookOpen class="h-4 w-4 flex-shrink-0" />
-        <span v-if="!isCollapsed" class="truncate">{{ t('workspace.exploreExperts') }}</span>
-      </button>
+        <button
+          type="button"
+          role="tab"
+          :title="t('workspace.exploreArticles')"
+          :aria-selected="exploreSegment === 'articles'"
+          :class="exploreSegmentClass('articles')"
+          @click="selectExploreSegment('articles')"
+        >
+          <Compass class="h-4 w-4 flex-shrink-0" />
+          <span v-if="!isCollapsed" class="truncate">{{ t('workspace.exploreArticles') }}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :title="t('workspace.exploreExperts')"
+          :aria-selected="exploreSegment === 'experts'"
+          :class="exploreSegmentClass('experts')"
+          @click="selectExploreSegment('experts')"
+        >
+          <BookOpen class="h-4 w-4 flex-shrink-0" />
+          <span v-if="!isCollapsed" class="truncate">{{ t('workspace.exploreExperts') }}</span>
+        </button>
+      </div>
       <button
         :title="t('workspace.assets.nav')"
         :class="navBtnClass(assetsOpen)"
@@ -371,6 +395,29 @@ const navBtnClass = (active) => [
   isCollapsed.value ? 'justify-center p-2.5' : 'gap-2 px-3 py-2.5',
   active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
 ]
+
+/** debug 下「探索文章 | 探索专家」分段开关的当前高亮 */
+const exploreSegment = computed(() => {
+  if (props.view === 'explore-experts' || props.view === 'expert-chat') return 'experts'
+  if (props.view === 'explore') return 'articles'
+  return null
+})
+
+function exploreSegmentClass(segment) {
+  const active = exploreSegment.value === segment
+  return [
+    'flex min-w-0 flex-1 items-center rounded-md text-sm font-medium transition-colors',
+    isCollapsed.value ? 'justify-center p-2.5' : 'justify-center gap-2 px-2 py-2.5',
+    active
+      ? 'bg-primary text-primary-foreground shadow-sm'
+      : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+  ]
+}
+
+function selectExploreSegment(segment) {
+  if (segment === 'articles') emit('explore')
+  else emit('explore-experts')
+}
 
 function projectDisplayTitle(project) {
   const titleFromDeck = props.projectTitleMap?.[project?.id]
