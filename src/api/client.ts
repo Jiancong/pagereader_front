@@ -77,9 +77,12 @@ export interface RequestOptions {
   signal?: AbortSignal
 }
 
+const FETCH_CREDENTIALS: RequestCredentials = "include"
+
 export async function get<T>(path: string, opts?: RequestOptions): Promise<T> {
   const res = await fetch(buildUrl(path, opts?.query), {
     method: "GET",
+    credentials: FETCH_CREDENTIALS,
     headers: authHeaders(opts?.headers),
     signal: opts?.signal,
   })
@@ -95,6 +98,7 @@ export async function postJson<T>(
   headers.set("Content-Type", "application/json")
   const res = await fetch(buildUrl(path, opts?.query), {
     method: "POST",
+    credentials: FETCH_CREDENTIALS,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: opts?.signal,
@@ -110,6 +114,7 @@ export async function postForm<T>(
 ): Promise<T> {
   const res = await fetch(buildUrl(path, opts?.query), {
     method: "POST",
+    credentials: FETCH_CREDENTIALS,
     headers: authHeaders(opts?.headers),
     body: form,
     signal: opts?.signal,
@@ -120,6 +125,7 @@ export async function postForm<T>(
 export async function del<T>(path: string, opts?: RequestOptions): Promise<T> {
   const res = await fetch(buildUrl(path, opts?.query), {
     method: "DELETE",
+    credentials: FETCH_CREDENTIALS,
     headers: authHeaders(opts?.headers),
     signal: opts?.signal,
   })
@@ -135,6 +141,7 @@ export async function put<T>(
   headers.set("Content-Type", "application/json")
   const res = await fetch(buildUrl(path, opts?.query), {
     method: "PUT",
+    credentials: FETCH_CREDENTIALS,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: opts?.signal,
@@ -146,6 +153,7 @@ export async function put<T>(
 export async function getBlob(path: string, opts?: RequestOptions): Promise<Blob> {
   const res = await fetch(buildUrl(path, opts?.query), {
     method: "GET",
+    credentials: FETCH_CREDENTIALS,
     headers: authHeaders(opts?.headers),
     signal: opts?.signal,
   })

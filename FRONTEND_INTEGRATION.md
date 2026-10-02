@@ -26,25 +26,46 @@ OSS 直传 PUT 需在阿里云控制台为 bucket **`page2top`** 配置 CORS，�
 | 步骤 | 接口 | 说明 |
 |------|------|------|
 | 注册 | `POST /api2/user/userSignUp` | `{ email, password, nickName? }`，**不返回 JWT** |
-| 登录 | `POST /api2/password/login` | `{ username, password }`，`data` = JWT 字符串 |
+| 登录 | `POST /api2/password/login` | `{ username, password }`，`data` = JWT；响应 **`Set-Cookie: pr_token`**（HttpOnly） |
 | Google | `POST /api2/google/login` | `{ googleEmail }`，按邮箱登录/自动注册 |
+| 登出 | `POST /api2/logout` | 清除 `pr_token` Cookie |
 | 当前用户 | `GET /api2/user/current/detail` | **必须读 `data.id`** 作为 `userId` |
 
+鉴权两种方式（**二选一或同时**即可）：
+
+1. **Header**：`Authorization: <JWT>`（不要强制 `Bearer`；前端存于 `localStorage` 键 **`pr_token`**）
+2. **Cookie**：登录后服务端写入 **`pr_token`**（HttpOnly）；浏览器 / curl 带 Cookie 即可，无需 Header
+
+前端 `fetch` 统一 `credentials: "include"`（见 `src/api/client.ts`）。
+
 ```javascript
-const token = localStorage.getItem("pagereader_token");
+const TOKEN_KEY = "pr_token";
 
 async function apiGet(path) {
+  const token = localStorage.getItem(TOKEN_KEY);
   const res = await fetch(`/api2${path}`, {
-    headers: { Authorization: token },
+    credentials: "include",
+    headers: token ? { Authorization: token } : {},
   });
   if (res.status === 401) {
-    localStorage.removeItem("pagereader_token");
+    localStorage.removeItem(TOKEN_KEY);
     throw new Error("请重新登录");
   }
   const json = await res.json();
   if (json.code !== 0) throw new Error(json.message);
   return json.data;
 }
+```
+
+**curl 示例**（保存 Cookie 后访问需登录接口）：
+
+```bash
+curl -c cookies.txt -X POST 'https://page2.top/api2/password/login' \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"you@example.com","password":"***"}'
+
+curl -b cookies.txt 'https://page2.top/api2/user/current/detail'
+# 或：curl -H "Authorization: <login 返回的 data JWT>" ...
 ```
 
 | HTTP / code | 处理 |

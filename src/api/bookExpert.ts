@@ -78,7 +78,12 @@ async function rawRequest<T>(
     headers.set("Content-Type", "application/json")
     body = JSON.stringify(opts.body)
   }
-  const res = await fetch(buildUrl(path, opts.query), { method, headers, body })
+  const res = await fetch(buildUrl(path, opts.query), {
+    method,
+    credentials: "include",
+    headers,
+    body,
+  })
   if (res.status === 401) {
     throw new ApiError(401, "未登录或登录已过期")
   }
@@ -391,6 +396,7 @@ export async function distillExpert(
 
   const res = await fetch(buildUrl("/book-experts/distill"), {
     method: "POST",
+    credentials: "include",
     headers: authStreamHeaders(),
     body: JSON.stringify(body),
     signal,

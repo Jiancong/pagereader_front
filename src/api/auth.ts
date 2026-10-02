@@ -1,8 +1,8 @@
 // 认证与用户模块
 // @author hc @date 2026-06-03
 
-import { get, postJson } from "./client"
-import { setToken, clearToken, clearLocalAvatar } from "./token"
+import { buildUrl, get, postJson } from "./client"
+import { setToken, clearToken, clearLocalAvatar, getToken } from "./token"
 import type {
   PasswordLoginReq,
   EmailLoginReq,
@@ -48,8 +48,16 @@ export async function signUpAndLogin(req: UserSignUpDto): Promise<string> {
   return passwordLogin({ username: req.email, password: req.password })
 }
 
-// 登出（清本地 token 与缓存头像）
-export function logout(): void {
+// 登出：清除服务端 pr_token Cookie + 本地 JWT
+export async function logout(): Promise<void> {
+  try {
+    const token = getToken()
+    const headers = new Headers()
+    if (token) headers.set("Authorization", token)
+    await fetch(buildUrl("/logout"), { method: "POST", credentials: "include", headers })
+  } catch {
+    /* 离线或旧后端无 /logout 时仍清本地 */
+  }
   clearToken()
   clearLocalAvatar()
 }

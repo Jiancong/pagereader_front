@@ -321,6 +321,7 @@ export async function youtubePptStream(
 
   const res = await fetch(buildUrl("/agent/ppt/youtube-stream"), {
     method: "POST",
+    credentials: "include",
     headers: authStreamHeaders(),
     body: JSON.stringify(body),
     signal,
@@ -339,6 +340,7 @@ export async function fetchYoutubeTranscript(
 
   const res = await fetch(buildUrl("/agent/ppt/youtube-transcript"), {
     method: "POST",
+    credentials: "include",
     headers,
     body: JSON.stringify(buildYoutubeTranscriptBody(req)),
     signal,
@@ -384,6 +386,7 @@ export async function cancelChatStream(
 
   const res = await fetch(buildUrl("/agent/chat-stream/cancel"), {
     method: "POST",
+    credentials: "include",
     headers,
     body: JSON.stringify({
       project_id: req.project_id,
@@ -414,6 +417,7 @@ export async function chatStream(
 ): Promise<{ completed: boolean }> {
   const res = await fetch(buildUrl("/agent/chat-stream"), {
     method: "POST",
+    credentials: "include",
     headers: authStreamHeaders(),
     body: JSON.stringify(buildChatStreamBody(body)),
     signal,
@@ -444,6 +448,7 @@ export async function refineGenerationQuery(
 
   const res = await fetch(buildUrl("/generation/refine_query"), {
     method: "POST",
+    credentials: "include",
     headers,
     body: JSON.stringify({
       query: req.query,
@@ -786,6 +791,7 @@ export async function generatePageTtsStream(
 
   const res = await fetch(buildUrl("/agent/audio/tts/pages/stream"), {
     method: "POST",
+    credentials: "include",
     headers: authStreamHeaders(),
     body: JSON.stringify({
       sessionId: projectId,

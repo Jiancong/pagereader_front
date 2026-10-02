@@ -57,6 +57,7 @@ export async function translateBatch(
   try {
     res = await fetch(buildUrl("/translate/batch"), {
       method: "POST",
+      credentials: "include",
       headers,
       body: JSON.stringify(req),
       signal: controller.signal,
