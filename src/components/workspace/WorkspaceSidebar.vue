@@ -12,10 +12,22 @@
         isCollapsed ? 'justify-center px-2' : 'gap-2 px-4',
       ]"
     >
-      <AppBrandMark class="flex-shrink-0" />
-      <span v-if="!isCollapsed" class="min-w-0 flex-1 truncate text-lg font-bold text-foreground">
+      <RouterLink
+        to="/"
+        class="flex-shrink-0 rounded-lg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        :aria-label="t('notFound.backHome')"
+        @click="$emit('close-mobile')"
+      >
+        <AppBrandMark class="flex-shrink-0" />
+      </RouterLink>
+      <RouterLink
+        v-if="!isCollapsed"
+        to="/"
+        class="min-w-0 flex-1 truncate text-lg font-bold text-foreground hover:text-foreground/90"
+        @click="$emit('close-mobile')"
+      >
         {{ t('app.brand') }}
-      </span>
+      </RouterLink>
       <button
         v-if="!isCollapsed"
         type="button"
@@ -302,6 +314,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
+import { RouterLink } from 'vue-router'
 import {
   Plus,
   Compass,

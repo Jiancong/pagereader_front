@@ -22,27 +22,6 @@
     <div v-else-if="loadError" class="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{{ loadError }}</div>
 
     <template v-else>
-      <!-- 我已公开（探索页不展示私有专家，私有仅从侧栏「我的历史」进入） -->
-      <section v-if="myPublishedExperts.length" class="mb-8">
-        <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {{ t('bookExpert.myPublishedExperts') }}
-        </h3>
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-          <ExpertOwnedCard
-            v-for="expert in myPublishedExperts"
-            :key="expert.expert_id"
-            :expert="expert"
-            :publishing-id="publishingId"
-            :deleting-id="deletingId"
-            show-public-badge
-            @select="$emit('select-expert', $event)"
-            @toggle-publish="onTogglePublish"
-            @delete="onDelete"
-          />
-        </div>
-      </section>
-
-      <!-- 公共专家（他人发布，推荐流 exclude_own） -->
       <section v-if="publicExperts.length">
         <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {{ t('bookExpert.publicExperts') }}
@@ -76,7 +55,7 @@
       </section>
 
       <p
-        v-if="!myPublishedExperts.length && !publicExperts.length"
+        v-else
         class="py-12 text-center text-sm text-muted-foreground"
       >
         {{ t('bookExpert.exploreEmptyPublic') }}
@@ -88,35 +67,26 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Loader2, BookOpen } from 'lucide-vue-next'
 import { bookExpertApi } from '@/api'
-import ExpertOwnedCard from '@/components/workspace/BookExpertOwnedCard.vue'
 import type { BookExpertSummary } from '@/api/types'
 
 const props = defineProps<{ userId: string | null }>()
-const emit = defineEmits<{ 'select-expert': [expert: BookExpertSummary]; 'experts-changed': [] }>()
+defineEmits<{ 'select-expert': [expert: BookExpertSummary] }>()
 
 const { t } = useI18n()
 
-const myRaw = ref<BookExpertSummary[]>([])
 const publicRaw = ref<BookExpertSummary[]>([])
 const loading = ref(false)
 const loadError = ref('')
 const keyword = ref('')
-const deletingId = ref<string | null>(null)
-const publishingId = ref<string | null>(null)
 
 async function load() {
   if (!props.userId) return
   loading.value = true
   loadError.value = ''
   try {
-    const [mine, pub] = await Promise.all([
-      bookExpertApi.listMyExperts(String(props.userId)),
-      bookExpertApi.listPublicExperts(String(props.userId), true),
-    ])
-    myRaw.value = mine?.experts ?? []
+    const pub = await bookExpertApi.listPublicExperts(String(props.userId), true)
     publicRaw.value = pub?.experts ?? []
   } catch (e: unknown) {
     loadError.value = e instanceof Error ? e.message : t('common.actionFailed')
@@ -135,57 +105,6 @@ function filterByKeyword(list: BookExpertSummary[]): BookExpertSummary[] {
   )
 }
 
-async function onDelete(expert: BookExpertSummary) {
-  if (!props.userId || deletingId.value) return
-  try {
-    await ElMessageBox.confirm(
-      t('bookExpert.deleteConfirm', { name: expert.expert_name }),
-      t('bookExpert.delete'),
-      { type: 'warning' },
-    )
-  } catch {
-    return
-  }
-  deletingId.value = expert.expert_id
-  try {
-    await bookExpertApi.deleteExpert(expert.expert_id, String(props.userId))
-    myRaw.value = myRaw.value.filter((e) => e.expert_id !== expert.expert_id)
-    publicRaw.value = publicRaw.value.filter((e) => e.expert_id !== expert.expert_id)
-    ElMessage.success(t('bookExpert.deleted'))
-    emit('experts-changed')
-  } catch (e: unknown) {
-    ElMessage.error(e instanceof Error ? e.message : t('common.actionFailed'))
-  } finally {
-    deletingId.value = null
-  }
-}
-
-async function onTogglePublish(expert: BookExpertSummary) {
-  if (!props.userId || publishingId.value) return
-  const makePublic = expert.visibility !== 'public'
-  publishingId.value = expert.expert_id
-  try {
-    const res = await bookExpertApi.publishExpert(expert.expert_id, {
-      userId: String(props.userId),
-      public: makePublic,
-    })
-    const visibility: BookExpertSummary['visibility'] =
-      res?.visibility ?? (makePublic ? 'public' : 'private')
-    myRaw.value = myRaw.value.map((e) =>
-      e.expert_id === expert.expert_id ? { ...e, visibility } : e,
-    )
-    ElMessage.success(makePublic ? t('bookExpert.published') : t('bookExpert.unpublished'))
-    emit('experts-changed')
-  } catch (e: unknown) {
-    ElMessage.error(e instanceof Error ? e.message : t('common.actionFailed'))
-  } finally {
-    publishingId.value = null
-  }
-}
-
-const myPublishedExperts = computed(() =>
-  filterByKeyword(myRaw.value.filter((e) => e.visibility === 'public')),
-)
 const publicExperts = computed(() => filterByKeyword(publicRaw.value))
 
 onMounted(load)

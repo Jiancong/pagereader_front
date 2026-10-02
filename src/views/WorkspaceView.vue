@@ -71,7 +71,6 @@
         v-else-if="view === 'explore-experts'"
         :user-id="userId ? String(userId) : null"
         @select-expert="onSelectExpert"
-        @experts-changed="loadMyExpertHistory"
       />
       <BookExpertChat
         v-else-if="view === 'expert-chat' && activeExpert"
