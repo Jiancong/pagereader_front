@@ -14,14 +14,26 @@ interface ReaderFileState {
   preserveFileOnLeave: boolean
 }
 
-function detectFormat(file: File): ReaderFormat | "" {
-  const name = file.name.toLowerCase()
+export function detectReaderFormatFromName(fileName: string): ReaderFormat | "" {
+  const name = String(fileName || "").toLowerCase()
   if (name.endsWith(".pdf")) return "pdf"
   if (name.endsWith(".epub")) return "epub"
   if (name.endsWith(".mobi") || name.endsWith(".azw") || name.endsWith(".azw3")) return "mobi"
   if (name.endsWith(".xlsx") || name.endsWith(".xls")) return "xlsx"
-  if (name.endsWith(".md") || name.endsWith(".markdown") || name.endsWith(".mdown") || name.endsWith(".mkd")) return "markdown"
+  if (
+    name.endsWith(".md") ||
+    name.endsWith(".markdown") ||
+    name.endsWith(".mdown") ||
+    name.endsWith(".mkd") ||
+    name.endsWith(".txt")
+  ) {
+    return "markdown"
+  }
   return ""
+}
+
+function detectFormat(file: File): ReaderFormat | "" {
+  return detectReaderFormatFromName(file.name)
 }
 
 export const useReaderFileStore = defineStore("reader-file", {
@@ -37,6 +49,32 @@ export const useReaderFileStore = defineStore("reader-file", {
       this.file = file
       this.format = detectFormat(file)
       this.objectUrl = URL.createObjectURL(file)
+    },
+    /** 拉取远程文件（如 OSS 签名 URL）后进入 /reader/open */
+    async loadFromUrl(url: string, fileName: string) {
+      const format = detectReaderFormatFromName(fileName)
+      if (!format) throw new Error("READER_UNSUPPORTED")
+      const res = await fetch(url, { mode: "cors", credentials: "omit" })
+      const blob = await res.blob()
+      if (!res.ok) {
+        const snippet = await blob.slice(0, 512).text()
+        if (/Request has expired|AccessDenied/i.test(snippet)) {
+          throw new Error("OSS_URL_EXPIRED")
+        }
+        throw new Error(`HTTP ${res.status}`)
+      }
+      const ct = blob.type.toLowerCase()
+      if (ct.includes("xml")) {
+        const snippet = await blob.slice(0, 512).text()
+        if (/Request has expired|AccessDenied/i.test(snippet)) {
+          throw new Error("OSS_URL_EXPIRED")
+        }
+      }
+      const file = new File([blob], fileName, {
+        type: blob.type && blob.type !== "application/octet-stream" ? blob.type : "application/octet-stream",
+      })
+      if (!detectFormat(file)) throw new Error("READER_UNSUPPORTED")
+      this.setFile(file)
     },
     setPreserveOnLeave(value: boolean) {
       this.preserveFileOnLeave = value

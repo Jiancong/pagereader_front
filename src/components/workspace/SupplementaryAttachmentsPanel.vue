@@ -57,14 +57,28 @@
         class="flex items-center gap-2 rounded-lg border border-border/80 bg-background/40 px-3 py-2"
       >
         <FileText class="h-4 w-4 shrink-0 text-muted-foreground" />
-        <div class="min-w-0 flex-1">
+        <button
+          type="button"
+          class="min-w-0 flex-1 text-left transition-colors disabled:cursor-default disabled:opacity-70"
+          :class="
+            canOpenInReader(item)
+              ? 'cursor-pointer rounded-md hover:bg-secondary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50'
+              : ''
+          "
+          :disabled="!canOpenInReader(item) || openingReaderId === attachmentId(item)"
+          :title="canOpenInReader(item) ? t(`${i18nScope}.attachmentsOpenInReader`) : undefined"
+          @click="onOpenInReader(item)"
+        >
           <p class="truncate text-xs font-medium text-foreground">{{ item.name }}</p>
           <p class="text-[10px] text-muted-foreground">
             <span v-if="fileSize(item)">{{ formatBytes(fileSize(item)!) }}</span>
             <span v-if="fileSize(item) && statusLabel(item)"> · </span>
             <span v-if="statusLabel(item)">{{ statusLabel(item) }}</span>
+            <span v-if="openingReaderId === attachmentId(item)" class="text-primary">
+              · {{ t(`${i18nScope}.attachmentsOpeningReader`) }}
+            </span>
           </p>
-        </div>
+        </button>
         <button
           v-if="item.url"
           type="button"
@@ -112,6 +126,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { FileText, FolderOpen, Loader2, Paperclip, Trash2 } from 'lucide-vue-next'
@@ -129,6 +144,7 @@ import {
 } from '@/utils/storageQuotaCheck'
 import { downloadFileFromUrl } from '@/utils/downloadRemoteFile'
 import type { SupplementaryAttachment } from '@/api/types'
+import { detectReaderFormatFromName, useReaderFileStore } from '@/stores/reader'
 
 const props = withDefaults(
   defineProps<{
@@ -150,6 +166,8 @@ const i18nScope = computed(() => (props.scope === 'project' ? 'workspace' : 'boo
 const canUpload = computed(() => !props.readOnly)
 
 const { t } = useI18n()
+const router = useRouter()
+const readerFileStore = useReaderFileStore()
 const maxCount = 10
 
 const acceptAttr =
@@ -162,6 +180,7 @@ const loadError = ref('')
 const uploading = ref(false)
 const deletingId = ref('')
 const downloadingId = ref('')
+const openingReaderId = ref('')
 const apiAvailable = ref(true)
 const libraryPickerOpen = ref(false)
 
@@ -183,6 +202,57 @@ function attachmentId(item: SupplementaryAttachment): string {
 function fileSize(item: SupplementaryAttachment): number | undefined {
   const n = item.file_size ?? item.fileSize
   return typeof n === 'number' ? n : undefined
+}
+
+function canOpenInReader(item: SupplementaryAttachment): boolean {
+  return Boolean(detectReaderFormatFromName(item.name))
+}
+
+async function resolveAttachmentUrl(item: SupplementaryAttachment): Promise<string> {
+  const fileKey = String(item.file_key ?? item.fileKey ?? '').trim()
+  const uid = String(props.userId || '').trim()
+  let url = String(item.url || '').trim()
+  if (fileKey && uid) {
+    const fresh = await fileApi.resolveUserUploadedFileUrl({
+      userId: uid,
+      fileKey,
+      projectId: props.scope === 'project' ? props.resourceId : undefined,
+    })
+    if (fresh) url = fresh
+  }
+  return url
+}
+
+async function onOpenInReader(item: SupplementaryAttachment) {
+  if (!canOpenInReader(item)) {
+    ElMessage.warning(t(`${i18nScope.value}.attachmentsReaderUnsupported`))
+    return
+  }
+  const aid = attachmentId(item)
+  if (!aid || openingReaderId.value) return
+  const scope = i18nScope.value
+  const filename = String(item.name || 'document').trim() || 'document'
+  openingReaderId.value = aid
+  try {
+    const url = await resolveAttachmentUrl(item)
+    if (!url) {
+      ElMessage.error(t(`${scope}.attachmentsDownloadLinkUnavailable`))
+      return
+    }
+    await readerFileStore.loadFromUrl(url, filename)
+    await router.push({ name: 'reader-open' })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : ''
+    if (msg === 'OSS_URL_EXPIRED') {
+      ElMessage.error(t(`${scope}.attachmentsDownloadExpired`))
+    } else if (msg === 'READER_UNSUPPORTED') {
+      ElMessage.warning(t(`${scope}.attachmentsReaderUnsupported`))
+    } else {
+      ElMessage.error(t(`${scope}.attachmentsReaderOpenFailed`))
+    }
+  } finally {
+    openingReaderId.value = ''
+  }
 }
 
 function statusLabel(item: SupplementaryAttachment): string {
@@ -334,20 +404,10 @@ async function onDownload(item: SupplementaryAttachment) {
   const aid = attachmentId(item)
   if (!aid || downloadingId.value) return
   const filename = String(item.name || 'attachment').trim() || 'attachment'
-  const fileKey = String(item.file_key ?? item.fileKey ?? '').trim()
-  const uid = String(props.userId || '').trim()
   const scope = i18nScope.value
   downloadingId.value = aid
   try {
-    let url = String(item.url || '').trim()
-    if (fileKey && uid) {
-      const fresh = await fileApi.resolveUserUploadedFileUrl({
-        userId: uid,
-        fileKey,
-        projectId: props.scope === 'project' ? props.resourceId : undefined,
-      })
-      if (fresh) url = fresh
-    }
+    const url = await resolveAttachmentUrl(item)
     if (!url) {
       ElMessage.error(t(`${scope}.attachmentsDownloadLinkUnavailable`))
       return
