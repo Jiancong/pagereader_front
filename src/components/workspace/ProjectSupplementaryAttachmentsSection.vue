@@ -5,6 +5,7 @@
       :resource-id="resolvedProjectId"
       :user-id="resolvedUserId"
       variant="card"
+      :read-only="readOnly"
     />
   </div>
 </template>
@@ -14,20 +15,27 @@ import { computed } from 'vue'
 import { isLoggedIn } from '@/api/token'
 import SupplementaryAttachmentsPanel from '@/components/workspace/SupplementaryAttachmentsPanel.vue'
 
-const props = defineProps<{
-  projectId?: string | null
-  userId?: string | number | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    projectId?: string | null
+    userId?: string | number | null
+    /** 社区阅读等：仅列表 / 下载 / 在线阅读，不要求登录 */
+    readOnly?: boolean
+  }>(),
+  { readOnly: false },
+)
 
 const resolvedProjectId = computed(() => String(props.projectId || '').trim())
-const resolvedUserId = computed(() => String(props.userId ?? '').trim())
+const resolvedUserId = computed(() => {
+  const id = String(props.userId ?? '').trim()
+  return id || null
+})
 
-const visible = computed(
-  () =>
-    isLoggedIn() &&
-    Boolean(resolvedProjectId.value) &&
-    Boolean(resolvedUserId.value),
-)
+const visible = computed(() => {
+  if (!resolvedProjectId.value) return false
+  if (props.readOnly) return true
+  return isLoggedIn() && Boolean(resolvedUserId.value)
+})
 </script>
 
 <style lang="scss">

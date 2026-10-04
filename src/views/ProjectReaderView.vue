@@ -46,19 +46,27 @@
             </p>
           </div>
 
-          <div v-if="pptData && pptResumeReady">
+          <div v-if="pptData && pptResumeReady" class="ppt-deck-block mb-2 min-w-0">
             <p class="mb-2 text-xs text-muted-foreground">{{ t('community.interactiveHint') }}</p>
-            <PptViewer
-              ref="pptViewerRef"
-              :ppt-data="pptData"
-              :initial-slide="initialPptSlide"
+            <div class="overflow-hidden rounded-2xl border border-border bg-card">
+              <PptViewer
+                ref="pptViewerRef"
+                :ppt-data="pptData"
+                :initial-slide="initialPptSlide"
+                :project-id="projectId"
+                :markdown="projectMarkdown"
+                :ppt-data-url="pptDataUrl"
+                :chat-history="displayChatHistory"
+                @update:ppt-data="(d) => (pptData = d)"
+                @related-search-recorded="(e) => (sessionEntries = e)"
+                @cover-uploaded="onCoverUploaded"
+              />
+            </div>
+            <ProjectSupplementaryAttachmentsSection
+              class="mt-3"
               :project-id="projectId"
-              :markdown="projectMarkdown"
-              :ppt-data-url="pptDataUrl"
-              :chat-history="displayChatHistory"
-              @update:ppt-data="(d) => (pptData = d)"
-              @related-search-recorded="(e) => (sessionEntries = e)"
-              @cover-uploaded="onCoverUploaded"
+              :user-id="loggedUserId"
+              read-only
             />
           </div>
           <div v-else-if="outlineResult" class="mb-2 min-w-0">
@@ -127,6 +135,7 @@ import { ArrowLeft, Loader2, GitFork } from 'lucide-vue-next'
 import AppHeader from '@/components/AppHeader.vue'
 import AuthDialog from '@/components/AuthDialog.vue'
 import PptViewer from '@/components/editor/chat/PptViewer.vue'
+import ProjectSupplementaryAttachmentsSection from '@/components/workspace/ProjectSupplementaryAttachmentsSection.vue'
 import WorkspaceNovelResult from '@/components/workspace/WorkspaceNovelResult.vue'
 import WorkspaceOutlineResult from '@/components/workspace/WorkspaceOutlineResult.vue'
 import { authApi, projectApi, isLoggedIn, getLocalAvatar } from '@/api'
@@ -167,6 +176,7 @@ const loading = ref(false)
 const loadingDeck = ref(false)
 const error = ref(null)
 const logged = ref(false)
+const loggedUserId = ref(null)
 const nickName = ref('')
 const avatar = ref(getLocalAvatar())
 const dialogOpen = ref(false)
@@ -364,14 +374,17 @@ async function loadPptDeck(id, proj, hist) {
 const refreshAuth = async () => {
   logged.value = isLoggedIn()
   if (!logged.value) {
+    loggedUserId.value = null
     nickName.value = ''
     return
   }
   try {
     const d = await authApi.getCurrentDetail()
+    loggedUserId.value = d?.id != null ? String(d.id) : null
     nickName.value = d?.nickName || d?.email || ''
     avatar.value = d?.avatar || getLocalAvatar()
   } catch {
+    loggedUserId.value = null
     /* ignore */
   }
 }
