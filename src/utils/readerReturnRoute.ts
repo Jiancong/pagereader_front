@@ -16,16 +16,31 @@ export function readerOpenRouteQuery(options: {
 
 export function navigateAfterReaderClose(
   router: { push: (loc: unknown) => void },
-  query: Record<string, string | string[] | undefined | null>,
+  options: {
+    query?: Record<string, string | string[] | undefined | null>
+    returnTo?: string
+    returnProjectId?: string
+    /** 未指定 returnTo 时，已登录用户默认回工作区 */
+    loggedIn?: boolean
+  },
 ): void {
-  const returnTo = String(query.returnTo ?? "").trim()
-  const projectId = String(query.projectId ?? "").trim()
+  const query = options.query ?? {}
+  const returnTo = String(options.returnTo || query.returnTo || "").trim()
+  const projectId = String(options.returnProjectId || query.projectId || "").trim()
   if (returnTo === "workspace") {
     router.push({ name: "workspace" })
     return
   }
   if (returnTo === "project-reader" && projectId) {
     router.push({ name: "project-reader", params: { projectId } })
+    return
+  }
+  if (returnTo === "reader-hub") {
+    router.push({ name: "reader" })
+    return
+  }
+  if (options.loggedIn) {
+    router.push({ name: "workspace" })
     return
   }
   router.push({ name: "reader" })

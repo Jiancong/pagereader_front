@@ -109,9 +109,10 @@ function startReading() {
     return
   }
   readerFileStore.setFile(selectedFile.value)
+  readerFileStore.setReturnNavigation("reader-hub")
   emit('start', selectedFile.value)
   if (props.autoOpen) {
-    router.push({ name: 'reader-open' })
+    router.push({ name: "reader-open", query: { returnTo: "reader-hub" } })
   }
 }
 </script>

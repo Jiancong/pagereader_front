@@ -241,6 +241,11 @@ async function onOpenInReader(item: SupplementaryAttachment) {
       return
     }
     await readerFileStore.loadFromUrl(url, filename)
+    if (props.scope === 'project' && props.readOnly) {
+      readerFileStore.setReturnNavigation('project-reader', props.resourceId)
+    } else {
+      readerFileStore.setReturnNavigation('workspace')
+    }
     const returnQuery =
       props.scope === 'project' && props.readOnly
         ? readerOpenRouteQuery({ returnTo: 'project-reader', projectId: props.resourceId })

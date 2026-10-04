@@ -626,7 +626,8 @@ const clearReaderFile = () => {
 const startReading = () => {
   if (!selectedReaderFile.value) return
   readerFileStore.setFile(selectedReaderFile.value)
-  router.push({ name: 'reader-open' })
+  readerFileStore.setReturnNavigation('workspace')
+  router.push({ name: 'reader-open', query: { returnTo: 'workspace' } })
 }
 
 const selectQuickExample = (example: { id: string; prompt: string }) => {

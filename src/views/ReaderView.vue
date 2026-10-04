@@ -535,12 +535,24 @@ function onContextMenu(e: MouseEvent) {
 }
 
 function goBack() {
-  navigateAfterReaderClose(router, route.query)
+  navigateAfterReaderClose(router, {
+    query: route.query,
+    returnTo: store.returnTo,
+    returnProjectId: store.returnProjectId,
+    loggedIn: isLoggedIn(),
+  })
+  store.clearReturnNavigation()
 }
 
 onMounted(() => {
   if (!store.file) {
-    navigateAfterReaderClose(router, route.query)
+    navigateAfterReaderClose(router, {
+      query: route.query,
+      returnTo: store.returnTo,
+      returnProjectId: store.returnProjectId,
+      loggedIn: isLoggedIn(),
+    })
+    store.clearReturnNavigation()
     return
   }
   if (window.innerWidth < 768) {

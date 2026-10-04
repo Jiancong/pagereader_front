@@ -3,6 +3,7 @@
 // @author hc @date 2026-08-24
 
 import { defineStore } from "pinia"
+import type { ReaderReturnTo } from "@/utils/readerReturnRoute"
 
 export type ReaderFormat = "pdf" | "epub" | "mobi" | "xlsx" | "markdown"
 
@@ -12,6 +13,9 @@ interface ReaderFileState {
   format: ReaderFormat | ""
   /** 跳转到工作区时保留文件，避免 onBeforeUnmount revoke */
   preserveFileOnLeave: boolean
+  /** 阅读器「返回」目标（不依赖 URL query） */
+  returnTo: ReaderReturnTo | ""
+  returnProjectId: string
 }
 
 export function detectReaderFormatFromName(fileName: string): ReaderFormat | "" {
@@ -42,8 +46,18 @@ export const useReaderFileStore = defineStore("reader-file", {
     objectUrl: "",
     format: "",
     preserveFileOnLeave: false,
+    returnTo: "",
+    returnProjectId: "",
   }),
   actions: {
+    setReturnNavigation(returnTo: ReaderReturnTo, projectId?: string) {
+      this.returnTo = returnTo
+      this.returnProjectId = String(projectId ?? "").trim()
+    },
+    clearReturnNavigation() {
+      this.returnTo = ""
+      this.returnProjectId = ""
+    },
     setFile(file: File) {
       this.revoke()
       this.file = file
@@ -87,6 +101,7 @@ export const useReaderFileStore = defineStore("reader-file", {
       this.file = null
       this.format = ""
       this.preserveFileOnLeave = false
+      this.clearReturnNavigation()
     },
   },
 })
