@@ -76,17 +76,23 @@
     />
 
     <!-- 已生成：展示当前标签对应任务的 PptViewer -->
-    <div v-else-if="activeTask.pptData" class="min-w-0 overflow-hidden rounded-2xl border border-border bg-card">
-      <PptViewer
-        :ppt-data="activeTask.pptData"
+    <div v-else-if="activeTask.pptData" class="min-w-0">
+      <div class="overflow-hidden rounded-2xl border border-border bg-card">
+        <PptViewer
+          :ppt-data="activeTask.pptData"
+          :project-id="activeTask.projectId"
+          :user-id="userId"
+          :markdown="activeTask.markdown"
+          :ppt-data-url="activeTask.pptDataUrl || ''"
+          can-upload-cover
+          @close="resetActiveTask"
+          @update:ppt-data="(d) => (activeTask.pptData = d)"
+        />
+      </div>
+      <ProjectSupplementaryAttachmentsSection
+        class="mt-3"
         :project-id="activeTask.projectId"
         :user-id="userId"
-        :markdown="activeTask.markdown"
-        :ppt-data-url="activeTask.pptDataUrl || ''"
-        can-upload-cover
-        can-manage-attachments
-        @close="resetActiveTask"
-        @update:ppt-data="(d) => (activeTask.pptData = d)"
       />
     </div>
 
@@ -681,6 +687,7 @@ import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languag
 import { useTranslateFileStore } from "@/stores/translateFile"
 import { useReaderFileStore } from "@/stores/reader"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
+import ProjectSupplementaryAttachmentsSection from "@/components/workspace/ProjectSupplementaryAttachmentsSection.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
 import WorkspaceNovelResult from "@/components/workspace/WorkspaceNovelResult.vue"
 import WorkspaceOutlineResult from "@/components/workspace/WorkspaceOutlineResult.vue"

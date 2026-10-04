@@ -95,18 +95,24 @@
         </p>
       </section>
 
-      <div v-if="pptData" class="mb-8 min-w-0 overflow-hidden">
-        <PptViewer
-          :ppt-data="pptData"
+      <div v-if="pptData" class="mb-8 min-w-0">
+        <div class="overflow-hidden rounded-2xl border border-border bg-card">
+          <PptViewer
+            :ppt-data="pptData"
+            :project-id="projectId"
+            :user-id="userId"
+            :markdown="projectMarkdown"
+            :ppt-data-url="pptDataUrl"
+            :chat-history="displayChatHistory"
+            can-upload-cover
+            @update:ppt-data="(d) => (pptData = d)"
+            @cover-uploaded="onCoverUploaded"
+          />
+        </div>
+        <ProjectSupplementaryAttachmentsSection
+          class="mt-3"
           :project-id="projectId"
           :user-id="userId"
-          :markdown="projectMarkdown"
-          :ppt-data-url="pptDataUrl"
-          :chat-history="displayChatHistory"
-          can-upload-cover
-          can-manage-attachments
-          @update:ppt-data="(d) => (pptData = d)"
-          @cover-uploaded="onCoverUploaded"
         />
       </div>
 
@@ -150,6 +156,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Loader2, Sparkles, ArrowLeft, ChevronDown } from 'lucide-vue-next'
 import PptViewer from '@/components/editor/chat/PptViewer.vue'
+import ProjectSupplementaryAttachmentsSection from '@/components/workspace/ProjectSupplementaryAttachmentsSection.vue'
 import WorkspaceNovelResult from '@/components/workspace/WorkspaceNovelResult.vue'
 import { projectApi } from '../../api'
 import { resolvePptDataFromStreamComplete } from '@/utils/pptCompletePayload'

@@ -44,7 +44,7 @@
       </div>
 
       <div
-        v-if="hasMarkdownDocument || showAttachmentsTab || activeDocumentView === 'ppt'"
+        v-if="hasMarkdownDocument || activeDocumentView === 'ppt'"
         class="ppt-view-tabs-row"
       >
         <div v-if="hasMarkdownDocument" class="ppt-view-tabs" role="tablist">
@@ -624,18 +624,6 @@
       </button>
     </div>
 
-    <div
-      v-if="showAttachmentsTab && !isPresentationFullscreen"
-      class="ppt-attachments-footer"
-    >
-      <SupplementaryAttachmentsPanel
-        scope="project"
-        :resource-id="String(projectId || '').trim()"
-        :user-id="resolvedAttachmentUserId"
-        variant="embedded"
-      />
-    </div>
-
     <PptContextMenu
       :show="pptContextMenuVisible"
       :x="pptContextMenuX"
@@ -734,7 +722,6 @@ import {
   shouldUseModernLiterarySlide,
 } from "@/components/editor/chat/ppt/themes/registry";
 import MarkdownMarkmapViewer from "@/components/editor/chat/MarkdownMarkmapViewer.vue";
-import SupplementaryAttachmentsPanel from "@/components/workspace/SupplementaryAttachmentsPanel.vue";
 import { usePptRelatedSearch, type PptRelatedSearchContext } from "@/composables/usePptRelatedSearch";
 import {
   mergeRelatedSearchAnswersIntoDisplay,
@@ -864,14 +851,11 @@ const props = withDefaults(
   canUploadCover?: boolean;
   /** OSS 上 ppt_data JSON 的地址；缺省时尝试从 pptData 内解析。划词追问回传 extra_body.pptDataUrl */
   pptDataUrl?: string;
-  /** 登录用户 id（补充附件上传）；未传时在已登录时尝试拉取 current user */
+  /** 登录用户 id（TTS 等）；未传时在已登录时尝试拉取 current user */
   userId?: string | number | null;
-  /** 是否显示「补充附件」Tab（需 projectId + 登录） */
-  canManageAttachments?: boolean;
 }>(),
   {
     canUploadCover: true,
-    canManageAttachments: true,
   },
 );
 
@@ -890,13 +874,6 @@ const activeDocumentView = ref<DocumentViewMode>("ppt");
 
 const markdownDocument = computed(() => String(props.markdown || "").trim());
 const hasMarkdownDocument = computed(() => markdownDocument.value.length > 0);
-
-const showAttachmentsTab = computed(
-  () =>
-    props.canManageAttachments &&
-    Boolean(String(props.projectId || "").trim()) &&
-    isLoggedIn(),
-);
 
 watch(hasMarkdownDocument, (available) => {
   if (!available && activeDocumentView.value === "markmap") {
@@ -2277,15 +2254,6 @@ const slide = computed(() => slideForExport.value);
 
 const ttsUserId = ref<number | null>(null);
 
-const resolvedAttachmentUserId = computed(() => {
-  const fromProp =
-    props.userId != null && String(props.userId).trim()
-      ? String(props.userId).trim()
-      : "";
-  if (fromProp) return fromProp;
-  if (ttsUserId.value != null) return String(ttsUserId.value);
-  return null;
-});
 const ttsLoading = ref(false);
 const ttsPlaying = ref(false);
 const ttsPlayAllActive = ref(false);
@@ -8529,21 +8497,6 @@ defineExpose({
   min-height: 560px;
   overflow: hidden;
   padding: 0;
-}
-
-.ppt-attachments-footer {
-  flex: 0 0 auto;
-  flex-shrink: 0;
-  max-height: min(38vh, 280px);
-  overflow-y: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.22);
-
-  :deep(.supp-attachments--embedded) {
-    max-width: none;
-    margin: 0;
-    padding: 0.65rem 1rem 0.75rem;
-  }
 }
 
 /* 幻灯片容器（仅正文画布，不含 speaker_notes） */
