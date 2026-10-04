@@ -98,6 +98,7 @@
     <UserAssetDocumentPickerDialog
       v-model:open="libraryPickerOpen"
       :user-id="userId"
+      :project-id="scope === 'project' ? resourceId : null"
       :title="t(`${i18nScope}.attachmentsPickFromLibraryTitle`)"
       :disabled-keys="linkedFileKeys"
       @select="onPickFromLibrary"
