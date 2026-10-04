@@ -81,8 +81,11 @@ export function isAllowedPptDocumentFile(file: File): boolean {
 }
 
 export function isPptDocumentAsset(name: string, url = "", contentType = ""): boolean {
-  const probe = `${name} ${url}`.toLowerCase();
-  if (PPT_DOC_EXT_RE.test(probe)) return true;
+  // 分别检测文件名与 URL 路径（去掉签名 query）；拼接检测会因 $ 锚定失效：
+  // OSS 签名 URL 结尾不是扩展名，而名称在拼接串开头无法命中 $锚点
+  const nameProbe = String(name || "").toLowerCase();
+  const urlPath = String(url || "").split("?")[0].toLowerCase();
+  if (PPT_DOC_EXT_RE.test(nameProbe) || PPT_DOC_EXT_RE.test(urlPath)) return true;
   const ct = String(contentType || "").toLowerCase();
   return (
     ct.includes("pdf") ||
