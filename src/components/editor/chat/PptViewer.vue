@@ -47,11 +47,7 @@
         v-if="hasMarkdownDocument || showAttachmentsTab || activeDocumentView === 'ppt'"
         class="ppt-view-tabs-row"
       >
-        <div
-          v-if="hasMarkdownDocument || showAttachmentsTab"
-          class="ppt-view-tabs"
-          role="tablist"
-        >
+        <div v-if="hasMarkdownDocument" class="ppt-view-tabs" role="tablist">
           <button
             type="button"
             class="ppt-view-tab"
@@ -71,17 +67,6 @@
             @click="activeDocumentView = 'markmap'"
           >
             {{ t("agent.pptViewMarkmap") }}
-          </button>
-          <button
-            v-if="showAttachmentsTab"
-            type="button"
-            class="ppt-view-tab"
-            :class="{ 'ppt-view-tab--active': activeDocumentView === 'attachments' }"
-            role="tab"
-            :aria-selected="activeDocumentView === 'attachments'"
-            @click="activeDocumentView = 'attachments'"
-          >
-            {{ t("agent.pptViewAttachments") }}
           </button>
         </div>
         <div v-if="activeDocumentView === 'ppt'" class="ppt-audio-actions">
@@ -625,15 +610,6 @@
       <MarkdownMarkmapViewer :markdown="markdownDocument" />
     </div>
 
-    <div v-else-if="activeDocumentView === 'attachments'" class="ppt-attachments-stage">
-      <SupplementaryAttachmentsPanel
-        scope="project"
-        :resource-id="String(projectId || '').trim()"
-        :user-id="resolvedAttachmentUserId"
-        variant="embedded"
-      />
-    </div>
-
     <!-- 缩略图导航 -->
     <div v-if="activeDocumentView === 'ppt'" class="ppt-thumbs">
       <button
@@ -646,6 +622,18 @@
         <span class="ppt-thumb-num">{{ si + 1 }}</span>
         <span class="ppt-thumb-label">{{ s.title ? s.title.slice(0, 8) : "" }}</span>
       </button>
+    </div>
+
+    <div
+      v-if="showAttachmentsTab && !isPresentationFullscreen"
+      class="ppt-attachments-footer"
+    >
+      <SupplementaryAttachmentsPanel
+        scope="project"
+        :resource-id="String(projectId || '').trim()"
+        :user-id="resolvedAttachmentUserId"
+        variant="embedded"
+      />
     </div>
 
     <PptContextMenu
@@ -897,7 +885,7 @@ const emit = defineEmits<{
 const chatHistoryRailCollapsed = ref(false);
 const relatedSearchSessionEntries = ref<RelatedSearchSessionEntry[]>([]);
 const { t, locale } = useI18n();
-type DocumentViewMode = "ppt" | "markmap" | "attachments";
+type DocumentViewMode = "ppt" | "markmap";
 const activeDocumentView = ref<DocumentViewMode>("ppt");
 
 const markdownDocument = computed(() => String(props.markdown || "").trim());
@@ -912,12 +900,6 @@ const showAttachmentsTab = computed(
 
 watch(hasMarkdownDocument, (available) => {
   if (!available && activeDocumentView.value === "markmap") {
-    activeDocumentView.value = "ppt";
-  }
-});
-
-watch(showAttachmentsTab, (visible) => {
-  if (!visible && activeDocumentView.value === "attachments") {
     activeDocumentView.value = "ppt";
   }
 });
@@ -8549,11 +8531,19 @@ defineExpose({
   padding: 0;
 }
 
-.ppt-attachments-stage {
-  flex: 1 1 auto;
-  min-height: 320px;
-  overflow: auto;
-  padding: 0.5rem 0 1rem;
+.ppt-attachments-footer {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  max-height: min(38vh, 280px);
+  overflow-y: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.22);
+
+  :deep(.supp-attachments--embedded) {
+    max-width: none;
+    margin: 0;
+    padding: 0.65rem 1rem 0.75rem;
+  }
 }
 
 /* 幻灯片容器（仅正文画布，不含 speaker_notes） */
