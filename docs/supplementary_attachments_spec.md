@@ -96,12 +96,20 @@
 
 **服务端逻辑（共用）**
 
-1. 校验 entity 存在且 caller 为 owner  
+1. 校验 entity 存在且 caller 为 owner（**JWT 为准**，忽略 body 伪造的 `userId`）  
 2. `count < 10`  
-3. 校验 `fileKey` 归属 `userId`，`fileSize` 与库中一致（允许 0 若历史无 size）  
-4. 同一 `(entity_id, file_key)` 不可重复 INSERT  
-5. INSERT `status=pending` → 异步索引 → `indexed` / `failed`  
-6. Response **201**：`{ "ok": true, "attachment": { ... } }`
+3. 按登记方式分支（见下表）  
+4. INSERT `status=pending` → 异步索引 → `indexed` / `failed`  
+5. Response **201**：`{ "ok": true, "attachment": { ... } }`
+
+| 步骤 | 方式 A/B（有 `fileKey`） | 方式 C（`source=external_url`，无 `fileKey`） |
+|------|--------------------------|-----------------------------------------------|
+| 必填字段 | `url`, `name`, `type`, `fileKey` | `url`, `name`, `type`；`source` 应为 `external_url`（缺省时可按「无 fileKey + 合法 http(s) url」推断） |
+| **勿再返回** | — | `{"ok":false,"error":"bad_request","message":"fileKey 不能为空"}`（联调样例见 §11） |
+| 归属 / 配额 | 校验 `fileKey` 归属 `userId`，`fileSize` 与库中一致；新上传已在 complete 入账 | **不**校验 `fileKey`；**不**增加 `usedBytes` |
+| 去重 | 同一 `(entity_id, file_key)` | 同一 `(entity_id, url)`（建议规范化：去 fragment、YouTube 统一 `v=`） |
+| `file_key` 列 | 用户 OSS key | `NULL` 或空串；若表 UNIQUE 不允许多行 NULL，改用占位如 `external:{sha256(url)}` |
+| 索引 job | 解析 OSS 文档 | YouTube：走现有 transcript / 抓取管道；其他 URL：抓取或直链下载后 chunk（SSRF 白名单） |
 
 ### 2.3 列表 Response
 
@@ -260,3 +268,46 @@ Auth：Cookie `pr_token` / `Authorization`；写操作仅 **expert owner**。
 
 - 专家主题分类：[`book_expert_topic_category_spec.md`](book_expert_topic_category_spec.md)  
 - 专家会话隐私：[`book_expert_session_privacy_spec.md`](book_expert_session_privacy_spec.md)
+
+---
+
+## 11. BFF 必改：`external_url`（2026-03 联调）
+
+前端已发 **无 `fileKey`** 的 POST。当前生产 BFF 仍校验 `fileKey` 非空，会拒绝合法请求：
+
+```http
+POST /api2/project/{projectId}/attachments
+Content-Type: application/json
+Authorization: Bearer …
+
+{
+  "userId": "4",
+  "url": "https://www.youtube.com/watch?v=Am7IWP8IpEc",
+  "name": "The $10B AI Assistant …",
+  "type": "youtube",
+  "fileSize": 0,
+  "source": "external_url"
+}
+```
+
+**当前错误**：`{"ok":false,"error":"bad_request","message":"fileKey 不能为空"}`  
+**期望**：`201` + `{ "ok": true, "attachment": { …, "status": "pending", "file_key": null } }`
+
+### 11.1 `pagereader-backend` 建议改动点
+
+1. **DTO / 校验**：`ProjectAttachmentCreateRequest`（及专家侧等价类）中 `fileKey` 改为 **条件必填**——仅当 `source` 不是 `external_url`（且非「外链推断」）时必填。  
+2. **Controller / Service**：在 `POST /project/{id}/attachments` 分支：
+   - `external_url` → 跳过 `FileUserService` / OSS 归属校验；
+   - 校验 `url` 为 `http`/`https`，长度上限，禁止内网 IP（与现有 webpage 抓取规则对齐）；
+   - `type=youtube` 时可选校验 host 为 YouTube 域名。  
+3. **DB**：`project_attachments.file_key` 允许 NULL；唯一约束改为 `(project_id, file_key)` 仅对非空 key，或增加 `(project_id, url_hash)` 唯一。  
+4. **异步索引**：`pending` job 根据 `type` 调用 Agent（YouTube transcript、URL fetch）；失败写 `status=failed` + `error_message`。  
+5. **DELETE**：无 `file_key` 时 **不**调 OSS 删除、**不**减 `usedBytes`，只删 DB + vector。  
+6. **专家**：`/api2/book-experts/{expertId}/attachments` **同一套**分支（BFF 转发 Python 时带上 `source` 字段）。
+
+### 11.2 联调清单（方式 C）
+
+- [ ] 上述 YouTube POST 返回 201，列表可见，`status` 最终 `indexed`  
+- [ ] 重复同一 URL → `400`（duplicate）  
+- [ ] 第 11 个附件仍 `400 ATTACHMENT_LIMIT`  
+- [ ] 带 `fileKey` 的上传/资源库路径 **行为不变**
