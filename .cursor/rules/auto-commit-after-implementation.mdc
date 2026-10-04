@@ -1,0 +1,13 @@
+---
+description: Commit completed implementation work without waiting for "git commit"
+alwaysApply: true
+---
+
+# Auto-commit after implementation
+
+When you finish an **implementation task** (code/docs changes in this repo, not question-only or review-only turns):
+
+1. **Create a git commit automatically** — do not end the turn with "say git commit if you want" or wait for the user to ask.
+2. Still follow the full **Git Safety Protocol** from user rules: no secrets (`.env*`, credentials), no `android/gradle.properties` unless explicitly part of the task, use `_commit_msg_body.txt` + `_do_commit_frontend.ps1` / `git commit-tree` when hooks block normal commit, never push unless the user asks.
+3. **Skip commit** when there are no staged-worthy source changes, or the user said not to commit this turn.
+4. Briefly report the commit hash and message in the reply; mention push only if the user cares about deployment (do not push by default).

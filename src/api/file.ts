@@ -109,6 +109,44 @@ export async function deleteUserFile(fileKey: string): Promise<unknown> {
   return del<unknown>("/file/user/file", { query: { fileKey } })
 }
 
+/** 按 fileKey 从用户文件列表解析新的 presigned URL（附件表内 url 会过期） */
+export async function resolveUserUploadedFileUrl(params: {
+  userId: number | string
+  fileKey: string
+  /** 可选：先按作品上下文筛列表，未命中再查全量 */
+  projectId?: string
+}): Promise<string | null> {
+  const fileKey = String(params.fileKey || "").trim()
+  if (!fileKey) return null
+
+  async function scan(projectId?: string): Promise<string | null> {
+    let marker: string | undefined
+    let more = true
+    while (more) {
+      const page = await listUserUploadedFiles({
+        userId: params.userId,
+        pageSize: 100,
+        marker,
+        projectId,
+      })
+      const hit = page.items.find((item) => item.fileKey === fileKey)
+      if (hit?.url) return hit.url
+      more = Boolean(page.hasMore)
+      const next = page.nextMarker?.trim()
+      if (more && !next) break
+      marker = next || undefined
+    }
+    return null
+  }
+
+  const projectId = String(params.projectId || "").trim()
+  if (projectId) {
+    const scoped = await scan(projectId)
+    if (scoped) return scoped
+  }
+  return scan(undefined)
+}
+
 // ===== OSS 直传（大文件走对象存储，绕过应用 413） =====
 
 // 申请直传凭证

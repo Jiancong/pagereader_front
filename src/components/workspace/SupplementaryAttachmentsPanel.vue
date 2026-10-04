@@ -331,16 +331,35 @@ async function onFileInputChange(ev: Event) {
 }
 
 async function onDownload(item: SupplementaryAttachment) {
-  const url = String(item.url || '').trim()
   const aid = attachmentId(item)
-  if (!url || !aid || downloadingId.value) return
+  if (!aid || downloadingId.value) return
   const filename = String(item.name || 'attachment').trim() || 'attachment'
+  const fileKey = String(item.file_key ?? item.fileKey ?? '').trim()
+  const uid = String(props.userId || '').trim()
   const scope = i18nScope.value
   downloadingId.value = aid
   try {
+    let url = String(item.url || '').trim()
+    if (fileKey && uid) {
+      const fresh = await fileApi.resolveUserUploadedFileUrl({
+        userId: uid,
+        fileKey,
+        projectId: props.scope === 'project' ? props.resourceId : undefined,
+      })
+      if (fresh) url = fresh
+    }
+    if (!url) {
+      ElMessage.error(t(`${scope}.attachmentsDownloadLinkUnavailable`))
+      return
+    }
     await downloadFileFromUrl(url, filename)
-  } catch {
-    ElMessage.error(t(`${scope}.attachmentsDownloadFailed`))
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : ''
+    if (msg === 'OSS_URL_EXPIRED') {
+      ElMessage.error(t(`${scope}.attachmentsDownloadExpired`))
+    } else {
+      ElMessage.error(t(`${scope}.attachmentsDownloadFailed`))
+    }
   } finally {
     downloadingId.value = ''
   }
