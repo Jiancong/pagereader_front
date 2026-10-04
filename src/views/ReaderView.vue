@@ -208,7 +208,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
@@ -218,11 +218,13 @@ import MobiReader from '@/components/reader/MobiReader.vue'
 import { useReaderFileStore } from '@/stores/reader'
 import { useBrowserTts } from '@/composables/useBrowserTts'
 import { isLoggedIn } from '@/api'
+import { navigateAfterReaderClose } from '@/utils/readerReturnRoute'
 
 const XlsxReader = defineAsyncComponent(() => import('@/components/reader/XlsxReader.vue'))
 const MarkdownReader = defineAsyncComponent(() => import('@/components/reader/MarkdownReader.vue'))
 
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
 const store = useReaderFileStore()
 
@@ -533,12 +535,12 @@ function onContextMenu(e: MouseEvent) {
 }
 
 function goBack() {
-  router.push({ name: 'reader' })
+  navigateAfterReaderClose(router, route.query)
 }
 
 onMounted(() => {
   if (!store.file) {
-    router.replace({ name: 'reader' })
+    navigateAfterReaderClose(router, route.query)
     return
   }
   if (window.innerWidth < 768) {

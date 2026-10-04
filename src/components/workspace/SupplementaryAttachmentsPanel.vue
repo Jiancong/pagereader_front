@@ -145,6 +145,7 @@ import {
 import { downloadFileFromUrl } from '@/utils/downloadRemoteFile'
 import type { SupplementaryAttachment } from '@/api/types'
 import { detectReaderFormatFromName, useReaderFileStore } from '@/stores/reader'
+import { readerOpenRouteQuery } from '@/utils/readerReturnRoute'
 
 const props = withDefaults(
   defineProps<{
@@ -240,7 +241,11 @@ async function onOpenInReader(item: SupplementaryAttachment) {
       return
     }
     await readerFileStore.loadFromUrl(url, filename)
-    await router.push({ name: 'reader-open' })
+    const returnQuery =
+      props.scope === 'project' && props.readOnly
+        ? readerOpenRouteQuery({ returnTo: 'project-reader', projectId: props.resourceId })
+        : readerOpenRouteQuery({ returnTo: 'workspace' })
+    await router.push({ name: 'reader-open', query: returnQuery })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : ''
     if (msg === 'OSS_URL_EXPIRED') {
