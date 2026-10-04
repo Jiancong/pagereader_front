@@ -26,7 +26,8 @@
 | 数量上限 | **10** / 项目或 / 专家（前端常量；超出 `400 ATTACHMENT_LIMIT`） |
 | 登记方式 A：**新上传** | 前端：`ensureStorageQuotaForUpload` → `direct-upload` → `complete`（**`usedBytes += fileSize`**）→ `POST .../attachments` 只提交元数据 |
 | 登记方式 B：**资源库关联** | 文件已在 `GET /file/user/files`；`POST .../attachments` 带已有 `fileKey` → **不得**再次 `usedBytes += fileSize`；校验 user 归属 + 同一 entity 未重复 `file_key` |
-| POST 共性 | **不传二进制**；校验 `fileKey`/`url` 属于 JWT user 且已在 complete 入账（方式 B 仅校验归属） |
+| 登记方式 C：**外部链接** | 前端 `POST` 仅 `url` + `name` + `type`（如 `youtube` / `url` / 扩展名推断），`source=external_url`，**无** `fileKey`，`fileSize=0`；不占云空间；服务端异步抓取/转录并索引（YouTube、公开 PDF 直链等） |
+| POST 共性 | **不传二进制**；方式 A/B 校验 `fileKey`/`url` 属于 JWT user 且已在 complete 入账（方式 B 仅校验归属）；方式 C 校验 URL 白名单/SSRF 与重复 `(entity_id, url)` |
 | 删除 | 删 DB + 删 vector chunks；若 `file_key` 无其他引用 → 删 OSS + **`usedBytes -= file_size`** |
 | 状态 | `pending` → 索引 job → `indexed` 或 `failed`（+ `error_message`） |
 
@@ -75,7 +76,21 @@
   "type": "pdf",
   "fileKey": "user-upload/...",
   "fileSize": 1048576,
-  "contentType": "application/pdf"
+  "contentType": "application/pdf",
+  "source": "upload | library | external_url"
+}
+```
+
+方式 C 示例（无 `fileKey`）：
+
+```json
+{
+  "userId": "123",
+  "url": "https://www.youtube.com/watch?v=…",
+  "name": "YouTube (dQw4w9WgXcQ)",
+  "type": "youtube",
+  "fileSize": 0,
+  "source": "external_url"
 }
 ```
 
@@ -228,7 +243,8 @@ Auth：Cookie `pr_token` / `Authorization`；写操作仅 **expert owner**。
 
 | 文件 | 说明 |
 |------|------|
-| `SupplementaryAttachmentsPanel.vue` | `scope=project \| bookExpert`；上传 + 资源库 |
+| `SupplementaryAttachmentsPanel.vue` | `scope=project \| bookExpert`；上传 + 资源库 + 外部链接 |
+| `SupplementaryAttachmentUrlDialog.vue` | 添加 http(s) 链接对话框 |
 | `UserAssetDocumentPickerDialog.vue` | `listUserUploadedFiles` + 文档过滤 |
 | `api/feed.ts` | `listProjectAttachments` / add / delete |
 | `api/bookExpert.ts` | `listExpertAttachments` / add / delete |

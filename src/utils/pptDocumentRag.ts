@@ -49,6 +49,92 @@ export function isHttpShareUrl(url: string): boolean {
   return t.startsWith("http://") || t.startsWith("https://");
 }
 
+const YOUTUBE_URL_RE = /(?:youtube\.com\/(?:watch|shorts|live)|youtu\.be\/)/i;
+
+export function isLikelyYoutubeUrl(raw: string): boolean {
+  const t = String(raw || "").trim();
+  return YOUTUBE_URL_RE.test(t);
+}
+
+/** 用户粘贴的外部链接 → 规范 https URL */
+export function normalizeExternalHttpUrl(raw: string): string | null {
+  let t = String(raw || "").trim();
+  if (!t) return null;
+  if (!/^https?:\/\//i.test(t)) {
+    if (/^www\./i.test(t)) t = `https://${t}`;
+    else return null;
+  }
+  try {
+    const u = new URL(t);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
+export function defaultNameFromExternalUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (isLikelyYoutubeUrl(url)) {
+      const id = u.searchParams.get("v") || u.pathname.split("/").filter(Boolean).pop() || "";
+      return id ? `YouTube (${id})` : `YouTube · ${u.hostname}`;
+    }
+    const path = u.pathname.length > 1 ? u.pathname : "";
+    return `${u.hostname}${path}`.slice(0, 120);
+  } catch {
+    return String(url).slice(0, 120);
+  }
+}
+
+export function inferSupplementaryTypeFromExternalUrl(url: string): string {
+  if (isLikelyYoutubeUrl(url)) return "youtube";
+  const path = String(url || "").split("?")[0];
+  if (PPT_DOC_EXT_RE.test(path)) return inferPptDocumentType(path);
+  return "url";
+}
+
+export function isExternalUrlSupplementaryAttachment(item: {
+  url?: string;
+  file_key?: string;
+  fileKey?: string;
+  type?: string;
+}): boolean {
+  const fk = String(item.file_key ?? item.fileKey ?? "").trim();
+  if (fk) return false;
+  const url = String(item.url || "").trim();
+  if (!isHttpShareUrl(url)) return false;
+  const ty = String(item.type || "").toLowerCase();
+  if (ty === "youtube" || ty === "url") return true;
+  return !isPptDocumentAsset("", url);
+}
+
+/** 外部 HTTP(S) 链接 → 补充附件登记（不占云空间、无 fileKey） */
+export function supplementaryAttachmentBodyFromExternalUrl(
+  userId: string,
+  rawUrl: string,
+  nameOverride?: string,
+): {
+  userId: string;
+  url: string;
+  name: string;
+  type: string;
+  fileSize: number;
+  source: "external_url";
+} | null {
+  const url = normalizeExternalHttpUrl(rawUrl);
+  if (!url) return null;
+  const name = String(nameOverride || "").trim() || defaultNameFromExternalUrl(url);
+  return {
+    userId: String(userId),
+    url,
+    name,
+    type: inferSupplementaryTypeFromExternalUrl(url),
+    fileSize: 0,
+    source: "external_url",
+  };
+}
+
 export function inferPptDocumentType(name: string, mime?: string): string {
   const lower = String(name || "").toLowerCase();
   const m = String(mime || "").toLowerCase();

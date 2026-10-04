@@ -1,10 +1,12 @@
 <template>
   <aside
     :class="[
-      'fixed inset-y-0 left-0 z-50 flex h-full flex-col overflow-hidden border-r border-border bg-card transition-transform duration-300 ease-in-out md:static md:z-auto md:flex-shrink-0 md:translate-x-0 md:transition-[width]',
-      isCollapsed ? 'w-full md:w-16' : 'w-full md:w-64',
+      'workspace-sidebar relative fixed inset-y-0 left-0 z-50 flex h-full flex-col overflow-hidden border-r border-border bg-card transition-transform duration-300 ease-in-out md:static md:z-auto md:flex-shrink-0 md:translate-x-0 md:transition-[width]',
+      isCollapsed ? 'w-full md:w-16' : 'workspace-sidebar-expanded w-full',
+      isResizing ? 'md:!transition-none' : '',
       mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
     ]"
+    :style="asideWidthStyle"
   >
     <div
       :class="[
@@ -300,6 +302,18 @@
       </div>
     </div>
 
+    <div
+      v-if="!isCollapsed"
+      role="separator"
+      aria-orientation="vertical"
+      :aria-label="t('workspace.sidebar.resize')"
+      :title="t('workspace.sidebar.resize')"
+      class="absolute inset-y-0 right-0 z-20 hidden w-2 -translate-x-1/2 cursor-col-resize touch-none select-none md:block"
+      :class="isResizing ? 'bg-primary/25' : 'hover:bg-border/80'"
+      @mousedown.prevent="startSidebarResize"
+      @dblclick.prevent="resetSidebarWidth"
+    />
+
     <WorkspaceAssetsDrawer
       :open="assetsOpen"
       :user-id="userId"
@@ -337,6 +351,10 @@ import WorkspaceAssetsDrawer from './WorkspaceAssetsDrawer.vue'
 import { isAppDebugEnabled } from '@/config/appDebug'
 
 const SIDEBAR_COLLAPSED_KEY = 'workspace-sidebar-collapsed'
+const SIDEBAR_WIDTH_KEY = 'workspace-sidebar-width'
+const SIDEBAR_MIN_WIDTH = 200
+const SIDEBAR_MAX_WIDTH = 420
+const SIDEBAR_DEFAULT_WIDTH = 256
 
 const props = defineProps({
   view: { type: String, default: 'new' },
@@ -372,10 +390,70 @@ const emit = defineEmits([
 
 const assetsOpen = ref(false)
 const collapsed = ref(false)
+const sidebarWidthPx = ref(SIDEBAR_DEFAULT_WIDTH)
+const isResizing = ref(false)
 const historyScrollRef = ref(null)
 const historyLoadSentinelRef = ref(null)
 let historyScrollObserver = null
 const isCollapsed = computed(() => collapsed.value && !props.mobileOpen)
+
+const asideWidthStyle = computed(() => {
+  if (isCollapsed.value) return undefined
+  return { '--workspace-sidebar-width': `${sidebarWidthPx.value}px` }
+})
+
+function clampSidebarWidth(n) {
+  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(n)))
+}
+
+function persistSidebarWidth() {
+  try {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidthPx.value))
+  } catch {
+    /* ignore */
+  }
+}
+
+function readStoredSidebarWidth() {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY)
+    if (raw == null) return
+    const n = parseInt(raw, 10)
+    if (Number.isFinite(n)) sidebarWidthPx.value = clampSidebarWidth(n)
+  } catch {
+    /* ignore */
+  }
+}
+
+function resetSidebarWidth() {
+  sidebarWidthPx.value = SIDEBAR_DEFAULT_WIDTH
+  persistSidebarWidth()
+}
+
+function startSidebarResize(event) {
+  if (isCollapsed.value) return
+  isResizing.value = true
+  const startX = event.clientX
+  const startWidth = sidebarWidthPx.value
+
+  const onMove = (ev) => {
+    sidebarWidthPx.value = clampSidebarWidth(startWidth + (ev.clientX - startX))
+  }
+
+  const onUp = () => {
+    isResizing.value = false
+    persistSidebarWidth()
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }
+
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
 const debugEnabled = computed(() => isAppDebugEnabled())
 const historyLoading = computed(() =>
   props.historyMode === 'experts' ? props.loadingExpertHistory : props.loadingProjects,
@@ -526,6 +604,7 @@ onMounted(() => {
   } catch {
     collapsed.value = false
   }
+  readStoredSidebarWidth()
   void nextTick(() => setupHistoryScrollObserver())
 })
 
@@ -533,3 +612,11 @@ onBeforeUnmount(() => {
   historyScrollObserver?.disconnect()
 })
 </script>
+
+<style scoped>
+@media (min-width: 768px) {
+  .workspace-sidebar-expanded {
+    width: var(--workspace-sidebar-width, 16rem);
+  }
+}
+</style>

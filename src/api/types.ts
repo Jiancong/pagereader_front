@@ -865,9 +865,12 @@ export interface SupplementaryAttachmentCreateReq {
   url: string
   name: string
   type: string
-  fileKey: string
-  fileSize: number
+  /** 本地上传 / 资源库关联必填；外部链接可省略 */
+  fileKey?: string
+  fileSize?: number
   contentType?: string
+  /** 登记来源：外部 HTTP(S) 链接（YouTube、直链文档等） */
+  source?: "upload" | "library" | "external_url"
 }
 
 export interface SupplementaryAttachmentCreateResult {

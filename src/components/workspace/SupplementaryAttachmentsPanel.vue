@@ -30,6 +30,15 @@
           <FolderOpen class="h-3.5 w-3.5" />
           {{ t(`${i18nScope}.attachmentsPickFromLibrary`) }}
         </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="!userId || uploading || atMaxCount || !apiAvailable"
+          @click="urlDialogOpen = true"
+        >
+          <Link2 class="h-3.5 w-3.5" />
+          {{ t(`${i18nScope}.attachmentsAddLink`) }}
+        </button>
       </div>
     </div>
 
@@ -56,7 +65,8 @@
         :key="attachmentId(item)"
         class="flex items-center gap-2 rounded-lg border border-border/80 bg-background/40 px-3 py-2"
       >
-        <FileText class="h-4 w-4 shrink-0 text-muted-foreground" />
+        <Link2 v-if="isExternalUrlAttachment(item)" class="h-4 w-4 shrink-0 text-muted-foreground" />
+        <FileText v-else class="h-4 w-4 shrink-0 text-muted-foreground" />
         <button
           type="button"
           class="min-w-0 flex-1 text-left transition-colors disabled:cursor-default disabled:opacity-70"
@@ -80,7 +90,15 @@
           </p>
         </button>
         <button
-          v-if="item.url"
+          v-if="isExternalUrlAttachment(item) && item.url"
+          type="button"
+          class="shrink-0 text-[10px] text-primary hover:underline"
+          @click="onOpenExternalLink(item)"
+        >
+          {{ t(`${i18nScope}.attachmentsOpenLink`) }}
+        </button>
+        <button
+          v-else-if="item.url"
           type="button"
           class="shrink-0 text-[10px] text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="downloadingId === attachmentId(item)"
@@ -121,6 +139,19 @@
       :disabled-keys="linkedFileKeys"
       @select="onPickFromLibrary"
     />
+
+    <SupplementaryAttachmentUrlDialog
+      v-model:open="urlDialogOpen"
+      :title="t(`${i18nScope}.attachmentsAddLinkTitle`)"
+      :hint="t(`${i18nScope}.attachmentsAddLinkHint`)"
+      :url-label="t(`${i18nScope}.attachmentsAddLinkUrlLabel`)"
+      :url-placeholder="t(`${i18nScope}.attachmentsAddLinkUrlPlaceholder`)"
+      :name-label="t(`${i18nScope}.attachmentsAddLinkNameLabel`)"
+      :name-placeholder="t(`${i18nScope}.attachmentsAddLinkNamePlaceholder`)"
+      :confirm-label="t(`${i18nScope}.attachmentsAddLinkConfirm`)"
+      :submitting="uploading"
+      @confirm="onAddExternalUrl"
+    />
   </section>
 </template>
 
@@ -129,13 +160,18 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { FileText, FolderOpen, Loader2, Paperclip, Trash2 } from 'lucide-vue-next'
+import { FileText, FolderOpen, Link2, Loader2, Paperclip, Trash2 } from 'lucide-vue-next'
 import { bookExpertApi, fileApi, projectApi, ApiError } from '@/api'
 import UserAssetDocumentPickerDialog from '@/components/workspace/UserAssetDocumentPickerDialog.vue'
+import SupplementaryAttachmentUrlDialog from '@/components/workspace/SupplementaryAttachmentUrlDialog.vue'
 import {
   validatePptDocumentFile,
   supplementaryAttachmentBodyFromUserAsset,
+  supplementaryAttachmentBodyFromExternalUrl,
+  normalizeExternalHttpUrl,
+  isExternalUrlSupplementaryAttachment,
 } from '@/utils/pptDocumentRag'
+import type { SupplementaryAttachmentCreateReq } from '@/api/types'
 import type { UserAssetItem } from '@/api/types'
 import { formatBytes } from '@/utils/userAssets'
 import {
@@ -184,6 +220,7 @@ const downloadingId = ref('')
 const openingReaderId = ref('')
 const apiAvailable = ref(true)
 const libraryPickerOpen = ref(false)
+const urlDialogOpen = ref(false)
 
 const atMaxCount = computed(() => attachments.value.length >= maxCount)
 
@@ -195,6 +232,20 @@ const linkedFileKeys = computed(() => {
   }
   return keys
 })
+
+const linkedExternalUrls = computed(() => {
+  const urls = new Set<string>()
+  for (const a of attachments.value) {
+    if (!isExternalUrlAttachment(a)) continue
+    const u = normalizeExternalHttpUrl(String(a.url || ''))
+    if (u) urls.add(u)
+  }
+  return urls
+})
+
+function isExternalUrlAttachment(item: SupplementaryAttachment): boolean {
+  return isExternalUrlSupplementaryAttachment(item)
+}
 
 function attachmentId(item: SupplementaryAttachment): string {
   return String(item.attachment_id ?? item.attachmentId ?? '').trim()
@@ -314,15 +365,7 @@ async function loadAttachments() {
   }
 }
 
-async function registerAttachment(body: {
-  userId: string
-  url: string
-  name: string
-  type: string
-  fileKey: string
-  fileSize: number
-  contentType?: string
-}) {
+async function registerAttachment(body: SupplementaryAttachmentCreateReq, successKey = 'attachmentsUploadSuccess') {
   const scope = i18nScope.value
   const res =
     props.scope === 'project'
@@ -336,7 +379,41 @@ async function registerAttachment(body: {
   } else {
     await loadAttachments()
   }
-  ElMessage.success(t(`${scope}.attachmentsUploadSuccess`))
+  ElMessage.success(t(`${scope}.${successKey}`))
+}
+
+function onOpenExternalLink(item: SupplementaryAttachment) {
+  const url = String(item.url || '').trim()
+  if (!url) {
+    ElMessage.error(t(`${i18nScope.value}.attachmentsDownloadLinkUnavailable`))
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+async function onAddExternalUrl(payload: { url: string; name: string }) {
+  if (!props.userId || uploading.value || atMaxCount.value || !canUpload.value) return
+  const uid = String(props.userId)
+  const scope = i18nScope.value
+  const body = supplementaryAttachmentBodyFromExternalUrl(uid, payload.url, payload.name)
+  if (!body) {
+    ElMessage.warning(t(`${scope}.attachmentsAddLinkInvalid`))
+    return
+  }
+  const normalized = normalizeExternalHttpUrl(body.url)
+  if (normalized && linkedExternalUrls.value.has(normalized)) {
+    ElMessage.info(t(`${scope}.attachmentsAlreadyLinked`))
+    return
+  }
+  uploading.value = true
+  try {
+    await registerAttachment(body, 'attachmentsLinkSuccess')
+    urlDialogOpen.value = false
+  } catch (e: unknown) {
+    ElMessage.error(e instanceof Error ? e.message : t(`${scope}.attachmentsLinkFailed`))
+  } finally {
+    uploading.value = false
+  }
 }
 
 async function onPickFromLibrary(asset: UserAssetItem) {
@@ -440,8 +517,11 @@ async function onDelete(item: SupplementaryAttachment) {
   if (!aid || !props.userId || deletingId.value || !canUpload.value) return
   const scope = i18nScope.value
   try {
+    const confirmKey = isExternalUrlAttachment(item)
+      ? 'attachmentsDeleteConfirmLink'
+      : 'attachmentsDeleteConfirm'
     await ElMessageBox.confirm(
-      t(`${scope}.attachmentsDeleteConfirm`, { name: item.name }),
+      t(`${scope}.${confirmKey}`, { name: item.name }),
       t(`${scope}.attachmentsDelete`),
       { type: 'warning' },
     )
