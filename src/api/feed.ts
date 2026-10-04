@@ -1,7 +1,7 @@
 // 读书 / 探索 Feed 模块
 // @author hc @date 2026-06-03
 
-import { ApiError, del, get, postForm, postJson, put } from "./client"
+import { ApiError, del, get, postForm, postJson, put, requestJsonOkPayload } from "./client"
 import type {
   FeedStreamRequest,
   FeedStreamPageDto,
@@ -337,7 +337,8 @@ export async function getRelatedProjects(
 export async function listProjectAttachments(
   projectId: string,
 ): Promise<SupplementaryAttachmentListResult> {
-  return get<SupplementaryAttachmentListResult>(
+  return requestJsonOkPayload<SupplementaryAttachmentListResult>(
+    "GET",
     `/project/${encodeURIComponent(projectId)}/attachments`,
   )
 }
@@ -346,7 +347,8 @@ export async function addProjectAttachment(
   projectId: string,
   body: SupplementaryAttachmentCreateReq,
 ): Promise<SupplementaryAttachmentCreateResult> {
-  return postJson<SupplementaryAttachmentCreateResult>(
+  return requestJsonOkPayload<SupplementaryAttachmentCreateResult>(
+    "POST",
     `/project/${encodeURIComponent(projectId)}/attachments`,
     body,
   )
@@ -356,7 +358,8 @@ export async function deleteProjectAttachment(
   projectId: string,
   attachmentId: string,
 ): Promise<SupplementaryAttachmentDeleteResult> {
-  return del<SupplementaryAttachmentDeleteResult>(
+  return requestJsonOkPayload<SupplementaryAttachmentDeleteResult>(
+    "DELETE",
     `/project/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}`,
   )
 }

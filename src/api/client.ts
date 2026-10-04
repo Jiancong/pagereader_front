@@ -10,10 +10,13 @@ const BASE = ((import.meta.env.VITE_API_URL as string) ?? "").replace(/\/+$/, ""
 // 业务异常
 export class ApiError extends Error {
   code: number
-  constructor(code: number, message: string) {
+  /** BFF `{ ok: false, error: "..." }` 业务码 */
+  errorCode?: string
+  constructor(code: number, message: string, errorCode?: string) {
     super(message)
     this.name = "ApiError"
     this.code = code
+    this.errorCode = errorCode
   }
 }
 
@@ -130,6 +133,44 @@ export async function del<T>(path: string, opts?: RequestOptions): Promise<T> {
     signal: opts?.signal,
   })
   return unwrap<T>(res)
+}
+
+/** 解析 `{ ok: true, ... }` / `{ ok: false, error, message }`（非 `R<T>` 的 code/data 包装） */
+export async function requestJsonOkPayload<T>(
+  method: "GET" | "POST" | "PUT" | "DELETE",
+  path: string,
+  body?: unknown,
+  opts?: RequestOptions,
+): Promise<T> {
+  const headers = authHeaders(opts?.headers)
+  let fetchBody: BodyInit | undefined
+  if (body !== undefined) {
+    headers.set("Content-Type", "application/json")
+    fetchBody = JSON.stringify(body)
+  }
+  const res = await fetch(buildUrl(path, opts?.query), {
+    method,
+    credentials: FETCH_CREDENTIALS,
+    headers,
+    body: fetchBody,
+    signal: opts?.signal,
+  })
+  if (res.status === 401) {
+    clearToken()
+    throw new ApiError(401, "未登录或登录已过期")
+  }
+  let parsed: unknown
+  try {
+    parsed = await res.json()
+  } catch {
+    throw new ApiError(res.status, `请求失败：${res.status}`)
+  }
+  const payload = parsed as { ok?: boolean; message?: string; msg?: string; error?: string } & T
+  if (!res.ok || payload?.ok === false) {
+    const msg = payload?.message || payload?.msg || payload?.error || `请求失败：${res.status}`
+    throw new ApiError(res.status || 400, msg, payload?.error)
+  }
+  return payload as T
 }
 
 export async function put<T>(

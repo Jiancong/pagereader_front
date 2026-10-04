@@ -47,10 +47,15 @@
                     <p class="text-[10px] text-muted-foreground">
                       <span v-if="asset.size != null">{{ formatBytes(asset.size) }}</span>
                       <span v-if="disabledKeys?.has(asset.fileKey)" class="text-primary">
-                        {{ t('workspace.attachmentsAlreadyLinked') }}
+                        · {{ t('workspace.attachmentsAlreadyLinked') }}
                       </span>
                     </p>
                   </div>
+                  <Check
+                    v-if="disabledKeys?.has(asset.fileKey)"
+                    class="h-4 w-4 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
                 </button>
               </li>
             </ul>
@@ -71,7 +76,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { FileText, Loader2, X } from 'lucide-vue-next'
+import { Check, FileText, Loader2, X } from 'lucide-vue-next'
 import { fileApi } from '@/api'
 import type { UserAssetItem } from '@/api/types'
 import { formatBytes } from '@/utils/userAssets'

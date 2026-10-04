@@ -270,6 +270,11 @@ async function onPickFromLibrary(asset: UserAssetItem) {
   try {
     await registerAttachment(body)
   } catch (e: unknown) {
+    if (e instanceof ApiError && e.errorCode === 'duplicate_file_key') {
+      await loadAttachments()
+      ElMessage.info(t(`${scope}.attachmentsAlreadyLinked`))
+      return
+    }
     ElMessage.error(e instanceof Error ? e.message : t(`${scope}.attachmentsUploadFailed`))
   } finally {
     uploading.value = false
