@@ -76,7 +76,7 @@
     />
 
     <!-- 已生成：展示当前标签对应任务的 PptViewer -->
-    <div v-else-if="activeTask.pptData" class="min-w-0">
+    <div v-else-if="activeTask.pptData" class="ppt-deck-block min-w-0">
       <div class="overflow-hidden rounded-2xl border border-border bg-card">
         <PptViewer
           :ppt-data="activeTask.pptData"

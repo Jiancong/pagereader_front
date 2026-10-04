@@ -95,7 +95,7 @@
         </p>
       </section>
 
-      <div v-if="pptData" class="mb-8 min-w-0">
+      <div v-if="pptData" class="ppt-deck-block mb-8 min-w-0">
         <div class="overflow-hidden rounded-2xl border border-border bg-card">
           <PptViewer
             :ppt-data="pptData"

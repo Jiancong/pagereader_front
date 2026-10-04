@@ -1,11 +1,12 @@
 <template>
-  <SupplementaryAttachmentsPanel
-    v-if="visible"
-    scope="project"
-    :resource-id="resolvedProjectId"
-    :user-id="resolvedUserId"
-    variant="card"
-  />
+  <div v-if="visible" class="project-supp-attachments-below">
+    <SupplementaryAttachmentsPanel
+      scope="project"
+      :resource-id="resolvedProjectId"
+      :user-id="resolvedUserId"
+      variant="card"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -28,3 +29,26 @@ const visible = computed(
     Boolean(resolvedUserId.value),
 )
 </script>
+
+<style lang="scss">
+/* 与 PptViewer 主栏同宽左对齐，不铺到右侧对话栏下方 */
+.ppt-deck-block .project-supp-attachments-below {
+  width: 100%;
+  max-width: 100%;
+  margin-right: auto;
+  margin-left: 0;
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .ppt-deck-block:has(.ppt-chat-rail:not(.ppt-chat-rail--collapsed)) .project-supp-attachments-below {
+    width: calc(100% - 22rem);
+    max-width: calc(100% - 22rem);
+  }
+
+  .ppt-deck-block:has(.ppt-chat-rail--collapsed) .project-supp-attachments-below {
+    width: calc(100% - 2.5rem);
+    max-width: calc(100% - 2.5rem);
+  }
+}
+</style>
