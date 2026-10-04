@@ -65,15 +65,19 @@
             <span v-if="statusLabel(item)">{{ statusLabel(item) }}</span>
           </p>
         </div>
-        <a
+        <button
           v-if="item.url"
-          :href="item.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="shrink-0 text-[10px] text-primary hover:underline"
+          type="button"
+          class="shrink-0 text-[10px] text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="downloadingId === attachmentId(item)"
+          @click="onDownload(item)"
         >
-          {{ t(`${i18nScope}.attachmentsOpen`) }}
-        </a>
+          <Loader2
+            v-if="downloadingId === attachmentId(item)"
+            class="inline h-3 w-3 animate-spin align-[-2px]"
+          />
+          {{ t(`${i18nScope}.attachmentsDownload`) }}
+        </button>
         <button
           v-if="canUpload"
           type="button"
@@ -123,6 +127,7 @@ import {
   ensureStorageQuotaForUpload,
   StorageQuotaBlockedError,
 } from '@/utils/storageQuotaCheck'
+import { downloadFileFromUrl } from '@/utils/downloadRemoteFile'
 import type { SupplementaryAttachment } from '@/api/types'
 
 const props = withDefaults(
@@ -156,6 +161,7 @@ const loading = ref(false)
 const loadError = ref('')
 const uploading = ref(false)
 const deletingId = ref('')
+const downloadingId = ref('')
 const apiAvailable = ref(true)
 const libraryPickerOpen = ref(false)
 
@@ -321,6 +327,22 @@ async function onFileInputChange(ev: Event) {
     }
   } finally {
     uploading.value = false
+  }
+}
+
+async function onDownload(item: SupplementaryAttachment) {
+  const url = String(item.url || '').trim()
+  const aid = attachmentId(item)
+  if (!url || !aid || downloadingId.value) return
+  const filename = String(item.name || 'attachment').trim() || 'attachment'
+  const scope = i18nScope.value
+  downloadingId.value = aid
+  try {
+    await downloadFileFromUrl(url, filename)
+  } catch {
+    ElMessage.error(t(`${scope}.attachmentsDownloadFailed`))
+  } finally {
+    downloadingId.value = ''
   }
 }
 
