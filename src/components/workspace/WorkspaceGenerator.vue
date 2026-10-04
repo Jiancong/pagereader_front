@@ -43,7 +43,7 @@
             <Languages class="h-4 w-4" />
             {{ t('workspace.tabTranslate') }}
           </button>
-          <button v-if="debugEnabled" :class="tabClass('read')" @click="activeTab = 'read'">
+          <button v-if="onlineReadEnabled" :class="tabClass('read')" @click="activeTab = 'read'">
             <BookOpen class="h-4 w-4" />
             {{ t('workspace.tabRead') }}
           </button>
@@ -747,7 +747,7 @@ import {
   gtmAssetAttach,
   gtmFileExt,
 } from "@/composables/useGtmDataLayer"
-import { isAppDebugEnabled } from "@/config/appDebug"
+import { isAppDebugEnabled, isOnlineReadEnabled } from "@/config/appDebug"
 
 const emit = defineEmits<{
   "project-started": [projectId: string]
@@ -816,6 +816,7 @@ const translateFileStore = useTranslateFileStore()
 const readerFileStore = useReaderFileStore()
 
 const debugEnabled = computed(() => isAppDebugEnabled())
+const onlineReadEnabled = computed(() => isOnlineReadEnabled())
 
 const activeTab = ref<"prompt" | "upload" | "youtube" | "translate" | "read" | "expert">("upload")
 
@@ -824,9 +825,11 @@ function ensureDebugOnlyTabsHidden() {
     !debugEnabled.value &&
     (activeTab.value === "prompt" ||
       activeTab.value === "translate" ||
-      activeTab.value === "read" ||
       activeTab.value === "expert")
   ) {
+    activeTab.value = "upload"
+  }
+  if (!onlineReadEnabled.value && activeTab.value === "read") {
     activeTab.value = "upload"
   }
 }
@@ -1535,7 +1538,7 @@ function importReaderBookFromQuery() {
   const fromReader = String(route.query.fromReader || "") === "1"
   const tab = String(route.query.tab || "")
   if (!fromReader || tab !== "read" || !readerFileStore.file) return
-  if (!debugEnabled.value) {
+  if (!onlineReadEnabled.value) {
     router.replace({ name: "workspace" })
     return
   }

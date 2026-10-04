@@ -387,7 +387,7 @@ import {
 } from '@/composables/useGtmDataLayer'
 import { useTranslateFileStore } from '@/stores/translateFile'
 import { useReaderFileStore } from '@/stores/reader'
-import { isAppDebugEnabled } from '@/config/appDebug'
+import { isAppDebugEnabled, isOnlineReadEnabled } from '@/config/appDebug'
 
 type TabId = 'upload' | 'quick' | 'youtube' | 'translate' | 'read'
 type QueueMode = 'CARD' | 'DOCUMENT' | 'NOVEL'
@@ -417,6 +417,7 @@ const readerFileInput = ref<HTMLInputElement | null>(null)
 const isDraggingReader = ref(false)
 
 const debugEnabled = computed(() => isAppDebugEnabled())
+const onlineReadEnabled = computed(() => isOnlineReadEnabled())
 
 const tabs = computed(() => {
   const list = [
@@ -426,12 +427,18 @@ const tabs = computed(() => {
     { id: 'translate' as TabId, label: t('landing.tabTranslate'), icon: markRaw(Languages) },
     { id: 'read' as TabId, label: t('landing.tabRead'), icon: markRaw(BookOpen) },
   ]
-  if (debugEnabled.value) return list
-  return list.filter((tab) => tab.id !== 'quick' && tab.id !== 'translate' && tab.id !== 'read')
+  return list.filter((tab) => {
+    if (!debugEnabled.value && (tab.id === 'quick' || tab.id === 'translate')) return false
+    if (!onlineReadEnabled.value && tab.id === 'read') return false
+    return true
+  })
 })
 
 function ensureDebugOnlyTabsHidden() {
-  if (!debugEnabled.value && (activeTab.value === 'quick' || activeTab.value === 'translate' || activeTab.value === 'read')) {
+  if (!debugEnabled.value && (activeTab.value === 'quick' || activeTab.value === 'translate')) {
+    activeTab.value = 'upload'
+  }
+  if (!onlineReadEnabled.value && activeTab.value === 'read') {
     activeTab.value = 'upload'
   }
 }
