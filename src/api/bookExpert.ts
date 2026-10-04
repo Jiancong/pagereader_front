@@ -185,7 +185,7 @@ export async function deleteExpert(
   })
 }
 
-// ===== 补充附件（详见 docs/book_expert_attachments_spec.md） =====
+// ===== 补充附件（详见 docs/supplementary_attachments_spec.md §5.2） =====
 
 export async function listExpertAttachments(
   expertId: string,

@@ -332,7 +332,7 @@ export async function getRelatedProjects(
   )
 }
 
-// ===== 作品补充附件（owner；RAG + 云空间配额，详见 docs/project_attachments_spec.md） =====
+// ===== 作品补充附件（详见 docs/supplementary_attachments_spec.md §5.1） =====
 
 export async function listProjectAttachments(
   projectId: string,

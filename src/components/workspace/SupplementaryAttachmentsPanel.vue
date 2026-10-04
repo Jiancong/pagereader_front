@@ -10,17 +10,27 @@
           {{ t(`${i18nScope}.attachmentsHint`) }}
         </p>
       </div>
-      <button
-        v-if="canUpload"
-        type="button"
-        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
-        :disabled="!userId || uploading || atMaxCount || !apiAvailable"
-        @click="openFilePicker"
-      >
-        <Loader2 v-if="uploading" class="h-3.5 w-3.5 animate-spin" />
-        <Paperclip v-else class="h-3.5 w-3.5" />
-        {{ t(`${i18nScope}.attachmentsAdd`) }}
-      </button>
+      <div v-if="canUpload" class="flex shrink-0 flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="!userId || uploading || atMaxCount || !apiAvailable"
+          @click="openFilePicker"
+        >
+          <Loader2 v-if="uploading" class="h-3.5 w-3.5 animate-spin" />
+          <Paperclip v-else class="h-3.5 w-3.5" />
+          {{ t(`${i18nScope}.attachmentsAdd`) }}
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="!userId || uploading || atMaxCount || !apiAvailable"
+          @click="libraryPickerOpen = true"
+        >
+          <FolderOpen class="h-3.5 w-3.5" />
+          {{ t(`${i18nScope}.attachmentsPickFromLibrary`) }}
+        </button>
+      </div>
     </div>
 
     <input
@@ -84,6 +94,14 @@
     <p v-else-if="canUpload && atMaxCount" class="mt-2 text-[10px] text-muted-foreground">
       {{ t(`${i18nScope}.attachmentsMaxCount`, { n: maxCount }) }}
     </p>
+
+    <UserAssetDocumentPickerDialog
+      v-model:open="libraryPickerOpen"
+      :user-id="userId"
+      :title="t(`${i18nScope}.attachmentsPickFromLibraryTitle`)"
+      :disabled-keys="linkedFileKeys"
+      @select="onPickFromLibrary"
+    />
   </section>
 </template>
 
@@ -91,9 +109,14 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { FileText, Loader2, Paperclip, Trash2 } from 'lucide-vue-next'
+import { FileText, FolderOpen, Loader2, Paperclip, Trash2 } from 'lucide-vue-next'
 import { bookExpertApi, fileApi, projectApi, ApiError } from '@/api'
-import { validatePptDocumentFile } from '@/utils/pptDocumentRag'
+import UserAssetDocumentPickerDialog from '@/components/workspace/UserAssetDocumentPickerDialog.vue'
+import {
+  validatePptDocumentFile,
+  supplementaryAttachmentBodyFromUserAsset,
+} from '@/utils/pptDocumentRag'
+import type { UserAssetItem } from '@/api/types'
 import { formatBytes } from '@/utils/userAssets'
 import {
   ensureStorageQuotaForUpload,
@@ -133,8 +156,18 @@ const loadError = ref('')
 const uploading = ref(false)
 const deletingId = ref('')
 const apiAvailable = ref(true)
+const libraryPickerOpen = ref(false)
 
 const atMaxCount = computed(() => attachments.value.length >= maxCount)
+
+const linkedFileKeys = computed(() => {
+  const keys = new Set<string>()
+  for (const a of attachments.value) {
+    const k = String(a.file_key ?? a.fileKey ?? '').trim()
+    if (k) keys.add(k)
+  }
+  return keys
+})
 
 function attachmentId(item: SupplementaryAttachment): string {
   return String(item.attachment_id ?? item.attachmentId ?? '').trim()
@@ -194,6 +227,54 @@ async function loadAttachments() {
   }
 }
 
+async function registerAttachment(body: {
+  userId: string
+  url: string
+  name: string
+  type: string
+  fileKey: string
+  fileSize: number
+  contentType?: string
+}) {
+  const scope = i18nScope.value
+  const res =
+    props.scope === 'project'
+      ? await projectApi.addProjectAttachment(props.resourceId, body)
+      : await bookExpertApi.addExpertAttachment(props.resourceId, body)
+  if (res?.attachment) {
+    attachments.value = [
+      res.attachment,
+      ...attachments.value.filter((a) => attachmentId(a) !== attachmentId(res.attachment)),
+    ]
+  } else {
+    await loadAttachments()
+  }
+  ElMessage.success(t(`${scope}.attachmentsUploadSuccess`))
+}
+
+async function onPickFromLibrary(asset: UserAssetItem) {
+  if (!props.userId || uploading.value || atMaxCount.value || !canUpload.value) return
+  const uid = String(props.userId)
+  const body = supplementaryAttachmentBodyFromUserAsset(asset, uid)
+  if (!body) {
+    ElMessage.warning(t('workspace.uploadUnsupportedType'))
+    return
+  }
+  if (linkedFileKeys.value.has(body.fileKey)) {
+    ElMessage.info(t(`${i18nScope.value}.attachmentsAlreadyLinked`))
+    return
+  }
+  const scope = i18nScope.value
+  uploading.value = true
+  try {
+    await registerAttachment(body)
+  } catch (e: unknown) {
+    ElMessage.error(e instanceof Error ? e.message : t(`${scope}.attachmentsUploadFailed`))
+  } finally {
+    uploading.value = false
+  }
+}
+
 async function onFileInputChange(ev: Event) {
   const input = ev.target as HTMLInputElement
   const file = input.files?.[0]
@@ -221,23 +302,11 @@ async function onFileInputChange(ev: Event) {
       url: uploaded.url,
       name: uploaded.name,
       type: uploaded.type,
-      fileKey: uploaded.fileKey,
+      fileKey: uploaded.fileKey!,
       fileSize: uploaded.fileSize ?? file.size,
       contentType: uploaded.contentType,
     }
-    const res =
-      props.scope === 'project'
-        ? await projectApi.addProjectAttachment(props.resourceId, body)
-        : await bookExpertApi.addExpertAttachment(props.resourceId, body)
-    if (res?.attachment) {
-      attachments.value = [
-        res.attachment,
-        ...attachments.value.filter((a) => attachmentId(a) !== attachmentId(res.attachment)),
-      ]
-    } else {
-      await loadAttachments()
-    }
-    ElMessage.success(t(`${scope}.attachmentsUploadSuccess`))
+    await registerAttachment(body)
   } catch (e: unknown) {
     if (e instanceof StorageQuotaBlockedError) {
       ElMessage.error(t(`${scope}.attachmentsQuotaExceeded`))

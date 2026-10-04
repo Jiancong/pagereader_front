@@ -108,6 +108,39 @@ export function uploadedDocumentFromUserAsset(asset: {
   };
 }
 
+/** 云资源库文档 → 补充附件登记 body（不再次上传，不重复占用配额） */
+export function supplementaryAttachmentBodyFromUserAsset(
+  asset: {
+    name: string;
+    url: string;
+    fileKey: string;
+    size?: number;
+    contentType?: string;
+  },
+  userId: string,
+): {
+  userId: string;
+  url: string;
+  name: string;
+  type: string;
+  fileKey: string;
+  fileSize: number;
+  contentType?: string;
+} | null {
+  const doc = uploadedDocumentFromUserAsset(asset);
+  const fileKey = String(asset.fileKey || "").trim();
+  if (!doc || !fileKey) return null;
+  return {
+    userId: String(userId),
+    url: doc.url,
+    name: doc.name || asset.name,
+    type: doc.type || inferPptDocumentType(asset.name, asset.contentType),
+    fileKey,
+    fileSize: typeof asset.size === "number" && asset.size >= 0 ? asset.size : 0,
+    contentType: asset.contentType,
+  };
+}
+
 export function validatePptDocumentFile(file: File): string | null {
   if (!isAllowedPptDocumentFile(file)) {
     return "unsupported";
