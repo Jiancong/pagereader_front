@@ -44,10 +44,14 @@
       </div>
 
       <div
-        v-if="hasMarkdownDocument || activeDocumentView === 'ppt'"
+        v-if="hasMarkdownDocument || showAttachmentsTab || activeDocumentView === 'ppt'"
         class="ppt-view-tabs-row"
       >
-        <div v-if="hasMarkdownDocument" class="ppt-view-tabs" role="tablist">
+        <div
+          v-if="hasMarkdownDocument || showAttachmentsTab"
+          class="ppt-view-tabs"
+          role="tablist"
+        >
           <button
             type="button"
             class="ppt-view-tab"
@@ -67,6 +71,17 @@
             @click="activeDocumentView = 'markmap'"
           >
             {{ t("agent.pptViewMarkmap") }}
+          </button>
+          <button
+            v-if="showAttachmentsTab"
+            type="button"
+            class="ppt-view-tab"
+            :class="{ 'ppt-view-tab--active': activeDocumentView === 'attachments' }"
+            role="tab"
+            :aria-selected="activeDocumentView === 'attachments'"
+            @click="activeDocumentView = 'attachments'"
+          >
+            {{ t("agent.pptViewAttachments") }}
           </button>
         </div>
         <div v-if="activeDocumentView === 'ppt'" class="ppt-audio-actions">
@@ -606,9 +621,17 @@
       </div>
     </div>
 
-    <!-- 缩略图导航 -->
-    <div v-else class="ppt-markmap-stage">
+    <div v-else-if="activeDocumentView === 'markmap'" class="ppt-markmap-stage">
       <MarkdownMarkmapViewer :markdown="markdownDocument" />
+    </div>
+
+    <div v-else-if="activeDocumentView === 'attachments'" class="ppt-attachments-stage">
+      <SupplementaryAttachmentsPanel
+        scope="project"
+        :resource-id="String(projectId || '').trim()"
+        :user-id="resolvedAttachmentUserId"
+        variant="embedded"
+      />
     </div>
 
     <!-- 缩略图导航 -->
@@ -723,6 +746,7 @@ import {
   shouldUseModernLiterarySlide,
 } from "@/components/editor/chat/ppt/themes/registry";
 import MarkdownMarkmapViewer from "@/components/editor/chat/MarkdownMarkmapViewer.vue";
+import SupplementaryAttachmentsPanel from "@/components/workspace/SupplementaryAttachmentsPanel.vue";
 import { usePptRelatedSearch, type PptRelatedSearchContext } from "@/composables/usePptRelatedSearch";
 import {
   mergeRelatedSearchAnswersIntoDisplay,
@@ -852,9 +876,14 @@ const props = withDefaults(
   canUploadCover?: boolean;
   /** OSS 上 ppt_data JSON 的地址；缺省时尝试从 pptData 内解析。划词追问回传 extra_body.pptDataUrl */
   pptDataUrl?: string;
+  /** 登录用户 id（补充附件上传）；未传时在已登录时尝试拉取 current user */
+  userId?: string | number | null;
+  /** 是否显示「补充附件」Tab（需 projectId + 登录） */
+  canManageAttachments?: boolean;
 }>(),
   {
     canUploadCover: true,
+    canManageAttachments: true,
   },
 );
 
@@ -868,13 +897,29 @@ const emit = defineEmits<{
 const chatHistoryRailCollapsed = ref(false);
 const relatedSearchSessionEntries = ref<RelatedSearchSessionEntry[]>([]);
 const { t, locale } = useI18n();
-const activeDocumentView = ref<"ppt" | "markmap">("ppt");
+type DocumentViewMode = "ppt" | "markmap" | "attachments";
+const activeDocumentView = ref<DocumentViewMode>("ppt");
 
 const markdownDocument = computed(() => String(props.markdown || "").trim());
 const hasMarkdownDocument = computed(() => markdownDocument.value.length > 0);
 
+const showAttachmentsTab = computed(
+  () =>
+    props.canManageAttachments &&
+    Boolean(String(props.projectId || "").trim()) &&
+    isLoggedIn(),
+);
+
 watch(hasMarkdownDocument, (available) => {
-  if (!available) activeDocumentView.value = "ppt";
+  if (!available && activeDocumentView.value === "markmap") {
+    activeDocumentView.value = "ppt";
+  }
+});
+
+watch(showAttachmentsTab, (visible) => {
+  if (!visible && activeDocumentView.value === "attachments") {
+    activeDocumentView.value = "ppt";
+  }
 });
 
 const MOBILE_LAYOUT_MAX = 767;
@@ -2249,6 +2294,16 @@ const slideForExport = computed<PptSlide | null>(() => {
 const slide = computed(() => slideForExport.value);
 
 const ttsUserId = ref<number | null>(null);
+
+const resolvedAttachmentUserId = computed(() => {
+  const fromProp =
+    props.userId != null && String(props.userId).trim()
+      ? String(props.userId).trim()
+      : "";
+  if (fromProp) return fromProp;
+  if (ttsUserId.value != null) return String(ttsUserId.value);
+  return null;
+});
 const ttsLoading = ref(false);
 const ttsPlaying = ref(false);
 const ttsPlayAllActive = ref(false);
@@ -8492,6 +8547,13 @@ defineExpose({
   min-height: 560px;
   overflow: hidden;
   padding: 0;
+}
+
+.ppt-attachments-stage {
+  flex: 1 1 auto;
+  min-height: 320px;
+  overflow: auto;
+  padding: 0.5rem 0 1rem;
 }
 
 /* 幻灯片容器（仅正文画布，不含 speaker_notes） */

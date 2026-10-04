@@ -10,6 +10,11 @@ import type {
   BookExpertDetailResult,
   BookExpertPublishReq,
   BookExpertPublishResult,
+  BookExpertTopicCategoryResult,
+  SupplementaryAttachmentListResult,
+  SupplementaryAttachmentCreateReq,
+  SupplementaryAttachmentCreateResult,
+  SupplementaryAttachmentDeleteResult,
   BookExpertDeleteResult,
   BookExpertCoverUploadResult,
   BookExpertSessionListResult,
@@ -110,7 +115,13 @@ export async function listMyExperts(userId: string): Promise<BookExpertListResul
   return rawRequest<BookExpertListResult>("GET", "/book-experts/mine", { query: { userId } })
 }
 
-/** 公共专家广场；excludeOwn=true 时排除我自己发布的（推荐流） */
+/**
+ * 全站 visibility=public 的专家。
+ * - `excludeOwn=false`：含当前用户自己发布的（验「是否已公开」用此模式）。
+ * - `excludeOwn=true`（`exclude_own=1`）：去掉 owner=当前用户的条目，探索页「他人推荐」；
+ *   若全站只有自己在 public，会返回 count=0，属预期，并非未发布成功。
+ * 自己拥有的全部专家（含 private/public）用 {@link listMyExperts}。
+ */
 export async function listPublicExperts(
   userId: string,
   excludeOwn = false,
@@ -134,10 +145,34 @@ export async function publishExpert(
   req: BookExpertPublishReq,
 ): Promise<BookExpertPublishResult> {
   const uid = String(req.userId || "").trim()
+  const categoryId = String(req.topicCategoryId ?? req.topic_category_id ?? "").trim()
+  const body: BookExpertPublishReq = { ...req, userId: uid }
+  if (categoryId) {
+    body.topicCategoryId = categoryId
+    body.topic_category_id = categoryId
+  }
   return rawRequest<BookExpertPublishResult>(
     "POST",
     `/book-experts/${encodeURIComponent(expertId)}/publish`,
-    { query: uid ? { userId: uid } : undefined, body: req },
+    { query: uid ? { userId: uid } : undefined, body },
+  )
+}
+
+/** 更新专家主题分类（owner；已 public 时用于广场筛选，与作品 PUT /project/{id}/category 对齐） */
+export async function updateExpertTopicCategory(
+  expertId: string,
+  userId: string,
+  categoryId: string,
+): Promise<BookExpertTopicCategoryResult> {
+  const uid = String(userId || "").trim()
+  const cid = String(categoryId || "").trim()
+  return rawRequest<BookExpertTopicCategoryResult>(
+    "PUT",
+    `/book-experts/${encodeURIComponent(expertId)}/category`,
+    {
+      query: uid ? { userId: uid } : undefined,
+      body: { userId: uid, categoryId: cid, topicCategoryId: cid, topic_category_id: cid },
+    },
   )
 }
 
@@ -148,6 +183,45 @@ export async function deleteExpert(
   return rawRequest<BookExpertDeleteResult>("DELETE", `/book-experts/${encodeURIComponent(expertId)}`, {
     query: { userId },
   })
+}
+
+// ===== 补充附件（详见 docs/book_expert_attachments_spec.md） =====
+
+export async function listExpertAttachments(
+  expertId: string,
+  userId: string,
+): Promise<SupplementaryAttachmentListResult> {
+  const uid = String(userId || "").trim()
+  return rawRequest<SupplementaryAttachmentListResult>(
+    "GET",
+    `/book-experts/${encodeURIComponent(expertId)}/attachments`,
+    { query: uid ? { userId: uid } : undefined },
+  )
+}
+
+export async function addExpertAttachment(
+  expertId: string,
+  body: SupplementaryAttachmentCreateReq,
+): Promise<SupplementaryAttachmentCreateResult> {
+  const uid = String(body.userId || "").trim()
+  return rawRequest<SupplementaryAttachmentCreateResult>(
+    "POST",
+    `/book-experts/${encodeURIComponent(expertId)}/attachments`,
+    { query: uid ? { userId: uid } : undefined, body },
+  )
+}
+
+export async function deleteExpertAttachment(
+  expertId: string,
+  attachmentId: string,
+  userId: string,
+): Promise<SupplementaryAttachmentDeleteResult> {
+  const uid = String(userId || "").trim()
+  return rawRequest<SupplementaryAttachmentDeleteResult>(
+    "DELETE",
+    `/book-experts/${encodeURIComponent(expertId)}/attachments/${encodeURIComponent(attachmentId)}`,
+    { query: uid ? { userId: uid } : undefined },
+  )
 }
 
 // ===== 封面 / 会话历史（Java BFF 代理 Python；详见 docs spec） =====

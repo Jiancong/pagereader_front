@@ -85,6 +85,7 @@
       <ProjectPreview
         v-else-if="view === 'project' && activeProjectId"
         :project-id="activeProjectId"
+        :user-id="userId"
         :refresh-key="projectRefreshKey"
         @back="view = 'explore'"
         @fork="goNew"

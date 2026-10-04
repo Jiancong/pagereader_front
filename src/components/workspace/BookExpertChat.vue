@@ -87,6 +87,41 @@
           <div v-if="shareMenuOpen" class="be-chat__share-backdrop" @click="shareMenuOpen = false" />
         </div>
       </div>
+
+      <section
+        v-if="isOwner"
+        class="be-chat__topic-category mt-3 rounded-xl border border-border bg-card/40 px-4 py-3"
+      >
+        <div class="flex flex-wrap items-center gap-3">
+          <p class="text-xs font-medium text-muted-foreground">
+            {{ t('workspace.projectTopicCategory') }}
+          </p>
+          <ExploreTopicCategoryPicker
+            v-model="selectedCategoryId"
+            :options="selectableOptions"
+            :display-label="currentCategoryLabel"
+            :placeholder="t('workspace.projectTopicCategoryPlaceholder')"
+            :aria-label="t('workspace.projectTopicCategory')"
+            :disabled="!userId"
+            :saving="updatingCategory"
+            @select="onSelectTopicCategory"
+          />
+          <span v-if="updatingCategory" class="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+            <Loader2 class="h-3 w-3 animate-spin" />
+            {{ t('workspace.projectTopicCategorySaving') }}
+          </span>
+        </div>
+        <p v-if="expert.visibility !== 'public'" class="mt-2 text-[11px] text-muted-foreground">
+          {{ t('workspace.projectTopicCategoryOnShareHint') }}
+        </p>
+      </section>
+
+      <BookExpertAttachmentsPanel
+        v-if="isOwner"
+        class="be-chat__attachments mt-3"
+        :expert-id="expert.expert_id"
+        :user-id="userId"
+      />
     </header>
 
     <!-- 历史会话抽屉 -->
@@ -183,8 +218,17 @@ import {
 import { buildExploreExpertShareUrl } from '@/utils/feedOpen'
 import ChatMarkdownBody from '@/components/editor/chat/ChatMarkdownBody.vue'
 import BookExpertAvatarPicker from '@/components/workspace/BookExpertAvatarPicker.vue'
+import ExploreTopicCategoryPicker from '@/components/explore/ExploreTopicCategoryPicker.vue'
+import BookExpertAttachmentsPanel from '@/components/workspace/BookExpertAttachmentsPanel.vue'
+import { useExploreTopicCategories } from '@/composables/useExploreTopicCategories'
+import { pickExpertTopicCategoryId } from '@/constants/exploreTopicCategories'
+import {
+  readExpertCategoryDraft,
+  writeExpertCategoryDraft,
+} from '@/utils/expertTopicCategoryDraft'
 import type {
   BookExpertSummary,
+  BookExpertPublishReq,
   BookExpertSessionMessage,
   BookExpertSessionSummary,
 } from '@/api/types'
@@ -203,6 +247,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { selectableOptions, resolveLabelById } = useExploreTopicCategories()
 
 interface ChatMessage { id: string; role: 'user' | 'assistant'; content: string }
 const messages = ref<ChatMessage[]>([])
@@ -226,6 +271,111 @@ let sessionRestoreGeneration = 0
 /** 分享菜单 */
 const shareMenuOpen = ref(false)
 const sharingToCommunity = ref(false)
+
+const selectedCategoryId = ref('')
+const updatingCategory = ref(false)
+
+function syncTopicCategoryFromExpert(ex: BookExpertSummary) {
+  const fromExpert = pickExpertTopicCategoryId(ex)
+  const draft = ex.visibility !== 'public' ? readExpertCategoryDraft(ex.expert_id) : ''
+  selectedCategoryId.value = fromExpert || draft || ''
+}
+
+const resolvedTopicCategoryId = computed(
+  () => selectedCategoryId.value || pickExpertTopicCategoryId(props.expert),
+)
+
+const currentCategoryLabel = computed(() => {
+  const id = resolvedTopicCategoryId.value
+  if (!id) {
+    return (
+      String(props.expert.topicCategoryName ?? props.expert.topic_category_name ?? '').trim()
+      || null
+    )
+  }
+  const fromCatalog = resolveLabelById(id)
+  if (fromCatalog) return fromCatalog
+  const fromOptions = selectableOptions.value.find(
+    (option) => option.id.toLowerCase() === id.toLowerCase(),
+  )?.label
+  if (fromOptions) return fromOptions
+  if (selectedCategoryId.value) return id
+  return (
+    String(props.expert.topicCategoryName ?? props.expert.topic_category_name ?? '').trim()
+    || null
+  )
+})
+
+function applyLocalTopicCategory(categoryId: string) {
+  const label =
+    resolveLabelById(categoryId)
+    || selectableOptions.value.find((option) => option.id === categoryId)?.label
+    || ''
+  selectedCategoryId.value = categoryId
+  const patch: BookExpertSummary = {
+    ...props.expert,
+    topic_category_id: categoryId,
+    topicCategoryId: categoryId,
+    ...(label ? { topic_category_name: label, topicCategoryName: label } : {}),
+  }
+  emit('expert-updated', patch)
+  if (props.expert.visibility !== 'public') {
+    writeExpertCategoryDraft(props.expert.expert_id, categoryId)
+  }
+}
+
+async function onSelectTopicCategory(categoryId: string) {
+  const currentId = resolvedTopicCategoryId.value
+  if (!categoryId || categoryId === currentId || updatingCategory.value || !props.userId) return
+
+  applyLocalTopicCategory(categoryId)
+
+  if (props.expert.visibility !== 'public') return
+
+  updatingCategory.value = true
+  try {
+    const result = await bookExpertApi.updateExpertTopicCategory(
+      props.expert.expert_id,
+      String(props.userId),
+      categoryId,
+    )
+    const cid = result.topic_category_id || categoryId
+    emit('expert-updated', {
+      ...props.expert,
+      topic_category_id: cid,
+      topicCategoryId: cid,
+      topic_category_name: result.topic_category_name ?? props.expert.topic_category_name,
+      topicCategoryName: result.topic_category_name ?? props.expert.topicCategoryName,
+    })
+    syncTopicCategoryFromExpert({
+      ...props.expert,
+      topic_category_id: cid,
+      visibility: props.expert.visibility,
+    })
+    ElMessage.success(t('workspace.projectTopicCategorySaved'))
+  } catch (e: unknown) {
+    syncTopicCategoryFromExpert(props.expert)
+    ElMessage.error(e instanceof Error ? e.message : t('common.actionFailed'))
+  } finally {
+    updatingCategory.value = false
+  }
+}
+
+function publishTopicCategoryPayload(): Pick<BookExpertPublishReq, 'topicCategoryId'> {
+  const cid = resolvedTopicCategoryId.value
+  return cid ? { topicCategoryId: cid } : {}
+}
+
+function publishTopicCategoryFields(): Partial<BookExpertSummary> {
+  const cid = resolvedTopicCategoryId.value
+  if (!cid) return {}
+  const label = resolveLabelById(cid) || currentCategoryLabel.value || undefined
+  return {
+    topic_category_id: cid,
+    topicCategoryId: cid,
+    ...(label ? { topic_category_name: label, topicCategoryName: label } : {}),
+  }
+}
 
 const shareToCommunityLabel = computed(() =>
   props.expert.visibility === 'public'
@@ -450,8 +600,16 @@ async function ensurePublicForShare(): Promise<boolean> {
     const res = await bookExpertApi.publishExpert(props.expert.expert_id, {
       userId: String(props.userId),
       public: true,
+      ...publishTopicCategoryPayload(),
     })
-    emit('expert-updated', { ...props.expert, visibility: res?.visibility ?? 'public' })
+    emit('expert-updated', {
+      ...props.expert,
+      visibility: res?.visibility ?? 'public',
+      ...publishTopicCategoryFields(),
+    })
+    if (props.expert.visibility !== 'public') {
+      writeExpertCategoryDraft(props.expert.expert_id, '')
+    }
     ElMessage.success(t('bookExpert.published'))
     return true
   } catch {
@@ -487,8 +645,14 @@ async function onShareToCommunity() {
     const res = await bookExpertApi.publishExpert(props.expert.expert_id, {
       userId: String(props.userId),
       public: true,
+      ...publishTopicCategoryPayload(),
     })
-    emit('expert-updated', { ...props.expert, visibility: res?.visibility ?? 'public' })
+    emit('expert-updated', {
+      ...props.expert,
+      visibility: res?.visibility ?? 'public',
+      ...publishTopicCategoryFields(),
+    })
+    writeExpertCategoryDraft(props.expert.expert_id, '')
     ElMessage.success(t('workspace.shareToCommunitySuccess'))
   } catch (e: unknown) {
     ElMessage.error(
@@ -612,6 +776,12 @@ function resolveSessionIdForExpert(expertId: string): string {
   }
   return getOrCreateExpertSessionId(id, uid)
 }
+
+watch(
+  () => props.expert,
+  (ex) => syncTopicCategoryFromExpert(ex),
+  { immediate: true, deep: true },
+)
 
 watch(
   () => [props.expert.expert_id, props.initialSessionId] as const,

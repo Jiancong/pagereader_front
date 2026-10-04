@@ -80,9 +80,11 @@
       <PptViewer
         :ppt-data="activeTask.pptData"
         :project-id="activeTask.projectId"
+        :user-id="userId"
         :markdown="activeTask.markdown"
         :ppt-data-url="activeTask.pptDataUrl || ''"
         can-upload-cover
+        can-manage-attachments
         @close="resetActiveTask"
         @update:ppt-data="(d) => (activeTask.pptData = d)"
       />

@@ -112,6 +112,30 @@ export function pickProjectExploreTopicCategoryId(
   return ""
 }
 
+type ExpertTopicSource = {
+  topic_category_id?: string | null
+  topicCategoryId?: string | null
+  category_id?: string | null
+  categoryId?: string | null
+  topic_category_name?: string | null
+  topicCategoryName?: string | null
+}
+
+/** 从专家 summary 解析探索主题 categoryId（与作品 Feed 分类 slug 一致） */
+export function pickExpertTopicCategoryId(
+  expert: ExpertTopicSource | null | undefined,
+): string {
+  if (!expert) return ""
+  for (const key of ["topicCategoryId", "topic_category_id", "categoryId", "category_id"] as const) {
+    const id = String(expert[key] ?? "").trim().toLowerCase()
+    if (isKnownExploreTopicId(id)) return id
+  }
+  const fromName = resolveExploreTopicIdByLabel(
+    expert.topicCategoryName ?? expert.topic_category_name,
+  )
+  return fromName ?? ""
+}
+
 /** 后端 Feed 筛选用：all 时不传 categoryId */
 export function toFeedTopicCategoryFilter(
   category: ExploreTopicCategory,

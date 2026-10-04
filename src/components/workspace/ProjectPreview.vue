@@ -99,10 +99,12 @@
         <PptViewer
           :ppt-data="pptData"
           :project-id="projectId"
+          :user-id="userId"
           :markdown="projectMarkdown"
           :ppt-data-url="pptDataUrl"
           :chat-history="displayChatHistory"
           can-upload-cover
+          can-manage-attachments
           @update:ppt-data="(d) => (pptData = d)"
           @cover-uploaded="onCoverUploaded"
         />
@@ -175,6 +177,7 @@ import { useExploreTopicCategories } from '@/composables/useExploreTopicCategori
 const props = defineProps({
   projectId: { type: String, required: true },
   refreshKey: { type: Number, default: 0 },
+  userId: { type: [String, Number], default: null },
 })
 const emit = defineEmits(['back', 'fork'])
 

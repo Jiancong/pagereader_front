@@ -742,6 +742,11 @@ export interface BookExpertSummary {
   created_at?: string
   /** 封面图（OSS URL；旧专家可能为空） */
   cover_url?: string
+  /** 探索主题分类 slug，与 Feed `/www/model/feed/categories` 一致，如 education */
+  topic_category_id?: string
+  topicCategoryId?: string
+  topic_category_name?: string
+  topicCategoryName?: string
   /** 详情接口才返回的方法论预览（Python 返回对象；历史信封可能为字符串） */
   methodology_preview?: string | BookExpertMethodologyPreview
 }
@@ -767,12 +772,26 @@ export interface BookExpertDetailResult {
 export interface BookExpertPublishReq {
   userId: string
   public: boolean
+  /** 发布到公共广场时写入；与作品 share-to-community 的 categoryId 同套 slug */
+  topicCategoryId?: string
+  topic_category_id?: string
+}
+
+export interface BookExpertTopicCategoryResult {
+  ok: boolean
+  expert_id: string
+  topic_category_id: string
+  topic_category_name?: string
 }
 
 export interface BookExpertPublishResult {
   ok: boolean
   expert_id: string
   visibility: BookExpertVisibility
+  topic_category_id?: string
+  topicCategoryId?: string
+  topic_category_name?: string
+  topicCategoryName?: string
 }
 
 export interface BookExpertDeleteResult {
@@ -811,6 +830,54 @@ export interface BookExpertSessionMessagesResult {
   sessionId: string
   updatedAt?: string
   messages: BookExpertSessionMessage[]
+}
+
+/** 作品 / 专家补充附件（直传 OSS 后登记；体积计入用户云空间） */
+export interface SupplementaryAttachment {
+  attachment_id?: string
+  attachmentId?: string
+  name: string
+  url: string
+  type?: string
+  content_type?: string
+  contentType?: string
+  file_size?: number
+  fileSize?: number
+  file_key?: string
+  fileKey?: string
+  status?: "pending" | "indexed" | "failed" | string
+  error_message?: string
+  created_at?: string
+  createdAt?: string
+}
+
+export type BookExpertAttachment = SupplementaryAttachment
+export type ProjectAttachment = SupplementaryAttachment
+
+export interface SupplementaryAttachmentListResult {
+  ok: boolean
+  count: number
+  attachments: SupplementaryAttachment[]
+}
+
+export interface SupplementaryAttachmentCreateReq {
+  userId: string
+  url: string
+  name: string
+  type: string
+  fileKey: string
+  fileSize: number
+  contentType?: string
+}
+
+export interface SupplementaryAttachmentCreateResult {
+  ok: boolean
+  attachment: SupplementaryAttachment
+}
+
+export interface SupplementaryAttachmentDeleteResult {
+  ok: boolean
+  attachment_id: string
 }
 
 export interface DistillUploadedDocument {

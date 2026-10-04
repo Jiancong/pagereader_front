@@ -24,7 +24,7 @@
     <template v-else>
       <section v-if="publicExperts.length">
         <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {{ t('bookExpert.publicExperts') }}
+          {{ t('bookExpert.publicExpertsFromOthers') }}
         </h3>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
           <button
@@ -86,6 +86,7 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
+    // exclude_own=1：仅他人发布的 public；不含侧栏「我的历史」里自己的专家
     const pub = await bookExpertApi.listPublicExperts(String(props.userId), true)
     publicRaw.value = pub?.experts ?? []
   } catch (e: unknown) {

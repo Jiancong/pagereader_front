@@ -18,6 +18,10 @@ import type {
   ProjectPromptHistoryVo,
   ShareToCommunityResult,
   UpdateProjectCategoryResult,
+  SupplementaryAttachmentListResult,
+  SupplementaryAttachmentCreateReq,
+  SupplementaryAttachmentCreateResult,
+  SupplementaryAttachmentDeleteResult,
   ProjectCommentVo,
   CommentRating,
   RatingFilter,
@@ -325,5 +329,34 @@ export async function getRelatedProjects(
   return get<ProjectRelatedResult>(
     `/project/${encodeURIComponent(id)}/related`,
     { query: { limit } },
+  )
+}
+
+// ===== 作品补充附件（owner；RAG + 云空间配额，详见 docs/project_attachments_spec.md） =====
+
+export async function listProjectAttachments(
+  projectId: string,
+): Promise<SupplementaryAttachmentListResult> {
+  return get<SupplementaryAttachmentListResult>(
+    `/project/${encodeURIComponent(projectId)}/attachments`,
+  )
+}
+
+export async function addProjectAttachment(
+  projectId: string,
+  body: SupplementaryAttachmentCreateReq,
+): Promise<SupplementaryAttachmentCreateResult> {
+  return postJson<SupplementaryAttachmentCreateResult>(
+    `/project/${encodeURIComponent(projectId)}/attachments`,
+    body,
+  )
+}
+
+export async function deleteProjectAttachment(
+  projectId: string,
+  attachmentId: string,
+): Promise<SupplementaryAttachmentDeleteResult> {
+  return del<SupplementaryAttachmentDeleteResult>(
+    `/project/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}`,
   )
 }

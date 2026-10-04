@@ -171,7 +171,14 @@ export async function uploadDocument(file: File): Promise<UploadedDocument> {
   if (!url) throw new Error("上传完成但未返回文件地址")
 
   const ext = file.name.split(".").pop()?.toLowerCase()
-  return { url, name: file.name, type: ext || "file" }
+  return {
+    url,
+    name: file.name,
+    type: ext || "file",
+    fileKey: token.fileKey,
+    fileSize: file.size,
+    contentType,
+  }
 }
 
 export { getToken }

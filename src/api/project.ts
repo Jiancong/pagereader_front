@@ -24,4 +24,7 @@ export {
   getRelatedProjects,
   deleteProject,
   getFeedTopicCategories,
+  listProjectAttachments,
+  addProjectAttachment,
+  deleteProjectAttachment,
 } from "./feed"
