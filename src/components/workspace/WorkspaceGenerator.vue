@@ -2167,7 +2167,12 @@ const resetActiveTask = () => {
   activeTask.value.projectId = ""
 }
 
-defineExpose({ attachCloudDocument })
+function openBookExpertDistill() {
+  activeTab.value = "expert"
+  resetExpertFlow()
+}
+
+defineExpose({ attachCloudDocument, openBookExpertDistill })
 </script>
 
 <style scoped>

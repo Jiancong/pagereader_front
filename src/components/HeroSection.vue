@@ -23,14 +23,32 @@
         {{ t('landing.heroSubtitle') }}
       </p>
 
-      <div class="mx-auto mb-10 flex max-w-2xl items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left text-sm text-muted-foreground sm:items-center">
-        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Headphones class="h-5 w-5" />
+      <div class="mx-auto mb-10 grid max-w-3xl gap-3 sm:grid-cols-2">
+        <div class="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left text-sm text-muted-foreground sm:items-center">
+          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Headphones class="h-5 w-5" />
+          </div>
+          <div>
+            <p class="font-semibold text-foreground">{{ t('landing.heroAudioTitle') }}</p>
+            <p class="mt-1 leading-relaxed">{{ t('landing.heroAudioDesc') }}</p>
+          </div>
         </div>
-        <div>
-          <p class="font-semibold text-foreground">{{ t('landing.heroAudioTitle') }}</p>
-          <p class="mt-1 leading-relaxed">{{ t('landing.heroAudioDesc') }}</p>
-        </div>
+        <button
+          type="button"
+          class="flex items-start gap-3 rounded-2xl border border-accent/30 bg-accent/5 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-accent/50 hover:bg-accent/10 sm:items-center"
+          @click="scrollToBookExpert"
+        >
+          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+            <BookOpen class="h-5 w-5" />
+          </div>
+          <div>
+            <p class="font-semibold text-foreground">{{ t('landing.heroExpertTitle') }}</p>
+            <p class="mt-1 leading-relaxed">{{ t('landing.heroExpertDesc') }}</p>
+            <span class="mt-2 inline-flex items-center text-xs font-medium text-primary">
+              {{ t('landing.heroExpertLink') }}
+            </span>
+          </div>
+        </button>
       </div>
 
       <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -56,7 +74,7 @@
 </template>
 
 <script setup>
-import { Sparkles, Zap, Play, Headphones } from 'lucide-vue-next'
+import { Sparkles, Zap, Play, Headphones, BookOpen } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { gtmCtaClick, gtmDemoClick, LANDING_WATCH_DEMO_EVENT } from '@/composables/useGtmDataLayer'
 
@@ -65,6 +83,11 @@ const { t } = useI18n()
 const scrollToGenerator = () => {
   gtmCtaClick('hero_get_started')
   document.getElementById('generator')?.scrollIntoView({ behavior: 'smooth' })
+}
+
+const scrollToBookExpert = () => {
+  gtmCtaClick('hero_book_expert')
+  document.getElementById('book-expert')?.scrollIntoView({ behavior: 'smooth' })
 }
 
 const watchDemo = () => {

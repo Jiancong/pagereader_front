@@ -9,6 +9,7 @@
     />
     <main class="pt-16">
       <HeroSection />
+      <BookExpertPromoSection @create="onExpertPromo('create')" @explore="onExpertPromo('explore')" />
       <TrustedByMarquee />
       <EbookShowcaseSection @start="onStart" />
       <PricingSection :user-id="userId" @select-plan="onPricingPlan" @subscribed="refresh" />
@@ -32,6 +33,7 @@ import { useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import ProductHuntBanner from '../components/ProductHuntBanner.vue'
 import HeroSection from '../components/HeroSection.vue'
+import BookExpertPromoSection from '../components/BookExpertPromoSection.vue'
 import TrustedByMarquee from '../components/TrustedByMarquee.vue'
 import EbookShowcaseSection from '../components/EbookShowcaseSection.vue'
 import PricingSection from '../components/PricingSection.vue'
@@ -47,6 +49,8 @@ const userId = ref(null)
 const dialogOpen = ref(false)
 const dialogMode = ref('login')
 const authSource = ref('header')
+/** 登录成功后跳转工作区时携带的 query（如书籍专家蒸馏 / 探索） */
+const pendingWorkspaceQuery = ref(null)
 
 const refresh = async () => {
   logged.value = isLoggedIn()
@@ -80,7 +84,20 @@ const openLogin = (mode, source = 'header') => {
 const goWorkspace = () => router.push('/workspace')
 
 const onLoginSuccess = () => {
-  router.push('/workspace')
+  const query = pendingWorkspaceQuery.value
+  pendingWorkspaceQuery.value = null
+  router.push(query ? { path: '/workspace', query } : '/workspace')
+}
+
+const onExpertPromo = (action) => {
+  const query =
+    action === 'create' ? { distill: 'expert' } : { experts: '1' }
+  if (isLoggedIn()) {
+    router.push({ path: '/workspace', query })
+    return
+  }
+  pendingWorkspaceQuery.value = query
+  openLogin('signup', action === 'create' ? 'landing_expert_create' : 'landing_expert_explore')
 }
 
 const onStart = (payload) => {

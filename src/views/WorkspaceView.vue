@@ -98,7 +98,7 @@
 <script setup>
 defineOptions({ name: 'WorkspaceView' })
 
-import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -278,6 +278,20 @@ onMounted(async () => {
     } catch {
       /* 专家不存在或未公开则忽略 */
     }
+    router.replace({ name: 'workspace' })
+  }
+
+  const distillIntent = String(route.query.distill || '').trim()
+  if (distillIntent === 'expert') {
+    returnToGenerator()
+    await nextTick()
+    generatorRef.value?.openBookExpertDistill?.()
+    router.replace({ name: 'workspace' })
+  }
+
+  const expertsBrowse = String(route.query.experts || '').trim()
+  if (expertsBrowse === '1' || expertsBrowse === 'true') {
+    onExploreExperts()
     router.replace({ name: 'workspace' })
   }
 })

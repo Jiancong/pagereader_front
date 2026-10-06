@@ -201,7 +201,25 @@ export default {
     heroAudioTitle: "生成书籍，自带有声书体验",
     heroAudioDesc:
       "把生成的图书摘要同步变成可连续播放的有声内容，用更轻松的听觉盛宴吸收故事、观点与关键启发。",
+    heroExpertTitle: "书籍专家 · 把一本书蒸馏成顾问",
+    heroExpertDesc:
+      "上传 PDF、EPUB 等，AI 提炼书中的方法论与判断原则，生成可对话的专属专家。",
+    heroExpertLink: "了解书籍专家 →",
     heroCta: "立即开始",
+    bookExpert: {
+      badge: "新 · 书籍专家",
+      title: "不只看摘要，还能向「这本书」提问",
+      subtitle:
+        "从原书中蒸馏方法论，像与作者的思维模型对话一样，追问观点依据、适用场景与行动建议。",
+      stepUploadTitle: "上传原书",
+      stepUploadDesc: "PDF、EPUB、Word 等常见格式",
+      stepDistillTitle: "AI 蒸馏",
+      stepDistillDesc: "提取核心问题、观点与判断原则",
+      stepChatTitle: "持续对话",
+      stepChatDesc: "基于方法论作答，可分享至社区",
+      ctaCreate: "蒸馏我的书籍专家",
+      ctaExplore: "浏览社区专家",
+    },
     heroDemo: "观看演示",
     trustedBy: {
       tag: "受到全球研究者、分析师、创作者与深度思考者的信赖",

@@ -202,7 +202,25 @@ export default {
     heroAudioTitle: "Books with audiobook playback",
     heroAudioDesc:
       "Turn generated book summaries into a listening experience, so readers can absorb the story, ideas, and key takeaways through an easier audio feast.",
+    heroExpertTitle: "Book experts · distill a book into an advisor",
+    heroExpertDesc:
+      "Upload PDF, EPUB, and more—AI extracts the book’s methodology and judgment principles into a chat-ready expert.",
+    heroExpertLink: "Learn about book experts →",
     heroCta: "Get started",
+    bookExpert: {
+      badge: "New · Book expert",
+      title: "Go beyond summaries—talk to the book",
+      subtitle:
+        "Distill methodology from the source and ask follow-ups as if you were debating the author’s mental model.",
+      stepUploadTitle: "Upload the book",
+      stepUploadDesc: "PDF, EPUB, Word, and more",
+      stepDistillTitle: "AI distillation",
+      stepDistillDesc: "Core problem, viewpoints, and principles",
+      stepChatTitle: "Keep chatting",
+      stepChatDesc: "Answers grounded in methodology; share publicly",
+      ctaCreate: "Distill my book expert",
+      ctaExplore: "Browse community experts",
+    },
     heroDemo: "Watch demo",
     trustedBy: {
       tag: "Trusted by researchers, analysts, creators, and deep thinkers around the world",
