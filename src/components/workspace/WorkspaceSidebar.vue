@@ -70,17 +70,7 @@
         <Plus class="h-4 w-4 flex-shrink-0" />
         <span v-if="!isCollapsed" class="truncate">{{ t('workspace.newGenerate') }}</span>
       </button>
-      <button
-        v-if="!debugEnabled"
-        :title="t('workspace.exploreArticles')"
-        :class="navBtnClass(view === 'explore')"
-        @click="$emit('explore')"
-      >
-        <Compass class="h-4 w-4 flex-shrink-0" />
-        <span v-if="!isCollapsed" class="truncate">{{ t('workspace.exploreArticles') }}</span>
-      </button>
       <div
-        v-else
         role="tablist"
         :aria-label="t('workspace.exploreSwitchLabel')"
         :class="[
@@ -348,8 +338,6 @@ import AppBrandMark from '../AppBrandMark.vue'
 import LocaleSwitcher from '../LocaleSwitcher.vue'
 import WorkspaceCreditsBar from './WorkspaceCreditsBar.vue'
 import WorkspaceAssetsDrawer from './WorkspaceAssetsDrawer.vue'
-import { isAppDebugEnabled } from '@/config/appDebug'
-
 const SIDEBAR_COLLAPSED_KEY = 'workspace-sidebar-collapsed'
 const SIDEBAR_WIDTH_KEY = 'workspace-sidebar-width'
 const SIDEBAR_MIN_WIDTH = 200
@@ -454,7 +442,6 @@ function startSidebarResize(event) {
   window.addEventListener('mousemove', onMove)
   window.addEventListener('mouseup', onUp)
 }
-const debugEnabled = computed(() => isAppDebugEnabled())
 const historyLoading = computed(() =>
   props.historyMode === 'experts' ? props.loadingExpertHistory : props.loadingProjects,
 )
@@ -488,7 +475,7 @@ const navBtnClass = (active) => [
   active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
 ]
 
-/** debug 下「探索文章 | 探索专家」分段开关的当前高亮 */
+/** 「探索文章 | 探索专家」分段开关的当前高亮 */
 const exploreSegment = computed(() => {
   if (props.view === 'explore-experts' || props.view === 'expert-chat') return 'experts'
   if (props.view === 'explore') return 'articles'
