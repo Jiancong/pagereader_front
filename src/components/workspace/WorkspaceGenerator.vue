@@ -222,13 +222,8 @@
           </div>
 
           <!-- 步骤 3：蒸馏中 -->
-          <div v-else-if="expertStep === 'progress'" class="py-8 text-center">
-            <Loader2 class="mx-auto h-8 w-8 animate-spin text-primary" />
-            <p class="mt-4 text-sm font-medium text-foreground">{{ t('bookExpert.distillRunning') }}</p>
-            <p class="mt-1 text-xs text-muted-foreground">{{ t('bookExpert.distillRunningHint') }}</p>
-            <div class="relative mx-auto mt-5 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-secondary">
-              <div class="be-distill__indeterminate" />
-            </div>
+          <div v-else-if="expertStep === 'progress'">
+            <BookExpertDistillProgress :lines="expertDistillLogs" />
           </div>
 
           <!-- 步骤 4：完成 -->
@@ -735,7 +730,8 @@ import { validatePptDocumentFile } from "@/utils/pptDocumentRag"
 import { isSrtFileName, readSrtFile, parseSrtContent, type SrtParseResult } from "@/utils/srtParser"
 import { formatBytes } from "@/utils/userAssets"
 import { bookExpertApi } from "@/api"
-import { extractCreatedExpert } from "@/api/bookExpert"
+import { extractCreatedExpert, formatDistillProgressLine } from "@/api/bookExpert"
+import BookExpertDistillProgress from "@/components/workspace/BookExpertDistillProgress.vue"
 import { getOrCreateSessionId } from "@/api/agent"
 import { getSavedLocale } from "@/composables/useAppLocale"
 import { useBookExpertStore } from "@/stores/bookExpert"
@@ -873,7 +869,17 @@ const expertDoneName = ref("")
 const expertCreated = ref<BookExpertSummary | null>(null)
 const expertPreview = ref<{ problem: string; viewpoints: string[]; principles: string[] } | null>(null)
 const expertPreviewLoading = ref(false)
+const expertDistillLogs = ref<string[]>([])
 let expertAbort: AbortController | null = null
+
+function appendExpertDistillLog(data: unknown) {
+  const line = formatDistillProgressLine(data)
+  if (!line) return
+  const prev = expertDistillLogs.value
+  if (prev.length && prev[prev.length - 1] === line) return
+  const next = [...prev, line]
+  expertDistillLogs.value = next.length > 40 ? next.slice(-40) : next
+}
 
 /** 创建完成后拉取详情，展示方法论速览（核心问题 / 观点 / 原则）。失败静默降级。 */
 /** Python 条目自带「1. 」序号前缀，与 list-disc 圆点叠加成双重编号，剥掉前缀 */
@@ -949,6 +955,7 @@ async function onExpertSubmit() {
   expertSubmitting.value = true
   expertError.value = ""
   expertStep.value = "progress"
+  expertDistillLogs.value = []
   bookExpertStore.startDistill()
   expertAbort?.abort()
   expertAbort = new AbortController()
@@ -965,6 +972,11 @@ async function onExpertSubmit() {
         uiLocale: getSavedLocale() === "en" ? "en" : "zh",
       },
       {
+        onProgress: (data) => appendExpertDistillLog(data),
+        onEvent: (event, data) => {
+          if (event === "expert_created" || event === "error" || event === "complete") return
+          appendExpertDistillLog(data)
+        },
         onExpertCreated: (data) => {
           // Python 把专家摘要嵌在 expert 字段下（顶层只有 status/ok/points_charged），
           // 此前直接读 data.expert_name 恒为 undefined，导致完成页名字不显示。
@@ -1014,6 +1026,7 @@ function resetExpertFlow() {
   expertCreated.value = null
   expertPreview.value = null
   expertPreviewLoading.value = false
+  expertDistillLogs.value = []
   bookExpertStore.resetDistill()
   if (expertFileInput.value) expertFileInput.value.value = ""
 }

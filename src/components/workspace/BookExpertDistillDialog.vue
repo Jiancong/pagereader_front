@@ -62,14 +62,7 @@
 
           <section v-else-if="step === 'progress'" class="be-distill__step">
             <p class="be-distill__step-label">{{ t('bookExpert.distillStepProgress') }}</p>
-            <div class="be-distill__progress">
-              <Loader2 class="h-6 w-6 animate-spin text-primary" />
-              <p class="mt-3 text-sm text-foreground">{{ t('bookExpert.distillRunning') }}</p>
-              <p class="mt-1 text-xs text-muted-foreground">{{ t('bookExpert.distillRunningHint') }}</p>
-              <div class="relative mt-4 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-                <div class="be-distill__indeterminate" />
-              </div>
-            </div>
+            <BookExpertDistillProgress :lines="distillLogs" />
           </section>
 
           <section v-else-if="step === 'done'" class="be-distill__step">
@@ -110,7 +103,8 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { X, Upload, FileText, Loader2, Sparkles } from 'lucide-vue-next'
 import { fileApi, bookExpertApi, ApiError, isCreditsInsufficient } from '@/api'
-import { extractCreatedExpert } from '@/api/bookExpert'
+import { extractCreatedExpert, formatDistillProgressLine } from '@/api/bookExpert'
+import BookExpertDistillProgress from '@/components/workspace/BookExpertDistillProgress.vue'
 import { useBookExpertStore } from '@/stores/bookExpert'
 import { getOrCreateSessionId } from '@/api/agent'
 import { getSavedLocale } from '@/composables/useAppLocale'
@@ -142,7 +136,17 @@ const submitting = ref(false)
 const errorMessage = ref('')
 const lastCreatedName = ref('')
 const lastCreatedExpert = ref<BookExpertSummary | null>(null)
+const distillLogs = ref<string[]>([])
 let abortController: AbortController | null = null
+
+function appendDistillLog(data: unknown) {
+  const line = formatDistillProgressLine(data)
+  if (!line) return
+  const prev = distillLogs.value
+  if (prev.length && prev[prev.length - 1] === line) return
+  const next = [...prev, line]
+  distillLogs.value = next.length > 40 ? next.slice(-40) : next
+}
 
 watch(() => props.open, (open) => {
   if (!open) return
@@ -165,6 +169,7 @@ function reset() {
   errorMessage.value = ''
   lastCreatedName.value = ''
   lastCreatedExpert.value = null
+  distillLogs.value = []
   store.resetDistill()
 }
 
@@ -215,6 +220,7 @@ async function onSubmit() {
   submitting.value = true
   errorMessage.value = ''
   step.value = 'progress'
+  distillLogs.value = []
   store.startDistill()
   abortController?.abort()
   abortController = new AbortController()
@@ -231,6 +237,11 @@ async function onSubmit() {
         uiLocale: getSavedLocale() === 'en' ? 'en' : 'zh',
       },
       {
+        onProgress: (data) => appendDistillLog(data),
+        onEvent: (event, data) => {
+          if (event === 'expert_created' || event === 'error' || event === 'complete') return
+          appendDistillLog(data)
+        },
         onExpertCreated: (data) => {
           // Python 把专家摘要嵌在 expert 字段下（顶层无 expert_name 等字段）
           const expert: BookExpertSummary = extractCreatedExpert(data, {

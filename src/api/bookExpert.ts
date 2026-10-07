@@ -432,7 +432,54 @@ export interface DistillStreamCallbacks {
   onExpertCreated?: (data: DistillExpertCreatedEvent) => void
   onError?: (message: string, data?: DistillErrorEvent | unknown) => void
   onComplete?: (data: DistillCompleteEvent | unknown) => void
+  onProgress?: (data: unknown) => void
   onEvent?: (event: string, data: unknown, raw: string) => void
+}
+
+/** 从蒸馏 SSE data 提取可展示进度文案 */
+export function formatDistillProgressLine(data: unknown): string {
+  if (typeof data === "string") return data.trim()
+  if (!data || typeof data !== "object") return ""
+  const o = data as Record<string, unknown>
+  for (const key of ["progress_status", "message", "text", "response", "detail"] as const) {
+    const v = o[key]
+    if (typeof v === "string" && v.trim()) return v.trim()
+  }
+  if (o.phase != null) {
+    const phase = String(o.phase)
+    const step = typeof o.step === "string" ? o.step.trim() : ""
+    return step ? `${phase}: ${step}` : `Phase ${phase}`
+  }
+  if (String(o.status ?? "").toLowerCase() === "in_progress") {
+    return typeof o.progress_status === "string" ? o.progress_status.trim() : ""
+  }
+  return ""
+}
+
+function normalizeDistillEventName(event: string): string {
+  return String(event ?? "")
+    .trim()
+    .toLowerCase()
+}
+
+function isDistillProgressEvent(event: string, data: unknown): boolean {
+  const e = normalizeDistillEventName(event)
+  if (
+    e === "progress" ||
+    e === "distill_progress" ||
+    e === "ping" ||
+    e === "distill_ping" ||
+    e === "status"
+  ) {
+    return true
+  }
+  if (data && typeof data === "object") {
+    const p = data as Record<string, unknown>
+    const st = String(p.status ?? "").toLowerCase()
+    if (st === "in_progress") return true
+    if (p.progress_status != null || p.phase != null) return true
+  }
+  return false
 }
 
 function safeParse(s: string): unknown {
@@ -523,6 +570,8 @@ export async function distillExpert(
     } else if (event === "complete") {
       completed = true
       cb.onComplete?.(data)
+    } else if (isDistillProgressEvent(event, data)) {
+      cb.onProgress?.(data)
     }
   }
 
