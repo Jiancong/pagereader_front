@@ -10,6 +10,11 @@
     <main class="pt-16">
       <HeroSection />
       <BookExpertPromoSection @create="onExpertPromo('create')" @explore="onExpertPromo('explore')" />
+      <BookExpertShowcaseSection
+        :user-id="userId"
+        @create="onExpertPromo('create')"
+        @explore="onExpertPromo('explore')"
+      />
       <TrustedByMarquee />
       <EbookShowcaseSection @start="onStart" />
       <PricingSection :user-id="userId" @select-plan="onPricingPlan" @subscribed="refresh" />
@@ -34,6 +39,7 @@ import AppHeader from '../components/AppHeader.vue'
 import ProductHuntBanner from '../components/ProductHuntBanner.vue'
 import HeroSection from '../components/HeroSection.vue'
 import BookExpertPromoSection from '../components/BookExpertPromoSection.vue'
+import BookExpertShowcaseSection from '../components/BookExpertShowcaseSection.vue'
 import TrustedByMarquee from '../components/TrustedByMarquee.vue'
 import EbookShowcaseSection from '../components/EbookShowcaseSection.vue'
 import PricingSection from '../components/PricingSection.vue'

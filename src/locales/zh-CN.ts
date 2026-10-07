@@ -219,6 +219,10 @@ export default {
       stepChatDesc: "基于方法论作答，可分享至社区",
       ctaCreate: "蒸馏我的书籍专家",
       ctaExplore: "浏览社区专家",
+      showcaseTitle: "社区书籍专家",
+      showcaseSubtitle:
+        "看看其他人从经典著作中蒸馏出的方法论顾问，点进卡片预览核心观点，登录后即可对话。",
+      cardAlt: "{name} — 书籍专家",
     },
     heroDemo: "观看演示",
     trustedBy: {

@@ -220,6 +220,10 @@ export default {
       stepChatDesc: "Answers grounded in methodology; share publicly",
       ctaCreate: "Distill my book expert",
       ctaExplore: "Browse community experts",
+      showcaseTitle: "Book experts from the community",
+      showcaseSubtitle:
+        "Explore methodology advisors distilled from real books—open a card for a preview, then chat after you sign in.",
+      cardAlt: "{name} — book expert",
     },
     heroDemo: "Watch demo",
     trustedBy: {

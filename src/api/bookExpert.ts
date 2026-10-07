@@ -123,11 +123,15 @@ export async function listMyExperts(userId: string): Promise<BookExpertListResul
  * 自己拥有的全部专家（含 private/public）用 {@link listMyExperts}。
  */
 export async function listPublicExperts(
-  userId: string,
+  userId?: string,
   excludeOwn = false,
 ): Promise<BookExpertListResult> {
+  const uid = String(userId ?? "").trim()
+  const query: Record<string, string | number> = {}
+  if (uid) query.userId = uid
+  if (excludeOwn && uid) query.exclude_own = 1
   return rawRequest<BookExpertListResult>("GET", "/book-experts/public", {
-    query: excludeOwn ? { userId, exclude_own: 1 } : { userId },
+    query: Object.keys(query).length ? query : undefined,
   })
 }
 
