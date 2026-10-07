@@ -44,6 +44,9 @@ const PPT_DOC_MAX_BYTES = 50 * 1024 * 1024;
 
 const PPT_DOC_EXT_RE = /\.(pdf|docx?|md|markdown|txt|epub|mobi|srt)$/i;
 
+/** 书籍专家蒸馏支持的扩展名（含 azw；不含 srt） */
+const BOOK_EXPERT_DOC_EXT_RE = /\.(pdf|docx?|md|markdown|txt|epub|mobi|azw3?)$/i;
+
 export function isHttpShareUrl(url: string): boolean {
   const t = String(url || "").trim();
   return t.startsWith("http://") || t.startsWith("https://");
@@ -163,6 +166,23 @@ export function isAllowedPptDocumentFile(file: File): boolean {
     m === "application/x-mobipocket-ebook" ||
     m === "application/x-subrip" ||
     m === "text/srt"
+  );
+}
+
+export function isBookExpertDocumentAsset(name: string, url = "", contentType = ""): boolean {
+  const nameProbe = String(name || "").toLowerCase();
+  const urlPath = String(url || "").split("?")[0].toLowerCase();
+  if (BOOK_EXPERT_DOC_EXT_RE.test(nameProbe) || BOOK_EXPERT_DOC_EXT_RE.test(urlPath)) {
+    return true;
+  }
+  const ct = String(contentType || "").toLowerCase();
+  return (
+    ct.includes("pdf") ||
+    ct.includes("msword") ||
+    ct.includes("wordprocessingml") ||
+    ct.includes("epub") ||
+    ct.includes("mobi") ||
+    ct.startsWith("text/")
   );
 }
 

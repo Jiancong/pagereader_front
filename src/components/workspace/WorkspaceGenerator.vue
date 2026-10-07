@@ -162,10 +162,26 @@
                 class="hidden"
                 @change="onExpertFileChange"
               />
-              <template v-if="expertPickedFile">
-                <FileText class="mx-auto h-10 w-10 text-primary" />
-                <p class="mt-3 break-words font-medium text-foreground">{{ expertPickedFile.name }}</p>
-                <p class="mt-1 text-sm text-muted-foreground">{{ formatBytes(expertPickedFile.size) }}</p>
+              <template v-if="hasExpertAttachedDoc">
+                <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+                  <FileText class="h-10 w-10 flex-shrink-0 text-primary" />
+                  <div class="min-w-0 flex-1 text-center sm:text-left">
+                    <p class="break-words font-medium text-foreground">{{ expertAttachedDocName }}</p>
+                    <p v-if="expertAttachedDocSizeLabel" class="mt-1 text-sm text-muted-foreground">
+                      {{ expertAttachedDocSizeLabel }}
+                    </p>
+                    <p v-if="expertCloudDocument" class="mt-1 text-xs text-muted-foreground">
+                      {{ t('workspace.fromCloudLibrary') }}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary"
+                    @click.stop="clearExpertAttachedDoc"
+                  >
+                    <X class="h-5 w-5 text-muted-foreground" />
+                  </button>
+                </div>
               </template>
               <template v-else>
                 <Upload class="mx-auto h-12 w-12 text-muted-foreground/50" />
@@ -176,7 +192,7 @@
             <p v-if="expertFileError" class="mt-3 text-sm text-red-400">{{ expertFileError }}</p>
             <button
               type="button"
-              :disabled="!expertPickedFile || expertUploading"
+              :disabled="!hasExpertAttachedDoc || expertUploading"
               class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               @click="onExpertNext"
             >
@@ -726,7 +742,11 @@ import { resolvePptDataFromStreamComplete, isPptStreamPayload } from "@/utils/pp
 import { pollProjectGenerationAfterStreamDisconnect, GENERATION_POLL_MAX_WAIT_MS } from "@/utils/streamProjectPoll"
 import { notifyCreditsRefresh } from "@/composables/useCreditsRefresh"
 import type { UploadedDocument } from "@/utils/pptDocumentRag"
-import { validatePptDocumentFile } from "@/utils/pptDocumentRag"
+import {
+  inferPptDocumentType,
+  isBookExpertDocumentAsset,
+  validatePptDocumentFile,
+} from "@/utils/pptDocumentRag"
 import { isSrtFileName, readSrtFile, parseSrtContent, type SrtParseResult } from "@/utils/srtParser"
 import { formatBytes } from "@/utils/userAssets"
 import { bookExpertApi } from "@/api"
@@ -858,6 +878,8 @@ const bookExpertStore = useBookExpertStore()
 const expertFileInput = ref<HTMLInputElement | null>(null)
 const expertStep = ref<"upload" | "name" | "progress" | "done">("upload")
 const expertPickedFile = ref<File | null>(null)
+const expertCloudDocument = ref<UploadedDocument | null>(null)
+const expertCloudSize = ref<number | undefined>(undefined)
 const expertUploadedDoc = ref<DistillUploadedDocument | null>(null)
 const expertFileError = ref("")
 const expertUploading = ref(false)
@@ -930,15 +952,68 @@ function pickExpertFile(f: File) {
   if (v === "unsupported") { expertFileError.value = t("workspace.uploadUnsupportedType"); return }
   if (v === "too_large") { expertFileError.value = t("workspace.uploadTooLarge"); return }
   expertPickedFile.value = f
+  expertCloudDocument.value = null
+  expertCloudSize.value = undefined
   expertUploadedDoc.value = null
 }
 
+const hasExpertAttachedDoc = computed(
+  () => Boolean(expertPickedFile.value || expertCloudDocument.value),
+)
+const expertAttachedDocName = computed(
+  () => expertPickedFile.value?.name || expertCloudDocument.value?.name || "",
+)
+const expertAttachedDocSizeLabel = computed(() => {
+  if (expertCloudSize.value != null) return formatBytes(expertCloudSize.value)
+  if (expertPickedFile.value) return formatBytes(expertPickedFile.value.size)
+  return ""
+})
+
+function clearExpertAttachedDoc() {
+  expertPickedFile.value = null
+  expertCloudDocument.value = null
+  expertCloudSize.value = undefined
+  expertUploadedDoc.value = null
+  expertFileError.value = ""
+  if (expertFileInput.value) expertFileInput.value.value = ""
+}
+
+function attachExpertCloudDocument(payload: { doc: UploadedDocument; size?: number }) {
+  const doc = payload.doc
+  if (
+    !isBookExpertDocumentAsset(doc.name || "", doc.url || "", String(doc.type || ""))
+  ) {
+    expertFileError.value = t("workspace.uploadUnsupportedType")
+    return
+  }
+  expertPickedFile.value = null
+  if (expertFileInput.value) expertFileInput.value.value = ""
+  expertCloudDocument.value = doc
+  expertCloudSize.value = payload.size
+  expertUploadedDoc.value = null
+  expertFileError.value = ""
+  activeTab.value = "expert"
+  if (expertStep.value !== "upload") expertStep.value = "upload"
+  gtmAssetAttach(gtmFileExt(doc.name || ""))
+}
+
 async function onExpertNext() {
-  if (!expertPickedFile.value || expertUploading.value) return
+  if (!hasExpertAttachedDoc.value || expertUploading.value) return
   expertUploading.value = true
   expertFileError.value = ""
   try {
-    expertUploadedDoc.value = await fileApi.uploadDocument(expertPickedFile.value)
+    if (expertCloudDocument.value) {
+      const cloud = expertCloudDocument.value
+      expertUploadedDoc.value = {
+        url: cloud.url,
+        name: cloud.name || "document",
+        type: cloud.type || inferPptDocumentType(cloud.name || ""),
+      }
+    } else if (expertPickedFile.value) {
+      expertUploadedDoc.value = await fileApi.uploadDocument(expertPickedFile.value)
+    } else {
+      return
+    }
     if (!expertBookTitle.value.trim()) {
       expertBookTitle.value = expertUploadedDoc.value.name.replace(/\.[^.]+$/, "")
     }
@@ -1015,6 +1090,8 @@ async function onExpertSubmit() {
 function resetExpertFlow() {
   expertStep.value = "upload"
   expertPickedFile.value = null
+  expertCloudDocument.value = null
+  expertCloudSize.value = undefined
   expertUploadedDoc.value = null
   expertFileError.value = ""
   expertUploading.value = false
@@ -1472,6 +1549,11 @@ const clearAttachedDoc = () => {
 
 function attachCloudDocument(payload: { doc: UploadedDocument; size?: number }) {
   if (!payload?.doc?.url) return
+
+  if (activeTab.value === "expert") {
+    attachExpertCloudDocument(payload)
+    return
+  }
 
   if (debugEnabled.value && isPdfDocument(payload.doc) && activeTab.value === "translate") {
     selectedPdf.value = null
