@@ -150,7 +150,7 @@
           </div>
 
           <!-- 一句话直连生成 -->
-          <div v-else-if="activeTab === 'quick'" class="space-y-6">
+          <div v-else-if="debugEnabled && activeTab === 'quick'" class="space-y-6">
             <div class="mb-6">
               <h3 class="text-lg font-semibold text-foreground">{{ t('landing.promptTitle') }}</h3>
               <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.promptHint') }}</p>
@@ -231,7 +231,7 @@
           </div>
 
           <!-- 沉浸式翻译 -->
-          <div v-else-if="activeTab === 'translate'" class="space-y-6">
+          <div v-else-if="debugEnabled && activeTab === 'translate'" class="space-y-6">
             <div class="mb-6">
               <h3 class="text-lg font-semibold text-foreground">{{ t('landing.translateTitle') }}</h3>
               <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.translateHint') }}</p>
@@ -595,6 +595,7 @@ const clearSelectedPdf = () => {
 }
 
 const startImmersiveTranslation = () => {
+  if (!debugEnabled.value) return
   if (translateMode.value === 'url') {
     const url = normalizeWebUrl(translateUrl.value)
     if (!url) return
@@ -641,6 +642,7 @@ const selectUploadExample = (example: { id: string; prompt: string }) => {
 }
 
 const generatePPT = () => {
+  if (!debugEnabled.value) return
   gtmGenerateIntent('prompt', Boolean(prompt.value.trim()))
   emit('start', { mode: 'prompt', prompt: prompt.value })
 }
@@ -673,6 +675,10 @@ const closeDemoVideo = () => {
 function onLandingWatchDemo() {
   showDemoVideo.value = true
 }
+
+watch(debugEnabled, () => {
+  ensureDebugOnlyTabsHidden()
+})
 
 onMounted(() => {
   ensureDebugOnlyTabsHidden()

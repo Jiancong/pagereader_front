@@ -365,7 +365,7 @@
         </div>
 
         <!-- 一句话 / 联网搜索 -->
-        <div v-else-if="activeTab === 'prompt'" class="p-6 sm:p-8">
+        <div v-else-if="debugEnabled && activeTab === 'prompt'" class="p-6 sm:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('promptTitle')) }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('promptHint')) }}</p>
@@ -389,7 +389,7 @@
         </div>
 
         <!-- 沉浸式翻译（PDF / 网页） -->
-        <div v-else-if="activeTab === 'translate'" class="p-6 sm:p-8">
+        <div v-else-if="debugEnabled && activeTab === 'translate'" class="p-6 sm:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.translateTitle') }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.translateHint') }}</p>
@@ -1473,7 +1473,7 @@ const clearAttachedDoc = () => {
 function attachCloudDocument(payload: { doc: UploadedDocument; size?: number }) {
   if (!payload?.doc?.url) return
 
-  if (isPdfDocument(payload.doc) && activeTab.value === "translate") {
+  if (debugEnabled.value && isPdfDocument(payload.doc) && activeTab.value === "translate") {
     selectedPdf.value = null
     if (pdfFileInput.value) pdfFileInput.value.value = ""
     cloudPdfDocument.value = payload.doc
@@ -1567,6 +1567,10 @@ onMounted(() => {
   importReaderBookFromQuery()
 })
 
+watch(debugEnabled, () => {
+  ensureDebugOnlyTabsHidden()
+})
+
 watch(
   () => route.query.fromReader,
   () => {
@@ -1575,6 +1579,7 @@ watch(
 )
 
 const startImmersiveTranslation = async () => {
+  if (!debugEnabled.value) return
   translateError.value = ""
   if (translateMode.value === "url") {
     const url = normalizeWebUrl(translateUrl.value)
@@ -1893,6 +1898,7 @@ const handleGenerateError = (task: GeneratorTask, e: unknown, mode: "prompt" | "
 }
 
 const onPromptSubmit = async () => {
+  if (!debugEnabled.value) return
   if (!input.value.trim() || promptTask.isGenerating) return
   startTask(promptTask)
   if (!(await ensureCreditsForTask(promptTask))) {

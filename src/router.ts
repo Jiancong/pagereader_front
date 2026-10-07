@@ -3,6 +3,7 @@
 
 import { createRouter, createWebHistory, createWebHashHistory } from "vue-router";
 import { isLoggedIn } from "./api";
+import { isAppDebugEnabled } from "./config/appDebug";
 import { pushGtmPageView, gtmPageTypeFromRoute } from "./composables/useGtmDataLayer";
 import { applyDocumentI18n, normalizeLocale } from "./composables/useAppLocale";
 import { i18n } from "./i18n";
@@ -61,6 +62,7 @@ const routes = [
     path: "/translate",
     name: "translate",
     component: () => import("./views/ImmersiveTranslationView.vue"),
+    meta: { requiresDebug: true },
   },
   {
     path: "/reader",
@@ -154,6 +156,7 @@ router.onError((error, to) => {
 router.beforeEach((to) => {
   const logged = isLoggedIn();
   if (to.meta.requiresAuth && !logged) return { name: "landing" };
+  if (to.meta.requiresDebug && !isAppDebugEnabled()) return { name: "workspace" };
   // 已登录访问落地页直接进工作区（定价页可单独查看）
   if (to.name === "landing" && logged) return { name: "workspace" };
   return true;
