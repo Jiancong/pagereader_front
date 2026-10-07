@@ -120,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -133,6 +133,7 @@ import { bookExpertApi } from '@/api'
 import { buildExploreExpertShareUrl } from '@/utils/feedOpen'
 import { useSeoHead } from '@/composables/useSeoHead'
 import type { BookExpertSummary } from '@/api/types'
+import { localizeBookExpertSummaries } from '@/utils/resolveBookExpertDisplay'
 
 defineOptions({ name: 'ExploreExpertView' })
 

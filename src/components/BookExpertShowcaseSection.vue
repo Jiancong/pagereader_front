@@ -83,20 +83,38 @@ import { useI18n } from 'vue-i18n'
 import { Loader2, Sparkles, BookOpen } from 'lucide-vue-next'
 import { bookExpertApi } from '@/api'
 import type { BookExpertSummary } from '@/api/types'
+import { localizeBookExpertSummaries } from '@/utils/resolveBookExpertDisplay'
 
 const props = defineProps<{ userId?: string | number | null }>()
 defineEmits<{ create: []; explore: [] }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const LANDING_EXPERT_LIMIT = 8
 
+const rawExperts = ref<BookExpertSummary[]>([])
 const experts = ref<BookExpertSummary[]>([])
 const loading = ref(false)
+const localizing = ref(false)
 const error = ref('')
 const hasLoaded = ref(false)
 
-const visible = computed(() => loading.value || (hasLoaded.value && experts.value.length > 0))
+const visible = computed(
+  () => loading.value || localizing.value || (hasLoaded.value && experts.value.length > 0),
+)
+
+async function applyDisplayLocale() {
+  if (!rawExperts.value.length) {
+    experts.value = []
+    return
+  }
+  localizing.value = true
+  try {
+    experts.value = await localizeBookExpertSummaries(rawExperts.value, locale.value)
+  } finally {
+    localizing.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -104,9 +122,11 @@ async function load() {
   try {
     const uid = props.userId != null ? String(props.userId).trim() : ''
     const res = await bookExpertApi.listPublicExperts(uid || undefined, Boolean(uid))
-    experts.value = (res?.experts ?? []).slice(0, LANDING_EXPERT_LIMIT)
+    rawExperts.value = (res?.experts ?? []).slice(0, LANDING_EXPERT_LIMIT)
+    await applyDisplayLocale()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('common.loadFailed')
+    rawExperts.value = []
     experts.value = []
   } finally {
     loading.value = false
@@ -120,6 +140,10 @@ watch(
     void load()
   },
 )
+
+watch(locale, () => {
+  void applyDisplayLocale()
+})
 
 onMounted(() => {
   void load()

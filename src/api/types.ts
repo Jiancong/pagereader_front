@@ -736,7 +736,12 @@ export type BookExpertVisibility = "private" | "public"
 export interface BookExpertSummary {
   expert_id: string
   expert_name: string
+  /** 英文展示名（公共列表 / 详情可选返回） */
+  expert_name_en?: string
+  expertNameEn?: string
   book_title?: string
+  book_title_en?: string
+  bookTitleEn?: string
   visibility: BookExpertVisibility
   owner_user_id: string
   created_at?: string

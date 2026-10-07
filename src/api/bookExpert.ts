@@ -4,7 +4,7 @@
 import { buildUrl, ApiError } from "./client"
 import { getToken } from "./token"
 import { getApiContextHeaders } from "@/utils/apiRequestContext"
-import { getSavedLocale } from "@/composables/useAppLocale"
+import { getSavedLocale, resolveApiLocale } from "@/composables/useAppLocale"
 import type {
   BookExpertListResult,
   BookExpertDetailResult,
@@ -127,11 +127,14 @@ export async function listPublicExperts(
   excludeOwn = false,
 ): Promise<BookExpertListResult> {
   const uid = String(userId ?? "").trim()
-  const query: Record<string, string | number> = {}
+  const query: Record<string, string | number> = {
+    locale: resolveApiLocale(),
+    ui_locale: getSavedLocale() === "en" ? "en" : "zh",
+  }
   if (uid) query.userId = uid
   if (excludeOwn && uid) query.exclude_own = 1
   return rawRequest<BookExpertListResult>("GET", "/book-experts/public", {
-    query: Object.keys(query).length ? query : undefined,
+    query,
   })
 }
 
@@ -139,8 +142,14 @@ export async function getExpert(
   expertId: string,
   userId?: string,
 ): Promise<BookExpertDetailResult> {
+  const query: Record<string, string> = {
+    locale: resolveApiLocale(),
+    ui_locale: getSavedLocale() === "en" ? "en" : "zh",
+  }
+  const uid = String(userId ?? "").trim()
+  if (uid) query.userId = uid
   return rawRequest<BookExpertDetailResult>("GET", `/book-experts/${encodeURIComponent(expertId)}`, {
-    query: userId ? { userId } : undefined,
+    query,
   })
 }
 
