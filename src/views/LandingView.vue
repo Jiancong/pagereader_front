@@ -17,9 +17,9 @@
         @create="onExpertPromo('create')"
         @explore="onExpertPromo('explore')"
       />
-      <TrustedByMarquee />
       <EbookShowcaseSection @start="onStart" />
       <PricingSection :user-id="userId" @select-plan="onPricingPlan" @subscribed="refresh" />
+      <TrustedByMarquee />
     </main>
     <ProductHuntBanner />
     <AppFooter />
