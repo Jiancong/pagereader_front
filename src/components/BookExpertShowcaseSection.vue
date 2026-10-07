@@ -2,7 +2,7 @@
   <section
     v-if="visible"
     id="book-expert-showcase"
-    class="py-16 sm:py-20"
+    class="pb-16 pt-6 sm:pb-20 sm:pt-8"
     aria-labelledby="book-expert-showcase-heading"
   >
     <div class="mx-auto max-w-6xl px-6">

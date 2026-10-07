@@ -8,8 +8,10 @@
       @enter="goWorkspace"
     />
     <main class="pt-16">
-      <HeroSection />
-      <BookExpertPromoSection @create="onExpertPromo('create')" @explore="onExpertPromo('explore')" />
+      <HeroSection
+        @expert-create="onExpertPromo('create')"
+        @expert-explore="onExpertPromo('explore')"
+      />
       <BookExpertShowcaseSection
         :user-id="userId"
         @create="onExpertPromo('create')"
@@ -38,7 +40,6 @@ import { useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import ProductHuntBanner from '../components/ProductHuntBanner.vue'
 import HeroSection from '../components/HeroSection.vue'
-import BookExpertPromoSection from '../components/BookExpertPromoSection.vue'
 import BookExpertShowcaseSection from '../components/BookExpertShowcaseSection.vue'
 import TrustedByMarquee from '../components/TrustedByMarquee.vue'
 import EbookShowcaseSection from '../components/EbookShowcaseSection.vue'
