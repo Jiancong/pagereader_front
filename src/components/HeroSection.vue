@@ -5,10 +5,12 @@
       <div class="absolute -bottom-40 -left-40 h-[400px] w-[400px] rounded-full bg-accent/10 blur-3xl" />
     </div>
 
-    <div class="relative mx-auto max-w-6xl px-6">
-      <div class="mx-auto max-w-3xl text-center">
+    <div
+      class="relative mx-auto grid max-w-6xl items-stretch gap-8 px-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.92fr)] lg:gap-10"
+    >
+      <div class="flex flex-col justify-center text-center lg:text-left">
         <div
-          class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-3 py-1.5 text-xs text-muted-foreground sm:text-sm"
+          class="mb-4 inline-flex self-center items-center gap-2 rounded-full border border-border bg-card/50 px-3 py-1.5 text-xs text-muted-foreground sm:text-sm lg:self-start"
         >
           <Sparkles class="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" />
           <span>{{ t('landing.heroBadge') }}</span>
@@ -24,11 +26,27 @@
           </span>
         </h1>
 
-        <p class="mx-auto mb-6 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg">
+        <p class="mx-auto mb-5 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg lg:mx-0">
           {{ t('landing.heroSubtitle') }}
         </p>
 
-        <div class="mb-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <div
+          class="mx-auto mb-6 flex max-w-xl items-center gap-3 rounded-xl border border-border/70 bg-card/40 p-3 text-left lg:mx-0"
+        >
+          <div
+            class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+          >
+            <Headphones class="h-4 w-4" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-foreground">{{ t('landing.heroAudioTitle') }}</p>
+            <p class="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
+              {{ t('landing.heroAudioDesc') }}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
           <button
             type="button"
             class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 sm:w-auto sm:px-7"
@@ -48,96 +66,73 @@
         </div>
       </div>
 
-      <!-- 亮点 + 书籍专家：单卡片、对齐同一栅格 -->
       <div
         id="book-expert"
-        class="overflow-hidden rounded-2xl border border-border/80 bg-card/50 shadow-sm backdrop-blur-sm"
+        class="flex flex-col rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-accent/5 p-5 shadow-lg shadow-primary/5 sm:p-6"
       >
-        <div class="grid divide-y divide-border/70 md:grid-cols-2 md:divide-x md:divide-y-0">
-          <div class="flex items-center gap-3 p-4 sm:p-5">
-            <div
-              class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
-            >
-              <Headphones class="h-4 w-4" />
-            </div>
-            <div class="min-w-0 text-left">
-              <p class="text-sm font-semibold text-foreground">{{ t('landing.heroAudioTitle') }}</p>
-              <p class="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
-                {{ t('landing.heroAudioDesc') }}
-              </p>
-            </div>
+        <div
+          class="mb-4 inline-flex self-start items-center gap-1.5 rounded-full border border-primary/25 bg-background/70 px-2.5 py-1 text-[11px] font-medium text-primary"
+        >
+          <Sparkles class="h-3 w-3" />
+          {{ t('landing.bookExpert.badge') }}
+        </div>
+
+        <div class="flex items-start gap-3">
+          <div
+            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent"
+          >
+            <BookOpen class="h-5 w-5" />
           </div>
-          <div class="flex items-center gap-3 p-4 sm:p-5">
-            <div
-              class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent"
-            >
-              <BookOpen class="h-4 w-4" />
-            </div>
-            <div class="min-w-0 text-left">
-              <p class="text-sm font-semibold text-foreground">{{ t('landing.bookExpert.title') }}</p>
-              <p class="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
-                {{ t('landing.bookExpert.subtitle') }}
-              </p>
-            </div>
+          <div>
+            <h2 class="text-xl font-bold leading-tight text-foreground sm:text-2xl">
+              {{ t('landing.bookExpert.title') }}
+            </h2>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {{ t('landing.bookExpert.subtitle') }}
+            </p>
           </div>
         </div>
 
-        <div
-          class="flex flex-col gap-4 border-t border-border/70 bg-gradient-to-r from-primary/[0.06] via-transparent to-accent/[0.06] p-4 sm:p-5 lg:flex-row lg:items-center lg:gap-6"
-        >
-          <div class="flex min-w-0 flex-shrink-0 items-center gap-2 lg:w-44 xl:w-52">
-            <span
-              class="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-background/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary"
-            >
-              <Sparkles class="h-3 w-3" />
-              {{ t('landing.bookExpert.badge') }}
-            </span>
-          </div>
-
-          <ol
-            class="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3"
-            :aria-label="t('landing.bookExpert.title')"
+        <ol class="my-5 space-y-3" :aria-label="t('landing.bookExpert.title')">
+          <li
+            v-for="(step, index) in steps"
+            :key="step.title"
+            class="flex items-center gap-3"
           >
-            <li
-              v-for="(step, index) in steps"
-              :key="step.title"
-              class="flex items-start gap-2 rounded-lg border border-border/60 bg-background/60 px-2.5 py-2 sm:px-3"
+            <span
+              class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-background/70 text-primary"
             >
-              <span
-                class="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
-              >
-                <component :is="step.icon" class="h-3.5 w-3.5" />
+              <component :is="step.icon" class="h-4 w-4" />
+            </span>
+            <span class="min-w-0 text-left">
+              <span class="block text-sm font-semibold leading-tight text-foreground">
+                <span class="mr-1.5 text-xs font-medium text-primary">{{ index + 1 }}</span>
+                {{ step.title }}
               </span>
-              <span class="min-w-0 text-left">
-                <span class="block text-xs font-semibold leading-tight text-foreground">
-                  <span class="mr-1 text-[10px] font-normal text-muted-foreground">{{ index + 1 }}.</span>
-                  {{ step.title }}
-                </span>
-                <span class="mt-0.5 block line-clamp-1 text-[11px] leading-snug text-muted-foreground">
-                  {{ step.desc }}
-                </span>
+              <span class="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                {{ step.desc }}
               </span>
-            </li>
-          </ol>
+            </span>
+          </li>
+        </ol>
 
-          <div class="flex flex-shrink-0 flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
-            <button
-              type="button"
-              class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-              @click="emit('expert-create')"
-            >
-              <Upload class="h-3.5 w-3.5" />
-              {{ t('landing.bookExpert.ctaCreate') }}
-            </button>
-            <button
-              type="button"
-              class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background/80 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/40"
-              @click="emit('expert-explore')"
-            >
-              <Compass class="h-3.5 w-3.5" />
-              {{ t('landing.bookExpert.ctaExplore') }}
-            </button>
-          </div>
+        <div class="mt-auto grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            @click="emit('expert-create')"
+          >
+            <Upload class="h-3.5 w-3.5" />
+            {{ t('landing.bookExpert.ctaCreate') }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background/80 px-4 py-2.5 text-xs font-semibold text-foreground transition-colors hover:border-primary/40"
+            @click="emit('expert-explore')"
+          >
+            <Compass class="h-3.5 w-3.5" />
+            {{ t('landing.bookExpert.ctaExplore') }}
+          </button>
         </div>
       </div>
     </div>
