@@ -1,12 +1,16 @@
 <template>
   <aside
     :class="[
-      'workspace-sidebar relative fixed inset-y-0 left-0 z-50 flex h-full flex-col overflow-hidden border-r border-border bg-card transition-transform duration-300 ease-in-out md:static md:z-auto md:flex-shrink-0 md:translate-x-0 md:transition-[width]',
-      isCollapsed ? 'w-[min(100vw,16rem)] md:w-16' : 'workspace-sidebar-expanded w-[min(100vw,16rem)]',
+      'workspace-sidebar fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-full max-w-full flex-col overflow-hidden border-r border-border bg-card shadow-xl',
+      'transition-transform duration-300 ease-out max-md:will-change-transform',
+      mobileOpen
+        ? 'max-md:translate-x-0 max-md:pointer-events-auto'
+        : 'max-md:-translate-x-full max-md:pointer-events-none',
+      'md:visible md:relative md:z-auto md:h-full md:max-h-none md:w-auto md:max-w-none md:flex-shrink-0 md:translate-x-0 md:shadow-none md:transition-[width] md:pointer-events-auto',
+      isCollapsed ? 'md:w-16' : 'workspace-sidebar-expanded',
       isResizing ? 'md:!transition-none' : '',
-      mobileOpen ? 'max-md:w-full max-md:max-w-full translate-x-0' : '-translate-x-full md:translate-x-0',
     ]"
-    :style="asideWidthStyle"
+    :style="desktopAsideWidthStyle"
   >
     <div
       :class="[
@@ -400,7 +404,8 @@ const historyLoadSentinelRef = ref(null)
 let historyScrollObserver = null
 const isCollapsed = computed(() => collapsed.value && !props.mobileOpen)
 
-const asideWidthStyle = computed(() => {
+/** 仅桌面展开态使用可拖拽宽度；移动端抽屉始终全宽，避免 420px 变量挤窄面板 */
+const desktopAsideWidthStyle = computed(() => {
   if (isCollapsed.value) return undefined
   return { '--workspace-sidebar-width': `${sidebarWidthPx.value}px` }
 })
@@ -661,13 +666,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-@media (max-width: 767px) {
-  .workspace-sidebar {
-    flex: 0 0 0;
-    min-width: 0;
-    overflow: visible;
-  }
-}
 @media (min-width: 768px) {
   .workspace-sidebar-expanded {
     width: var(--workspace-sidebar-width, 16rem);

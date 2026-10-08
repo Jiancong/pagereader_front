@@ -1,5 +1,5 @@
 <template>
-  <div class="rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
+  <div class="min-w-0 rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
     <div v-if="loading" class="flex items-center gap-2">
       <Loader2 class="h-3.5 w-3.5 animate-spin" /> {{ t('billing.loading') }}
     </div>
@@ -14,7 +14,7 @@
       <p class="text-[11px] text-muted-foreground">
         {{ t('billing.creditsBreakdown', { daily: dailyRemaining, pkg: packageRemaining }) }}
       </p>
-      <p class="mt-1 text-[11px] leading-snug">{{ t('billing.dailyHint') }}</p>
+      <p class="mt-1 hidden text-[11px] leading-snug md:block">{{ t('billing.dailyHint') }}</p>
       <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1">
         <RouterLink to="/pricing" class="text-primary hover:underline">
           {{ t('billing.managePlan') }}
