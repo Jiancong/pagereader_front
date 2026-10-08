@@ -230,6 +230,10 @@ export default {
       cardAlt: "{name} — 书籍专家",
     },
     heroDemo: "观看演示",
+    heroCarouselLabel: "产品亮点",
+    heroCarouselDots: "切换亮点",
+    heroCarouselSlideBookExpert: "书籍专家",
+    heroCarouselSlideDeck: "AI 演示生成",
     trustedBy: {
       tag: "受到全球研究者、分析师、创作者与深度思考者的信赖",
     },

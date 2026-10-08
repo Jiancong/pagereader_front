@@ -231,6 +231,10 @@ export default {
       cardAlt: "{name} — book expert",
     },
     heroDemo: "Watch demo",
+    heroCarouselLabel: "Product highlights",
+    heroCarouselDots: "Choose highlight",
+    heroCarouselSlideBookExpert: "Book expert",
+    heroCarouselSlideDeck: "AI presentation generation",
     trustedBy: {
       tag: "Trusted by researchers, analysts, creators, and deep thinkers around the world",
     },

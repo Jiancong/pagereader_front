@@ -6,18 +6,24 @@
     </div>
 
     <div class="relative mx-auto max-w-6xl px-6">
-      <div class="hero-marquee-viewport">
-        <div class="hero-marquee-track">
-          <template v-for="copy in 2" :key="`copy-${copy}`">
+      <div
+        class="hero-carousel"
+        role="region"
+        :aria-label="t('landing.heroCarouselLabel')"
+        @mouseenter="pauseAutoplay"
+        @mouseleave="resumeAutoplay"
+        @focusin="pauseAutoplay"
+        @focusout="onCarouselFocusOut"
+      >
+        <div class="hero-carousel-viewport">
+          <Transition :name="reduceMotion ? '' : 'hero-carousel-fade'" mode="out-in">
             <article
-              v-for="slide in heroSlides"
-              :key="`${copy}-${slide.id}`"
-              class="hero-marquee-slide"
-              :aria-hidden="copy > 1 ? true : undefined"
+              v-if="activeSlide === 0"
+              key="book-expert"
+              class="hero-carousel-panel"
             >
               <div
-                v-if="slide.id === 'book-expert'"
-                :id="copy === 1 ? 'book-expert' : undefined"
+                id="book-expert"
                 class="flex h-full min-h-[28rem] flex-col rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-accent/5 p-5 shadow-lg shadow-primary/5 sm:min-h-[26rem] sm:p-6 lg:min-h-[24rem]"
               >
                 <div
@@ -85,9 +91,10 @@
                   </button>
                 </div>
               </div>
+            </article>
 
+            <article v-else key="deck" class="hero-carousel-panel">
               <div
-                v-else
                 class="flex h-full min-h-[28rem] flex-col justify-center rounded-2xl border border-border/70 bg-card/30 p-5 text-center sm:min-h-[26rem] sm:p-8 lg:min-h-[24rem] lg:text-left"
               >
                 <div
@@ -147,17 +154,33 @@
                 </div>
               </div>
             </article>
-          </template>
+          </Transition>
         </div>
-        <div class="hero-marquee-mask hero-marquee-mask-left" />
-        <div class="hero-marquee-mask hero-marquee-mask-right" />
+
+        <div
+          class="mt-4 flex items-center justify-center gap-2"
+          role="tablist"
+          :aria-label="t('landing.heroCarouselDots')"
+        >
+          <button
+            v-for="(slide, index) in slideDots"
+            :key="slide.id"
+            type="button"
+            role="tab"
+            class="hero-carousel-dot"
+            :class="activeSlide === index ? 'hero-carousel-dot--active' : ''"
+            :aria-selected="activeSlide === index"
+            :aria-label="slide.dotLabel"
+            @click="goToSlide(index)"
+          />
+        </div>
       </div>
     </div>
   </section>
 </template>
 
 <script setup>
-import { computed, markRaw } from 'vue'
+import { computed, markRaw, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   Sparkles,
   Zap,
@@ -176,11 +199,18 @@ const emit = defineEmits(['expert-create', 'expert-explore'])
 
 const { t } = useI18n()
 
-/** 跑马灯顺序：书籍专家优先，其次 Deck 主叙事 */
-const heroSlides = [
-  { id: 'book-expert' },
-  { id: 'deck' },
-]
+const HERO_SLIDE_COUNT = 2
+const AUTOPLAY_MS = 7000
+
+const activeSlide = ref(0)
+const autoplayPaused = ref(false)
+const reduceMotion = ref(false)
+let autoplayTimer = null
+
+const slideDots = computed(() => [
+  { id: 'book-expert', dotLabel: t('landing.heroCarouselSlideBookExpert') },
+  { id: 'deck', dotLabel: t('landing.heroCarouselSlideDeck') },
+])
 
 const steps = computed(() => [
   {
@@ -200,6 +230,46 @@ const steps = computed(() => [
   },
 ])
 
+function goToSlide(index) {
+  if (index < 0 || index >= HERO_SLIDE_COUNT) return
+  activeSlide.value = index
+}
+
+function nextSlide() {
+  activeSlide.value = (activeSlide.value + 1) % HERO_SLIDE_COUNT
+}
+
+function clearAutoplay() {
+  if (autoplayTimer != null) {
+    clearInterval(autoplayTimer)
+    autoplayTimer = null
+  }
+}
+
+function startAutoplay() {
+  clearAutoplay()
+  if (reduceMotion.value || autoplayPaused.value) return
+  autoplayTimer = setInterval(nextSlide, AUTOPLAY_MS)
+}
+
+function pauseAutoplay() {
+  autoplayPaused.value = true
+  clearAutoplay()
+}
+
+function resumeAutoplay() {
+  autoplayPaused.value = false
+  startAutoplay()
+}
+
+function onCarouselFocusOut(e) {
+  const current = e.currentTarget
+  if (current instanceof HTMLElement && e.relatedTarget instanceof Node && current.contains(e.relatedTarget)) {
+    return
+  }
+  resumeAutoplay()
+}
+
 const scrollToGenerator = () => {
   gtmCtaClick('hero_get_started')
   document.getElementById('generator')?.scrollIntoView({ behavior: 'smooth' })
@@ -211,87 +281,50 @@ const watchDemo = () => {
   window.dispatchEvent(new CustomEvent(LANDING_WATCH_DEMO_EVENT))
   document.getElementById('generator')?.scrollIntoView({ behavior: 'smooth' })
 }
+
+onMounted(() => {
+  reduceMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  startAutoplay()
+})
+
+onBeforeUnmount(() => {
+  clearAutoplay()
+})
 </script>
 
 <style scoped>
-.hero-marquee-viewport {
-  position: relative;
-  display: grid;
-  overflow: hidden;
+.hero-carousel-viewport {
   width: 100%;
 }
 
-.hero-marquee-track {
-  display: flex;
-  grid-column: 1;
-  grid-row: 1;
-  width: 100%;
-  animation: hero-marquee-scroll 42s linear infinite;
+.hero-carousel-dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 9999px;
+  border: none;
+  background: hsl(var(--muted-foreground) / 0.35);
+  padding: 0;
+  cursor: pointer;
+  transition: width 0.2s ease, background-color 0.2s ease;
 }
 
-.hero-marquee-viewport:hover .hero-marquee-track {
-  animation-play-state: paused;
+.hero-carousel-dot--active {
+  width: 1.25rem;
+  background: hsl(var(--primary));
 }
 
-.hero-marquee-slide {
-  flex: 0 0 100%;
-  min-width: 100%;
-  box-sizing: border-box;
-  padding-right: 1.5rem;
+.hero-carousel-dot:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
 }
 
-.hero-marquee-mask {
-  pointer-events: none;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 1;
-  width: 2.5rem;
+.hero-carousel-fade-enter-active,
+.hero-carousel-fade-leave-active {
+  transition: opacity 0.35s ease;
 }
 
-.hero-marquee-mask-left {
-  left: 0;
-  background: linear-gradient(to right, hsl(var(--background)), transparent);
-}
-
-.hero-marquee-mask-right {
-  right: 0;
-  background: linear-gradient(to left, hsl(var(--background)), transparent);
-}
-
-@keyframes hero-marquee-scroll {
-  from {
-    transform: translateX(0);
-  }
-
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-marquee-viewport {
-    overflow: visible;
-  }
-
-  .hero-marquee-track {
-    animation: none;
-    flex-direction: column;
-    width: 100%;
-    gap: 1.5rem;
-  }
-
-  .hero-marquee-slide {
-    min-width: 0;
-    padding-right: 0;
-  }
-
-  .hero-marquee-slide:nth-child(n + 3) {
-    display: none;
-  }
-
-  .hero-marquee-mask {
-    display: none;
-  }
+.hero-carousel-fade-enter-from,
+.hero-carousel-fade-leave-to {
+  opacity: 0;
 }
 </style>
