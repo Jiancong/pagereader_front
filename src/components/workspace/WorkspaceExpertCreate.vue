@@ -69,7 +69,7 @@
               v-model="expertName"
               type="text"
               maxlength="40"
-              class="be-distill__input placeholder:text-muted-foreground/60"
+              class="w-full rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               :placeholder="t('bookExpert.expertNamePlaceholder')"
             />
             <p v-if="!expertName.trim()" class="mt-1 text-xs text-muted-foreground">
@@ -82,7 +82,7 @@
               v-model="expertBookTitle"
               type="text"
               maxlength="120"
-              class="be-distill__input placeholder:text-muted-foreground/60"
+              class="w-full rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               :placeholder="t('bookExpert.bookTitlePlaceholder')"
             />
           </div>
@@ -461,24 +461,3 @@ function onEnterExpert() {
 
 defineExpose({ attachCloudDocument, resetExpertFlow })
 </script>
-
-<style scoped>
-.be-distill__input {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid hsl(var(--foreground) / 0.35);
-  background: hsl(var(--background));
-  padding: 10px 16px;
-  font-size: 14px;
-  color: hsl(var(--foreground));
-}
-.be-distill__input::placeholder {
-  color: hsl(var(--muted-foreground) / 0.65);
-  opacity: 1;
-}
-.be-distill__input:focus {
-  outline: none;
-  border-color: hsl(var(--primary));
-  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
-}
-</style>
