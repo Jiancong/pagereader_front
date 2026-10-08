@@ -53,7 +53,7 @@
       </div>
 
       <main
-        class="min-h-0 min-w-0 flex-1 overflow-x-hidden bg-background p-3 sm:p-6 lg:p-8"
+        class="min-h-0 min-w-0 flex-1 overflow-x-hidden bg-background px-2 py-3 sm:p-6 lg:p-8"
         :class="view === 'expert-chat' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'"
       >
       <!-- v-show：切换探索/历史时保持生成状态与 SSE 连接 -->
@@ -176,6 +176,15 @@ watch(mobileSidebarOpen, (open) => {
   if (typeof document === 'undefined') return
   document.body.style.overflow = open ? 'hidden' : ''
 })
+
+/** keep-alive / 异常状态：主区 v-else-if 无匹配时会整屏空白 */
+watch(
+  () => [view.value, activeExpert.value, activeProjectId.value],
+  ([v, expert, projectId]) => {
+    if (v === 'expert-chat' && !expert) view.value = 'new'
+    else if (v === 'project' && !projectId) view.value = 'new'
+  },
+)
 
 onBeforeUnmount(() => {
   if (typeof document !== 'undefined') document.body.style.overflow = ''

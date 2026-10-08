@@ -1,8 +1,8 @@
 <template>
   <div :class="(activeTask.pptData || activeTask.cardResult || activeTask.novelResult || activeTask.outlineResult) ? 'mx-auto w-full min-w-0 max-w-[min(100%,96rem)]' : 'mx-auto w-full min-w-0 max-w-3xl'">
     <!-- Tab 切换：两套任务状态独立，可并行生成 -->
-    <div class="mb-4 flex w-full justify-center sm:mb-8">
-        <div class="inline-flex max-w-full flex-wrap justify-center gap-1 rounded-xl border border-border bg-secondary/30 p-1 sm:flex-nowrap sm:gap-0 sm:p-1.5">
+    <div class="mb-4 w-full sm:mb-8 sm:flex sm:justify-center">
+        <div class="grid w-full grid-cols-2 gap-1 rounded-xl border border-border bg-secondary/30 p-1 sm:inline-flex sm:w-auto sm:max-w-full sm:flex-nowrap sm:justify-center sm:gap-0 sm:p-1.5">
           <button :class="tabClass('upload')" @click="activeTab = 'upload'">
             <Upload class="h-4 w-4" />
             {{ t('workspace.tabUpload') }}
@@ -97,46 +97,78 @@
     </div>
 
     <template v-else>
-      <div v-if="activeTab !== 'translate' && activeTab !== 'read'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
+      <div v-if="activeTab !== 'translate' && activeTab !== 'read'" class="mb-4 rounded-xl border border-border bg-card/80 px-3 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
-        <div class="mt-2 flex flex-wrap gap-3">
-          <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
-            <input v-model="queueSelection" type="radio" value="CARD" class="accent-primary" />
-            <span>{{ t('workspace.queueCard') }}</span>
-            <span class="text-muted-foreground">({{ t('pricing.usageCardCredits') }})</span>
+        <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
+          <label :class="queueModeLabelClass('CARD')">
+            <input v-model="queueSelection" type="radio" value="CARD" class="mt-0.5 accent-primary sm:mt-0" />
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span>{{ t('workspace.queueCard') }}</span>
+                <span class="text-xs text-muted-foreground sm:text-sm">({{ t('pricing.usageCardCredits') }})</span>
+              </span>
+              <span
+                v-if="queueSelection === 'CARD'"
+                class="queue-mode-hint-sm mt-1 block text-xs leading-snug text-muted-foreground sm:hidden"
+              >{{ t('workspace.queueCardHint') }}</span>
+            </span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueCardHint') }}</span>
           </label>
-          <label class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm">
-            <input v-model="queueSelection" type="radio" value="DOCUMENT" class="accent-primary" />
-            <span>{{ t('workspace.queueDocument') }}</span>
-            <span class="text-muted-foreground">({{ t('pricing.usageDocumentCredits') }})</span>
+          <label :class="queueModeLabelClass('DOCUMENT')">
+            <input v-model="queueSelection" type="radio" value="DOCUMENT" class="mt-0.5 accent-primary sm:mt-0" />
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span>{{ t('workspace.queueDocument') }}</span>
+                <span class="text-xs text-muted-foreground sm:text-sm">({{ t('pricing.usageDocumentCredits') }})</span>
+              </span>
+              <span
+                v-if="queueSelection === 'DOCUMENT'"
+                class="queue-mode-hint-sm mt-1 block text-xs leading-snug text-muted-foreground sm:hidden"
+              >{{ t('workspace.queueDocumentHint') }}</span>
+            </span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueDocumentHint') }}</span>
           </label>
           <label
             v-if="activeTab === 'upload'"
-            class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
+            :class="queueModeLabelClass('NOVEL')"
           >
-            <input v-model="queueSelection" type="radio" value="NOVEL" class="accent-primary" />
-            <span>{{ t('workspace.queueNovel') }}</span>
-            <span class="text-muted-foreground">({{ t('pricing.usageNovelCredits') }})</span>
+            <input v-model="queueSelection" type="radio" value="NOVEL" class="mt-0.5 accent-primary sm:mt-0" />
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span>{{ t('workspace.queueNovel') }}</span>
+                <span class="text-xs text-muted-foreground sm:text-sm">({{ t('pricing.usageNovelCredits') }})</span>
+              </span>
+              <span
+                v-if="queueSelection === 'NOVEL'"
+                class="queue-mode-hint-sm mt-1 block text-xs leading-snug text-muted-foreground sm:hidden"
+              >{{ t('workspace.queueNovelHint') }}</span>
+            </span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueNovelHint') }}</span>
           </label>
           <label
             v-if="activeTab === 'youtube'"
-            class="queue-mode-option flex cursor-pointer items-center gap-2 text-sm"
+            :class="queueModeLabelClass('OUTLINE')"
           >
-            <input v-model="queueSelection" type="radio" value="OUTLINE" class="accent-primary" />
-            <span>{{ t('workspace.queueOutline') }}</span>
-            <span class="text-muted-foreground">({{ t('pricing.usageOutlineCredits') }})</span>
+            <input v-model="queueSelection" type="radio" value="OUTLINE" class="mt-0.5 accent-primary sm:mt-0" />
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span>{{ t('workspace.queueOutline') }}</span>
+                <span class="text-xs text-muted-foreground sm:text-sm">({{ t('pricing.usageOutlineCredits') }})</span>
+              </span>
+              <span
+                v-if="queueSelection === 'OUTLINE'"
+                class="queue-mode-hint-sm mt-1 block text-xs leading-snug text-muted-foreground sm:hidden"
+              >{{ t('workspace.queueOutlineHint') }}</span>
+            </span>
             <span class="queue-mode-tooltip" role="tooltip">{{ t('workspace.queueOutlineHint') }}</span>
           </label>
         </div>
-        <p class="mt-2 text-xs text-muted-foreground">{{ t('workspace.queueHint') }}</p>
+        <p class="mt-2 text-xs leading-relaxed text-muted-foreground">{{ t('workspace.queueHint') }}</p>
       </div>
 
       <div class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <!-- RAG 上传分析 -->
-        <div v-if="activeTab === 'upload'" class="p-6 sm:p-8">
+        <div v-if="activeTab === 'upload'" class="p-4 sm:p-6 md:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('uploadTitle')) }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('uploadHint')) }}</p>
@@ -208,7 +240,7 @@
         </div>
 
         <!-- 一句话 / 联网搜索 -->
-        <div v-else-if="debugEnabled && activeTab === 'prompt'" class="p-6 sm:p-8">
+        <div v-else-if="debugEnabled && activeTab === 'prompt'" class="p-4 sm:p-6 md:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('promptTitle')) }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('promptHint')) }}</p>
@@ -232,7 +264,7 @@
         </div>
 
         <!-- 沉浸式翻译（PDF / 网页） -->
-        <div v-else-if="debugEnabled && activeTab === 'translate'" class="p-6 sm:p-8">
+        <div v-else-if="debugEnabled && activeTab === 'translate'" class="p-4 sm:p-6 md:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.translateTitle') }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.translateHint') }}</p>
@@ -317,7 +349,7 @@
         </div>
 
         <!-- 在线阅读 -->
-        <div v-else-if="activeTab === 'read'" class="p-6 sm:p-8">
+        <div v-else-if="activeTab === 'read'" class="p-4 sm:p-6 md:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t('workspace.readTitle') }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t('workspace.readHint') }}</p>
@@ -369,7 +401,7 @@
         </div>
 
         <!-- YouTube 视频生成 PPT -->
-        <div v-else-if="activeTab === 'youtube'" class="p-6 sm:p-8">
+        <div v-else-if="activeTab === 'youtube'" class="p-4 sm:p-6 md:p-8">
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-foreground">{{ t(workspaceCopyKey('youtubeTitle')) }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">{{ t(workspaceCopyKey('youtubeHint')) }}</p>
@@ -814,9 +846,21 @@ const activeElapsedDisplay = computed(() => {
 })
 
 const tabClass = (tab: "prompt" | "upload" | "youtube" | "translate" | "read") => [
-  "flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm",
+  "flex min-h-[2.75rem] items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-all sm:min-h-0 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm",
   activeTab.value === tab ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground",
 ]
+
+type QueueSelection = "CARD" | "DOCUMENT" | "NOVEL" | "OUTLINE"
+
+function queueModeLabelClass(value: QueueSelection): string[] {
+  const selected = queueSelection.value === value
+  return [
+    "queue-mode-option flex w-full min-w-0 cursor-pointer gap-2.5 rounded-lg border px-3 py-2.5 text-sm transition-colors sm:w-auto sm:items-center sm:gap-2 sm:border-transparent sm:bg-transparent sm:px-0 sm:py-0",
+    selected
+      ? "border-primary/45 bg-primary/10 sm:bg-transparent"
+      : "border-border bg-secondary/20 sm:bg-transparent",
+  ]
+}
 
 const appendLog = (task: GeneratorTask, line: string) => task.logs.push(line)
 
@@ -1888,10 +1932,17 @@ defineExpose({ attachCloudDocument })
   border-top-color: rgba(18, 22, 32, 0.96);
 }
 
-.queue-mode-option:hover .queue-mode-tooltip,
-.queue-mode-option:focus-within .queue-mode-tooltip {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(0);
+@media (hover: hover) and (min-width: 640px) {
+  .queue-mode-option:hover .queue-mode-tooltip,
+  .queue-mode-option:focus-within .queue-mode-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+@media (max-width: 639px) {
+  .queue-mode-tooltip {
+    display: none;
+  }
 }
 </style>

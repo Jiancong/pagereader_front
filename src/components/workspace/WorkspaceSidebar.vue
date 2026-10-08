@@ -4,7 +4,7 @@
       'workspace-sidebar relative fixed inset-y-0 left-0 z-50 flex h-full flex-col overflow-hidden border-r border-border bg-card transition-transform duration-300 ease-in-out md:static md:z-auto md:flex-shrink-0 md:translate-x-0 md:transition-[width]',
       isCollapsed ? 'w-[min(100vw,16rem)] md:w-16' : 'workspace-sidebar-expanded w-[min(100vw,16rem)]',
       isResizing ? 'md:!transition-none' : '',
-      mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+      mobileOpen ? 'max-md:w-full max-md:max-w-full translate-x-0' : '-translate-x-full md:translate-x-0',
     ]"
     :style="asideWidthStyle"
   >
@@ -230,7 +230,7 @@
               v-if="!isCollapsed"
               type="button"
               :title="t('workspace.deleteProject')"
-              class="flex-shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+              class="flex-shrink-0 rounded-md p-1.5 text-muted-foreground opacity-100 transition-all hover:bg-red-500/10 hover:text-red-400 md:opacity-0 md:group-hover:opacity-100"
               :disabled="deletingProjectId === p.id"
               @click.stop="$emit('delete-project', p.id)"
             >
