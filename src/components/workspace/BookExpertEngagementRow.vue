@@ -1,20 +1,20 @@
 <template>
-  <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground sm:text-xs">
-    <span class="inline-flex items-center gap-1 tabular-nums" :title="t('bookExpert.openCountHint')">
-      <Eye class="h-3 w-3 flex-shrink-0" />
+  <div class="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0 text-[9px] text-muted-foreground sm:mt-2 sm:gap-x-3 sm:text-xs">
+    <span class="inline-flex items-center gap-0.5 tabular-nums sm:gap-1" :title="t('bookExpert.openCountHint')">
+      <Eye class="h-2.5 w-2.5 flex-shrink-0 sm:h-3 sm:w-3" />
       {{ openCount }}
     </span>
     <button
       type="button"
-      class="inline-flex items-center gap-1 rounded-md px-0.5 py-0.5 tabular-nums transition-colors hover:text-foreground disabled:opacity-50"
+      class="inline-flex items-center gap-0.5 rounded-md px-0.5 py-px tabular-nums transition-colors hover:text-foreground disabled:opacity-50 sm:gap-1 sm:py-0.5"
       :class="liked ? 'text-primary' : ''"
       :disabled="liking"
       :aria-label="liked ? t('workspace.unfavorite') : t('workspace.favorite')"
       :aria-pressed="liked"
       @click.stop="$emit('toggle-like')"
     >
-      <Loader2 v-if="liking" class="h-3 w-3 animate-spin" />
-      <Heart v-else class="h-3 w-3" :class="liked ? 'fill-current' : ''" />
+      <Loader2 v-if="liking" class="h-2.5 w-2.5 animate-spin sm:h-3 sm:w-3" />
+      <Heart v-else class="h-2.5 w-2.5 sm:h-3 sm:w-3" :class="liked ? 'fill-current' : ''" />
       {{ likeCount }}
     </button>
   </div>
