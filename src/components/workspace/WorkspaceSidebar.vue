@@ -186,6 +186,18 @@
                 </span>
               </span>
             </button>
+            <button
+              v-if="!isCollapsed"
+              type="button"
+              :title="t('bookExpert.delete')"
+              :aria-label="t('bookExpert.delete')"
+              class="flex-shrink-0 rounded-md p-1.5 text-muted-foreground opacity-100 transition-all hover:bg-red-500/10 hover:text-red-400 md:opacity-0 md:group-hover:opacity-100"
+              :disabled="deletingExpertId === expert.expert_id"
+              @click.stop="$emit('delete-expert', expert)"
+            >
+              <Loader2 v-if="deletingExpertId === expert.expert_id" class="h-4 w-4 animate-spin" />
+              <Trash2 v-else class="h-4 w-4" />
+            </button>
           </div>
         </template>
         <template v-else>
@@ -379,6 +391,7 @@ const props = defineProps({
   loadingMoreProjects: { type: Boolean, default: false },
   hasMoreProjects: { type: Boolean, default: false },
   deletingProjectId: { type: String, default: null },
+  deletingExpertId: { type: String, default: null },
   mobileOpen: { type: Boolean, default: false },
 })
 const emit = defineEmits([
@@ -389,6 +402,7 @@ const emit = defineEmits([
   'open-project',
   'open-expert',
   'delete-project',
+  'delete-expert',
   'logout',
   'select-document',
   'close-mobile',

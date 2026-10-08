@@ -22,6 +22,7 @@
       :loading-more-projects="loadingMoreProjects"
       :has-more-projects="projectsHasMore"
       :deleting-project-id="deletingProjectId"
+      :deleting-expert-id="deletingExpertId"
       @load-more-projects="loadMoreProjects"
       :mobile-open="mobileSidebarOpen"
       @new-deck="onSidebarNav(goNewDeck)"
@@ -31,6 +32,7 @@
       @open-project="(id) => onSidebarNav(() => openProject(id))"
       @open-expert="(expert) => onSidebarNav(() => onSelectExpert(expert))"
       @delete-project="onDeleteProject"
+      @delete-expert="onDeleteExpert"
       @logout="handleLogout"
       @select-document="onSelectDocumentFromAssets"
       @close-mobile="mobileSidebarOpen = false"
@@ -114,7 +116,7 @@ defineOptions({ name: 'WorkspaceView' })
 import { ref, computed, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Menu } from 'lucide-vue-next'
 import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar.vue'
 import WorkspaceGenerator from '../components/workspace/WorkspaceGenerator.vue'
@@ -148,6 +150,8 @@ const loadingMoreProjects = ref(false)
 const projectsHasMore = ref(false)
 const projectPage = ref(0)
 const deletingProjectId = ref(null)
+const deletingExpertId = ref(null)
+const bookExpertStore = useBookExpertStore()
 const genPrompt = ref('')
 const genKey = ref(0)
 const expertCreateKey = ref(0)
@@ -162,7 +166,6 @@ const activeExpertSessionId = ref(null)
 const pendingExpertSessionId = ref(null)
 
 const activeExpertId = computed(() => activeExpert.value?.expert_id ?? null)
-const bookExpertStore = useBookExpertStore()
 
 const sidebarHistoryMode = computed(() =>
   view.value === 'explore-experts' || view.value === 'expert-chat' || view.value === 'new-expert'
@@ -346,6 +349,38 @@ const onExploreProjectDeleted = (projectId) => {
   if (activeProjectId.value === projectId) {
     activeProjectId.value = null
     view.value = 'explore'
+  }
+}
+
+const onDeleteExpert = async (expert) => {
+  const expertId = expert?.expert_id
+  if (!expertId || !userId.value || deletingExpertId.value) return
+  try {
+    await ElMessageBox.confirm(
+      t('bookExpert.deleteConfirm', { name: expert.expert_name || expertId }),
+      t('bookExpert.delete'),
+      { type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  deletingExpertId.value = expertId
+  try {
+    await bookExpertStore.deleteExpert(expertId, String(userId.value))
+    myExpertHistory.value = myExpertHistory.value.filter((e) => e.expert_id !== expertId)
+    if (activeExpert.value?.expert_id === expertId) {
+      activeExpert.value = null
+      expertProjectId.value = ''
+      pendingExpertSessionId.value = null
+      activeExpertSessionId.value = null
+      bookExpertStore.clearActiveExpert()
+      view.value = 'explore-experts'
+    }
+    ElMessage.success(t('bookExpert.deleted'))
+  } catch (e) {
+    ElMessage.error(e?.message || t('common.actionFailed'))
+  } finally {
+    deletingExpertId.value = null
   }
 }
 
