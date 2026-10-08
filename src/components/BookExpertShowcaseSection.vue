@@ -29,13 +29,13 @@
             :to="{ name: 'expert-community', params: { expertId: expert.expert_id } }"
             class="flex h-full flex-col text-left"
           >
-            <div class="relative flex h-24 w-full items-center justify-center overflow-hidden bg-accent/10 sm:h-28">
+            <div class="relative aspect-[3/4] w-full overflow-hidden bg-accent/10">
               <img
                 v-if="expert.cover_url"
                 :src="expert.cover_url"
                 :alt="t('landing.bookExpert.cardAlt', { name: expert.expert_name })"
                 loading="lazy"
-                class="h-full w-auto max-w-full object-contain"
+                class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
               <div v-else class="flex h-full items-center justify-center">
                 <BookOpen class="h-8 w-8 text-accent" />
