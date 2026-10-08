@@ -5,12 +5,12 @@
       class="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-lg"
       @click="$emit('select', expert)"
     >
-      <div class="relative flex h-24 w-full items-center justify-center overflow-hidden bg-primary/10 p-2 sm:h-28">
+      <div class="relative h-24 w-full overflow-hidden bg-primary/10 sm:h-28">
         <img
           v-if="expert.cover_url"
           :src="expert.cover_url"
           :alt="expert.expert_name"
-          class="max-h-full max-w-full object-contain object-center"
+          class="h-full w-full object-cover object-top"
           loading="lazy"
         />
         <div v-else class="flex h-full items-center justify-center">
