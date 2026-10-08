@@ -51,11 +51,11 @@
             <div class="space-y-4">
               <div>
                 <label class="mb-1.5 block text-sm font-medium text-foreground">{{ t('bookExpert.expertNameLabel') }}</label>
-                <input v-model="expertName" type="text" maxlength="40" class="be-distill__input" :placeholder="t('bookExpert.expertNamePlaceholder')" />
+                <input v-model="expertName" type="text" maxlength="40" class="be-distill__input placeholder:text-muted-foreground/60" :placeholder="t('bookExpert.expertNamePlaceholder')" />
               </div>
               <div>
                 <label class="mb-1.5 block text-sm font-medium text-foreground">{{ t('bookExpert.bookTitleLabel') }}</label>
-                <input v-model="bookTitle" type="text" maxlength="120" class="be-distill__input" :placeholder="t('bookExpert.bookTitlePlaceholder')" />
+                <input v-model="bookTitle" type="text" maxlength="120" class="be-distill__input placeholder:text-muted-foreground/60" :placeholder="t('bookExpert.bookTitlePlaceholder')" />
               </div>
             </div>
           </section>
@@ -316,7 +316,10 @@ function onEnterExpert() {
   background: hsl(var(--secondary) / 0.5); padding: 10px 16px; font-size: 14px;
   color: hsl(var(--foreground));
 }
-.be-distill__input::placeholder { color: hsl(var(--muted-foreground) / 0.6); }
+.be-distill__input::placeholder {
+  color: hsl(var(--muted-foreground) / 0.65);
+  opacity: 1;
+}
 .be-distill__input:focus { outline: none; border-color: hsl(var(--primary)); box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2); }
 .be-distill__progress { text-align: center; padding: 24px 0; }
 .be-distill__indeterminate {

@@ -69,7 +69,7 @@
               v-model="expertName"
               type="text"
               maxlength="40"
-              class="be-distill__input"
+              class="be-distill__input placeholder:text-muted-foreground/60"
               :placeholder="t('bookExpert.expertNamePlaceholder')"
             />
             <p v-if="!expertName.trim()" class="mt-1 text-xs text-muted-foreground">
@@ -82,7 +82,7 @@
               v-model="expertBookTitle"
               type="text"
               maxlength="120"
-              class="be-distill__input"
+              class="be-distill__input placeholder:text-muted-foreground/60"
               :placeholder="t('bookExpert.bookTitlePlaceholder')"
             />
           </div>
@@ -473,7 +473,8 @@ defineExpose({ attachCloudDocument, resetExpertFlow })
   color: hsl(var(--foreground));
 }
 .be-distill__input::placeholder {
-  color: hsl(var(--muted-foreground));
+  color: hsl(var(--muted-foreground) / 0.65);
+  opacity: 1;
 }
 .be-distill__input:focus {
   outline: none;
