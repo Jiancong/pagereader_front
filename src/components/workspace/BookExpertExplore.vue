@@ -47,7 +47,15 @@
               </div>
             </div>
             <div class="flex flex-1 flex-col p-3">
-              <p class="line-clamp-2 text-sm font-medium text-foreground">{{ expert.expert_name }}</p>
+              <p class="line-clamp-2 text-sm font-medium text-foreground">
+                {{ expert.expert_name }}
+                <span
+                  v-if="isOwnExpert(expert)"
+                  class="ml-1.5 inline-flex rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+                >
+                  {{ t('bookExpert.exploreMineBadge') }}
+                </span>
+              </p>
               <p v-if="expert.book_title" class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ expert.book_title }}</p>
             </div>
           </button>
@@ -86,8 +94,7 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    // exclude_own=1：仅他人发布的 public；不含侧栏「我的历史」里自己的专家
-    const pub = await bookExpertApi.listPublicExperts(String(props.userId), true)
+    const pub = await bookExpertApi.listPublicExperts(String(props.userId))
     publicRaw.value = pub?.experts ?? []
   } catch (e: unknown) {
     loadError.value = e instanceof Error ? e.message : t('common.actionFailed')
@@ -107,6 +114,12 @@ function filterByKeyword(list: BookExpertSummary[]): BookExpertSummary[] {
 }
 
 const publicExperts = computed(() => filterByKeyword(publicRaw.value))
+
+function isOwnExpert(expert: BookExpertSummary): boolean {
+  const uid = String(props.userId ?? "").trim()
+  if (!uid) return false
+  return String(expert.owner_user_id ?? "") === uid
+}
 
 onMounted(load)
 </script>
