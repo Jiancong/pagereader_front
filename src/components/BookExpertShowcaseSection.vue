@@ -19,17 +19,17 @@
         {{ error }}
       </div>
 
-      <ul v-if="experts.length" class="grid grid-cols-4 gap-1.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 lg:gap-4 xl:grid-cols-5">
+      <ul v-if="experts.length" class="grid grid-cols-4 gap-1.5 sm:grid-cols-5 sm:gap-2 md:grid-cols-6 lg:grid-cols-7 lg:gap-2.5">
         <li
           v-for="expert in experts"
           :key="expert.expert_id"
-          class="group overflow-hidden rounded-md border border-border bg-card transition-all hover:border-primary/50 hover:shadow-md sm:rounded-xl sm:hover:shadow-lg"
+          class="group overflow-hidden rounded-md border border-border bg-card transition-all hover:border-primary/50 hover:shadow-sm"
         >
           <RouterLink
             :to="{ name: 'expert-community', params: { expertId: expert.expert_id } }"
             class="flex h-full flex-col text-left"
           >
-            <div class="relative h-[64px] w-full overflow-hidden bg-accent/10 sm:h-auto sm:aspect-[3/4] sm:max-h-[140px] lg:max-h-none">
+            <div class="relative h-12 w-full overflow-hidden bg-accent/10 sm:h-14 md:h-16">
               <img
                 v-if="expert.cover_url"
                 :src="expert.cover_url"
@@ -38,12 +38,12 @@
                 class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
               <div v-else class="flex h-full items-center justify-center">
-                <BookOpen class="h-5 w-5 text-accent sm:h-8 sm:w-8" />
+                <BookOpen class="h-4 w-4 text-accent sm:h-5 sm:w-5" />
               </div>
             </div>
-            <div class="flex flex-1 flex-col p-1.5 sm:p-3">
-              <h3 class="line-clamp-2 text-[10px] font-semibold leading-tight text-foreground sm:text-sm sm:leading-snug">{{ expert.expert_name }}</h3>
-              <p v-if="expert.book_title" class="mt-0.5 line-clamp-1 text-[9px] text-muted-foreground sm:mt-1 sm:text-xs">
+            <div class="flex flex-1 flex-col p-1 sm:p-1.5">
+              <h3 class="line-clamp-2 text-[9px] font-semibold leading-tight text-foreground sm:text-[10px]">{{ expert.expert_name }}</h3>
+              <p v-if="expert.book_title" class="mt-0.5 line-clamp-1 text-[8px] text-muted-foreground sm:text-[9px]">
                 {{ expert.book_title }}
               </p>
               <div @click.prevent.stop>

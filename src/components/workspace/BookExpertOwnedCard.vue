@@ -2,10 +2,10 @@
   <div class="group relative">
     <button
       type="button"
-      class="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-lg"
+      class="flex h-full w-full flex-col overflow-hidden rounded-md border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-sm"
       @click="$emit('select', expert)"
     >
-      <div class="relative aspect-[3/4] w-full overflow-hidden bg-primary/10">
+      <div class="relative h-12 w-full overflow-hidden bg-primary/10 sm:h-14 md:h-16">
         <img
           v-if="expert.cover_url"
           :src="expert.cover_url"
@@ -21,9 +21,9 @@
           class="absolute bottom-1 right-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium text-primary backdrop-blur"
         >{{ t('bookExpert.publicBadge') }}</span>
       </div>
-      <div class="flex flex-1 flex-col p-3">
-        <p class="line-clamp-2 text-sm font-medium text-foreground">{{ expert.expert_name }}</p>
-        <p v-if="expert.book_title" class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ expert.book_title }}</p>
+      <div class="flex flex-1 flex-col p-1 sm:p-1.5">
+        <p class="line-clamp-2 text-[9px] font-medium leading-tight text-foreground sm:text-[10px]">{{ expert.expert_name }}</p>
+        <p v-if="expert.book_title" class="mt-0.5 line-clamp-1 text-[8px] text-muted-foreground sm:text-[9px]">{{ expert.book_title }}</p>
         <BookExpertEngagementRow
           :expert="expert"
           :liking="liking"
