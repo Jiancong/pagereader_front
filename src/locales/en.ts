@@ -616,6 +616,8 @@ export default {
   },
   workspace: {
     newGenerate: "New deck",
+    newExpert: "New expert",
+    newExpertHint: "Upload a book to distill a book expert — separate from deck generation.",
     explore: "Explore",
     exploreArticles: "Explore Articles",
     exploreExperts: "Explore Experts",
@@ -632,7 +634,7 @@ export default {
     loading: "Loading…",
     noHistory: "No projects yet",
     noExpertChatHistory: "No expert conversations yet",
-    noExpertHistory: "No experts yet. Create your first expert from the generator.",
+    noExpertHistory: "No experts yet. Use New expert above to create one.",
     unnamedProject: "Untitled project",
     loggedIn: "Signed in",
     logout: "Log out",

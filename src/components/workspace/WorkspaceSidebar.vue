@@ -65,10 +65,18 @@
       <button
         :title="t('workspace.newGenerate')"
         :class="navBtnClass(view === 'new')"
-        @click="$emit('new')"
+        @click="$emit('new-deck')"
       >
         <Plus class="h-4 w-4 flex-shrink-0" />
         <span v-if="!isCollapsed" class="truncate">{{ t('workspace.newGenerate') }}</span>
+      </button>
+      <button
+        :title="t('workspace.newExpert')"
+        :class="navBtnClass(view === 'new-expert')"
+        @click="$emit('new-expert')"
+      >
+        <Sparkles class="h-4 w-4 flex-shrink-0" />
+        <span v-if="!isCollapsed" class="truncate">{{ t('workspace.newExpert') }}</span>
       </button>
       <div
         role="tablist"
@@ -321,6 +329,7 @@ import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   Plus,
+  Sparkles,
   Compass,
   LogOut,
   FileText,
@@ -364,7 +373,8 @@ const props = defineProps({
   mobileOpen: { type: Boolean, default: false },
 })
 const emit = defineEmits([
-  'new',
+  'new-deck',
+  'new-expert',
   'explore',
   'explore-experts',
   'open-project',
@@ -477,7 +487,9 @@ const navBtnClass = (active) => [
 
 /** 「探索文章 | 探索专家」分段开关的当前高亮 */
 const exploreSegment = computed(() => {
-  if (props.view === 'explore-experts' || props.view === 'expert-chat') return 'experts'
+  if (props.view === 'explore-experts' || props.view === 'expert-chat' || props.view === 'new-expert') {
+    return 'experts'
+  }
   if (props.view === 'explore') return 'articles'
   return null
 })

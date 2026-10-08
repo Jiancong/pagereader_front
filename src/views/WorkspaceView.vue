@@ -24,7 +24,8 @@
       :deleting-project-id="deletingProjectId"
       @load-more-projects="loadMoreProjects"
       :mobile-open="mobileSidebarOpen"
-      @new="onSidebarNav(returnToGenerator)"
+      @new-deck="onSidebarNav(goNewDeck)"
+      @new-expert="onSidebarNav(goNewExpert)"
       @explore="onSidebarNav(onExploreArticles)"
       @explore-experts="onSidebarNav(onExploreExperts)"
       @open-project="(id) => onSidebarNav(() => openProject(id))"
@@ -56,10 +57,16 @@
         :key="genKey"
         :initial-prompt="genPrompt"
         :user-id="userId"
-        :active-expert-id="activeExpert ? activeExpert.expert_id : null"
         @project-started="onProjectStarted"
         @project-complete="onProjectComplete"
+      />
+      <WorkspaceExpertCreate
+        ref="expertCreateRef"
+        v-show="view === 'new-expert'"
+        :key="expertCreateKey"
+        :user-id="userId"
         @select-expert="onSelectExpert"
+        @expert-created="loadMyExpertHistory"
       />
       <ExploreGrid
         v-if="view === 'explore'"
@@ -109,6 +116,7 @@ import ExploreGrid from '../components/ExploreGrid.vue'
 import ProjectPreview from '../components/workspace/ProjectPreview.vue'
 import BookExpertChat from '../components/workspace/BookExpertChat.vue'
 import BookExpertExplore from '../components/workspace/BookExpertExplore.vue'
+import WorkspaceExpertCreate from '../components/workspace/WorkspaceExpertCreate.vue'
 import { useBookExpertStore } from '@/stores/bookExpert'
 import { authApi, feedApi, getLocalAvatar, bookExpertApi } from '../api'
 import { createFreshExpertSessionId, getOrCreateExpertSessionId } from '@/api/bookExpert'
@@ -135,6 +143,8 @@ const projectPage = ref(0)
 const deletingProjectId = ref(null)
 const genPrompt = ref('')
 const genKey = ref(0)
+const expertCreateKey = ref(0)
+const expertCreateRef = ref(null)
 const projectRefreshKey = ref(0)
 const generatorRef = ref(null)
 const activeExpert = ref(null)
@@ -148,7 +158,9 @@ const activeExpertId = computed(() => activeExpert.value?.expert_id ?? null)
 const bookExpertStore = useBookExpertStore()
 
 const sidebarHistoryMode = computed(() =>
-  view.value === 'explore-experts' || view.value === 'expert-chat' ? 'experts' : 'projects',
+  view.value === 'explore-experts' || view.value === 'expert-chat' || view.value === 'new-expert'
+    ? 'experts'
+    : 'projects',
 )
 
 const assetsRefreshBus = provideAssetsRefreshBus()
@@ -283,9 +295,7 @@ onMounted(async () => {
 
   const distillIntent = String(route.query.distill || '').trim()
   if (distillIntent === 'expert') {
-    returnToGenerator()
-    await nextTick()
-    generatorRef.value?.openBookExpertDistill?.()
+    goNewExpert()
     router.replace({ name: 'workspace' })
   }
 
@@ -323,18 +333,33 @@ const onExploreProjectDeleted = (projectId) => {
   }
 }
 
-/** 从探索/历史回到生成页，保留进行中的任务与已生成 PPT */
-const returnToGenerator = () => {
+/** 从探索/历史回到 Deck 生成页，保留进行中的任务与已生成 PPT */
+const goNewDeck = () => {
   activeProjectId.value = null
+  activeExpert.value = null
   view.value = 'new'
 }
 
-const onSelectDocumentFromAssets = (payload) => {
-  returnToGenerator()
-  generatorRef.value?.attachCloudDocument?.(payload)
+/** 新建书籍专家（蒸馏） */
+const goNewExpert = () => {
+  activeProjectId.value = null
+  expertCreateKey.value++
+  view.value = 'new-expert'
+  void loadMyExpertHistory()
 }
 
-/** 新建空白任务（fork 等），重置生成器 */
+const onSelectDocumentFromAssets = (payload) => {
+  if (view.value === 'new-expert') {
+    expertCreateRef.value?.attachCloudDocument?.(payload)
+    return
+  }
+  goNewDeck()
+  nextTick(() => {
+    generatorRef.value?.attachCloudDocument?.(payload)
+  })
+}
+
+/** 新建空白 Deck 任务（fork 等），重置生成器 */
 const goNew = (prompt = '') => {
   genPrompt.value = typeof prompt === 'string' ? prompt : ''
   genKey.value++
