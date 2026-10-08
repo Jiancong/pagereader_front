@@ -61,8 +61,9 @@ const displayLabel = computed(() => props.displayLabel)
 
 function onPick(id: string) {
   open.value = false
-  emit('update:modelValue', id)
+  // select 须在 update:modelValue 之前，否则父组件用 v-model 时 currentId 已等于新值，会误判为未变更
   emit('select', id)
+  emit('update:modelValue', id)
 }
 
 function onDocClick(e: MouseEvent) {

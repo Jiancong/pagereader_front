@@ -344,7 +344,10 @@ function applyLocalTopicCategory(categoryId: string) {
 }
 
 async function onSelectTopicCategory(categoryId: string) {
-  const currentId = resolvedTopicCategoryId.value
+  const currentId =
+    pickExpertTopicCategoryId(props.expert)
+    || (props.expert.visibility !== 'public' ? readExpertCategoryDraft(props.expert.expert_id) : '')
+    || selectedCategoryId.value
   if (!categoryId || categoryId === currentId || updatingCategory.value || !props.userId) return
 
   applyLocalTopicCategory(categoryId)
