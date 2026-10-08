@@ -5,15 +5,15 @@
       class="flex h-full w-full flex-col overflow-hidden rounded-md border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-sm"
       @click="$emit('select', expert)"
     >
-      <div class="relative h-12 w-full overflow-hidden bg-primary/10 sm:h-14 md:h-16">
+      <div class="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-primary/10">
         <img
           v-if="expert.cover_url"
           :src="expert.cover_url"
           :alt="expert.expert_name"
-          class="h-full w-full object-cover"
+          class="max-h-full max-w-full object-contain"
           loading="lazy"
         />
-        <div v-else class="flex h-full items-center justify-center">
+        <div v-else class="flex h-full w-full items-center justify-center">
           <BookOpen class="h-8 w-8 text-primary" />
         </div>
         <span
@@ -21,9 +21,9 @@
           class="absolute bottom-1 right-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium text-primary backdrop-blur"
         >{{ t('bookExpert.publicBadge') }}</span>
       </div>
-      <div class="flex flex-1 flex-col p-1 sm:p-1.5">
-        <p class="line-clamp-2 text-[9px] font-medium leading-tight text-foreground sm:text-[10px]">{{ expert.expert_name }}</p>
-        <p v-if="expert.book_title" class="mt-0.5 line-clamp-1 text-[8px] text-muted-foreground sm:text-[9px]">{{ expert.book_title }}</p>
+      <div class="flex flex-1 flex-col p-1.5 sm:p-2">
+        <p class="line-clamp-2 text-[10px] font-medium leading-snug text-foreground sm:text-xs">{{ expert.expert_name }}</p>
+        <p v-if="expert.book_title" class="mt-0.5 line-clamp-1 text-[9px] text-muted-foreground sm:text-[10px]">{{ expert.book_title }}</p>
         <BookExpertEngagementRow
           :expert="expert"
           :liking="liking"

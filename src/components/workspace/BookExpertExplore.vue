@@ -26,37 +26,37 @@
         <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {{ t('bookExpert.publicExpertsFromOthers') }}
         </h3>
-        <div class="grid grid-cols-4 gap-1.5 sm:grid-cols-5 sm:gap-2 md:grid-cols-6 lg:grid-cols-7 lg:gap-2.5">
+        <div class="grid grid-cols-4 gap-2 sm:gap-3">
           <button
             v-for="expert in publicExperts"
             :key="expert.expert_id"
             type="button"
-            class="group flex flex-col overflow-hidden rounded-md border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-sm"
+            class="group flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-md"
             @click="$emit('select-expert', expert)"
           >
-            <div class="relative h-12 w-full overflow-hidden bg-accent/10 sm:h-14 md:h-16">
+            <div class="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-accent/10">
               <img
                 v-if="expert.cover_url"
                 :src="expert.cover_url"
                 :alt="expert.expert_name"
-                class="h-full w-full object-cover"
+                class="max-h-full max-w-full object-contain"
                 loading="lazy"
               />
-              <div v-else class="flex h-full items-center justify-center">
-                <BookOpen class="h-4 w-4 text-accent sm:h-5 sm:w-5" />
+              <div v-else class="flex h-full w-full items-center justify-center">
+                <BookOpen class="h-7 w-7 text-accent sm:h-8 sm:w-8" />
               </div>
             </div>
-            <div class="flex flex-1 flex-col p-1 sm:p-1.5">
-              <p class="line-clamp-2 text-[9px] font-medium leading-tight text-foreground sm:text-[10px]">
+            <div class="flex flex-1 flex-col p-1.5 sm:p-2">
+              <p class="line-clamp-2 text-[10px] font-medium leading-snug text-foreground sm:text-xs">
                 {{ expert.expert_name }}
                 <span
                   v-if="isOwnExpert(expert)"
-                  class="ml-0.5 inline-flex rounded bg-primary/15 px-0.5 py-px text-[7px] font-semibold uppercase tracking-wide text-primary sm:px-1 sm:text-[8px]"
+                  class="ml-0.5 inline-flex rounded bg-primary/15 px-1 py-px text-[8px] font-semibold uppercase tracking-wide text-primary sm:text-[9px]"
                 >
                   {{ t('bookExpert.exploreMineBadge') }}
                 </span>
               </p>
-              <p v-if="expert.book_title" class="mt-0.5 line-clamp-1 text-[8px] text-muted-foreground sm:text-[9px]">{{ expert.book_title }}</p>
+              <p v-if="expert.book_title" class="mt-0.5 line-clamp-1 text-[9px] text-muted-foreground sm:text-[10px]">{{ expert.book_title }}</p>
               <BookExpertEngagementRow
                 :expert="expert"
                 :liking="favoritingId === expert.expert_id"
