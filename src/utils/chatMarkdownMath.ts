@@ -27,6 +27,21 @@ export function renderChatKatex(latex: string, displayMode: boolean): string {
   }
 }
 
+const INLINE_MATH_MAX_LEN = 160;
+
+/** 避免把「$50k … 从 $12 降到 $8」等美元金额之间的正文误当成行内公式 */
+function looksLikeInlineMath(inner: string): boolean {
+  const t = inner.trim();
+  if (!t || t.length > INLINE_MATH_MAX_LEN) return false;
+  if (/\n/.test(t)) return false;
+  if (/[\u4e00-\u9fff]/.test(t)) return false;
+  if (/(^|\s)#/.test(t)) return false;
+  if (/\|\s*[^|\n]+\s*\|/.test(t)) return false;
+  if (looksLikeLatex(t)) return true;
+  if (/^[a-zA-Z0-9\s.+\-*/=()|,;:^_\\[\]{}'"]+$/.test(t) && /[=\\^_]/.test(t)) return true;
+  return false;
+}
+
 function looksLikeLatex(inner: string): boolean {
   const t = inner.trim();
   if (!t) return false;
@@ -79,9 +94,11 @@ export function preprocessChatMarkdownMath(md: string): { markdown: string; slot
     return `\n\n${stashMath(slots, counter, renderChatKatex(inner, true))}\n\n`;
   });
 
-  s = s.replace(/\$(?!\$)(?:\\.|[^$\\])+\$/g, (match) =>
-    stashMath(slots, counter, renderChatKatex(match.slice(1, -1), false)),
-  );
+  s = s.replace(/\$(?!\$)(?:\\.|[^$\n\\])+\$/g, (match) => {
+    const inner = match.slice(1, -1);
+    if (!looksLikeInlineMath(inner)) return match;
+    return stashMath(slots, counter, renderChatKatex(inner, false));
+  });
 
   s = s.replace(/\\\(([\s\S]+?)\\\)/g, (_m, latex: string) =>
     stashMath(slots, counter, renderChatKatex(latex, false)),

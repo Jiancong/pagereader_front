@@ -71,4 +71,30 @@ function htmlForMarkdown(text: string): string {
 :deep(.chat-md-math--display .katex) {
   font-size: 1.12em;
 }
+
+.chat-markdown-body {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+:deep(.markdown-body table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.65rem 0 0.85rem;
+  font-size: 0.92em;
+}
+
+:deep(.markdown-body th),
+:deep(.markdown-body td) {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+:deep(.markdown-body th) {
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 600;
+}
 </style>
