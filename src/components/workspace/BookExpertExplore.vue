@@ -5,15 +5,23 @@
       <p class="mt-1 text-sm text-muted-foreground">{{ t('bookExpert.exploreSubtitle') }}</p>
     </div>
 
-    <div class="mb-4 relative max-w-md">
-      <Search class="be-explore__search-icon" />
-      <input
-        v-model="keyword"
-        type="text"
-        class="be-explore__search-input"
-        :placeholder="t('bookExpert.searchPlaceholder')"
-      />
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div class="relative max-w-md flex-1 min-w-[12rem]">
+        <Search class="be-explore__search-icon" />
+        <input
+          v-model="keyword"
+          type="text"
+          class="be-explore__search-input"
+          :placeholder="t('bookExpert.searchPlaceholder')"
+        />
+      </div>
     </div>
+
+    <ExploreTopicTabs
+      v-model="selectedCategory"
+      class="mb-4"
+      :aria-label="t('bookExpert.exploreTopicFilter')"
+    />
 
     <div v-if="loading" class="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
       <Loader2 class="h-5 w-5 animate-spin" />
@@ -22,13 +30,13 @@
     <div v-else-if="loadError" class="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{{ loadError }}</div>
 
     <template v-else>
-      <section v-if="publicExperts.length">
+      <section v-if="filteredExperts.length">
         <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {{ t('bookExpert.publicExpertsFromOthers') }}
         </h3>
         <div class="grid grid-cols-4 gap-2 sm:gap-3">
           <button
-            v-for="expert in publicExperts"
+            v-for="expert in filteredExperts"
             :key="expert.expert_id"
             type="button"
             class="group flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-md"
@@ -68,6 +76,12 @@
       </section>
 
       <p
+        v-else-if="hasLoadedExperts"
+        class="py-12 text-center text-sm text-muted-foreground"
+      >
+        {{ t('bookExpert.exploreEmptyFilter') }}
+      </p>
+      <p
         v-else
         class="py-12 text-center text-sm text-muted-foreground"
       >
@@ -84,11 +98,20 @@ import { Search, Loader2, BookOpen } from 'lucide-vue-next'
 import { bookExpertApi } from '@/api'
 import type { BookExpertSummary } from '@/api/types'
 import BookExpertEngagementRow from '@/components/workspace/BookExpertEngagementRow.vue'
+import ExploreTopicTabs from '@/components/explore/ExploreTopicTabs.vue'
 import { useBookExpertLikeToggle } from '@/composables/useBookExpertLikeToggle'
+import { useExploreTopicCategories } from '@/composables/useExploreTopicCategories'
+import type { ExploreTopicCategory } from '@/constants/exploreTopicCategories'
+import {
+  pickExpertTopicCategoryId,
+  toFeedTopicCategoryFilter,
+} from '@/constants/exploreTopicCategories'
 import {
   localizeBookExpertSummaries,
   mapBookExpertSummariesForDisplay,
 } from '@/utils/resolveBookExpertDisplay'
+
+void useExploreTopicCategories()
 
 const props = defineProps<{ userId: string | null }>()
 defineEmits<{ 'select-expert': [expert: BookExpertSummary] }>()
@@ -101,6 +124,7 @@ const publicLocalized = ref<BookExpertSummary[]>([])
 const loading = ref(false)
 const loadError = ref('')
 const keyword = ref('')
+const selectedCategory = ref<ExploreTopicCategory>('all')
 
 async function load() {
   if (!props.userId) return
@@ -130,6 +154,19 @@ function filterByKeyword(list: BookExpertSummary[]): BookExpertSummary[] {
   )
 }
 
+function filterByTopicCategory(list: BookExpertSummary[]): BookExpertSummary[] {
+  const categoryId = toFeedTopicCategoryFilter(selectedCategory.value)
+  if (!categoryId) return list
+  const want = categoryId.toLowerCase()
+  return list.filter((e) => pickExpertTopicCategoryId(e) === want)
+}
+
+const hasLoadedExperts = computed(() => publicLocalized.value.length > 0)
+
+const filteredExperts = computed(() =>
+  filterByTopicCategory(filterByKeyword(publicLocalized.value)),
+)
+
 function applyDisplayLocaleSync() {
   publicLocalized.value = mapBookExpertSummariesForDisplay(publicRaw.value, locale.value)
 }
@@ -150,8 +187,6 @@ watch(locale, () => {
   void refineDisplayLocale()
 })
 
-const publicExperts = computed(() => filterByKeyword(publicLocalized.value))
-
 function isOwnExpert(expert: BookExpertSummary): boolean {
   const uid = String(props.userId ?? "").trim()
   if (!uid) return false
@@ -170,8 +205,6 @@ watch(
 <style scoped>
 .be-explore__search {
   position: relative;
-  margin-bottom: 16px;
-  max-width: 28rem;
 }
 .be-explore__search-icon {
   position: absolute;

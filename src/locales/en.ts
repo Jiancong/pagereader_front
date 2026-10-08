@@ -142,6 +142,8 @@ export default {
     publicBadge: "Public expert",
     privateBadge: "Private expert",
     exploreEmptyPublic: "No public experts yet. Publish one from My history in the sidebar, or create a new expert and share it to the community.",
+    exploreEmptyFilter: "No public experts in this category. Try All or another topic.",
+    exploreTopicFilter: "Filter by topic",
     publicCta: "Summon this expert",
     publicPreviewTitle: "Methodology at a glance",
     publicCoreProblem: "Core problem",

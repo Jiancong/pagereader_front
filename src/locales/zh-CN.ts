@@ -141,6 +141,8 @@ export default {
     publicBadge: "公开专家",
     privateBadge: "私有专家",
     exploreEmptyPublic: "暂无公开专家。可在侧栏「我的历史」中将专家设为公开，或新建专家并分享到社区。",
+    exploreEmptyFilter: "该分类下暂无公开专家，试试「全部」或其他分类。",
+    exploreTopicFilter: "按主题分类筛选",
     publicCta: "召唤这位专家",
     publicPreviewTitle: "方法论速览",
     publicCoreProblem: "核心问题",
