@@ -85,7 +85,10 @@ import { bookExpertApi } from '@/api'
 import type { BookExpertSummary } from '@/api/types'
 import BookExpertEngagementRow from '@/components/workspace/BookExpertEngagementRow.vue'
 import { useBookExpertLikeToggle } from '@/composables/useBookExpertLikeToggle'
-import { localizeBookExpertSummaries } from '@/utils/resolveBookExpertDisplay'
+import {
+  localizeBookExpertSummaries,
+  mapBookExpertSummariesForDisplay,
+} from '@/utils/resolveBookExpertDisplay'
 
 const props = defineProps<{ userId: string | null }>()
 defineEmits<{ 'select-expert': [expert: BookExpertSummary] }>()
@@ -106,12 +109,15 @@ async function load() {
   try {
     const pub = await bookExpertApi.listPublicExperts(String(props.userId))
     publicRaw.value = pub?.experts ?? []
-    await applyDisplayLocale()
+    publicLocalized.value = mapBookExpertSummariesForDisplay(publicRaw.value, locale.value)
   } catch (e: unknown) {
     loadError.value = e instanceof Error ? e.message : t('common.actionFailed')
+    publicRaw.value = []
+    publicLocalized.value = []
   } finally {
     loading.value = false
   }
+  void refineDisplayLocale()
 }
 
 function filterByKeyword(list: BookExpertSummary[]): BookExpertSummary[] {
@@ -124,12 +130,24 @@ function filterByKeyword(list: BookExpertSummary[]): BookExpertSummary[] {
   )
 }
 
-async function applyDisplayLocale() {
-  publicLocalized.value = await localizeBookExpertSummaries(publicRaw.value, locale.value)
+function applyDisplayLocaleSync() {
+  publicLocalized.value = mapBookExpertSummariesForDisplay(publicRaw.value, locale.value)
+}
+
+/** 批量翻译可能较慢，不阻塞列表首屏。 */
+async function refineDisplayLocale() {
+  if (!publicRaw.value.length) return
+  applyDisplayLocaleSync()
+  try {
+    publicLocalized.value = await localizeBookExpertSummaries(publicRaw.value, locale.value)
+  } catch {
+    /* 保留 sync 结果 */
+  }
 }
 
 watch(locale, () => {
-  void applyDisplayLocale()
+  applyDisplayLocaleSync()
+  void refineDisplayLocale()
 })
 
 const publicExperts = computed(() => filterByKeyword(publicLocalized.value))

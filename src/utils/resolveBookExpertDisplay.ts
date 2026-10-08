@@ -88,6 +88,15 @@ export function withBookExpertDisplayFields(
   }
 }
 
+/** 仅用 API 多语言字段与主字段，不调用翻译接口（可立即渲染列表）。 */
+export function mapBookExpertSummariesForDisplay(
+  experts: BookExpertSummary[],
+  locale: string,
+): BookExpertSummary[] {
+  if (!experts.length) return []
+  return experts.map((e) => withBookExpertDisplayFields(e, locale))
+}
+
 /**
  * 英文 UI：对仍含 CJK 的标题/书名走批量翻译；失败则保留原文。
  * 未登录时翻译接口可能 401，此时仅使用 API 英文字段与拉丁书名。

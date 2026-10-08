@@ -90,7 +90,10 @@ import { useI18n } from 'vue-i18n'
 import { Loader2, Sparkles, BookOpen } from 'lucide-vue-next'
 import { bookExpertApi } from '@/api'
 import type { BookExpertSummary } from '@/api/types'
-import { localizeBookExpertSummaries } from '@/utils/resolveBookExpertDisplay'
+import {
+  localizeBookExpertSummaries,
+  mapBookExpertSummariesForDisplay,
+} from '@/utils/resolveBookExpertDisplay'
 import BookExpertEngagementRow from '@/components/workspace/BookExpertEngagementRow.vue'
 import { useBookExpertLikeToggle } from '@/composables/useBookExpertLikeToggle'
 
@@ -115,14 +118,17 @@ const visible = computed(
   () => loading.value || localizing.value || (hasLoaded.value && experts.value.length > 0),
 )
 
-async function applyDisplayLocale() {
+async function refineDisplayLocale() {
   if (!rawExperts.value.length) {
     experts.value = []
     return
   }
+  experts.value = mapBookExpertSummariesForDisplay(rawExperts.value, locale.value)
   localizing.value = true
   try {
     experts.value = await localizeBookExpertSummaries(rawExperts.value, locale.value)
+  } catch {
+    /* 保留 sync 结果 */
   } finally {
     localizing.value = false
   }
@@ -135,7 +141,7 @@ async function load() {
     const uid = props.userId != null ? String(props.userId).trim() : ''
     const res = await bookExpertApi.listPublicExperts(uid || undefined, Boolean(uid))
     rawExperts.value = (res?.experts ?? []).slice(0, LANDING_EXPERT_LIMIT)
-    await applyDisplayLocale()
+    experts.value = mapBookExpertSummariesForDisplay(rawExperts.value, locale.value)
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('common.loadFailed')
     rawExperts.value = []
@@ -144,6 +150,7 @@ async function load() {
     loading.value = false
     hasLoaded.value = true
   }
+  void refineDisplayLocale()
 }
 
 watch(
@@ -154,7 +161,8 @@ watch(
 )
 
 watch(locale, () => {
-  void applyDisplayLocale()
+  experts.value = mapBookExpertSummariesForDisplay(rawExperts.value, locale.value)
+  void refineDisplayLocale()
 })
 
 onMounted(() => {
