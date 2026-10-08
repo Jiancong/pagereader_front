@@ -2,7 +2,7 @@
   <aside
     :class="[
       'workspace-sidebar relative fixed inset-y-0 left-0 z-50 flex h-full flex-col overflow-hidden border-r border-border bg-card transition-transform duration-300 ease-in-out md:static md:z-auto md:flex-shrink-0 md:translate-x-0 md:transition-[width]',
-      isCollapsed ? 'w-full md:w-16' : 'workspace-sidebar-expanded w-full',
+      isCollapsed ? 'w-[min(100vw,16rem)] md:w-16' : 'workspace-sidebar-expanded w-[min(100vw,16rem)]',
       isResizing ? 'md:!transition-none' : '',
       mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
     ]"
@@ -661,6 +661,13 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+@media (max-width: 767px) {
+  .workspace-sidebar {
+    flex: 0 0 0;
+    min-width: 0;
+    overflow: visible;
+  }
+}
 @media (min-width: 768px) {
   .workspace-sidebar-expanded {
     width: var(--workspace-sidebar-width, 16rem);

@@ -1,5 +1,5 @@
 <template>
-    <div class="flex h-[100dvh] min-h-0 overflow-hidden bg-background">
+    <div class="relative flex h-[100dvh] min-h-0 overflow-hidden bg-background">
     <div
       v-if="mobileSidebarOpen"
       class="fixed inset-0 z-40 bg-black/50 md:hidden"
@@ -36,8 +36,11 @@
       @close-mobile="mobileSidebarOpen = false"
     />
 
-    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div class="flex h-14 flex-shrink-0 items-center gap-2 border-b border-border px-4 md:hidden">
+    <!-- 移动端：侧栏 w-full 会占满 flex 行导致主栏宽度为 0；主栏用 absolute 铺满视口 -->
+    <div
+      class="flex min-h-0 min-w-0 flex-1 flex-col max-md:absolute max-md:inset-0 max-md:z-0 max-md:w-full max-md:max-w-full md:relative"
+    >
+      <div class="flex h-14 flex-shrink-0 items-center gap-2 border-b border-border bg-background px-4 md:hidden">
         <button
           type="button"
           class="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
@@ -50,7 +53,7 @@
       </div>
 
       <main
-        class="min-h-0 min-w-0 flex-1 overflow-x-hidden p-3 sm:p-6 lg:p-8"
+        class="min-h-0 min-w-0 flex-1 overflow-x-hidden bg-background p-3 sm:p-6 lg:p-8"
         :class="view === 'expert-chat' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'"
       >
       <!-- v-show：切换探索/历史时保持生成状态与 SSE 连接 -->
