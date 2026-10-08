@@ -15,7 +15,8 @@
         @focusin="pauseAutoplay"
         @focusout="onCarouselFocusOut"
       >
-        <div class="hero-carousel-viewport">
+        <div class="hero-carousel-shell overflow-hidden rounded-2xl border border-border/60 bg-card/20 shadow-lg">
+          <div class="hero-carousel-viewport">
           <Transition :name="reduceMotion ? '' : 'hero-carousel-fade'" mode="out-in">
             <article
               v-if="activeSlide === 0"
@@ -24,69 +25,69 @@
             >
               <div
                 id="book-expert"
-                class="flex h-full min-h-[28rem] flex-col rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-accent/5 p-5 shadow-lg shadow-primary/5 sm:min-h-[26rem] sm:p-6 lg:min-h-[24rem]"
+                class="flex h-full min-h-[28rem] flex-col rounded-2xl border-0 bg-gradient-to-br from-primary/10 via-card to-accent/5 p-6 shadow-none sm:min-h-[26rem] sm:p-8 lg:min-h-[24rem]"
               >
                 <div
-                  class="mb-4 inline-flex self-start items-center gap-1.5 rounded-full border border-primary/25 bg-background/70 px-2.5 py-1 text-[11px] font-medium text-primary"
+                  class="mb-5 inline-flex self-start items-center gap-2 rounded-full border border-primary/25 bg-background/70 px-3 py-1.5 text-xs font-medium text-primary sm:text-sm"
                 >
-                  <Sparkles class="h-3 w-3" />
+                  <Sparkles class="h-4 w-4" />
                   {{ t('landing.bookExpert.badge') }}
                 </div>
 
-                <div class="flex items-start gap-3">
+                <div class="flex items-start gap-4">
                   <div
-                    class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent"
+                    class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent sm:h-14 sm:w-14"
                   >
-                    <BookOpen class="h-5 w-5" />
+                    <BookOpen class="h-6 w-6 sm:h-7 sm:w-7" />
                   </div>
                   <div>
-                    <h2 class="text-xl font-bold leading-tight text-foreground sm:text-2xl">
+                    <h2 class="text-2xl font-bold leading-tight text-foreground sm:text-3xl lg:text-4xl">
                       {{ t('landing.bookExpert.title') }}
                     </h2>
-                    <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    <p class="mt-2 text-base leading-relaxed text-muted-foreground sm:text-lg">
                       {{ t('landing.bookExpert.subtitle') }}
                     </p>
                   </div>
                 </div>
 
-                <ol class="my-5 space-y-3" :aria-label="t('landing.bookExpert.title')">
+                <ol class="my-6 space-y-4 sm:my-8" :aria-label="t('landing.bookExpert.title')">
                   <li
                     v-for="(step, index) in steps"
                     :key="step.title"
-                    class="flex items-center gap-3"
+                    class="flex items-center gap-4"
                   >
                     <span
-                      class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-background/70 text-primary"
+                      class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-background/70 text-primary sm:h-11 sm:w-11"
                     >
-                      <component :is="step.icon" class="h-4 w-4" />
+                      <component :is="step.icon" class="h-5 w-5" />
                     </span>
                     <span class="min-w-0 text-left">
-                      <span class="block text-sm font-semibold leading-tight text-foreground">
-                        <span class="mr-1.5 text-xs font-medium text-primary">{{ index + 1 }}</span>
+                      <span class="block text-base font-semibold leading-snug text-foreground sm:text-lg">
+                        <span class="mr-2 text-sm font-medium text-primary sm:text-base">{{ index + 1 }}</span>
                         {{ step.title }}
                       </span>
-                      <span class="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                      <span class="mt-1 block text-sm leading-snug text-muted-foreground sm:text-base">
                         {{ step.desc }}
                       </span>
                     </span>
                   </li>
                 </ol>
 
-                <div class="mt-auto grid gap-2 sm:grid-cols-2">
+                <div class="mt-auto grid gap-3 sm:grid-cols-2">
                   <button
                     type="button"
-                    class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:text-base"
                     @click="emit('expert-create')"
                   >
-                    <Upload class="h-3.5 w-3.5" />
+                    <Upload class="h-4 w-4" />
                     {{ t('landing.bookExpert.ctaCreate') }}
                   </button>
                   <button
                     type="button"
-                    class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background/80 px-4 py-2.5 text-xs font-semibold text-foreground transition-colors hover:border-primary/40"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background/80 px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/40 sm:text-base"
                     @click="emit('expert-explore')"
                   >
-                    <Compass class="h-3.5 w-3.5" />
+                    <Compass class="h-4 w-4" />
                     {{ t('landing.bookExpert.ctaExplore') }}
                   </button>
                 </div>
@@ -95,7 +96,7 @@
 
             <article v-else key="deck" class="hero-carousel-panel">
               <div
-                class="flex h-full min-h-[28rem] flex-col justify-center rounded-2xl border border-border/70 bg-card/30 p-5 text-center sm:min-h-[26rem] sm:p-8 lg:min-h-[24rem] lg:text-left"
+                class="flex h-full min-h-[28rem] flex-col justify-center rounded-2xl border-0 bg-card/30 p-6 text-center sm:min-h-[26rem] sm:p-8 lg:min-h-[24rem] lg:text-left"
               >
                 <div
                   class="mb-4 inline-flex self-center items-center gap-2 rounded-full border border-border bg-card/50 px-3 py-1.5 text-xs text-muted-foreground sm:text-sm lg:self-start"
@@ -127,8 +128,8 @@
                     <Headphones class="h-4 w-4" />
                   </div>
                   <div class="min-w-0">
-                    <p class="text-sm font-semibold text-foreground">{{ t('landing.heroAudioTitle') }}</p>
-                    <p class="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
+                    <p class="text-base font-semibold text-foreground sm:text-lg">{{ t('landing.heroAudioTitle') }}</p>
+                    <p class="mt-1 line-clamp-2 text-sm leading-snug text-muted-foreground sm:text-base">
                       {{ t('landing.heroAudioDesc') }}
                     </p>
                   </div>
@@ -155,24 +156,29 @@
               </div>
             </article>
           </Transition>
-        </div>
+          </div>
 
-        <div
-          class="mt-4 flex items-center justify-center gap-2"
-          role="tablist"
-          :aria-label="t('landing.heroCarouselDots')"
-        >
-          <button
-            v-for="(slide, index) in slideDots"
-            :key="slide.id"
-            type="button"
-            role="tab"
-            class="hero-carousel-dot"
-            :class="activeSlide === index ? 'hero-carousel-dot--active' : ''"
-            :aria-selected="activeSlide === index"
-            :aria-label="slide.dotLabel"
-            @click="goToSlide(index)"
-          />
+          <div
+            class="flex items-center justify-center gap-3 border-t border-border/50 bg-background/40 px-4 py-4"
+            role="tablist"
+            :aria-label="t('landing.heroCarouselDots')"
+          >
+            <button
+              v-for="(slide, index) in slideDots"
+              :key="slide.id"
+              type="button"
+              role="tab"
+              class="hero-carousel-dot"
+              :aria-selected="activeSlide === index"
+              :aria-label="slide.dotLabel"
+              @click="onDotClick(index)"
+            >
+              <span
+                class="hero-carousel-dot-pill"
+                :class="activeSlide === index ? 'hero-carousel-dot-pill--active' : ''"
+              />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -233,6 +239,11 @@ const steps = computed(() => [
 function goToSlide(index) {
   if (index < 0 || index >= HERO_SLIDE_COUNT) return
   activeSlide.value = index
+}
+
+function onDotClick(index) {
+  goToSlide(index)
+  startAutoplay()
 }
 
 function nextSlide() {
@@ -298,18 +309,37 @@ onBeforeUnmount(() => {
 }
 
 .hero-carousel-dot {
-  height: 0.5rem;
-  width: 0.5rem;
+  height: 0.625rem;
+  width: 0.625rem;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
   border-radius: 9999px;
   border: none;
-  background: hsl(var(--muted-foreground) / 0.35);
+  background: hsl(var(--muted-foreground) / 0.4);
   padding: 0;
   cursor: pointer;
-  transition: width 0.2s ease, background-color 0.2s ease;
+  transition: width 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  box-shadow: inset 0 0 0 0 transparent;
+}
+
+.hero-carousel-dot::before {
+  content: '';
+  display: block;
+  height: 0.625rem;
+  width: 0.625rem;
+  margin: auto;
+  border-radius: 9999px;
+  background: inherit;
 }
 
 .hero-carousel-dot--active {
-  width: 1.25rem;
+  width: 2.5rem;
+  min-width: 2.75rem;
+  background: hsl(var(--primary));
+}
+
+.hero-carousel-dot--active::before {
+  width: 2.5rem;
   background: hsl(var(--primary));
 }
 
