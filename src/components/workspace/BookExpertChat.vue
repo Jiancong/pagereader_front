@@ -1,5 +1,5 @@
 <template>
-  <div class="book-expert-chat">
+  <div class="book-expert-chat flex min-h-0 flex-1 flex-col">
     <div class="book-expert-chat__shell">
     <header class="be-chat__header">
       <button type="button" class="be-chat__back" @click="$emit('exit')">
@@ -860,20 +860,26 @@ watch(
   --be-primary-rgb: 29, 155, 240;
   --be-primary-fg: #ffffff;
 
-  display: flex; flex-direction: column; height: 100%; min-height: 0;
+  display: flex; flex-direction: column; flex: 1 1 0%; min-height: 0;
   max-width: 72rem; margin: 0 auto; width: 100%;
 }
 .book-expert-chat__shell {
   position: relative;
-  flex: 1; display: flex; flex-direction: column; min-height: min(720px, calc(100dvh - 7rem));
+  flex: 1 1 0%; display: flex; flex-direction: column; min-height: 0;
+  max-height: 100%;
   border: 1px solid var(--be-border);
   border-radius: 1rem;
   background: var(--be-card);
   box-shadow: 0 25px 50px -12px rgba(var(--be-fg-rgb), 0.18);
   overflow: hidden;
 }
+@media (min-width: 768px) {
+  .book-expert-chat__shell {
+    min-height: min(720px, calc(100dvh - 7rem));
+  }
+}
 .be-chat__header {
-  flex-shrink: 0; padding: 16px 24px 14px;
+  flex-shrink: 0; padding: 12px 14px;
   border-bottom: 1px solid var(--be-border);
   background: linear-gradient(
     180deg,
@@ -978,7 +984,7 @@ watch(
 .be-chat__drawer-enter-active, .be-chat__drawer-leave-active { transition: transform 0.2s ease; }
 .be-chat__drawer-enter-from, .be-chat__drawer-leave-to { transform: translateX(100%); }
 .be-chat__messages {
-  flex: 1; min-height: 0; overflow-y: auto; padding: 20px 28px;
+  flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px;
   display: flex; flex-direction: column; gap: 12px;
   background: var(--be-bg);
 }

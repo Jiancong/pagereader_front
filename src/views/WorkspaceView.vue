@@ -36,7 +36,7 @@
       @close-mobile="mobileSidebarOpen = false"
     />
 
-    <div class="flex min-w-0 flex-1 flex-col">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
       <div class="flex h-14 flex-shrink-0 items-center gap-2 border-b border-border px-4 md:hidden">
         <button
           type="button"
@@ -49,7 +49,10 @@
         <span class="text-base font-bold text-foreground">{{ t('app.brand') }}</span>
       </div>
 
-      <main class="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-6 lg:p-8">
+      <main
+        class="min-h-0 min-w-0 flex-1 overflow-x-hidden p-3 sm:p-6 lg:p-8"
+        :class="view === 'expert-chat' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'"
+      >
       <!-- v-show：切换探索/历史时保持生成状态与 SSE 连接 -->
       <WorkspaceGenerator
         ref="generatorRef"

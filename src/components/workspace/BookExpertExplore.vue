@@ -141,6 +141,12 @@ function isOwnExpert(expert: BookExpertSummary): boolean {
 }
 
 onMounted(load)
+watch(
+  () => props.userId,
+  (uid) => {
+    if (uid) void load()
+  },
+)
 </script>
 
 <style scoped>
