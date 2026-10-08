@@ -139,9 +139,10 @@ defineOptions({ name: 'ExploreExpertView' })
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const expertId = computed(() => String(route.params.expertId || ''))
+const rawExpert = ref<BookExpertSummary | null>(null)
 const expert = ref<BookExpertSummary | null>(null)
 const loading = ref(false)
 const error = ref('')
@@ -196,20 +197,39 @@ useSeoHead(() => {
   }
 })
 
-onMounted(async () => {
+async function applyDisplayLocale() {
+  if (!rawExpert.value) {
+    expert.value = null
+    return
+  }
+  const [localized] = await localizeBookExpertSummaries([rawExpert.value], locale.value)
+  expert.value = localized ?? rawExpert.value
+}
+
+async function loadExpert() {
   if (!expertId.value) return
   loading.value = true
   error.value = ''
   try {
-    // 匿名可访问（公开专家）；登录态由 token 头携带，BFF 注入 userId
     const res = await bookExpertApi.getExpert(expertId.value)
-    expert.value = res?.expert ?? null
-    if (!expert.value) error.value = t('bookExpert.publicNotFound')
+    rawExpert.value = res?.expert ?? null
+    if (!rawExpert.value) error.value = t('bookExpert.publicNotFound')
+    else await applyDisplayLocale()
   } catch {
     error.value = t('bookExpert.publicNotFound')
+    rawExpert.value = null
+    expert.value = null
   } finally {
     loading.value = false
   }
+}
+
+watch(locale, () => {
+  void applyDisplayLocale()
+})
+
+onMounted(() => {
+  void loadExpert()
 })
 
 function goBack() {
