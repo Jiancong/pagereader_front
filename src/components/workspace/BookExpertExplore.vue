@@ -57,6 +57,11 @@
                 </span>
               </p>
               <p v-if="expert.book_title" class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ expert.book_title }}</p>
+              <BookExpertEngagementRow
+                :expert="expert"
+                :liking="favoritingId === expert.expert_id"
+                @toggle-like="toggleLike(expert)"
+              />
             </div>
           </button>
         </div>
@@ -78,11 +83,14 @@ import { useI18n } from 'vue-i18n'
 import { Search, Loader2, BookOpen } from 'lucide-vue-next'
 import { bookExpertApi } from '@/api'
 import type { BookExpertSummary } from '@/api/types'
+import BookExpertEngagementRow from '@/components/workspace/BookExpertEngagementRow.vue'
+import { useBookExpertLikeToggle } from '@/composables/useBookExpertLikeToggle'
 
 const props = defineProps<{ userId: string | null }>()
 defineEmits<{ 'select-expert': [expert: BookExpertSummary] }>()
 
 const { t } = useI18n()
+const { favoritingId, toggleLike } = useBookExpertLikeToggle(() => props.userId)
 
 const publicRaw = ref<BookExpertSummary[]>([])
 const loading = ref(false)

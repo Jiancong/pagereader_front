@@ -24,6 +24,8 @@ import type {
   DistillExpertCreatedEvent,
   DistillErrorEvent,
   DistillCompleteEvent,
+  BookExpertLikeResult,
+  BookExpertOpenIncrementResult,
 } from "./types"
 
 export const BOOK_EXPERT_SKILL_PREFIX = "book_expert:"
@@ -151,6 +153,45 @@ export async function getExpert(
   return rawRequest<BookExpertDetailResult>("GET", `/book-experts/${encodeURIComponent(expertId)}`, {
     query,
   })
+}
+
+export type BookExpertFavoriteAction = "click" | "unclick"
+
+/** 进入专家会话/公开页时 +1；见 docs/book_expert_engagement_spec.md */
+export async function incrementExpertOpen(
+  expertId: string,
+  userId?: string,
+): Promise<number> {
+  const query: Record<string, string> = {}
+  const uid = String(userId ?? "").trim()
+  if (uid) query.userId = uid
+  try {
+    const res = await rawRequest<BookExpertOpenIncrementResult>(
+      "POST",
+      `/book-experts/${encodeURIComponent(expertId)}/open/increment`,
+      { query },
+    )
+    return Math.max(
+      0,
+      Number(res.openCount ?? res.open_count ?? res.viewCount ?? 0),
+    )
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 501)) return -1
+    throw e
+  }
+}
+
+/** 点赞/取消；需登录 */
+export async function favoriteExpert(
+  expertId: string,
+  action: BookExpertFavoriteAction,
+  userId: string,
+): Promise<BookExpertLikeResult> {
+  return rawRequest<BookExpertLikeResult>(
+    "POST",
+    `/book-experts/${encodeURIComponent(expertId)}/like`,
+    { body: { action, userId: String(userId) } },
+  )
 }
 
 export async function publishExpert(

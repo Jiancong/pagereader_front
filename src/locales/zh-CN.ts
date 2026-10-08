@@ -68,6 +68,8 @@ export default {
     publicExperts: "公共专家",
     publicExpertsFromOthers: "公开专家",
     exploreMineBadge: "我的",
+    openCountHint: "打开次数",
+    likeNeedsLogin: "登录后可点赞该专家",
     searchPlaceholder: "搜索专家或书名",
     emptyHint: "还没有专家，点击「蒸馏书籍为专家」创建一个。",
     publish: "发布到公共",

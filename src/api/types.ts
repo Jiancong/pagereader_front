@@ -754,6 +754,31 @@ export interface BookExpertSummary {
   topicCategoryName?: string
   /** 详情接口才返回的方法论预览（Python 返回对象；历史信封可能为字符串） */
   methodology_preview?: string | BookExpertMethodologyPreview
+  /** 打开/进入专家次数（广场统计，见 docs/book_expert_engagement_spec.md） */
+  open_count?: number
+  openCount?: number
+  view_count?: number
+  viewCount?: number
+  like_count?: number
+  likeCount?: number
+  favorite_count?: number
+  favoriteCount?: number
+  liked_by_me?: boolean
+  likedByMe?: boolean
+}
+
+export interface BookExpertLikeResult {
+  ok?: boolean
+  likeCount?: number
+  favoriteCount?: number
+  likedByMe?: boolean
+}
+
+export interface BookExpertOpenIncrementResult {
+  ok?: boolean
+  openCount?: number
+  open_count?: number
+  viewCount?: number
 }
 
 /** 详情接口返回的方法论预览（截断版） */

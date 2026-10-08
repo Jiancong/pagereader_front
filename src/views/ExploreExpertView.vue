@@ -134,6 +134,7 @@ import { buildExploreExpertShareUrl } from '@/utils/feedOpen'
 import { useSeoHead } from '@/composables/useSeoHead'
 import type { BookExpertSummary } from '@/api/types'
 import { localizeBookExpertSummaries } from '@/utils/resolveBookExpertDisplay'
+import { recordBookExpertOpen } from '@/utils/bookExpertEngagement'
 
 defineOptions({ name: 'ExploreExpertView' })
 
@@ -214,7 +215,10 @@ async function loadExpert() {
     const res = await bookExpertApi.getExpert(expertId.value)
     rawExpert.value = res?.expert ?? null
     if (!rawExpert.value) error.value = t('bookExpert.publicNotFound')
-    else await applyDisplayLocale()
+    else {
+      await applyDisplayLocale()
+      recordBookExpertOpen(rawExpert.value)
+    }
   } catch {
     error.value = t('bookExpert.publicNotFound')
     rawExpert.value = null

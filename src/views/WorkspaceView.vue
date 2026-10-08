@@ -121,6 +121,7 @@ import { useBookExpertStore } from '@/stores/bookExpert'
 import { authApi, feedApi, getLocalAvatar, bookExpertApi } from '../api'
 import { createFreshExpertSessionId, getOrCreateExpertSessionId } from '@/api/bookExpert'
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
+import { recordBookExpertOpen } from '@/utils/bookExpertEngagement'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
 
 import { provideAssetsRefreshBus } from '@/composables/useAssetsRefreshBus'
@@ -420,6 +421,7 @@ function onSelectExpert(expert) {
     : ''
   activeExpertSessionId.value = sid || null
   view.value = 'expert-chat'
+  recordBookExpertOpen(expert, uid || null)
   void loadMyExpertHistory()
 }
 

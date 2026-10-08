@@ -68,6 +68,8 @@ export default {
     publicExperts: "Public experts",
     publicExpertsFromOthers: "Public experts",
     exploreMineBadge: "Yours",
+    openCountHint: "Times opened",
+    likeNeedsLogin: "Sign in to like this expert",
     searchPlaceholder: "Search expert or book title",
     emptyHint: "No experts yet. Click \"Distill a book into an expert\" to create one.",
     publish: "Publish to public",

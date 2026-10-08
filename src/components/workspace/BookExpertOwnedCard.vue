@@ -24,6 +24,11 @@
       <div class="flex flex-1 flex-col p-3">
         <p class="line-clamp-2 text-sm font-medium text-foreground">{{ expert.expert_name }}</p>
         <p v-if="expert.book_title" class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ expert.book_title }}</p>
+        <BookExpertEngagementRow
+          :expert="expert"
+          :liking="liking"
+          @toggle-like="$emit('toggle-like', expert)"
+        />
       </div>
     </button>
     <button
@@ -56,18 +61,21 @@
 import { useI18n } from 'vue-i18n'
 import { BookOpen, Trash2, Globe, Lock, Loader2 } from 'lucide-vue-next'
 import type { BookExpertSummary } from '@/api/types'
+import BookExpertEngagementRow from '@/components/workspace/BookExpertEngagementRow.vue'
 
 defineProps<{
   expert: BookExpertSummary
   publishingId: string | null
   deletingId: string | null
   showPublicBadge?: boolean
+  liking?: boolean
 }>()
 
 defineEmits<{
   select: [expert: BookExpertSummary]
   'toggle-publish': [expert: BookExpertSummary]
   delete: [expert: BookExpertSummary]
+  'toggle-like': [expert: BookExpertSummary]
 }>()
 
 const { t } = useI18n()

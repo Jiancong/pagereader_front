@@ -46,6 +46,13 @@
               <p v-if="expert.book_title" class="mt-1 line-clamp-1 text-xs text-muted-foreground">
                 {{ expert.book_title }}
               </p>
+              <div @click.prevent.stop>
+                <BookExpertEngagementRow
+                  :expert="expert"
+                  :liking="favoritingId === expert.expert_id"
+                  @toggle-like="toggleLike(expert)"
+                />
+              </div>
             </div>
           </RouterLink>
         </li>
@@ -84,11 +91,16 @@ import { Loader2, Sparkles, BookOpen } from 'lucide-vue-next'
 import { bookExpertApi } from '@/api'
 import type { BookExpertSummary } from '@/api/types'
 import { localizeBookExpertSummaries } from '@/utils/resolveBookExpertDisplay'
+import BookExpertEngagementRow from '@/components/workspace/BookExpertEngagementRow.vue'
+import { useBookExpertLikeToggle } from '@/composables/useBookExpertLikeToggle'
 
 const props = defineProps<{ userId?: string | number | null }>()
 defineEmits<{ create: []; explore: [] }>()
 
 const { t, locale } = useI18n()
+const { favoritingId, toggleLike } = useBookExpertLikeToggle(() =>
+  props.userId != null ? String(props.userId) : null,
+)
 
 const LANDING_EXPERT_LIMIT = 8
 
