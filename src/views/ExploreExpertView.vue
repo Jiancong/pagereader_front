@@ -23,12 +23,12 @@
 
       <article v-else-if="expert" class="overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
         <!-- 封面（有则展示，无则品牌渐变兜底） -->
-        <div class="relative h-44 w-full overflow-hidden bg-primary/10 sm:h-56">
+        <div class="relative flex h-44 w-full items-center justify-center overflow-hidden bg-primary/10 sm:h-56">
           <img
             v-if="expert.cover_url"
             :src="expert.cover_url"
             :alt="expert.expert_name"
-            class="h-full w-full object-cover object-top"
+            class="h-full w-auto max-w-full object-contain"
           />
           <div v-else class="flex h-full items-center justify-center">
             <BookOpen class="h-14 w-14 text-primary/60" />
