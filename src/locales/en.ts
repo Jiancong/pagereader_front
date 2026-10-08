@@ -616,6 +616,8 @@ export default {
   },
   workspace: {
     newGenerate: "New deck",
+    newMenu: "New",
+    exploreMenu: "Explore",
     newExpert: "New expert",
     newExpertHint: "Upload a book to distill a book expert — separate from deck generation.",
     explore: "Explore",

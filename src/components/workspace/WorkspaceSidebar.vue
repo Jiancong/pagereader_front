@@ -61,53 +61,56 @@
       <PanelLeftOpen class="h-4 w-4" />
     </button>
 
-    <div :class="['space-y-1', isCollapsed ? 'p-2' : 'p-3']">
-      <button
-        :title="t('workspace.newGenerate')"
-        :class="navBtnClass(view === 'new')"
-        @click="$emit('new-deck')"
-      >
-        <Plus class="h-4 w-4 flex-shrink-0" />
-        <span v-if="!isCollapsed" class="truncate">{{ t('workspace.newGenerate') }}</span>
-      </button>
-      <button
-        :title="t('workspace.newExpert')"
-        :class="navBtnClass(view === 'new-expert')"
-        @click="$emit('new-expert')"
-      >
-        <Sparkles class="h-4 w-4 flex-shrink-0" />
-        <span v-if="!isCollapsed" class="truncate">{{ t('workspace.newExpert') }}</span>
-      </button>
-      <div
-        role="tablist"
-        :aria-label="t('workspace.exploreSwitchLabel')"
-        :class="[
-          'w-full rounded-lg border border-border bg-secondary/40 p-0.5',
-          isCollapsed ? 'flex flex-col gap-0.5' : 'flex flex-row gap-0.5',
-        ]"
-      >
+    <div ref="navBlockRef" :class="['space-y-1', isCollapsed ? 'p-2' : 'p-3']">
+      <!-- 新建：点击展开 Deck / Expert 菜单 -->
+      <div class="relative">
         <button
           type="button"
-          role="tab"
-          :title="t('workspace.exploreArticles')"
-          :aria-selected="exploreSegment === 'articles'"
-          :class="exploreSegmentClass('articles')"
-          @click="selectExploreSegment('articles')"
+          :title="t('workspace.newMenu')"
+          :class="navBtnClass(view === 'new' || view === 'new-expert')"
+          :aria-expanded="newMenuOpen"
+          aria-haspopup="menu"
+          @click="toggleNewMenu"
         >
-          <Compass class="h-3.5 w-3.5 flex-shrink-0" />
-          <span v-if="!isCollapsed" class="truncate">{{ t('workspace.exploreArticles') }}</span>
+          <Plus class="h-4 w-4 flex-shrink-0" />
+          <span v-if="!isCollapsed" class="truncate">{{ newButtonLabel }}</span>
+          <ChevronDown v-if="!isCollapsed" class="ml-auto h-3.5 w-3.5 flex-shrink-0 opacity-70" />
         </button>
+        <div v-if="newMenuOpen" :class="navMenuPanelClass" role="menu" :aria-label="t('workspace.newMenu')">
+          <button type="button" role="menuitem" :class="navMenuItemClass(view === 'new')" @click="chooseNew('deck')">
+            <LayoutGrid class="h-4 w-4 flex-shrink-0" />
+            <span class="truncate">{{ t('workspace.newGenerate') }}</span>
+          </button>
+          <button type="button" role="menuitem" :class="navMenuItemClass(view === 'new-expert')" @click="chooseNew('expert')">
+            <Sparkles class="h-4 w-4 flex-shrink-0" />
+            <span class="truncate">{{ t('workspace.newExpert') }}</span>
+          </button>
+        </div>
+      </div>
+      <!-- 探索：点击展开 文章 / 专家 菜单 -->
+      <div class="relative">
         <button
           type="button"
-          role="tab"
-          :title="t('workspace.exploreExperts')"
-          :aria-selected="exploreSegment === 'experts'"
-          :class="exploreSegmentClass('experts')"
-          @click="selectExploreSegment('experts')"
+          :title="t('workspace.exploreMenu')"
+          :class="navBtnClass(exploreSegment !== null)"
+          :aria-expanded="exploreMenuOpen"
+          aria-haspopup="menu"
+          @click="toggleExploreMenu"
         >
-          <BookOpen class="h-3.5 w-3.5 flex-shrink-0" />
-          <span v-if="!isCollapsed" class="truncate">{{ t('workspace.exploreExperts') }}</span>
+          <Compass class="h-4 w-4 flex-shrink-0" />
+          <span v-if="!isCollapsed" class="truncate">{{ exploreButtonLabel }}</span>
+          <ChevronDown v-if="!isCollapsed" class="ml-auto h-3.5 w-3.5 flex-shrink-0 opacity-70" />
         </button>
+        <div v-if="exploreMenuOpen" :class="navMenuPanelClass" role="menu" :aria-label="t('workspace.exploreMenu')">
+          <button type="button" role="menuitem" :class="navMenuItemClass(exploreSegment === 'articles')" @click="chooseExplore('articles')">
+            <FileText class="h-4 w-4 flex-shrink-0" />
+            <span class="truncate">{{ t('workspace.exploreArticles') }}</span>
+          </button>
+          <button type="button" role="menuitem" :class="navMenuItemClass(exploreSegment === 'experts')" @click="chooseExplore('experts')">
+            <BookOpen class="h-4 w-4 flex-shrink-0" />
+            <span class="truncate">{{ t('workspace.exploreExperts') }}</span>
+          </button>
+        </div>
       </div>
       <button
         :title="t('workspace.assets.nav')"
@@ -331,6 +334,8 @@ import {
   Plus,
   Sparkles,
   Compass,
+  ChevronDown,
+  LayoutGrid,
   LogOut,
   FileText,
   Loader2,
@@ -487,23 +492,66 @@ const navBtnClass = (active) => [
 
 /** 「探索文章 | 探索专家」分段开关的当前高亮 */
 const exploreSegment = computed(() => {
-  if (props.view === 'explore-experts' || props.view === 'expert-chat' || props.view === 'new-expert') {
-    return 'experts'
-  }
+  if (props.view === 'explore-experts' || props.view === 'expert-chat') return 'experts'
   if (props.view === 'explore') return 'articles'
   return null
 })
 
-function exploreSegmentClass(segment) {
-  const active = exploreSegment.value === segment
-  return [
-    'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-medium transition-colors',
-    isCollapsed.value ? 'px-0 py-2' : 'px-2 py-1.5',
-    active
-      ? 'bg-primary text-primary-foreground'
-      : 'text-muted-foreground hover:text-foreground',
-  ]
+const newMenuOpen = ref(false)
+const exploreMenuOpen = ref(false)
+const navBlockRef = ref(null)
+
+const newButtonLabel = computed(() => {
+  if (props.view === 'new-expert') return t('workspace.newExpert')
+  return t('workspace.newGenerate')
+})
+
+const exploreButtonLabel = computed(() => {
+  if (exploreSegment.value === 'experts') return t('workspace.exploreExperts')
+  if (exploreSegment.value === 'articles') return t('workspace.exploreArticles')
+  return t('workspace.exploreMenu')
+})
+
+const navMenuPanelClass = computed(() => [
+  'absolute z-50 w-max min-w-[11rem] rounded-lg border border-border bg-card p-1 shadow-lg',
+  isCollapsed.value ? 'left-full top-0 ml-2' : 'left-0 top-full mt-1',
+])
+
+const navMenuItemClass = (active) => [
+  'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm font-medium transition-colors',
+  active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+]
+
+function toggleNewMenu() {
+  exploreMenuOpen.value = false
+  newMenuOpen.value = !newMenuOpen.value
 }
+
+function toggleExploreMenu() {
+  newMenuOpen.value = false
+  exploreMenuOpen.value = !exploreMenuOpen.value
+}
+
+function chooseNew(kind) {
+  newMenuOpen.value = false
+  if (kind === 'expert') emit('new-expert')
+  else emit('new-deck')
+}
+
+function chooseExplore(segment) {
+  exploreMenuOpen.value = false
+  selectExploreSegment(segment)
+}
+
+function onNavOutsideClick(e) {
+  if (navBlockRef.value && !navBlockRef.value.contains(e.target)) {
+    newMenuOpen.value = false
+    exploreMenuOpen.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('mousedown', onNavOutsideClick))
+onBeforeUnmount(() => document.removeEventListener('mousedown', onNavOutsideClick))
 
 function selectExploreSegment(segment) {
   if (segment === 'articles') emit('explore')

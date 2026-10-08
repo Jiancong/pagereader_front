@@ -605,6 +605,8 @@ export default {
   },
   workspace: {
     newGenerate: "新建 Deck",
+    newMenu: "新建",
+    exploreMenu: "探索",
     newExpert: "新建专家",
     newExpertHint: "上传书籍并蒸馏为书籍专家，与 Deck 生成相互独立。",
     explore: "探索 Explore",
