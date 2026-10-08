@@ -78,21 +78,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Search, Loader2, BookOpen } from 'lucide-vue-next'
 import { bookExpertApi } from '@/api'
 import type { BookExpertSummary } from '@/api/types'
 import BookExpertEngagementRow from '@/components/workspace/BookExpertEngagementRow.vue'
 import { useBookExpertLikeToggle } from '@/composables/useBookExpertLikeToggle'
+import { localizeBookExpertSummaries } from '@/utils/resolveBookExpertDisplay'
 
 const props = defineProps<{ userId: string | null }>()
 defineEmits<{ 'select-expert': [expert: BookExpertSummary] }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { favoritingId, toggleLike } = useBookExpertLikeToggle(() => props.userId)
 
 const publicRaw = ref<BookExpertSummary[]>([])
+const publicLocalized = ref<BookExpertSummary[]>([])
 const loading = ref(false)
 const loadError = ref('')
 const keyword = ref('')
@@ -104,6 +106,7 @@ async function load() {
   try {
     const pub = await bookExpertApi.listPublicExperts(String(props.userId))
     publicRaw.value = pub?.experts ?? []
+    await applyDisplayLocale()
   } catch (e: unknown) {
     loadError.value = e instanceof Error ? e.message : t('common.actionFailed')
   } finally {
@@ -121,7 +124,15 @@ function filterByKeyword(list: BookExpertSummary[]): BookExpertSummary[] {
   )
 }
 
-const publicExperts = computed(() => filterByKeyword(publicRaw.value))
+async function applyDisplayLocale() {
+  publicLocalized.value = await localizeBookExpertSummaries(publicRaw.value, locale.value)
+}
+
+watch(locale, () => {
+  void applyDisplayLocale()
+})
+
+const publicExperts = computed(() => filterByKeyword(publicLocalized.value))
 
 function isOwnExpert(expert: BookExpertSummary): boolean {
   const uid = String(props.userId ?? "").trim()

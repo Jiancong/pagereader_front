@@ -9,15 +9,15 @@
         <img
           v-if="expert.cover_url"
           :src="expert.cover_url"
-          :alt="expert.expert_name"
+          :alt="displayExpert.expert_name"
           class="be-chat__cover"
         />
         <div class="be-chat__title-col">
           <div class="be-chat__title-line">
             <span class="be-chat__badge">{{ t('bookExpert.expertBadge') }}</span>
-            <h2 class="be-chat__title">{{ expert.expert_name }}</h2>
+            <h2 class="be-chat__title">{{ displayExpert.expert_name }}</h2>
           </div>
-          <p v-if="expert.book_title" class="be-chat__book">{{ expert.book_title }}</p>
+          <p v-if="displayExpert.book_title" class="be-chat__book">{{ displayExpert.book_title }}</p>
         </div>
       </div>
 
@@ -189,7 +189,7 @@
         v-model="input"
         class="be-chat__input"
         rows="2"
-        :placeholder="t('bookExpert.inputPlaceholder', { name: expert.expert_name })"
+        :placeholder="t('bookExpert.inputPlaceholder', { name: displayExpert.expert_name })"
         :disabled="generating"
         @keydown.enter.exact.prevent="onSend"
       />
@@ -232,6 +232,7 @@ import type {
   BookExpertSessionMessage,
   BookExpertSessionSummary,
 } from '@/api/types'
+import { localizeBookExpertSummaries } from '@/utils/resolveBookExpertDisplay'
 
 const props = defineProps<{
   expert: BookExpertSummary
@@ -246,8 +247,26 @@ const emit = defineEmits<{
   'sessions-changed': []
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { selectableOptions, resolveLabelById } = useExploreTopicCategories()
+
+/** 随 UI locale 展示的专家名/书名（不写回持久化字段） */
+const displayExpert = ref<BookExpertSummary>({ ...props.expert })
+
+async function applyDisplayLocale() {
+  let source: BookExpertSummary = { ...props.expert }
+  try {
+    const res = await bookExpertApi.getExpert(
+      props.expert.expert_id,
+      props.userId ? String(props.userId) : undefined,
+    )
+    if (res?.expert) source = { ...source, ...res.expert }
+  } catch {
+    /* 列表带入的 summary 足够降级 */
+  }
+  const [localized] = await localizeBookExpertSummaries([source], locale.value)
+  displayExpert.value = localized ?? source
+}
 
 interface ChatMessage { id: string; role: 'user' | 'assistant'; content: string }
 const messages = ref<ChatMessage[]>([])
@@ -667,7 +686,7 @@ async function runShare(action: ShareAction) {
   shareMenuOpen.value = false
   if (!(await ensurePublicForShare())) return
   const url = buildExploreExpertShareUrl(props.expert.expert_id)
-  const text = props.expert.expert_name || ''
+  const text = displayExpert.value.expert_name || ''
   try {
     if (action === 'link') {
       await navigator.clipboard.writeText(url)
@@ -779,9 +798,16 @@ function resolveSessionIdForExpert(expertId: string): string {
 
 watch(
   () => props.expert,
-  (ex) => syncTopicCategoryFromExpert(ex),
+  (ex) => {
+    syncTopicCategoryFromExpert(ex)
+    void applyDisplayLocale()
+  },
   { immediate: true, deep: true },
 )
+
+watch(locale, () => {
+  void applyDisplayLocale()
+})
 
 watch(
   () => [props.expert.expert_id, props.initialSessionId] as const,

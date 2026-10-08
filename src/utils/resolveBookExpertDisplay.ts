@@ -19,18 +19,41 @@ export function isEnglishUiLocale(locale: string | null | undefined): boolean {
   return raw === "en" || raw.startsWith("en-")
 }
 
+export function isChineseUiLocale(locale: string | null | undefined): boolean {
+  const raw = String(locale ?? "").trim().toLowerCase()
+  return raw === "zh" || raw.startsWith("zh-")
+}
+
 function pickLocalizedField(
   primary: string | undefined,
   enVariant: string | undefined,
+  zhVariant: string | undefined,
   locale: string,
 ): string {
   const base = String(primary ?? "").trim()
   const en = String(enVariant ?? "").trim()
+  const zh = String(zhVariant ?? "").trim()
   if (isEnglishUiLocale(locale)) {
     if (en) return en
     if (base && !containsCjk(base)) return base
   }
+  if (isChineseUiLocale(locale)) {
+    if (zh) return zh
+    if (base && containsCjk(base)) return base
+  }
   return base
+}
+
+function needsClientTranslation(value: string, locale: string): boolean {
+  const v = String(value ?? "").trim()
+  if (!v) return false
+  if (isEnglishUiLocale(locale)) return containsCjk(v)
+  if (isChineseUiLocale(locale)) return !containsCjk(v)
+  return false
+}
+
+function translationTargetLang(locale: string): string {
+  return isEnglishUiLocale(locale) ? "en" : "zh-CN"
 }
 
 /** 合并 API 可能返回的英文字段（camelCase / snake_case） */
@@ -41,19 +64,25 @@ export function withBookExpertDisplayFields(
   const raw = expert as BookExpertSummary & {
     expert_name_en?: string
     expertNameEn?: string
+    expert_name_zh?: string
+    expertNameZh?: string
     book_title_en?: string
     bookTitleEn?: string
+    book_title_zh?: string
+    bookTitleZh?: string
   }
   return {
     ...expert,
     expert_name: pickLocalizedField(
       expert.expert_name,
       raw.expert_name_en ?? raw.expertNameEn,
+      raw.expert_name_zh ?? raw.expertNameZh,
       locale,
     ),
     book_title: pickLocalizedField(
       expert.book_title,
       raw.book_title_en ?? raw.bookTitleEn,
+      raw.book_title_zh ?? raw.bookTitleZh,
       locale,
     ),
   }
@@ -68,19 +97,18 @@ export async function localizeBookExpertSummaries(
   locale: string,
 ): Promise<BookExpertSummary[]> {
   if (!experts.length) return []
-  if (!isEnglishUiLocale(locale)) {
-    return experts.map((e) => withBookExpertDisplayFields(e, locale))
-  }
-
   const base = experts.map((e) => withBookExpertDisplayFields(e, locale))
+  if (!isEnglishUiLocale(locale) && !isChineseUiLocale(locale)) return base
+
+  const targetLang = translationTargetLang(locale)
   const texts: string[] = []
   const slots: { index: number; field: "expert_name" | "book_title" }[] = []
 
   base.forEach((expert, index) => {
     for (const field of ["expert_name", "book_title"] as const) {
       const value = String(expert[field] ?? "").trim()
-      if (!value || !containsCjk(value)) continue
-      const cached = translationCache.get(cacheKey(value, "en"))
+      if (!value || !needsClientTranslation(value, locale)) continue
+      const cached = translationCache.get(cacheKey(value, targetLang))
       if (cached) {
         expert[field] = cached
         continue
@@ -93,16 +121,17 @@ export async function localizeBookExpertSummaries(
   if (!texts.length) return base
 
   try {
-    const translations = await translateTextsInChunks(texts, "en")
+    const translations = await translateTextsInChunks(texts, targetLang)
     const out = base.map((e) => ({ ...e }))
     slots.forEach((slot, i) => {
       const translated = String(translations[i] ?? "").trim()
       if (!translated) return
-      translationCache.set(cacheKey(texts[i], "en"), translated)
+      translationCache.set(cacheKey(texts[i], targetLang), translated)
       out[slot.index][slot.field] = translated
     })
     return out
   } catch {
+    if (!isEnglishUiLocale(locale)) return base
     return base.map((expert, index) => {
       const categoryId = pickExpertTopicCategoryId(experts[index])
       const categoryLabel = resolveExploreTopicLabelById(categoryId, locale)

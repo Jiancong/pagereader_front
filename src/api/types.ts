@@ -739,9 +739,14 @@ export interface BookExpertSummary {
   /** 英文展示名（公共列表 / 详情可选返回） */
   expert_name_en?: string
   expertNameEn?: string
+  /** 中文展示名（主字段为英文时按 locale=zh 返回） */
+  expert_name_zh?: string
+  expertNameZh?: string
   book_title?: string
   book_title_en?: string
   bookTitleEn?: string
+  book_title_zh?: string
+  bookTitleZh?: string
   visibility: BookExpertVisibility
   owner_user_id: string
   created_at?: string

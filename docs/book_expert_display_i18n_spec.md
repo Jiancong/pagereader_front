@@ -41,8 +41,10 @@
 |----|------|------|
 | `expert_name` | `VARCHAR` | 主展示名（创建时语言，通常与 `ui_locale` 一致） |
 | `expert_name_en` | `VARCHAR NULL` | 英文展示名；`ui_locale=en` 创建时与 `expert_name` 相同；`ui_locale=zh` 时在蒸馏流水线末尾 **LLM 翻译或英文蒸馏** 写入 |
+| `expert_name_zh` | `VARCHAR NULL` | 中文展示名；主字段为英文时写入（蒸馏或 backfill） |
 | `book_title` | `VARCHAR NULL` | 书名（原文） |
 | `book_title_en` | `VARCHAR NULL` | 英文书名（同上） |
+| `book_title_zh` | `VARCHAR NULL` | 中文书名（主字段为英文时） |
 | `methodology_preview_json` | `JSON NULL` | 见 §2.1 |
 
 **历史数据**：`expert_name_en` / `book_title_en` 为空时，读接口在 `locale=en` 时可 **按需翻译一次并回写**（异步 job），或同步翻译（需超时控制）。
@@ -110,8 +112,8 @@ Java BFF：从 query 或 `Accept-Language` 转发到 Python；**不要**丢弃�
 | `expert_id` | 不变 |
 | `expert_name` | **当前 locale 下的展示名**（推荐：服务端已解析，前端直接渲染） |
 | `book_title` | **当前 locale 下的书名** |
-| `expert_name_en` / `book_title_en` | 可选；保留英文列供前端 fallback / SEO |
-| `expert_name_zh` / `book_title_zh` | 可选；保留原文供切换语言 |
+| `expert_name_en` / `book_title_en` | 可选；`ui_locale=en` 时优先展示 |
+| `expert_name_zh` / `book_title_zh` | 可选；主字段为英文时 `ui_locale=zh` 优先展示 |
 | `topic_category_id` | slug |
 | `topic_category_name` | **当前 locale** 下分类名（来自 Feed catalog，非写死中文） |
 | `methodology_preview` | **当前 locale** 下预览（§2.1） |
@@ -162,9 +164,11 @@ Java BFF：从 query 或 `Accept-Language` 转发到 Python；**不要**丢弃�
 | 能力 | 状态 |
 |------|------|
 | 请求 public/detail 时带 `locale` + `ui_locale` | 已实现（`bookExpert.ts`） |
-| 读取 `expert_name_en` / `book_title_en` | 已实现（`withBookExpertDisplayFields`） |
-| 英文 UI 下 CJK 批量翻译 | 已实现但 **401 未登录失败** → 依赖 §4 |
-| 翻译失败兜底 | 主题分类英文标签 + `Book expert`（弱体验） |
+| 读取 `expert_name_en` / `book_title_en` / `*_zh` | 已实现（`withBookExpertDisplayFields`） |
+| 工作区专家聊天标题 `be-chat__title` | 已实现：`BookExpertChat` 按 locale 拉详情 + `localizeBookExpertSummaries` |
+| 探索广场卡片标题 | 已实现：`BookExpertExplore` 列表本地化 |
+| 英文 UI 下 CJK → 批量翻译 en；中文 UI 下拉丁文 → 批量翻译 zh-CN | 已实现但 **401 未登录失败** → 依赖 §4 |
+| 翻译失败兜底 | 英文 UI：主题分类 + `Book expert`；中文 UI：保留原文 |
 
 **联调验收**（`ui_locale=en`，**未登录**）：
 
