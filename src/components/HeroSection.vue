@@ -50,28 +50,27 @@
                   </div>
                 </div>
 
-                <ol class="my-6 space-y-4 sm:my-8" :aria-label="t('landing.bookExpert.title')">
+                <ul class="my-6 space-y-4 sm:my-8" :aria-label="t('landing.bookExpert.scenariosAria')">
                   <li
-                    v-for="(step, index) in steps"
-                    :key="step.title"
+                    v-for="example in scenarioExamples"
+                    :key="example.title"
                     class="flex items-center gap-4"
                   >
                     <span
                       class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-background/70 text-primary sm:h-11 sm:w-11"
                     >
-                      <component :is="step.icon" class="h-5 w-5" />
+                      <component :is="example.icon" class="h-5 w-5" />
                     </span>
                     <span class="min-w-0 text-left">
                       <span class="block text-base font-semibold leading-snug text-foreground sm:text-lg">
-                        <span class="mr-2 text-sm font-medium text-primary sm:text-base">{{ index + 1 }}</span>
-                        {{ step.title }}
+                        {{ example.title }}
                       </span>
                       <span class="mt-1 block text-sm leading-snug text-muted-foreground sm:text-base">
-                        {{ step.desc }}
+                        {{ example.desc }}
                       </span>
                     </span>
                   </li>
-                </ol>
+                </ul>
 
                 <div class="mt-auto grid gap-3 sm:grid-cols-2">
                   <button
@@ -195,8 +194,9 @@ import {
   BookOpen,
   Upload,
   Compass,
-  FlaskConical,
-  MessageSquare,
+  TrendingUp,
+  Rocket,
+  Handshake,
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { gtmCtaClick, gtmDemoClick, LANDING_WATCH_DEMO_EVENT } from '@/composables/useGtmDataLayer'
@@ -218,21 +218,21 @@ const slideDots = computed(() => [
   { id: 'deck', dotLabel: t('landing.heroCarouselSlideDeck') },
 ])
 
-const steps = computed(() => [
+const scenarioExamples = computed(() => [
   {
-    icon: markRaw(Upload),
-    title: t('landing.bookExpert.stepUploadTitle'),
-    desc: t('landing.bookExpert.stepUploadDesc'),
+    icon: markRaw(TrendingUp),
+    title: t('landing.bookExpert.scenarioInvestTitle'),
+    desc: t('landing.bookExpert.scenarioInvestDesc'),
   },
   {
-    icon: markRaw(FlaskConical),
-    title: t('landing.bookExpert.stepDistillTitle'),
-    desc: t('landing.bookExpert.stepDistillDesc'),
+    icon: markRaw(Rocket),
+    title: t('landing.bookExpert.scenarioStartupTitle'),
+    desc: t('landing.bookExpert.scenarioStartupDesc'),
   },
   {
-    icon: markRaw(MessageSquare),
-    title: t('landing.bookExpert.stepChatTitle'),
-    desc: t('landing.bookExpert.stepChatDesc'),
+    icon: markRaw(Handshake),
+    title: t('landing.bookExpert.scenarioNegotiateTitle'),
+    desc: t('landing.bookExpert.scenarioNegotiateDesc'),
   },
 ])
 
@@ -309,36 +309,27 @@ onBeforeUnmount(() => {
 }
 
 .hero-carousel-dot {
-  height: 0.625rem;
-  width: 0.625rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 2.75rem;
   min-width: 2.75rem;
-  border-radius: 9999px;
   border: none;
-  background: hsl(var(--muted-foreground) / 0.4);
+  background: transparent;
   padding: 0;
   cursor: pointer;
-  transition: width 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
-  box-shadow: inset 0 0 0 0 transparent;
 }
 
-.hero-carousel-dot::before {
-  content: '';
+.hero-carousel-dot-pill {
   display: block;
   height: 0.625rem;
   width: 0.625rem;
-  margin: auto;
   border-radius: 9999px;
-  background: inherit;
+  background: hsl(var(--muted-foreground) / 0.45);
+  transition: width 0.2s ease, background-color 0.2s ease;
 }
 
-.hero-carousel-dot--active {
-  width: 2.5rem;
-  min-width: 2.75rem;
-  background: hsl(var(--primary));
-}
-
-.hero-carousel-dot--active::before {
+.hero-carousel-dot-pill--active {
   width: 2.5rem;
   background: hsl(var(--primary));
 }

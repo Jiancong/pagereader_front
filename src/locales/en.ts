@@ -207,24 +207,32 @@ export default {
     heroAudioTitle: "Books with audiobook playback",
     heroAudioDesc:
       "Turn generated book summaries into a listening experience, so readers can absorb the story, ideas, and key takeaways through an easier audio feast.",
-    heroExpertTitle: "Book experts · distill a book into an advisor",
+    heroExpertTitle: "What would you ask if the book could answer?",
     heroExpertDesc:
-      "Upload PDF, EPUB, and more—AI extracts the book’s methodology and judgment principles into a chat-ready expert.",
+      "If Charlie Munger—or The Intelligent Investor—could reply in your context, what would you ask? Upload a book or open a community expert and get methodology-grounded answers.",
     heroExpertLink: "Learn about book experts →",
     heroCta: "Get started",
     bookExpert: {
-      badge: "New · Book expert",
-      title: "Go beyond summaries—talk to the book",
+      badge: "Ask the book",
+      title: "If Charlie Munger could answer your question—what would you ask?",
       subtitle:
-        "Distill methodology from the source and ask follow-ups as if you were debating the author’s mental model.",
+        "You can ask The Intelligent Investor the same way: one real question, answered from the book’s methodology—not a generic chatbot.",
+      scenariosAria: "Example questions you can ask a book expert",
+      scenarioInvestTitle: "If you could ask The Intelligent Investor one thing?",
+      scenarioInvestDesc:
+        "Margin of safety, valuation, or when the smartest move is to do nothing.",
+      scenarioStartupTitle: "Building a company from zero?",
+      scenarioStartupDesc: "Ask Zero to One like a founder across the table.",
+      scenarioNegotiateTitle: "In a negotiation—or learning psychology?",
+      scenarioNegotiateDesc: "Ask Getting to Yes or Influence in the moment you need them.",
       stepUploadTitle: "Upload the book",
       stepUploadDesc: "PDF, EPUB, Word, and more",
       stepDistillTitle: "AI distillation",
       stepDistillDesc: "Core problem, viewpoints, and principles",
       stepChatTitle: "Keep chatting",
       stepChatDesc: "Answers grounded in methodology; share publicly",
-      ctaCreate: "Distill my book expert",
-      ctaExplore: "Browse community experts",
+      ctaCreate: "Upload a book & ask",
+      ctaExplore: "See what others ask",
       showcaseTitle: "Book experts from the community",
       showcaseSubtitle:
         "Explore methodology advisors distilled from real books—open a card for a preview, then chat after you sign in.",
@@ -233,7 +241,7 @@ export default {
     heroDemo: "Watch demo",
     heroCarouselLabel: "Product highlights",
     heroCarouselDots: "Choose highlight",
-    heroCarouselSlideBookExpert: "Book expert",
+    heroCarouselSlideBookExpert: "Ask the book",
     heroCarouselSlideDeck: "AI presentation generation",
     trustedBy: {
       tag: "Trusted by researchers, analysts, creators, and deep thinkers around the world",
