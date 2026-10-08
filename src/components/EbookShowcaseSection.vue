@@ -26,9 +26,9 @@
         {{ error }}
       </div>
 
-      <ul v-if="cards.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      <ul v-if="displayCards.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <li
-          v-for="card in cards"
+          v-for="card in displayCards"
           :key="card.id"
           class="group overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-primary/50 hover:shadow-lg"
         >
@@ -69,7 +69,7 @@
         {{ selectedCategory === 'all' ? t('workspace.noWorks') : t('workspace.exploreCategoryEmpty') }}
       </p>
 
-      <div v-if="loading" class="mt-8 flex justify-center text-muted-foreground">
+      <div v-if="loading && !displayCards.length" class="mt-8 flex justify-center text-muted-foreground">
         <Loader2 class="h-5 w-5 animate-spin" />
       </div>
 
@@ -110,6 +110,9 @@ defineEmits(['start'])
 const { t, locale } = useI18n()
 void useExploreTopicCategories()
 
+/** 首页 book summary 区块最多展示条数（与 book expert showcase 一致） */
+const LANDING_EBOOK_LIMIT = 8
+
 const cards = ref([])
 const itemTitleMap = ref({})
 const loading = ref(false)
@@ -118,6 +121,7 @@ const selectedCategory = ref('all')
 const hasLoaded = ref(false)
 
 const visible = computed(() => loading.value || hasLoaded.value)
+const displayCards = computed(() => cards.value.slice(0, LANDING_EBOOK_LIMIT))
 const exploreLink = computed(() => {
   const category = toFeedTopicCategoryFilter(selectedCategory.value)
   return category ? { path: '/explore', query: { category } } : '/explore'
@@ -170,16 +174,18 @@ async function loadItemDeckTitles(feedItems) {
 
 async function loadFeed() {
   loading.value = true
+  cards.value = []
   error.value = null
   try {
     const res = await feedApi.getFeedStream(
-      buildFeedStreamRequest(1, undefined, {
+      buildFeedStreamRequest(1, LANDING_EBOOK_LIMIT, {
         categoryId: toFeedTopicCategoryFilter(selectedCategory.value),
       }),
     )
     const feedItems = res.data || []
-    cards.value = feedItems.map(buildCard).filter(Boolean)
-    void loadItemDeckTitles(feedItems)
+    const built = feedItems.map(buildCard).filter(Boolean).slice(0, LANDING_EBOOK_LIMIT)
+    cards.value = built
+    void loadItemDeckTitles(feedItems.slice(0, LANDING_EBOOK_LIMIT))
   } catch (e) {
     error.value = e?.message || t('common.loadFailed')
     cards.value = []
