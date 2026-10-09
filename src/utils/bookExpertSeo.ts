@@ -21,6 +21,41 @@ function clean(text: unknown): string {
     .trim()
 }
 
+function stripLeadingNumber(s: string): string {
+  return s.replace(/^\s*\d+\s*[.、)）]\s*/, "").trim()
+}
+
+/** 与公开页 ExploreExpertView 一致：解析 methodology_preview */
+export function parseExpertMethodologyPreview(
+  raw: string | BookExpertMethodologyPreviewLike | null | undefined,
+): ExpertSeoPreview | null {
+  if (raw == null) return null
+  if (typeof raw === "string") {
+    const t = raw.trim()
+    return t ? { problem: t, viewpoints: [], principles: [] } : null
+  }
+  const arr = (v: unknown): string[] =>
+    Array.isArray(v)
+      ? v
+          .filter((x): x is string => typeof x === "string")
+          .map(stripLeadingNumber)
+          .filter((s) => s.length > 0)
+          .slice(0, 5)
+      : []
+  const problem = typeof raw.core_problem === "string" ? raw.core_problem.trim() : ""
+  const viewpoints = arr(raw.core_viewpoints)
+  const principles = arr(raw.judgment_principles)
+  if (!problem && !viewpoints.length && !principles.length) return null
+  return { problem, viewpoints, principles }
+}
+
+/** 构建脚本 / API 预览对象的宽松类型 */
+export interface BookExpertMethodologyPreviewLike {
+  core_problem?: string
+  core_viewpoints?: string[]
+  judgment_principles?: string[]
+}
+
 export function truncateSeoDescription(text: string, max = 160): string {
   const s = clean(text)
   if (s.length <= max) return s
@@ -54,6 +89,55 @@ export function buildExpertSeoDescription(content: ExpertSeoContent): string {
     "Explore core viewpoints and judgment principles from the source book."
   const tail = "Ask questions grounded in the book's methodology — summon the expert for free."
   return truncateSeoDescription(`${lead} ${snippet} ${tail}`)
+}
+
+/** 社交媒体软文（多行，基于方法论预览 + 与 SEO 相同的 snippet 逻辑） */
+export function buildExpertSocialShareCopy(
+  content: ExpertSeoContent,
+  format: {
+    withBook: (p: {
+      expertName: string
+      bookTitle: string
+      snippet: string
+      bullets: string
+      cta: string
+    }) => string
+    withoutBook: (p: { expertName: string; snippet: string; bullets: string; cta: string }) => string
+    cta: string
+    fallbackSnippet: string
+  },
+  maxLength = 500,
+): string {
+  const snippet =
+    content.problem ||
+    content.viewpoints[0] ||
+    content.principles[0] ||
+    format.fallbackSnippet
+  const bulletLines = content.viewpoints
+    .slice(content.problem ? 0 : 1, content.problem ? 2 : 3)
+    .map((v) => `• ${v}`)
+  const bullets = bulletLines.length ? `\n${bulletLines.join("\n")}` : ""
+  const cta = format.cta
+  const raw = content.bookTitle
+    ? format.withBook({
+        expertName: content.expertName,
+        bookTitle: content.bookTitle,
+        snippet,
+        bullets,
+        cta,
+      })
+    : format.withoutBook({ expertName: content.expertName, snippet, bullets, cta })
+  const normalized = raw.replace(/\n{3,}/g, "\n\n").trim()
+  if (normalized.length <= maxLength) return normalized
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`
+}
+
+/** X/Twitter intent：正文与 URL 分开传参时的字数预算（URL 按 t.co 23 字计） */
+export function truncateExpertShareTextForTweet(text: string, maxTotal = 280, urlBudget = 23): string {
+  const budget = maxTotal - urlBudget - 1
+  const s = text.trim()
+  if (s.length <= budget) return s
+  return `${s.slice(0, budget - 1).trimEnd()}…`
 }
 
 export function buildExpertSeoTitle(content: ExpertSeoContent, siteName = "Page2Top"): string {

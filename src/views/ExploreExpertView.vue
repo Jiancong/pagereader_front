@@ -181,7 +181,13 @@ import {
   buildExpertJsonLd,
   buildExpertSeoDescription,
   truncateSeoDescription,
+  parseExpertMethodologyPreview,
 } from '@/utils/bookExpertSeo'
+import {
+  resolveExpertShareMaterials,
+  buildExpertSocialShareUrl,
+  shouldCopySharePostForPlatform,
+} from '@/utils/bookExpertShare'
 
 defineOptions({ name: 'ExploreExpertView' })
 
@@ -195,31 +201,7 @@ const expert = ref<BookExpertSummary | null>(null)
 const loading = ref(false)
 const error = ref('')
 
-/** Python 条目自带「1. 」序号前缀，与 list-disc 圆点叠加成双重编号，剥掉前缀 */
-function stripLeadingNumber(s: string): string {
-  return s.replace(/^\s*\d+\s*[.、)）]\s*/, '').trim()
-}
-
-const preview = computed(() => {
-  const raw = expert.value?.methodology_preview
-  if (!raw) return null
-  if (typeof raw === 'string') {
-    return raw.trim() ? { problem: raw, viewpoints: [] as string[], principles: [] as string[] } : null
-  }
-  const arr = (v: unknown): string[] =>
-    Array.isArray(v)
-      ? v
-          .filter((x): x is string => typeof x === 'string')
-          .map(stripLeadingNumber)
-          .filter((s) => s.length > 0)
-          .slice(0, 5)
-      : []
-  const problem = typeof raw.core_problem === 'string' ? raw.core_problem : ''
-  const viewpoints = arr(raw.core_viewpoints)
-  const principles = arr(raw.judgment_principles)
-  if (!problem && !viewpoints.length && !principles.length) return null
-  return { problem, viewpoints, principles }
-})
+const preview = computed(() => parseExpertMethodologyPreview(expert.value?.methodology_preview))
 
 const seoContent = computed(() => extractExpertSeoContent(expert.value, preview.value))
 
@@ -386,16 +368,23 @@ async function copyLink() {
   }
 }
 
-function shareTo(platform: 'facebook' | 'x' | 'linkedin') {
+async function shareTo(platform: 'facebook' | 'x' | 'linkedin') {
   if (!expert.value) return
-  const encoded = encodeURIComponent(buildExploreExpertShareUrl(expert.value.expert_id))
-  const text = encodeURIComponent(expert.value.expert_name || '')
-  const target =
-    platform === 'facebook'
-      ? `https://www.facebook.com/sharer/sharer.php?u=${encoded}`
-      : platform === 'x'
-        ? `https://twitter.com/intent/tweet?url=${encoded}&text=${text}`
-        : `https://www.linkedin.com/sharing/share-offsite/?url=${encoded}`
-  window.open(target, '_blank', 'noopener,noreferrer')
+  const materials =
+    resolveExpertShareMaterials(expert.value, t) ??
+    ({
+      url: buildExploreExpertShareUrl(expert.value.expert_id),
+      copy: expert.value.expert_name || '',
+      fullPost: `${expert.value.expert_name || ''}\n\n${buildExploreExpertShareUrl(expert.value.expert_id)}`,
+    } as const)
+  if (shouldCopySharePostForPlatform(platform)) {
+    try {
+      await navigator.clipboard.writeText(materials.fullPost)
+      ElMessage.success(t('bookExpert.sharePostCopied'))
+    } catch {
+      /* 仍打开分享页，用户可手动粘贴 */
+    }
+  }
+  window.open(buildExpertSocialShareUrl(platform, materials), '_blank', 'noopener,noreferrer')
 }
 </script>

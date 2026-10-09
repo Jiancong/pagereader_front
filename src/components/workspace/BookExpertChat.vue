@@ -216,6 +216,11 @@ import {
   setActiveExpertSessionId,
 } from '@/api/bookExpert'
 import { buildExploreExpertShareUrl } from '@/utils/feedOpen'
+import {
+  resolveExpertShareMaterials,
+  buildExpertSocialShareUrl,
+  shouldCopySharePostForPlatform,
+} from '@/utils/bookExpertShare'
 import ChatMarkdownBody from '@/components/editor/chat/ChatMarkdownBody.vue'
 import BookExpertAvatarPicker from '@/components/workspace/BookExpertAvatarPicker.vue'
 import ExploreTopicCategoryPicker from '@/components/explore/ExploreTopicCategoryPicker.vue'
@@ -689,21 +694,28 @@ async function runShare(action: ShareAction) {
   shareMenuOpen.value = false
   if (!(await ensurePublicForShare())) return
   const url = buildExploreExpertShareUrl(props.expert.expert_id)
-  const text = displayExpert.value.expert_name || ''
   try {
     if (action === 'link') {
       await navigator.clipboard.writeText(url)
       ElMessage.success(t('bookExpert.shareCopied'))
       return
     }
-    const encoded = encodeURIComponent(url)
-    const target =
-      action === 'facebook'
-        ? `https://www.facebook.com/sharer/sharer.php?u=${encoded}`
-        : action === 'x'
-          ? `https://twitter.com/intent/tweet?url=${encoded}&text=${encodeURIComponent(text)}`
-          : `https://www.linkedin.com/sharing/share-offsite/?url=${encoded}`
-    window.open(target, '_blank', 'noopener,noreferrer')
+    const materials =
+      resolveExpertShareMaterials(displayExpert.value, t) ??
+      ({
+        url,
+        copy: displayExpert.value.expert_name || '',
+        fullPost: `${displayExpert.value.expert_name || ''}\n\n${url}`,
+      } as const)
+    if (shouldCopySharePostForPlatform(action)) {
+      try {
+        await navigator.clipboard.writeText(materials.fullPost)
+        ElMessage.success(t('bookExpert.sharePostCopied'))
+      } catch {
+        /* 仍打开分享页 */
+      }
+    }
+    window.open(buildExpertSocialShareUrl(action, materials), '_blank', 'noopener,noreferrer')
   } catch {
     ElMessage.error(t('bookExpert.shareCopyFailed'))
   }

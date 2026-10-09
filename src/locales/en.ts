@@ -134,7 +134,15 @@ export default {
     shareX: "Share to X",
     shareLinkedIn: "Share to LinkedIn",
     shareCopied: "Share link copied",
+    sharePostCopied:
+      "Share copy with expert description copied — paste into your post if the preview is empty.",
     shareCopyFailed: "Copy failed. Please copy manually.",
+    socialShare: {
+      postWithBook:
+        "{expertName} — AI book expert from “{bookTitle}”\n\n{snippet}{bullets}\n\n{cta}",
+      postNoBook: "{expertName} — AI book expert\n\n{snippet}{bullets}\n\n{cta}",
+      postCta: "Summon & chat free on Page2Top →",
+    },
     shareNeedsPublish: "This expert is private. Publish it first to create a public share page. Publish now?",
     shareToCommunityConfirm:
       "Your expert will appear in the public plaza so others can discover and chat with it. Continue?",

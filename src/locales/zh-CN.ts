@@ -134,7 +134,14 @@ export default {
     shareX: "分享到 X",
     shareLinkedIn: "分享到 LinkedIn",
     shareCopied: "分享链接已复制",
+    sharePostCopied: "已复制含专家描述的分享文案，若平台未自动带出正文，请粘贴到帖子中。",
     shareCopyFailed: "复制失败，请手动复制",
+    socialShare: {
+      postWithBook:
+        "{expertName} — 源自《{bookTitle}》的 AI 书籍专家\n\n{snippet}{bullets}\n\n{cta}",
+      postNoBook: "{expertName} — AI 书籍专家\n\n{snippet}{bullets}\n\n{cta}",
+      postCta: "在 Page2Top 免费召唤对话 →",
+    },
     shareNeedsPublish: "该专家还未发布，发布后才能生成公开分享页。是否立即发布？",
     shareToCommunityConfirm: "发布后专家会出现在公共专家广场，其他人可以发现并与之对话。是否继续？",
     sharePublishFailed: "发布失败，请稍后重试",
