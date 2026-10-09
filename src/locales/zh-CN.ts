@@ -148,6 +148,23 @@ export default {
     publicCoreProblem: "核心问题",
     publicNotFound: "专家不存在或未公开",
     publicFromBook: "源自《{title}》",
+    seo: {
+      documentTitleWithBook:
+        "{expertName} · 《{bookTitle}》书籍专家 — 对话与方法论 | {brand}",
+      documentTitle: "{expertName} · 书籍专家 — 对话与方法论 | {brand}",
+      metaDescriptionWithBook:
+        "与源自《{bookTitle}》的 AI 专家「{expertName}」对话。{snippet} 基于书中方法论提问，在 {brand} 免费召唤。",
+      metaDescription:
+        "与公开 AI 书籍专家「{expertName}」对话。{snippet} 基于方法论提问，在 {brand} 免费召唤。",
+      headingWithBook: "{expertName} — 源自《{bookTitle}》的 AI 书籍专家",
+      heading: "{expertName} — AI 书籍专家",
+      coverAlt: "{expertName} 书籍专家封面",
+      principlesHeading: "{expertName} 的判断原则",
+      ctaHeading: "与 {expertName} 探讨《{bookTitle}》",
+      ctaHeadingNoBook: "与 {expertName} 对话",
+      ctaBody:
+        "在 Page2Top 打开会话，专家会依据从原书蒸馏的方法论作答，适合研读、决策与读书会讨论。",
+    },
     attachmentsTitle: "补充附件",
     attachmentsHint: "可上传文件、从「我的资源」关联，或添加网页/视频链接（如 YouTube）；新上传占用云空间，关联与链接不占配额。",
     attachmentsAdd: "上传文件",

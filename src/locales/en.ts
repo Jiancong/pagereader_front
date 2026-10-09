@@ -149,6 +149,23 @@ export default {
     publicCoreProblem: "Core problem",
     publicNotFound: "Expert not found or not public",
     publicFromBook: "From “{title}”",
+    seo: {
+      documentTitleWithBook:
+        "{expertName} · {bookTitle} Book Expert — Chat & Methodology | {brand}",
+      documentTitle: "{expertName} · Book Expert — Chat & Methodology | {brand}",
+      metaDescriptionWithBook:
+        "Chat with {expertName}, an AI expert distilled from “{bookTitle}”. {snippet} Ask questions grounded in the book’s methodology — summon for free on {brand}.",
+      metaDescription:
+        "Chat with {expertName}, a public AI book expert. {snippet} Ask methodology-based questions — summon for free on {brand}.",
+      headingWithBook: "{expertName} — AI Book Expert from “{bookTitle}”",
+      heading: "{expertName} — AI Book Expert",
+      coverAlt: "{expertName} — book expert cover",
+      principlesHeading: "Judgment principles from {expertName}",
+      ctaHeading: "Talk to {expertName} about “{bookTitle}”",
+      ctaHeadingNoBook: "Talk to {expertName}",
+      ctaBody:
+        "Open a chat session on Page2Top. The expert answers using distilled methodology from the source book — ideal for study, decision-making, and book-club discussions.",
+    },
     attachmentsTitle: "Supplementary files",
     attachmentsHint: "Upload files, link from My resources, or add a web/video URL (e.g. YouTube). New uploads use quota; linking and URLs do not.",
     attachmentsAdd: "Upload",

@@ -1,7 +1,10 @@
 <template>
   <div class="flex min-h-screen flex-col bg-background text-foreground">
     <AppHeader />
-    <main class="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
+    <main
+      class="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6 sm:py-12"
+      :data-seo-ready="seoReady ? 'true' : undefined"
+    >
       <button
         type="button"
         class="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -22,12 +25,32 @@
       </div>
 
       <article v-else-if="expert" class="overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
+        <nav
+          v-if="seoContent"
+          class="border-b border-border bg-muted/20 px-5 py-3 text-xs text-muted-foreground sm:px-8"
+          aria-label="Breadcrumb"
+        >
+          <ol class="flex flex-wrap items-center gap-1.5">
+            <li>
+              <RouterLink to="/" class="transition-colors hover:text-foreground">{{ t('common.brand') }}</RouterLink>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li>
+              <RouterLink :to="{ name: 'explore' }" class="transition-colors hover:text-foreground">
+                {{ t('bookExpert.exploreTitle') }}
+              </RouterLink>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li class="font-medium text-foreground">{{ expert.expert_name }}</li>
+          </ol>
+        </nav>
+
         <!-- 封面（有则展示，无则品牌渐变兜底） -->
         <div class="relative mx-auto aspect-[3/4] w-full max-w-xs overflow-hidden bg-primary/10 sm:max-w-sm">
           <img
             v-if="expert.cover_url"
             :src="expert.cover_url"
-            :alt="expert.expert_name"
+            :alt="coverAlt"
             class="h-full w-full object-cover"
           />
           <div v-else class="flex h-full items-center justify-center">
@@ -39,13 +62,16 @@
         </div>
 
         <div class="p-5 sm:p-8">
-          <h1 class="text-2xl font-bold sm:text-3xl">{{ expert.expert_name }}</h1>
+          <h1 class="text-2xl font-bold sm:text-3xl">{{ pageHeading }}</h1>
           <p v-if="expert.book_title" class="mt-2 text-sm text-muted-foreground">
             {{ t('bookExpert.publicFromBook', { title: expert.book_title }) }}
           </p>
+          <p v-if="seoDescription" class="mt-3 text-base leading-relaxed text-muted-foreground">
+            {{ seoDescription }}
+          </p>
 
           <!-- 方法论速览 -->
-          <section v-if="preview" class="mt-6">
+          <section v-if="preview" class="mt-6" data-seo-section="methodology">
             <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               {{ t('bookExpert.publicPreviewTitle') }}
             </h2>
@@ -61,12 +87,27 @@
                 </ul>
               </div>
               <div v-if="preview.principles.length" class="rounded-xl bg-background/60 p-4">
-                <p class="mb-2 text-xs font-semibold text-primary">{{ t('bookExpert.previewPrinciples') }}</p>
+                <h3 class="mb-2 text-xs font-semibold text-primary">
+                  {{ principlesHeading }}
+                </h3>
                 <ul class="list-disc space-y-1.5 pl-5 text-sm leading-relaxed">
                   <li v-for="(p, i) in preview.principles" :key="`pr-${i}`">{{ p }}</li>
                 </ul>
               </div>
             </div>
+          </section>
+
+          <section
+            v-if="seoContent"
+            class="mt-8 rounded-xl border border-border bg-muted/30 p-4 sm:p-5"
+            data-seo-section="cta"
+          >
+            <h2 class="text-base font-semibold text-foreground">
+              {{ ctaHeading }}
+            </h2>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {{ t('bookExpert.seo.ctaBody') }}
+            </p>
           </section>
 
           <!-- 分享 + 召唤 CTA -->
@@ -135,6 +176,12 @@ import { useSeoHead } from '@/composables/useSeoHead'
 import type { BookExpertSummary } from '@/api/types'
 import { localizeBookExpertSummaries } from '@/utils/resolveBookExpertDisplay'
 import { recordBookExpertOpen } from '@/utils/bookExpertEngagement'
+import {
+  extractExpertSeoContent,
+  buildExpertJsonLd,
+  buildExpertSeoDescription,
+  truncateSeoDescription,
+} from '@/utils/bookExpertSeo'
 
 defineOptions({ name: 'ExploreExpertView' })
 
@@ -174,27 +221,110 @@ const preview = computed(() => {
   return { problem, viewpoints, principles }
 })
 
+const seoContent = computed(() => extractExpertSeoContent(expert.value, preview.value))
+
+const seoSnippet = computed(() => {
+  const c = seoContent.value
+  if (!c) return ''
+  return (
+    c.problem ||
+    c.viewpoints[0] ||
+    c.principles[0] ||
+    t('bookExpert.exploreSubtitle')
+  )
+})
+
+const seoDescription = computed(() => {
+  const c = seoContent.value
+  if (!c) return ''
+  const raw = c.bookTitle
+    ? t('bookExpert.seo.metaDescriptionWithBook', {
+        expertName: c.expertName,
+        bookTitle: c.bookTitle,
+        snippet: seoSnippet.value,
+        brand: t('common.brand'),
+      })
+    : t('bookExpert.seo.metaDescription', {
+        expertName: c.expertName,
+        snippet: seoSnippet.value,
+        brand: t('common.brand'),
+      })
+  return truncateSeoDescription(raw)
+})
+
+const pageHeading = computed(() => {
+  const c = seoContent.value
+  if (!c) return expert.value?.expert_name || ''
+  return c.bookTitle
+    ? t('bookExpert.seo.headingWithBook', { expertName: c.expertName, bookTitle: c.bookTitle })
+    : t('bookExpert.seo.heading', { expertName: c.expertName })
+})
+
+const coverAlt = computed(() => {
+  const name = seoContent.value?.expertName || expert.value?.expert_name || ''
+  return name ? t('bookExpert.seo.coverAlt', { expertName: name }) : ''
+})
+
+const principlesHeading = computed(() => {
+  const name = seoContent.value?.expertName || expert.value?.expert_name || ''
+  return name
+    ? t('bookExpert.seo.principlesHeading', { expertName: name })
+    : t('bookExpert.previewPrinciples')
+})
+
+const ctaHeading = computed(() => {
+  const c = seoContent.value
+  if (!c) return t('bookExpert.publicCta')
+  return c.bookTitle
+    ? t('bookExpert.seo.ctaHeading', { expertName: c.expertName, bookTitle: c.bookTitle })
+    : t('bookExpert.seo.ctaHeadingNoBook', { expertName: c.expertName })
+})
+
+const seoReady = computed(() => Boolean(seoContent.value) && !loading.value)
+
+const documentTitle = computed(() => {
+  const c = seoContent.value
+  if (!c) return ''
+  const brand = t('common.brand')
+  return c.bookTitle
+    ? t('bookExpert.seo.documentTitleWithBook', {
+        expertName: c.expertName,
+        bookTitle: c.bookTitle,
+        brand,
+      })
+    : t('bookExpert.seo.documentTitle', { expertName: c.expertName, brand })
+})
+
 useSeoHead(() => {
-  const e = expert.value
-  if (!e) return {}
-  const url = buildExploreExpertShareUrl(e.expert_id)
-  const description = e.book_title
-    ? t('bookExpert.publicFromBook', { title: e.book_title })
-    : t('bookExpert.exploreSubtitle')
+  if (loading.value) return {}
+  if (error.value || !seoContent.value) {
+    return {
+      title: `${t('bookExpert.publicNotFound')} | ${t('common.brand')}`,
+      robots: 'noindex,nofollow',
+    }
+  }
+  const c = seoContent.value
+  const url = buildExploreExpertShareUrl(expertId.value)
+  const description = seoDescription.value || buildExpertSeoDescription(c)
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://page2.top'
+  const image = expert.value?.cover_url || undefined
+  const pageName = documentTitle.value.replace(/\s*\|\s*[^|]+$/, '').trim()
   return {
-    title: `${e.expert_name} · ${t('bookExpert.expertBadge')}`,
+    title: documentTitle.value,
     description,
     canonical: url,
-    ogType: 'profile',
-    image: e.cover_url || undefined,
-    jsonLd: {
-      '@context': 'https://schema.org',
-      '@type': 'Person',
-      name: e.expert_name,
-      description,
+    ogType: 'article',
+    image,
+    jsonLd: buildExpertJsonLd(c, {
       url,
-      ...(e.cover_url ? { image: e.cover_url } : {}),
-    },
+      image,
+      description,
+      pageName,
+      siteName: t('common.brand'),
+      siteOrigin: origin,
+      exploreUrl: `${origin}/explore`,
+      exploreLabel: t('bookExpert.exploreTitle'),
+    }),
   }
 })
 
