@@ -1,4 +1,4 @@
-// 构建期生成 sitemap.xml 快照（首页 + 社区图书详情页）。
+// 构建期生成 sitemap.xml 快照（首页 + 探索页 + 社区图书 / 公开专家详情页）。
 // 注意：图书目录会持续增长，构建期快照只覆盖运行时刻的内容；
 // 推荐由后端动态提供 /sitemap.xml 以覆盖全量与新增图书。
 //
@@ -11,7 +11,7 @@ import { writeFile, mkdir } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { loadBuildEnv } from "./loadBuildEnv.mjs"
-import { resolveApiBase, collectFeedProjectIds } from "./buildApi.mjs"
+import { resolveApiBase, collectFeedProjectIds, collectPublicExpertIds } from "./buildApi.mjs"
 
 loadBuildEnv()
 
@@ -22,6 +22,8 @@ const SITE_ORIGIN = (process.env.SITE_ORIGIN || "https://page2.top").replace(/\/
 const OUT = process.env.SITEMAP_OUT || resolve(ROOT, "dist", "sitemap.xml")
 const MAX_PAGES = Number(process.env.SITEMAP_MAX_PAGES || 20)
 const PAGE_SIZE = Number(process.env.SITEMAP_PAGE_SIZE || 100)
+const MAX_EXPERTS = Number(process.env.SITEMAP_MAX_EXPERTS || 500)
+const SEO_LOCALE = String(process.env.SEO_LOCALE || "en").trim() || "en"
 const SKIP = /^(1|true|yes)$/i.test(
   String(process.env.SKIP_SITEMAP || process.env.SKIP_SEO || ""),
 )
@@ -34,6 +36,16 @@ function xmlEscape(str) {
 
 function urlEntry(loc, { changefreq = "weekly", priority = "0.7" } = {}) {
   return `  <url>\n    <loc>${xmlEscape(loc)}</loc>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`
+}
+
+async function collectExpertIds() {
+  if (!resolveApiBase()) return []
+  try {
+    return await collectPublicExpertIds({ maxIds: MAX_EXPERTS, locale: SEO_LOCALE })
+  } catch (e) {
+    console.warn(`[sitemap] public experts fetch failed:`, e?.message || e)
+    return []
+  }
 }
 
 async function collectProjectIds() {
@@ -60,13 +72,21 @@ async function main() {
     return
   }
 
-  const ids = await collectProjectIds()
+  const [ids, expertIds] = await Promise.all([collectProjectIds(), collectExpertIds()])
   const entries = [
     urlEntry(`${SITE_ORIGIN}/`, { changefreq: "daily", priority: "1.0" }),
     urlEntry(`${SITE_ORIGIN}/explore`, { changefreq: "daily", priority: "0.9" }),
   ]
   for (const id of ids) {
     entries.push(urlEntry(`${SITE_ORIGIN}/explore/project/${encodeURIComponent(id)}`))
+  }
+  for (const eid of expertIds) {
+    entries.push(
+      urlEntry(`${SITE_ORIGIN}/explore/expert/${encodeURIComponent(eid)}`, {
+        changefreq: "weekly",
+        priority: "0.75",
+      }),
+    )
   }
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</urlset>\n`
   await mkdir(dirname(OUT), { recursive: true })

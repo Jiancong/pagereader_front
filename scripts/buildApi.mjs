@@ -160,3 +160,52 @@ export async function resolveProjectDeck(projectId) {
   }
   return { project, deck: null }
 }
+
+function expertIdFromRow(row) {
+  return String(row?.expert_id ?? row?.expertId ?? "").trim()
+}
+
+/** 公开专家列表（构建期 sitemap / prerender / inject） */
+export async function fetchPublicBookExpertsPage(page, pageSize, locale = "en") {
+  const q = new URLSearchParams({
+    locale,
+    ui_locale: locale,
+    page: String(page),
+    pageSize: String(pageSize),
+  })
+  const data = await fetchApiJson(`/book-experts/public?${q}`)
+  const experts = data?.experts ?? []
+  return {
+    experts: Array.isArray(experts) ? experts : [],
+    count: data?.count ?? experts.length,
+  }
+}
+
+export async function collectPublicExpertIds({
+  maxIds = Infinity,
+  locale = "en",
+  pageSize = 100,
+  maxPages = 50,
+} = {}) {
+  if (!resolveApiBase()) return []
+
+  const ids = []
+  for (let page = 1; page <= maxPages && ids.length < maxIds; page++) {
+    const { experts } = await fetchPublicBookExpertsPage(page, pageSize, locale)
+    if (!experts.length) break
+    for (const row of experts) {
+      const id = expertIdFromRow(row)
+      if (id && !ids.includes(id)) ids.push(id)
+      if (ids.length >= maxIds) break
+    }
+    if (experts.length < pageSize) break
+  }
+  return ids.slice(0, maxIds)
+}
+
+/** 公开专家详情（含 methodology_preview） */
+export async function fetchPublicExpertDetail(expertId, locale = "en") {
+  const q = new URLSearchParams({ locale, ui_locale: locale })
+  const data = await fetchApiJson(`/book-experts/${encodeURIComponent(expertId)}?${q}`)
+  return data?.expert ?? data
+}

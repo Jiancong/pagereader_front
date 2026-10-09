@@ -15,6 +15,16 @@ import {
   buildBookSeoDescription,
   buildBookJsonLd,
 } from "./bookSeoExtract.mjs"
+import {
+  htmlEscape,
+  upsertTitle,
+  upsertMetaDescription,
+  upsertCanonical,
+  upsertJsonLd,
+  injectCrawlBlock,
+  hasBookCrawlableSeo,
+  renderList,
+} from "./seoHeadInject.mjs"
 
 loadBuildEnv()
 
@@ -27,66 +37,12 @@ const SKIP = /^(1|true|yes)$/i.test(
   String(process.env.SKIP_INJECT_SEO || process.env.SKIP_SEO || ""),
 )
 
-function htmlEscape(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-}
-
 async function fileExists(p) {
   try {
     return (await stat(p)).isFile()
   } catch {
     return false
   }
-}
-
-function hasCrawlableSeo(html) {
-  return html.includes('data-seo-section="summary"') || html.includes('data-seo-crawl="true"')
-}
-
-function upsertTitle(html, title) {
-  if (/<title[^>]*>/.test(html)) {
-    return html.replace(/<title[^>]*>[\s\S]*?<\/title>/i, `<title>${htmlEscape(title)}</title>`)
-  }
-  return html.replace("</head>", `  <title>${htmlEscape(title)}</title>\n</head>`)
-}
-
-function upsertMetaDescription(html, description) {
-  const tag = `<meta name="description" content="${htmlEscape(description)}" data-seo-inject="" />`
-  if (/<meta\s+name="description"/i.test(html)) {
-    return html.replace(/<meta\s+name="description"[^>]*>/i, tag)
-  }
-  return html.replace("</head>", `  ${tag}\n</head>`)
-}
-
-function upsertCanonical(html, href) {
-  const tag = `<link rel="canonical" href="${htmlEscape(href)}" data-seo-inject="" />`
-  if (/<link\s+rel="canonical"/i.test(html)) {
-    return html.replace(/<link\s+rel="canonical"[^>]*>/i, tag)
-  }
-  return html.replace("</head>", `  ${tag}\n</head>`)
-}
-
-function upsertJsonLd(html, blocks) {
-  let out = html.replace(
-    /<script\s+type="application\/ld\+json"\s+data-seo-inject[^>]*>[\s\S]*?<\/script>\s*/gi,
-    "",
-  )
-  const scripts = blocks
-    .map(
-      (block) =>
-        `  <script type="application/ld+json" data-seo-inject="">${JSON.stringify(block)}</script>`,
-    )
-    .join("\n")
-  return out.replace("</head>", `${scripts}\n</head>`)
-}
-
-function renderList(items) {
-  if (!items.length) return ""
-  return `<ul>${items.map((item) => `<li>${htmlEscape(item)}</li>`).join("")}</ul>`
 }
 
 function renderCharacters(chars) {
@@ -137,13 +93,6 @@ function renderCrawlBlock(content, projectId) {
   return body
 }
 
-function injectCrawlBlock(html, crawlBlock) {
-  if (html.includes('data-seo-crawl="true"')) {
-    return html.replace(/<main id="seo-crawl"[\s\S]*?<\/main>\s*/i, crawlBlock)
-  }
-  return html.replace(/<div id="app"/i, `${crawlBlock}<div id="app"`)
-}
-
 async function loadBaseHtml(projectId) {
   const routeFile = join(DIST, "explore/project", projectId, "index.html")
   if (await fileExists(routeFile)) return readFile(routeFile, "utf8")
@@ -164,7 +113,7 @@ async function injectBookPage(projectId, { project, deck }) {
   const jsonLd = buildBookJsonLd(content, { url: pageUrl, image, description })
 
   let html = await loadBaseHtml(projectId)
-  const prerenderHasBody = hasCrawlableSeo(html)
+  const prerenderHasBody = hasBookCrawlableSeo(html)
 
   html = upsertTitle(html, title)
   html = upsertMetaDescription(html, description)

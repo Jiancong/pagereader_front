@@ -2,5 +2,5 @@ User-agent: *
 Allow: /
 Disallow: /workspace
 
-# 站点地图（建议由后端动态生成全量图书 URL；构建期可用 npm run gen:sitemap 生成快照）
+# 站点地图（含图书与公开专家页；构建期 npm run build / gen:sitemap 生成快照，生产建议后端动态 sitemap）
 Sitemap: https://page2.top/sitemap.xml

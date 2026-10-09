@@ -1,4 +1,4 @@
-// 构建后 SEO 步骤：prerender → injectBookSeoPages → generate-sitemap
+// 构建后 SEO 步骤：prerender → injectBookSeoPages → injectExpertSeoPages → generate-sitemap
 //
 // 跳过全部 SEO（本地快速构建）：
 //   SKIP_SEO=1 npm run build
@@ -6,7 +6,7 @@
 // 或直接使用：npm run build:fast
 //
 // 也可单独跳过某一步：
-//   SKIP_PRERENDER=1 | SKIP_INJECT_SEO=1 | SKIP_SITEMAP=1
+//   SKIP_PRERENDER=1 | SKIP_INJECT_SEO=1 | SKIP_INJECT_EXPERT_SEO=1 | SKIP_SITEMAP=1
 
 import { spawnSync } from "node:child_process"
 import { dirname, resolve } from "node:path"
@@ -33,13 +33,14 @@ function runNodeScript(scriptName) {
 function main() {
   if (isSkipEnv("SKIP_SEO")) {
     console.log(
-      "[build] SKIP_SEO=1 — skipping prerender, injectBookSeoPages, generate-sitemap",
+      "[build] SKIP_SEO=1 — skipping prerender, inject SEO pages, generate-sitemap",
     )
     return
   }
 
   runNodeScript("prerender.mjs")
   runNodeScript("injectBookSeoPages.mjs")
+  runNodeScript("injectExpertSeoPages.mjs")
   runNodeScript("generate-sitemap.mjs")
 }
 

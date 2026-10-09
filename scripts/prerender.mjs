@@ -1,4 +1,4 @@
-// 构建后预渲染：用无头 Chrome 渲染首页与热门图书详情页，写出静态 HTML 供爬虫抓取。
+// 构建后预渲染：用无头 Chrome 渲染首页、探索页、热门图书与公开专家详情页，写出静态 HTML 供爬虫抓取。
 // App 运行时仍是 SPA；预渲染产物仅为首屏可抓取内容。
 //
 // 用法（需先 vite build）：
@@ -7,6 +7,7 @@
 //   SKIP_PRERENDER=1     跳过预渲染（构建仍成功）
 //   SKIP_SEO=1           跳过全部构建后 SEO 步骤（见 postBuildSeo.mjs）
 //   PRERENDER_LIMIT      预渲染的图书页数量（默认 50）
+//   PRERENDER_EXPERT_LIMIT  预渲染的公开专家页数量（默认与 PRERENDER_LIMIT 相同）
 //   PRERENDER_PORT       本地静态服务端口（默认 4179）
 //   CHROME_PATH          使用系统已安装的 Chrome/Chromium 可执行文件
 //   SITEMAP_API_BASE / VITE_API_URL / NEXT_PUBLIC_API_BASE  图书列表 API 源
@@ -16,7 +17,7 @@ import { readFile, writeFile, mkdir, stat } from "node:fs/promises"
 import { dirname, resolve, join, extname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { loadBuildEnv } from "./loadBuildEnv.mjs"
-import { resolveApiBase, collectFeedProjectIds } from "./buildApi.mjs"
+import { resolveApiBase, collectFeedProjectIds, collectPublicExpertIds } from "./buildApi.mjs"
 
 loadBuildEnv()
 
@@ -26,6 +27,9 @@ const DIST = resolve(ROOT, "dist")
 
 const PORT = Number(process.env.PRERENDER_PORT || 4179)
 const LIMIT = Number(process.env.PRERENDER_LIMIT || 50)
+const EXPERT_LIMIT = Number(
+  process.env.PRERENDER_EXPERT_LIMIT || process.env.PRERENDER_LIMIT || 50,
+)
 const SKIP = /^(1|true|yes)$/i.test(
   String(process.env.SKIP_PRERENDER || process.env.SKIP_SEO || ""),
 )
@@ -83,6 +87,19 @@ function startStaticServer() {
   return new Promise((resolveServer) => server.listen(PORT, () => resolveServer(server)))
 }
 
+async function fetchTopExpertIds(limit) {
+  if (!resolveApiBase()) {
+    console.warn("[prerender] No API base; skipping expert pages.")
+    return []
+  }
+  try {
+    return await collectPublicExpertIds({ maxIds: limit, locale: "en" })
+  } catch (e) {
+    console.warn("[prerender] public experts fetch failed:", e?.message || e)
+    return []
+  }
+}
+
 async function fetchTopProjectIds(limit) {
   if (!resolveApiBase()) {
     console.warn("[prerender] No API base; only homepage will be prerendered.")
@@ -120,9 +137,15 @@ async function prerenderRoute(browser, baseUrl, routePath, { waitForSeo } = {}) 
           () =>
             document.querySelector('[data-seo-ready="true"]') ||
             document.querySelector('[data-seo-section="summary"]') ||
+            document.querySelector('[data-seo-section="methodology"]') ||
             document.querySelector('script[type="application/ld+json"][data-seo-head]'),
           { timeout: 45000 },
         )
+        .catch(() => {})
+    }
+    if (routePath.startsWith("/explore/expert/")) {
+      await page
+        .waitForSelector("article h1", { timeout: 20000 })
         .catch(() => {})
     }
     if (routePath === "/") {
@@ -201,7 +224,13 @@ async function main() {
     for (const id of ids) {
       await prerenderRoute(browser, baseUrl, `/explore/project/${id}`, { waitForSeo: true })
     }
-    console.log(`[prerender] done: home + explore + ${ids.length} book pages`)
+    const expertIds = await fetchTopExpertIds(EXPERT_LIMIT)
+    for (const eid of expertIds) {
+      await prerenderRoute(browser, baseUrl, `/explore/expert/${eid}`, { waitForSeo: true })
+    }
+    console.log(
+      `[prerender] done: home + explore + ${ids.length} book + ${expertIds.length} expert pages`,
+    )
   } finally {
     await browser.close()
     server.close()
