@@ -1,5 +1,5 @@
 <template>
-  <div class="mobi-reader">
+  <div class="mobi-reader" :class="{ 'mobi-reader--night': colorTheme === 'dark' }">
     <div class="mobi-reader__zoom-wrap" :style="{ zoom: scale }">
       <div ref="containerRef" class="mobi-reader__container"></div>
     </div>
@@ -11,14 +11,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
+import { applyReaderDocColorTheme } from '@/utils/readerNightDocStyle'
 import { useI18n } from 'vue-i18n'
 import 'foliate-js/view.js'
 
-const props = defineProps<{
-  file: File
-  scale?: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    file: File
+    scale?: number
+    colorTheme?: ReaderColorTheme
+  }>(),
+  { colorTheme: 'light' },
+)
 
 const emit = defineEmits<{
   'page-change': [page: number]
@@ -73,11 +79,31 @@ function detachFromDoc(doc: Document) {
   doc.removeEventListener('wheel', onDocWheel, true)
 }
 
+function syncDocTheme(doc: Document) {
+  applyReaderDocColorTheme(doc, props.colorTheme === 'dark' ? 'dark' : 'light')
+}
+
 function onLoad(e: Event) {
   const doc = (e as CustomEvent).detail?.doc
-  if (doc) attachToDoc(doc)
+  if (doc) {
+    attachToDoc(doc)
+    syncDocTheme(doc)
+  }
   emit('page-ready')
 }
+
+watch(
+  () => props.colorTheme,
+  () => {
+    for (const doc of trackedDocs) syncDocTheme(doc)
+    try {
+      const doc: Document | undefined = view?.renderer?.getContents?.()?.doc
+      if (doc) syncDocTheme(doc)
+    } catch {
+      /* ignore */
+    }
+  },
+)
 
 function onRelocate(e: Event) {
   const detail = (e as CustomEvent).detail
@@ -187,6 +213,14 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd })
 }
 .mobi-reader__overlay--error {
   color: #dc2626;
+}
+
+.mobi-reader--night {
+  background: #0a0a0a;
+}
+.mobi-reader--night .mobi-reader__overlay {
+  background: #0a0a0a;
+  color: #9ca3af;
 }
 
 @media (max-width: 767px) {

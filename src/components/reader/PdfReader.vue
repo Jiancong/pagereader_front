@@ -1,5 +1,5 @@
 <template>
-  <div class="pdf-reader" ref="rootRef">
+  <div class="pdf-reader" :class="{ 'pdf-reader--night': colorTheme === 'dark' }" ref="rootRef">
     <div v-if="loading" class="pdf-reader__placeholder">{{ t('reader.loading') }}</div>
     <div v-else-if="loadError" class="pdf-reader__placeholder pdf-reader__placeholder--error">
       {{ loadError }}
@@ -29,10 +29,16 @@ import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
 
-const props = defineProps<{
-  objectUrl: string
-  scale: number
-}>()
+import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
+
+const props = withDefaults(
+  defineProps<{
+    objectUrl: string
+    scale: number
+    colorTheme?: ReaderColorTheme
+  }>(),
+  { colorTheme: 'light' },
+)
 const emit = defineEmits<{
   (event: 'page-change', page: number): void
   (event: 'page-count', count: number): void
@@ -287,5 +293,18 @@ defineExpose({
 }
 .pdf-reader__placeholder--error {
   color: #fca5a5;
+}
+.pdf-reader--night {
+  background: #0a0a0a;
+}
+.pdf-reader--night .pdf-reader__scroll {
+  background: #0a0a0a;
+}
+.pdf-reader--night .pdf-reader__page-inner {
+  background: #0a0a0a;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+.pdf-reader--night .pdf-reader__canvas {
+  filter: invert(1) hue-rotate(180deg);
 }
 </style>

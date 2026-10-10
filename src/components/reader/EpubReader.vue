@@ -1,5 +1,5 @@
 <template>
-  <div class="epub-reader" ref="rootRef">
+  <div class="epub-reader" :class="{ 'epub-reader--night': colorTheme === 'dark' }" ref="rootRef">
     <div class="epub-reader__stage">
       <div
         class="epub-reader__zoom"
@@ -32,14 +32,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
 import { useI18n } from 'vue-i18n'
 import ePub, { type Book, type Rendition } from 'epubjs'
 
-const props = defineProps<{
-  file: File
-  scale?: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    file: File
+    scale?: number
+    colorTheme?: ReaderColorTheme
+  }>(),
+  { colorTheme: 'light' },
+)
 
 const emit = defineEmits<{
   'page-change': [page: number]
@@ -149,6 +154,41 @@ function uninstallUnloadShim() {
   }
 }
 
+function applyEpubColorTheme() {
+  if (!rendition) return
+  const mediaRules = {
+    'img, svg, video': {
+      'max-width': '100% !important',
+      'max-height': '95vh !important',
+      width: 'auto !important',
+      height: 'auto !important',
+    },
+  }
+  rendition.themes.register('page2-light', {
+    ...mediaRules,
+    body: {
+      color: '#1f2937 !important',
+      background: '#ffffff !important',
+    },
+    a: { color: '#2563eb !important' },
+  })
+  rendition.themes.register('page2-dark', {
+    ...mediaRules,
+    body: {
+      color: '#e5e5e5 !important',
+      background: '#0a0a0a !important',
+    },
+    p: { color: '#e5e5e5 !important' },
+    a: { color: '#93c5fd !important' },
+  })
+  rendition.themes.select(props.colorTheme === 'dark' ? 'page2-dark' : 'page2-light')
+}
+
+watch(
+  () => props.colorTheme,
+  () => applyEpubColorTheme(),
+)
+
 onMounted(async () => {
   try {
     // iOS Safari 旧版本 File.arrayBuffer() 可能缺失，用 slice+FileReader 兜底
@@ -204,6 +244,7 @@ onMounted(async () => {
         height: 'auto !important',
       },
     })
+    applyEpubColorTheme()
 
     rendition.on('relocated', (location: any) => {
       atStart.value = location.atStart ?? false
@@ -402,6 +443,18 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
 .er-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.epub-reader--night {
+  background: #0a0a0a;
+}
+.epub-reader--night .epub-reader__viewer {
+  background: #0a0a0a;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+}
+.epub-reader--night .epub-reader__overlay {
+  background: #0a0a0a;
+  color: #9ca3af;
 }
 
 @media (max-width: 767px) {

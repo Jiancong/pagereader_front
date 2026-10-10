@@ -5,6 +5,7 @@
       'reader-view--epub': isEpub,
       'reader-view--mobi': isMobi,
       'reader-view--pdf': isPdf,
+      'reader-view--night': isDark,
     }"
     @contextmenu="onContextMenu"
     @wheel="onWheel"
@@ -41,6 +42,20 @@
           <span class="rv-zoom-value">{{ Math.round(scale * 100) }}%</span>
           <button class="rv-btn rv-btn--sm" @click="zoomIn" :disabled="scale >= 3">+</button>
         </div>
+
+        <button
+          v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown)"
+          type="button"
+          class="rv-btn rv-btn--sm rv-btn--theme"
+          :class="{ 'rv-btn--theme-on': isDark }"
+          :title="isDark ? t('reader.colorThemeLight') : t('reader.colorThemeDark')"
+          :aria-label="isDark ? t('reader.colorThemeLight') : t('reader.colorThemeDark')"
+          @click="toggleTheme"
+        >
+          <Sun v-if="isDark" class="h-4 w-4" />
+          <Moon v-else class="h-4 w-4" />
+          <span class="rv-btn--theme-label">{{ isDark ? t('reader.colorThemeLight') : t('reader.colorThemeDark') }}</span>
+        </button>
 
         <button
           v-if="showTtsControls"
@@ -104,6 +119,7 @@
       ref="pdfReaderRef"
       :object-url="objectUrl"
       :scale="scale"
+      :color-theme="theme"
       @page-change="onPageChange"
       @page-count="onPageCount"
       @page-ready="onReaderPageReady"
@@ -115,6 +131,7 @@
       ref="epubReaderRef"
       :file="file"
       :scale="scale"
+      :color-theme="theme"
       @page-change="onPageChange"
       @page-count="onPageCount"
       @page-ready="onReaderPageReady"
@@ -127,6 +144,7 @@
       ref="mobiReaderRef"
       :file="file"
       :scale="scale"
+      :color-theme="theme"
       @page-change="onPageChange"
       @page-count="onPageCount"
       @page-ready="onReaderPageReady"
@@ -149,6 +167,7 @@
       ref="markdownReaderRef"
       :file="file"
       :scale="scale"
+      :color-theme="theme"
       @page-change="onPageChange"
       @page-count="onPageCount"
     />
@@ -176,6 +195,16 @@
         ‹ {{ t('reader.prev') }}
       </button>
       <div class="reader-view__mobile-bar-center">
+        <button
+          v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown)"
+          type="button"
+          class="reader-view__mobile-bar-btn"
+          :aria-label="isDark ? t('reader.colorThemeLight') : t('reader.colorThemeDark')"
+          @click="toggleTheme"
+        >
+          <Sun v-if="isDark" class="h-5 w-5" />
+          <Moon v-else class="h-5 w-5" />
+        </button>
         <button
           v-if="showTtsControls"
           type="button"
@@ -210,7 +239,8 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun } from 'lucide-vue-next'
+import { useReaderColorTheme } from '@/composables/useReaderColorTheme'
 import { ElMessage } from 'element-plus'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
@@ -227,6 +257,7 @@ const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 const store = useReaderFileStore()
+const { theme, isDark, toggleTheme } = useReaderColorTheme()
 
 const file = computed(() => store.file)
 const objectUrl = computed(() => store.objectUrl)
@@ -585,6 +616,9 @@ onBeforeUnmount(() => {
   background: #3a3a3a;
   overflow: hidden;
 }
+.reader-view--night {
+  background: #0a0a0a;
+}
 .reader-view__toolbar {
   display: flex;
   align-items: center;
@@ -762,6 +796,24 @@ onBeforeUnmount(() => {
 }
 .rv-btn--auto-advance-label {
   white-space: nowrap;
+}
+.rv-btn--theme {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.rv-btn--theme-on {
+  border-color: #6366f1;
+  color: #fcd34d;
+}
+.rv-btn--theme-label {
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .rv-btn--theme-label {
+    display: none;
+  }
 }
 .rv-btn--workspace {
   display: inline-flex;

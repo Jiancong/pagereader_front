@@ -1,5 +1,5 @@
 <template>
-  <div class="markdown-reader">
+  <div class="markdown-reader" :class="{ 'markdown-reader--night': colorTheme === 'dark' }">
     <div v-if="loading" class="markdown-reader__overlay">{{ t('reader.loading') }}</div>
     <div v-else-if="loadError" class="markdown-reader__overlay markdown-reader__overlay--error">
       {{ loadError }}
@@ -20,7 +20,12 @@ import { ref, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 
-const props = defineProps<{ file: File; scale?: number }>()
+import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
+
+const props = withDefaults(
+  defineProps<{ file: File; scale?: number; colorTheme?: ReaderColorTheme }>(),
+  { colorTheme: 'light' },
+)
 const emit = defineEmits<{
   'page-change': [page: number]
   'page-count': [count: number]
@@ -189,5 +194,39 @@ onMounted(async () => {
   margin: 1.4em 0;
   border: none;
   border-top: 1px solid #e5e7eb;
+}
+.markdown-reader--night {
+  background: #0a0a0a;
+}
+.markdown-reader--night .markdown-reader__overlay {
+  background: #0a0a0a;
+  color: #9ca3af;
+}
+.markdown-reader--night .markdown-reader__article {
+  background: #0a0a0a;
+  color: #e5e5e5;
+  box-shadow: none;
+}
+.markdown-reader--night .markdown-reader__article :deep(a) {
+  color: #93c5fd;
+}
+.markdown-reader--night .markdown-reader__article :deep(blockquote) {
+  background: #171717;
+  border-left-color: #4b5563;
+  color: #d1d5db;
+}
+.markdown-reader--night .markdown-reader__article :deep(code) {
+  background: #262626;
+  color: #e5e5e5;
+}
+.markdown-reader--night .markdown-reader__article :deep(th),
+.markdown-reader--night .markdown-reader__article :deep(td) {
+  border-color: #374151;
+}
+.markdown-reader--night .markdown-reader__article :deep(th) {
+  background: #171717;
+}
+.markdown-reader--night .markdown-reader__article :deep(hr) {
+  border-top-color: #374151;
 }
 </style>
