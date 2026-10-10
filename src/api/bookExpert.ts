@@ -60,23 +60,57 @@ export function extractCreatedExpert(
 
 // ===== REST（经 BFF，非标准 R<T> 信封，顶层 ok 判断） =====
 
-function authJsonHeaders(): Headers {
+function authJsonHeaders(opts: { omitAuth?: boolean } = {}): Headers {
   const headers = new Headers()
   headers.set("Accept", "application/json")
-  const token = getToken()
-  if (token) headers.set("Authorization", token)
+  if (!opts.omitAuth) {
+    const token = getToken()
+    if (token) headers.set("Authorization", token)
+  }
   Object.entries(getApiContextHeaders()).forEach(([key, value]) => {
     if (value) headers.set(key, value)
   })
   return headers
 }
 
+function parseBookExpertPayload<T>(res: Response, parsed: unknown): T {
+  const payload = parsed as {
+    ok?: boolean
+    code?: number
+    success?: boolean
+    message?: string
+    msg?: string
+    error?: string
+  } & T
+  // BFF 偶发 R<T> 信封（如带失效 JWT 时 code=900111 且无 expert）
+  if (
+    typeof payload.code === "number" &&
+    payload.code !== 0 &&
+    payload.success !== true &&
+    payload.ok !== true
+  ) {
+    const msg = payload.message || payload.msg || payload.error || `请求失败：${payload.code}`
+    throw new ApiError(payload.code, msg)
+  }
+  if (!res.ok || payload?.ok === false) {
+    const msg = payload?.message || payload?.msg || payload?.error || `请求失败：${res.status}`
+    throw new ApiError(res.status, msg)
+  }
+  return payload as T
+}
+
 async function rawRequest<T>(
   method: string,
   path: string,
-  opts: { query?: Record<string, unknown>; body?: unknown; form?: FormData } = {},
+  opts: {
+    query?: Record<string, unknown>
+    body?: unknown
+    form?: FormData
+    /** 公开页匿名读：不附带 Authorization，避免失效 token 导致「未登录」而无 expert */
+    omitAuth?: boolean
+  } = {},
 ): Promise<T> {
-  const headers = authJsonHeaders()
+  const headers = authJsonHeaders({ omitAuth: opts.omitAuth })
   let body: BodyInit | undefined
   if (opts.form) {
     // multipart：由浏览器补 boundary，勿手动设 Content-Type
@@ -100,12 +134,7 @@ async function rawRequest<T>(
   } catch {
     throw new ApiError(res.status, `请求失败：${res.status}`)
   }
-  const payload = parsed as { ok?: boolean; message?: string; msg?: string; error?: string } & T
-  if (!res.ok || payload?.ok === false) {
-    const msg = payload?.message || payload?.msg || payload?.error || `请求失败：${res.status}`
-    throw new ApiError(res.status, msg)
-  }
-  return payload as T
+  return parseBookExpertPayload<T>(res, parsed)
 }
 
 export async function listExperts(userId: string): Promise<BookExpertListResult> {
@@ -140,18 +169,30 @@ export async function listPublicExperts(
   })
 }
 
-export async function getExpert(
-  expertId: string,
-  userId?: string,
-): Promise<BookExpertDetailResult> {
+function expertDetailQuery(userId?: string): Record<string, string> {
   const query: Record<string, string> = {
     locale: resolveApiLocale(),
     ui_locale: getSavedLocale() === "en" ? "en" : "zh",
   }
   const uid = String(userId ?? "").trim()
   if (uid) query.userId = uid
+  return query
+}
+
+export async function getExpert(
+  expertId: string,
+  userId?: string,
+): Promise<BookExpertDetailResult> {
   return rawRequest<BookExpertDetailResult>("GET", `/book-experts/${encodeURIComponent(expertId)}`, {
-    query,
+    query: expertDetailQuery(userId),
+  })
+}
+
+/** 探索公开页：匿名可读，禁止附带失效 JWT */
+export async function getPublicExpertDetail(expertId: string): Promise<BookExpertDetailResult> {
+  return rawRequest<BookExpertDetailResult>("GET", `/book-experts/${encodeURIComponent(expertId)}`, {
+    query: expertDetailQuery(),
+    omitAuth: true,
   })
 }
 

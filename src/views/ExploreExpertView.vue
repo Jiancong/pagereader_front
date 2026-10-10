@@ -324,11 +324,18 @@ async function loadExpert() {
   loading.value = true
   error.value = ''
   try {
-    const res = await bookExpertApi.getExpert(expertId.value)
+    const res = await bookExpertApi.getPublicExpertDetail(expertId.value)
     rawExpert.value = res?.expert ?? null
-    if (!rawExpert.value) error.value = t('bookExpert.publicNotFound')
-    else {
-      await applyDisplayLocale()
+    if (!rawExpert.value || String(rawExpert.value.visibility ?? '').toLowerCase() !== 'public') {
+      error.value = t('bookExpert.publicNotFound')
+      rawExpert.value = null
+      expert.value = null
+    } else {
+      try {
+        await applyDisplayLocale()
+      } catch {
+        expert.value = rawExpert.value
+      }
       recordBookExpertOpen(rawExpert.value)
     }
   } catch {
