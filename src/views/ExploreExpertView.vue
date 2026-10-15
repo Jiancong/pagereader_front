@@ -170,7 +170,7 @@ import {
 } from 'lucide-vue-next'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
-import { bookExpertApi } from '@/api'
+import { bookExpertApi, isBookExpertPubliclyViewable } from '@/api/bookExpert'
 import { buildExploreExpertShareUrl } from '@/utils/feedOpen'
 import { useSeoHead } from '@/composables/useSeoHead'
 import type { BookExpertSummary } from '@/api/types'
@@ -319,14 +319,27 @@ async function applyDisplayLocale() {
   expert.value = localized ?? rawExpert.value
 }
 
+async function fetchPublicExpertOnce(id: string) {
+  const res = await bookExpertApi.getPublicExpertDetail(id)
+  return res?.expert ?? null
+}
+
 async function loadExpert() {
   if (!expertId.value) return
   loading.value = true
   error.value = ''
+  const id = expertId.value
   try {
-    const res = await bookExpertApi.getPublicExpertDetail(expertId.value)
-    rawExpert.value = res?.expert ?? null
-    if (!rawExpert.value || String(rawExpert.value.visibility ?? '').toLowerCase() !== 'public') {
+    let row: BookExpertSummary | null = null
+    try {
+      row = await fetchPublicExpertOnce(id)
+    } catch {
+      // 弱网 / 瞬时失败：短延迟重试一次
+      await new Promise((r) => setTimeout(r, 400))
+      row = await fetchPublicExpertOnce(id)
+    }
+    rawExpert.value = row
+    if (!isBookExpertPubliclyViewable(row)) {
       error.value = t('bookExpert.publicNotFound')
       rawExpert.value = null
       expert.value = null

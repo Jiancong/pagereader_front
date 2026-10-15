@@ -5,6 +5,10 @@ import { buildUrl, ApiError } from "./client"
 import { getToken } from "./token"
 import { getApiContextHeaders } from "@/utils/apiRequestContext"
 import { getSavedLocale, resolveApiLocale } from "@/composables/useAppLocale"
+import {
+  extractExpertFromDetailPayload,
+  isBookExpertPubliclyViewable,
+} from "@/utils/bookExpertDetail"
 import type {
   BookExpertListResult,
   BookExpertDetailResult,
@@ -166,6 +170,8 @@ export async function listPublicExperts(
   if (excludeOwn && uid) query.exclude_own = 1
   return rawRequest<BookExpertListResult>("GET", "/book-experts/public", {
     query,
+    // 未登录浏览广场时不带 JWT，避免失效 token 导致整表「未登录」而无 experts
+    omitAuth: !uid,
   })
 }
 
@@ -179,22 +185,42 @@ function expertDetailQuery(userId?: string): Record<string, string> {
   return query
 }
 
+async function requestExpertDetail(
+  expertId: string,
+  opts: { userId?: string; omitAuth?: boolean },
+): Promise<BookExpertDetailResult> {
+  const raw = await rawRequest<unknown>("GET", `/book-experts/${encodeURIComponent(expertId)}`, {
+    query: expertDetailQuery(opts.userId),
+    omitAuth: opts.omitAuth,
+  })
+  const expert = extractExpertFromDetailPayload(raw)
+  if (!expert) {
+    throw new ApiError(404, "Expert not found")
+  }
+  const ok =
+    asRecord(raw)?.ok === true ||
+    asRecord(asRecord(raw)?.data)?.ok === true ||
+    true
+  return { ok: Boolean(ok), expert }
+}
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null
+}
+
 export async function getExpert(
   expertId: string,
   userId?: string,
 ): Promise<BookExpertDetailResult> {
-  return rawRequest<BookExpertDetailResult>("GET", `/book-experts/${encodeURIComponent(expertId)}`, {
-    query: expertDetailQuery(userId),
-  })
+  return requestExpertDetail(expertId, { userId })
 }
 
 /** 探索公开页：匿名可读，禁止附带失效 JWT */
 export async function getPublicExpertDetail(expertId: string): Promise<BookExpertDetailResult> {
-  return rawRequest<BookExpertDetailResult>("GET", `/book-experts/${encodeURIComponent(expertId)}`, {
-    query: expertDetailQuery(),
-    omitAuth: true,
-  })
+  return requestExpertDetail(expertId, { omitAuth: true })
 }
+
+export { isBookExpertPubliclyViewable }
 
 export type BookExpertFavoriteAction = "click" | "unclick"
 
