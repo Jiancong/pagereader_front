@@ -26,11 +26,9 @@
 - 用户分享链接时专家为**私有**，尚未发布到公共广场。
 - 发布后 BFF/Python 未同步 `visibility=public`（需查后端）。
 
-## 后端建议
+## 后端修改规格
 
-1. 匿名 `GET /book-experts/{id}`：**忽略无效 JWT**，公开专家仍返回 200 + `expert`（与无效 token 不应返回「未登录」且无 body）。
-2. 详情与列表统一 `{ ok, expert }` 或统一 `R<T>`，避免双信封。
-3. 公开专家详情始终带 `visibility: "public"`。
+见 **`book_expert_public_anonymous_access_spec.md`**（无效 JWT 下仍须返回 public `expert`；禁止 900111 + 空 body）。
 
 ## 验证
 
