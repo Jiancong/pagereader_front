@@ -311,3 +311,14 @@ export async function parseCoReadFile(file: File): Promise<{
 export function chapterApiNumber(chapterIndex: number): number {
   return chapterIndex + 1
 }
+
+/** SSE / 会话详情里的 chapterIndex 多为 1-based；Pinia 为 0-based */
+export function wireChapterToStoreIndex(
+  wire: number | undefined,
+  fallbackZeroBased: number,
+): number {
+  if (typeof wire !== "number" || !Number.isFinite(wire)) return fallbackZeroBased
+  const n = Math.trunc(wire)
+  if (n >= 1) return n - 1
+  return Math.max(0, n)
+}

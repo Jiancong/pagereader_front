@@ -9,6 +9,7 @@ import type {
   CoReadSessionDetail,
   CoReadViewPhase,
 } from "@/types/coReading"
+import { wireChapterToStoreIndex } from "@/utils/coReadChapter"
 
 const DRAFT_PREFIX = "page2top.coReading.draft."
 const LAST_SESSION_KEY = "page2top.coReading.lastSession"
@@ -223,7 +224,11 @@ export const useCoReadingStore = defineStore("co-reading", {
       const byChapter = detail.annotationsByChapter || {}
       for (const list of Object.values(byChapter)) {
         for (const a of list) {
-          this.annotations.push({ ...a, streaming: false })
+          this.annotations.push({
+            ...a,
+            chapterIndex: wireChapterToStoreIndex(a.chapterIndex, a.chapterIndex),
+            streaming: false,
+          })
         }
       }
       this.chatMessages = []

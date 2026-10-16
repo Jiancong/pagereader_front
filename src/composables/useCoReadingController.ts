@@ -6,7 +6,7 @@ import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
 import { useRouter } from "vue-router"
 import * as coReadingApi from "@/api/coReading"
-import { chapterApiNumber, parseCoReadFile } from "@/utils/coReadChapter"
+import { chapterApiNumber, parseCoReadFile, wireChapterToStoreIndex } from "@/utils/coReadChapter"
 import { ApiError } from "@/api/client"
 import { useCoReadingStore } from "@/stores/coReading"
 import { useCoReadFileStore } from "@/stores/coReadFile"
@@ -128,7 +128,7 @@ export function useCoReadingController() {
           onAnnotationAnchor: (data) => {
             store.upsertAnnotation({
               id: data.id,
-              chapterIndex: data.chapterIndex ?? chapterIndex,
+              chapterIndex: wireChapterToStoreIndex(data.chapterIndex, chapterIndex),
               pageIndex: data.pageIndex,
               anchor: data.anchor ?? { paragraphIndex: 0 },
               kind: data.kind ?? "reaction",
