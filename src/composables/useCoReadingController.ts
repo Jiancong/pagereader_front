@@ -77,16 +77,19 @@ export function useCoReadingController() {
     store.chapterTextUploaded[chapterIndex] = true
   }
 
-  async function openChapterStream(chapterIndex: number, opts?: { navigate?: boolean }) {
+  function isOnCoReadReader(): boolean {
+    return (
+      router.currentRoute.value.name === "reader-open" &&
+      router.currentRoute.value.query.coRead === "1"
+    )
+  }
+
+  /** 后台拉 SSE 批注，不阻塞进入阅读器 */
+  async function runChapterOpenStream(chapterIndex: number) {
     if (!store.sessionId) return
     openAbort?.abort()
     openAbort = new AbortController()
-    lastReportedPage.value = -1
     store.openingChapter = true
-    store.chapterOpenDone = false
-    store.annotations = store.annotations.filter((a) => a.chapterIndex !== chapterIndex)
-    store.loadDraftsForChapter(chapterIndex)
-
     const n = chapterApiNumber(chapterIndex)
     try {
       await ensureChapterTextUploaded(chapterIndex)
@@ -114,13 +117,6 @@ export function useCoReadingController() {
         openAbort.signal,
       )
       if (!store.chapterOpenDone) store.chapterOpenDone = true
-      store.phase = "reading"
-      const onReader =
-        router.currentRoute.value.name === "reader-open" &&
-        router.currentRoute.value.query.coRead === "1"
-      if (opts?.navigate ?? !onReader) {
-        await navigateToReaderView()
-      }
     } catch (e) {
       if (openAbort.signal.aborted) return
       ElMessage.error(e instanceof ApiError ? e.message : t("coRead.openFailed"))
@@ -128,6 +124,22 @@ export function useCoReadingController() {
     } finally {
       store.openingChapter = false
     }
+  }
+
+  /** 先打开书籍（ReaderView），AI 批注在后台 streaming */
+  async function enterReadingChapter(chapterIndex: number) {
+    if (!store.sessionId) return
+    store.currentChapterIndex = chapterIndex
+    store.phase = "reading"
+    lastReportedPage.value = -1
+    store.chapterOpenDone = false
+    store.annotations = store.annotations.filter((a) => a.chapterIndex !== chapterIndex)
+    store.loadDraftsForChapter(chapterIndex)
+
+    if (!isOnCoReadReader()) {
+      await navigateToReaderView()
+    }
+    void runChapterOpenStream(chapterIndex)
   }
 
   async function onStartSession(startChapterIndex: number) {
@@ -147,7 +159,7 @@ export function useCoReadingController() {
         startChapter: chapterApiNumber(startChapterIndex),
       })
       store.setSessionCreated(sessionId, startChapterIndex)
-      await openChapterStream(startChapterIndex)
+      await enterReadingChapter(startChapterIndex)
     } catch (e) {
       ElMessage.error(e instanceof ApiError ? e.message : t("coRead.sessionFailed"))
     } finally {
@@ -246,14 +258,13 @@ export function useCoReadingController() {
     const next = store.currentChapterIndex + 1
     store.currentChapterIndex = next
     store.phase = "reading"
-    await openChapterStream(next)
+    await enterReadingChapter(next)
   }
 
   async function onSelectChapter(index: number) {
     navOpen.value = false
     if (index === store.currentChapterIndex) return
-    store.currentChapterIndex = index
-    await openChapterStream(index)
+    await enterReadingChapter(index)
   }
 
   async function onPickFile(file: File) {
@@ -278,7 +289,7 @@ export function useCoReadingController() {
       for (const ch of store.chapters) {
         if (ch.paragraphs.length) store.cacheChapter(ch)
       }
-      await openChapterStream(store.currentChapterIndex)
+      await enterReadingChapter(store.currentChapterIndex)
     } catch (e) {
       store.sessionError =
         e instanceof ApiError && e.code === 404
@@ -315,7 +326,7 @@ export function useCoReadingController() {
     onSelectChapter,
     onPickFile,
     restoreSession,
-    openChapterStream,
+    enterReadingChapter,
     navigateToReaderView,
   }
 }
