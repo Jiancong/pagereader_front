@@ -35,6 +35,9 @@ export const useCoReadingStore = defineStore("co-reading", {
     openingChapter: false,
     repliesSending: false,
     chapterOpenDone: false,
+    /** SSE error code，如 generation_interrupted */
+    pageOpenError: "" as string,
+    pageIntroText: "" as string,
   }),
   getters: {
     totalChapters: (s) => s.chapters.length,
@@ -58,6 +61,9 @@ export const useCoReadingStore = defineStore("co-reading", {
       this.sessionError = ""
       this.openingChapter = false
       this.repliesSending = false
+      this.chapterOpenDone = false
+      this.pageOpenError = ""
+      this.pageIntroText = ""
     },
     setFromParse(fileName: string, chapters: CoReadChapter[]) {
       this.fileName = fileName
@@ -122,12 +128,20 @@ export const useCoReadingStore = defineStore("co-reading", {
         /* ignore */
       }
     },
+    clearPageOpenError() {
+      this.pageOpenError = ""
+    },
+    appendPageIntro(delta: string) {
+      this.pageIntroText += delta || ""
+    },
     upsertAnnotation(partial: Partial<CoReadAnnotation> & { id: string }) {
+      if (!partial.id) return
       const idx = this.annotations.findIndex((a) => a.id === partial.id)
       if (idx === -1) {
         this.annotations.push({
           id: partial.id,
           chapterIndex: partial.chapterIndex ?? this.currentChapterIndex,
+          pageIndex: partial.pageIndex,
           anchor: partial.anchor ?? { paragraphIndex: 0 },
           kind: partial.kind ?? "reaction",
           content: partial.content ?? "",
@@ -148,9 +162,12 @@ export const useCoReadingStore = defineStore("co-reading", {
       if (!ann) return
       ann.content = `${ann.content || ""}${delta || ""}`
     },
-    finalizeAnnotation(id: string) {
+    finalizeAnnotation(id: string, content?: string) {
       const ann = this.annotations.find((a) => a.id === id)
-      if (ann) ann.streaming = false
+      if (ann) {
+        ann.streaming = false
+        if (content !== undefined && content !== "") ann.content = content
+      }
     },
     markReplySent(annotationId: string) {
       const ann = this.annotations.find((a) => a.id === annotationId)

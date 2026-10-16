@@ -8,6 +8,9 @@ export type CoReadAnnotationKind =
   | "prediction"
   | "question"
   | "tease"
+  | "hint"
+  | "resonance"
+  | "humor"
 
 export interface CoReadChapter {
   index: number
@@ -27,6 +30,8 @@ export interface CoReadChapterMeta {
 export interface CoReadAnnotation {
   id: string
   chapterIndex: number
+  /** 共读逐页模型：批注所属页码（1-based，与阅读器一致） */
+  pageIndex?: number
   anchor: { paragraphIndex: number; quote?: string }
   kind: CoReadAnnotationKind
   content: string

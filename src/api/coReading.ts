@@ -6,6 +6,7 @@ import { buildAuthStreamHeaders, consumeFetchSse } from "@/utils/sse"
 import { getSavedLocale } from "@/composables/useAppLocale"
 import type {
   CoReadAnnotation,
+  CoReadAnnotationKind,
   CoReadChapterMeta,
   CoReadSessionDetail,
   CoReadSessionSummary,
@@ -13,6 +14,47 @@ import type {
 
 function resolveUiLocale(): "zh" | "en" {
   return getSavedLocale() === "en" ? "en" : "zh"
+}
+
+const WIRE_KIND_MAP: Record<string, CoReadAnnotationKind> = {
+  hint: "hint",
+  resonance: "resonance",
+  humor: "humor",
+  question: "question",
+  suspicion: "suspicion",
+  reaction: "reaction",
+  praise: "praise",
+  prediction: "prediction",
+  tease: "tease",
+}
+
+export function normalizeCoReadKind(kind: unknown): CoReadAnnotationKind {
+  const k = String(kind ?? "")
+    .trim()
+    .toLowerCase()
+  return WIRE_KIND_MAP[k] ?? "reaction"
+}
+
+/** wire(annotationId/paragraph_index) → internal(id/paragraphIndex) */
+export function normalizeAnnotationAnchorEvent(data: unknown): Partial<CoReadAnnotation> & { id: string } {
+  const d = (data ?? {}) as Record<string, unknown>
+  const a = (d.anchor ?? {}) as Record<string, unknown>
+  return {
+    id: String(d.annotationId ?? d.id ?? "").trim(),
+    chapterIndex: typeof d.chapterIndex === "number" ? d.chapterIndex : undefined,
+    pageIndex: typeof d.pageIndex === "number" ? d.pageIndex : undefined,
+    kind: normalizeCoReadKind(d.kind),
+    anchor: {
+      paragraphIndex: Number(a.paragraph_index ?? a.paragraphIndex ?? 0),
+      quote: typeof a.quote === "string" ? a.quote : undefined,
+    },
+    content: typeof d.content === "string" ? d.content : "",
+  }
+}
+
+function normalizeAnnotationId(data: unknown): string {
+  const d = data as { annotationId?: string; id?: string }
+  return String(d?.annotationId ?? d?.id ?? "").trim()
 }
 
 export interface CreateCoReadSessionBody {
@@ -43,12 +85,22 @@ export async function uploadChapterText(
 }
 
 export interface OpenChapterSseCallbacks {
+  onMeta?: (data: unknown) => void
+  onChatIntro?: (data: { delta: string; role?: string }) => void
   onAnnotationAnchor?: (data: Partial<CoReadAnnotation> & { id: string }) => void
-  onAnnotationDelta?: (data: { id: string; delta: string }) => void
-  onAnnotationDone?: (data: { id: string }) => void
-  onChapterDone?: (data: { chapterIndex: number; annotationCount?: number }) => void
+  onAnnotationDelta?: (data: { id: string; delta: string; pageIndex?: number }) => void
+  onAnnotationDone?: (data: { id: string; content?: string; pageIndex?: number }) => void
+  onChapterDone?: (data: {
+    chapterIndex: number
+    annotationCount?: number
+    replayed?: boolean
+    nextChapter?: number
+    status?: string
+  }) => void
   onError?: (message: string, data?: unknown) => void
   onPing?: () => void
+  /** 丢弃迟到 SSE 时可选回调 */
+  shouldAcceptPage?: (pageIndex: number | undefined) => boolean
 }
 
 export async function openChapter(
@@ -56,27 +108,59 @@ export async function openChapter(
   chapterNumber: number,
   cb: OpenChapterSseCallbacks = {},
   signal?: AbortSignal,
-  retryOnce = true,
+  opts?: { force?: boolean; retryOnce?: boolean },
 ): Promise<void> {
+  const retryOnce = opts?.retryOnce ?? true
+  const acceptPage = (pageIndex: number | undefined) =>
+    cb.shouldAcceptPage ? cb.shouldAcceptPage(pageIndex) : true
+
   const run = async () => {
     const res = await fetch(buildUrl(`/co-reading/sessions/${sessionId}/chapters/${chapterNumber}/open`), {
       method: "POST",
       credentials: "include",
       headers: buildAuthStreamHeaders(),
-      body: JSON.stringify({}),
+      body: JSON.stringify({ force: !!opts?.force }),
       signal,
     })
     await consumeFetchSse(
       res,
       (event, data) => {
+        if (event === "meta") {
+          cb.onMeta?.(data)
+          return
+        }
+        if (event === "chat_delta") {
+          const payload = data as { delta?: string; role?: string }
+          if (payload?.delta) cb.onChatIntro?.({ delta: payload.delta, role: payload.role })
+          return
+        }
         if (event === "annotation_anchor") {
-          cb.onAnnotationAnchor?.(data as Partial<CoReadAnnotation> & { id: string })
+          const normalized = normalizeAnnotationAnchorEvent(data)
+          if (!normalized.id) return
+          if (!acceptPage(normalized.pageIndex)) return
+          cb.onAnnotationAnchor?.(normalized)
         } else if (event === "annotation_delta") {
-          cb.onAnnotationDelta?.(data as { id: string; delta: string })
+          const d = data as { annotationId?: string; id?: string; delta?: string; pageIndex?: number }
+          const id = normalizeAnnotationId(d)
+          if (!id) return
+          if (!acceptPage(typeof d.pageIndex === "number" ? d.pageIndex : undefined)) return
+          cb.onAnnotationDelta?.({ id, delta: String(d.delta ?? ""), pageIndex: d.pageIndex })
         } else if (event === "annotation_done") {
-          cb.onAnnotationDone?.(data as { id: string })
+          const d = data as { annotationId?: string; id?: string; content?: string; pageIndex?: number }
+          const id = normalizeAnnotationId(d)
+          if (!id) return
+          if (!acceptPage(typeof d.pageIndex === "number" ? d.pageIndex : undefined)) return
+          cb.onAnnotationDone?.({ id, content: d.content, pageIndex: d.pageIndex })
         } else if (event === "chapter_done") {
-          cb.onChapterDone?.(data as { chapterIndex: number; annotationCount?: number })
+          cb.onChapterDone?.(
+            data as {
+              chapterIndex: number
+              annotationCount?: number
+              replayed?: boolean
+              nextChapter?: number
+              status?: string
+            },
+          )
         } else if (event === "error") {
           const payload = data as { message?: string; code?: string }
           cb.onError?.(payload?.message || "共读批注失败", data)
@@ -185,21 +269,17 @@ export async function reportProgress(
   })
 }
 
-/** 分页伴读：每翻一页上报当前页文本（BFF/Python 可选实现，未实现时静默失败） */
+/** 同步当前页文本（翻页后必须先成功再 open） */
 export async function reportPageRead(
   sessionId: string,
   chapterNumber: number,
   payload: { pageIndex: number; pageTotal?: number; text?: string },
 ): Promise<void> {
-  try {
-    await requestJsonOkPayload("POST", `/co-reading/sessions/${sessionId}/chapters/${chapterNumber}/page`, {
-      pageIndex: payload.pageIndex,
-      pageTotal: payload.pageTotal,
-      text: payload.text,
-    })
-  } catch {
-    /* optional endpoint */
-  }
+  await requestJsonOkPayload("POST", `/co-reading/sessions/${sessionId}/chapters/${chapterNumber}/page`, {
+    pageIndex: payload.pageIndex,
+    pageTotal: payload.pageTotal,
+    text: payload.text,
+  })
 }
 
 export async function getSession(sessionId: string): Promise<CoReadSessionDetail> {

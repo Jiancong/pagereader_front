@@ -11,7 +11,6 @@ import { ApiError } from "@/api/client"
 import { useCoReadingStore } from "@/stores/coReading"
 import { useCoReadFileStore } from "@/stores/coReadFile"
 import { useReaderFileStore } from "@/stores/reader"
-import type { CoReadAnnotationKind } from "@/types/coReading"
 import type { ReaderReturnTo } from "@/utils/readerReturnRoute"
 
 export function syncCoReadFileToReaderStore() {
@@ -49,7 +48,12 @@ export function useCoReadingController() {
   })
 
   const chapterAnnotations = computed(() =>
-    store.annotations.filter((a) => a.chapterIndex === store.currentChapterIndex),
+    store.annotations.filter((a) => {
+      if (a.chapterIndex !== store.currentChapterIndex) return false
+      const page = lastReportedPage.value
+      if (page >= 1 && a.pageIndex !== undefined && a.pageIndex !== page) return false
+      return true
+    }),
   )
 
   const replyDraftCount = computed(() =>
@@ -84,45 +88,75 @@ export function useCoReadingController() {
     )
   }
 
-  /** 后台拉 SSE 批注，不阻塞进入阅读器 */
-  async function runChapterOpenStream(chapterIndex: number) {
+  function handleOpenSseError(msg: string, data?: unknown) {
+    const code = String((data as { code?: string })?.code ?? "")
+    if (code === "chapter_text_missing") return
+    if (code === "generation_interrupted") {
+      store.pageOpenError = code
+      return
+    }
+    if (code === "rate_limited") {
+      ElMessage.warning(t("coRead.rateLimited"))
+      return
+    }
+    if (code === "upstream_unavailable") {
+      ElMessage.error(t("coRead.upstreamUnavailable"))
+      return
+    }
+    ElMessage.error(msg || t("coRead.openFailed"))
+  }
+
+  /** 当前页 open（SSE）；翻页会先 abort 上一条流 */
+  async function runChapterOpenStream(chapterIndex: number, opts?: { force?: boolean }) {
     if (!store.sessionId) return
     openAbort?.abort()
     openAbort = new AbortController()
+    const signal = openAbort.signal
+    const expectedPage = lastReportedPage.value
     store.openingChapter = true
+    if (!opts?.force) store.clearPageOpenError()
     const n = chapterApiNumber(chapterIndex)
     try {
-      await ensureChapterTextUploaded(chapterIndex)
+      void ensureChapterTextUploaded(chapterIndex)
       await coReadingApi.openChapter(
         store.sessionId,
         n,
         {
+          shouldAcceptPage: (pageIndex) =>
+            pageIndex === undefined || expectedPage < 1 || pageIndex === expectedPage,
+          onChatIntro: (data) => store.appendPageIntro(data.delta),
           onAnnotationAnchor: (data) => {
             store.upsertAnnotation({
               id: data.id,
               chapterIndex: data.chapterIndex ?? chapterIndex,
+              pageIndex: data.pageIndex,
               anchor: data.anchor ?? { paragraphIndex: 0 },
-              kind: (data.kind as CoReadAnnotationKind) || "reaction",
+              kind: data.kind ?? "reaction",
               content: data.content ?? "",
               streaming: true,
             })
           },
           onAnnotationDelta: (data) => store.appendAnnotationDelta(data.id, data.delta),
-          onAnnotationDone: (data) => store.finalizeAnnotation(data.id),
+          onAnnotationDone: (data) => store.finalizeAnnotation(data.id, data.content),
           onChapterDone: () => {
             store.chapterOpenDone = true
           },
-          onError: (msg) => ElMessage.error(msg),
+          onError: handleOpenSseError,
         },
-        openAbort.signal,
+        signal,
+        { force: opts?.force, retryOnce: true },
       )
       if (!store.chapterOpenDone) store.chapterOpenDone = true
     } catch (e) {
-      if (openAbort.signal.aborted) return
-      ElMessage.error(e instanceof ApiError ? e.message : t("coRead.openFailed"))
+      if (signal.aborted) return
+      if (e instanceof ApiError && e.code === 429) {
+        ElMessage.warning(t("coRead.rateLimited"))
+      } else {
+        ElMessage.error(e instanceof ApiError ? e.message : t("coRead.openFailed"))
+      }
       store.chapterOpenDone = true
     } finally {
-      store.openingChapter = false
+      if (!signal.aborted) store.openingChapter = false
     }
   }
 
@@ -133,13 +167,14 @@ export function useCoReadingController() {
     store.phase = "reading"
     lastReportedPage.value = -1
     store.chapterOpenDone = false
+    store.clearPageOpenError()
+    store.pageIntroText = ""
     store.annotations = store.annotations.filter((a) => a.chapterIndex !== chapterIndex)
     store.loadDraftsForChapter(chapterIndex)
 
     if (!isOnCoReadReader()) {
       await navigateToReaderView()
     }
-    void runChapterOpenStream(chapterIndex)
   }
 
   async function onStartSession(startChapterIndex: number) {
@@ -176,13 +211,54 @@ export function useCoReadingController() {
     if (page === lastReportedPage.value) return
     lastReportedPage.value = page
     const chapterNumber = chapterApiNumber(store.currentChapterIndex)
-    void coReadingApi.reportPageRead(store.sessionId, chapterNumber, {
-      pageIndex: page,
-      pageTotal,
-      text: text.slice(0, 8000),
-    })
+    try {
+      await coReadingApi.reportPageRead(store.sessionId, chapterNumber, {
+        pageIndex: page,
+        pageTotal,
+        text: text.slice(0, 8000),
+      })
+    } catch (e) {
+      lastReportedPage.value = -1
+      ElMessage.error(e instanceof ApiError ? e.message : t("coRead.pageSyncFailed"))
+      return
+    }
+    store.annotations = store.annotations.filter((a) => a.chapterIndex !== store.currentChapterIndex)
+    store.chapterOpenDone = false
+    store.clearPageOpenError()
+    store.pageIntroText = ""
+    void runChapterOpenStream(store.currentChapterIndex)
     const percent = pageTotal ? Math.min(100, Math.round((page / pageTotal) * 100)) : 0
     void coReadingApi.reportProgress(store.sessionId, store.currentChapterIndex, percent).catch(() => undefined)
+  }
+
+  async function retryCurrentPageOpen() {
+    if (!store.sessionId || lastReportedPage.value < 1) return
+    store.clearPageOpenError()
+    store.annotations = store.annotations.filter(
+      (a) =>
+        !(
+          a.chapterIndex === store.currentChapterIndex &&
+          (a.pageIndex === undefined || a.pageIndex === lastReportedPage.value)
+        ),
+    )
+    store.chapterOpenDone = false
+    store.pageIntroText = ""
+    await runChapterOpenStream(store.currentChapterIndex)
+  }
+
+  async function forceRegenerateCurrentPage() {
+    if (!store.sessionId || lastReportedPage.value < 1) return
+    store.clearPageOpenError()
+    store.annotations = store.annotations.filter(
+      (a) =>
+        !(
+          a.chapterIndex === store.currentChapterIndex &&
+          (a.pageIndex === undefined || a.pageIndex === lastReportedPage.value)
+        ),
+    )
+    store.chapterOpenDone = false
+    store.pageIntroText = ""
+    await runChapterOpenStream(store.currentChapterIndex, { force: true })
   }
 
   async function onSendReplies() {
@@ -328,5 +404,7 @@ export function useCoReadingController() {
     restoreSession,
     enterReadingChapter,
     navigateToReaderView,
+    retryCurrentPageOpen,
+    forceRegenerateCurrentPage,
   }
 }

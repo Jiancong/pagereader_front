@@ -257,9 +257,16 @@
       />
       <div v-if="coReadStore.phase === 'reading' || coReadStore.phase === 'discussing'" class="reader-view__co-read">
         <CoReadAnnotationStrip
-          v-if="coReadStore.phase === 'reading' && coReadChapterAnnotations.length"
+          v-if="coReadStore.phase === 'reading'"
           :annotations="coReadChapterAnnotations"
+          :intro-text="coReadStore.pageIntroText"
+          :page-error="coReadStore.pageOpenError"
+          :loading="coReadStore.openingChapter"
+          show-regenerate
+          :regenerate-disabled="coReadStore.openingChapter"
           @draft="onCoReadDraft"
+          @retry="onCoReadRetryPage"
+          @regenerate="onCoReadRegeneratePage"
         />
         <CoReadReplyTray
           v-if="coReadStore.phase === 'reading' && coReadChapterOpenDone"
@@ -334,6 +341,8 @@ const {
   onChatSend: onCoReadChatSend,
   onNextChapter: onCoReadNextChapter,
   onSelectChapter: onCoReadSelectChapter,
+  retryCurrentPageOpen: onCoReadRetryPage,
+  forceRegenerateCurrentPage: onCoReadRegeneratePage,
 } = useCoReadingController()
 const coReadChapterKey = computed(
   () => `${coReadStore.currentChapterIndex}-${coReadSpineIndex.value ?? 0}`,
