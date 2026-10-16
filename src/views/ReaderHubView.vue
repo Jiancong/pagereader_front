@@ -20,7 +20,7 @@
         @open-login="openLogin"
       />
 
-      <LocalReaderUploadPanel />
+      <LocalReaderUploadPanel @open-login="() => openLogin('login')" />
     </main>
 
     <AuthDialog

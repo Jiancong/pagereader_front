@@ -170,7 +170,7 @@ import {
 } from 'lucide-vue-next'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
-import { bookExpertApi, isBookExpertPubliclyViewable } from '@/api/bookExpert'
+import { getPublicExpertDetail, isBookExpertPubliclyViewable } from '@/api/bookExpert'
 import { buildExploreExpertShareUrl } from '@/utils/feedOpen'
 import { useSeoHead } from '@/composables/useSeoHead'
 import type { BookExpertSummary } from '@/api/types'
@@ -320,7 +320,7 @@ async function applyDisplayLocale() {
 }
 
 async function fetchPublicExpertOnce(id: string) {
-  const res = await bookExpertApi.getPublicExpertDetail(id)
+  const res = await getPublicExpertDetail(id)
   return res?.expert ?? null
 }
 

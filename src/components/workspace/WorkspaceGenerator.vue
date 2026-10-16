@@ -47,6 +47,10 @@
             <BookOpen class="h-4 w-4" />
             {{ t('workspace.tabRead') }}
           </button>
+          <button v-if="onlineReadEnabled" :class="tabClass('coRead')" @click="activeTab = 'coRead'">
+            <BookHeart class="h-4 w-4" />
+            {{ t('workspace.tabCoRead') }}
+          </button>
         </div>
     </div>
 
@@ -97,7 +101,7 @@
     </div>
 
     <template v-else>
-      <div v-if="activeTab !== 'translate' && activeTab !== 'read'" class="mb-4 rounded-xl border border-border bg-card/80 px-3 py-3 sm:px-5">
+      <div v-if="activeTab !== 'translate' && activeTab !== 'read' && activeTab !== 'coRead'" class="mb-4 rounded-xl border border-border bg-card/80 px-3 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('workspace.queueLabel') }}</p>
         <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
           <label :class="queueModeLabelClass('CARD')">
@@ -400,6 +404,59 @@
           </button>
         </div>
 
+        <!-- 沉浸式共读 -->
+        <div v-else-if="activeTab === 'coRead'" class="p-4 sm:p-6 md:p-8">
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold text-foreground">{{ t('reader.coReadTitle') }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{{ t('reader.coReadSubtitle') }}</p>
+          </div>
+
+          <div
+            @dragover.prevent="isDraggingCoRead = true"
+            @dragleave="isDraggingCoRead = false"
+            @drop.prevent="handleCoReadDrop"
+            :class="[
+              'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
+              isDraggingCoRead ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
+            ]"
+            @click="coReadFileInput?.click()"
+          >
+            <input
+              ref="coReadFileInput"
+              type="file"
+              accept=".txt,.md,.markdown,.mdown,.mkd,.epub,text/plain,text/markdown,application/epub+zip"
+              class="hidden"
+              @change="handleCoReadSelect"
+            />
+            <div v-if="selectedCoReadFile" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
+              <BookHeart class="h-10 w-10 flex-shrink-0 text-primary" />
+              <div class="min-w-0 flex-1 text-left">
+                <p class="break-words font-medium text-foreground">{{ selectedCoReadFile.name }}</p>
+                <p v-if="coReadFileSizeLabel" class="text-sm text-muted-foreground">{{ coReadFileSizeLabel }}</p>
+              </div>
+              <button type="button" class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary" @click.stop="clearCoReadFile">
+                <X class="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+            <template v-else>
+              <BookHeart class="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <p class="mt-4 font-medium text-foreground">{{ t('reader.coReadPickFile') }}</p>
+              <p class="mt-1 text-sm text-muted-foreground">{{ t('reader.coReadFormats') }}</p>
+            </template>
+          </div>
+
+          <button
+            type="button"
+            :disabled="!selectedCoReadFile || coReadStarting"
+            class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="startCoReading"
+          >
+            <Loader2 v-if="coReadStarting" class="h-5 w-5 animate-spin" />
+            <BookHeart v-else class="h-5 w-5" />
+            {{ t('reader.coReadStart') }}
+          </button>
+        </div>
+
         <!-- YouTube 视频生成 PPT -->
         <div v-else-if="activeTab === 'youtube'" class="p-4 sm:p-6 md:p-8">
           <div class="mb-6">
@@ -553,9 +610,12 @@ import { ref, computed, reactive, watch, onMounted, onBeforeUnmount } from "vue"
 import { RouterLink, useRouter, useRoute } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
-import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages, Globe, BookOpen } from "lucide-vue-next"
+import { MessageSquare, Upload, Sparkles, FileText, Loader2, X, Youtube, Languages, Globe, BookOpen, BookHeart } from "lucide-vue-next"
 import { useTranslateFileStore } from "@/stores/translateFile"
 import { useReaderFileStore } from "@/stores/reader"
+import { useCoReadFileStore } from "@/stores/coReadFile"
+import { detectCoReadFormat, parseCoReadFile } from "@/utils/coReadChapter"
+import { useCoReadingStore } from "@/stores/coReading"
 import PptViewer from "@/components/editor/chat/PptViewer.vue"
 import ProjectSupplementaryAttachmentsSection from "@/components/workspace/ProjectSupplementaryAttachmentsSection.vue"
 import WorkspaceCardResult from "@/components/workspace/WorkspaceCardResult.vue"
@@ -675,11 +735,13 @@ const router = useRouter()
 const route = useRoute()
 const translateFileStore = useTranslateFileStore()
 const readerFileStore = useReaderFileStore()
+const coReadFileStore = useCoReadFileStore()
+const coReadingStore = useCoReadingStore()
 
 const debugEnabled = computed(() => isAppDebugEnabled())
 const onlineReadEnabled = computed(() => isOnlineReadEnabled())
 
-const activeTab = ref<"prompt" | "upload" | "youtube" | "translate" | "read">("upload")
+const activeTab = ref<"prompt" | "upload" | "youtube" | "translate" | "read" | "coRead">("upload")
 
 function ensureDebugOnlyTabsHidden() {
   if (
@@ -688,7 +750,7 @@ function ensureDebugOnlyTabsHidden() {
   ) {
     activeTab.value = "upload"
   }
-  if (!onlineReadEnabled.value && activeTab.value === "read") {
+  if (!onlineReadEnabled.value && (activeTab.value === "read" || activeTab.value === "coRead")) {
     activeTab.value = "upload"
   }
 }
@@ -713,6 +775,10 @@ const translateUrl = ref("")
 const selectedReaderFile = ref<File | null>(null)
 const readerFileInput = ref<HTMLInputElement | null>(null)
 const isDraggingReader = ref(false)
+const selectedCoReadFile = ref<File | null>(null)
+const coReadFileInput = ref<HTMLInputElement | null>(null)
+const isDraggingCoRead = ref(false)
+const coReadStarting = ref(false)
 const uploadPrompt = ref("")
 const uploadFileError = ref("")
 const srtPreview = ref<SrtParseResult | null>(null)
@@ -783,6 +849,9 @@ const translatePdfSizeLabel = computed(() => {
 const readerFileSizeLabel = computed(() =>
   selectedReaderFile.value ? formatBytes(selectedReaderFile.value.size) : "",
 )
+const coReadFileSizeLabel = computed(() =>
+  selectedCoReadFile.value ? formatBytes(selectedCoReadFile.value.size) : "",
+)
 
 const activeTask = computed(() => {
   if (activeTab.value === "prompt") return promptTask
@@ -845,7 +914,7 @@ const activeElapsedDisplay = computed(() => {
   return null
 })
 
-const tabClass = (tab: "prompt" | "upload" | "youtube" | "translate" | "read") => [
+const tabClass = (tab: "prompt" | "upload" | "youtube" | "translate" | "read" | "coRead") => [
   "flex min-h-[2.75rem] items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-all sm:min-h-0 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm",
   activeTab.value === tab ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground",
 ]
@@ -1235,6 +1304,43 @@ const startReading = () => {
     name: "reader-open",
     query: { returnTo: "workspace" },
   })
+}
+
+const handleCoReadDrop = (e: DragEvent) => {
+  isDraggingCoRead.value = false
+  const files = e.dataTransfer?.files
+  if (files && files.length > 0) selectedCoReadFile.value = files[0]
+}
+
+const handleCoReadSelect = (e: Event) => {
+  const files = (e.target as HTMLInputElement).files
+  if (files && files.length > 0) selectedCoReadFile.value = files[0]
+}
+
+const clearCoReadFile = () => {
+  selectedCoReadFile.value = null
+  if (coReadFileInput.value) coReadFileInput.value.value = ""
+}
+
+const startCoReading = async () => {
+  const file = selectedCoReadFile.value
+  if (!file) return
+  if (!detectCoReadFormat(file.name)) {
+    ElMessage.warning(t("coRead.unsupportedFormat"))
+    return
+  }
+  coReadStarting.value = true
+  try {
+    coReadingStore.resetSession()
+    const parsed = await parseCoReadFile(file)
+    coReadFileStore.setParsed(file, parsed.chapters, parsed.fileHash, parsed.format)
+    coReadFileStore.setReturnTo("workspace")
+    await router.push({ name: "co-reading" })
+  } catch {
+    ElMessage.error(t("coRead.parseFailed"))
+  } finally {
+    coReadStarting.value = false
+  }
 }
 
 function importReaderBookFromQuery() {

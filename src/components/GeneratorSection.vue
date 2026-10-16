@@ -47,7 +47,7 @@
       </div>
 
       <!-- 生成模式选择器（YouTube / 沉浸式翻译 / 阅读 tab 隐藏） -->
-      <div v-if="activeTab !== 'youtube' && activeTab !== 'translate' && activeTab !== 'read'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
+      <div v-if="activeTab !== 'youtube' && activeTab !== 'translate' && activeTab !== 'read' && activeTab !== 'coRead'" class="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3 sm:px-5">
         <p class="text-sm font-medium text-foreground">{{ t('landing.queueLabel') }}</p>
         <div class="mt-2 flex flex-wrap gap-3">
           <label
@@ -365,6 +365,61 @@
               {{ t('landing.readStart') }}
             </button>
           </div>
+
+          <!-- 沉浸式共读 -->
+          <div v-else-if="activeTab === 'coRead'" class="space-y-6">
+            <div class="mb-6">
+              <h3 class="text-lg font-semibold text-foreground">{{ t('reader.coReadTitle') }}</h3>
+              <p class="mt-1 text-sm text-muted-foreground">{{ t('reader.coReadSubtitle') }}</p>
+            </div>
+
+            <div
+              @dragover.prevent="isDraggingCoRead = true"
+              @dragleave="isDraggingCoRead = false"
+              @drop.prevent="handleCoReadDrop"
+              :class="[
+                'cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors',
+                isDraggingCoRead ? 'border-primary bg-primary/5' : 'border-border bg-secondary/30 hover:border-primary/50',
+              ]"
+              @click="coReadFileInput?.click()"
+            >
+              <input
+                ref="coReadFileInput"
+                type="file"
+                accept=".txt,.md,.markdown,.mdown,.mkd,.epub,text/plain,text/markdown,application/epub+zip"
+                class="hidden"
+                @change="handleCoReadSelect"
+              />
+              <div v-if="selectedCoReadFile" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
+                <BookHeart class="h-10 w-10 flex-shrink-0 text-primary" />
+                <div class="min-w-0 flex-1 text-left">
+                  <p class="break-words font-medium text-foreground">{{ selectedCoReadFile.name }}</p>
+                  <p class="text-sm text-muted-foreground">{{ formatFileSize(selectedCoReadFile.size) }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="flex-shrink-0 rounded-lg p-1 hover:bg-secondary"
+                  @click.stop="clearCoReadFile"
+                >
+                  <X class="h-5 w-5 text-muted-foreground" />
+                </button>
+              </div>
+              <template v-else>
+                <BookHeart class="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <p class="mt-4 font-medium text-foreground">{{ t('reader.coReadPickFile') }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ t('reader.coReadFormats') }}</p>
+              </template>
+            </div>
+
+            <button
+              :disabled="!selectedCoReadFile || coReadStarting"
+              class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="startCoReading"
+            >
+              <BookHeart class="h-5 w-5" />
+              {{ t('reader.coReadStart') }}
+            </button>
+          </div>
         </div>
       </div>
       </template>
@@ -376,7 +431,12 @@
 import { ref, computed, watch, markRaw, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages, Globe, BookOpen } from 'lucide-vue-next'
+import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages, Globe, BookOpen, BookHeart } from 'lucide-vue-next'
+import { ElMessage } from 'element-plus'
+import { isLoggedIn } from '@/api'
+import { useCoReadFileStore } from '@/stores/coReadFile'
+import { useCoReadingStore } from '@/stores/coReading'
+import { detectCoReadFormat, parseCoReadFile } from '@/utils/coReadChapter'
 import {
   gtmGenerateIntent,
   gtmGeneratorTabSelect,
@@ -389,14 +449,19 @@ import { useTranslateFileStore } from '@/stores/translateFile'
 import { useReaderFileStore } from '@/stores/reader'
 import { isAppDebugEnabled, isOnlineReadEnabled } from '@/config/appDebug'
 
-type TabId = 'upload' | 'quick' | 'youtube' | 'translate' | 'read'
+type TabId = 'upload' | 'quick' | 'youtube' | 'translate' | 'read' | 'coRead'
 type QueueMode = 'CARD' | 'DOCUMENT' | 'NOVEL'
 
 const { t } = useI18n()
 const router = useRouter()
 const translateFileStore = useTranslateFileStore()
 const readerFileStore = useReaderFileStore()
-const emit = defineEmits<{ start: [payload: { mode: string; prompt: string }] }>()
+const coReadFileStore = useCoReadFileStore()
+const coReadingStore = useCoReadingStore()
+const emit = defineEmits<{
+  start: [payload: { mode: string; prompt: string }]
+  'co-read-login': []
+}>()
 
 const activeTab = ref<TabId>('upload')
 const queue = ref<QueueMode>('DOCUMENT')
@@ -413,6 +478,10 @@ const translateMode = ref<'pdf' | 'url'>('pdf')
 const translateUrl = ref('')
 const showDemoVideo = ref(false)
 const selectedReaderFile = ref<File | null>(null)
+const selectedCoReadFile = ref<File | null>(null)
+const coReadFileInput = ref<HTMLInputElement | null>(null)
+const isDraggingCoRead = ref(false)
+const coReadStarting = ref(false)
 const readerFileInput = ref<HTMLInputElement | null>(null)
 const isDraggingReader = ref(false)
 
@@ -426,10 +495,11 @@ const tabs = computed(() => {
     { id: 'youtube' as TabId, label: t('landing.tabYoutube'), icon: markRaw(Youtube) },
     { id: 'translate' as TabId, label: t('landing.tabTranslate'), icon: markRaw(Languages) },
     { id: 'read' as TabId, label: t('landing.tabRead'), icon: markRaw(BookOpen) },
+    { id: 'coRead' as TabId, label: t('landing.tabCoRead'), icon: markRaw(BookHeart) },
   ]
   return list.filter((tab) => {
     if (!debugEnabled.value && (tab.id === 'quick' || tab.id === 'translate')) return false
-    if (!onlineReadEnabled.value && tab.id === 'read') return false
+    if (!onlineReadEnabled.value && (tab.id === 'read' || tab.id === 'coRead')) return false
     return true
   })
 })
@@ -438,7 +508,7 @@ function ensureDebugOnlyTabsHidden() {
   if (!debugEnabled.value && (activeTab.value === 'quick' || activeTab.value === 'translate')) {
     activeTab.value = 'upload'
   }
-  if (!onlineReadEnabled.value && activeTab.value === 'read') {
+  if (!onlineReadEnabled.value && (activeTab.value === 'read' || activeTab.value === 'coRead')) {
     activeTab.value = 'upload'
   }
 }
@@ -629,6 +699,47 @@ const startReading = () => {
   readerFileStore.setFile(selectedReaderFile.value)
   readerFileStore.setReturnNavigation('workspace')
   router.push({ name: 'reader-open', query: { returnTo: 'workspace' } })
+}
+
+const handleCoReadDrop = (e: DragEvent) => {
+  isDraggingCoRead.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file) selectedCoReadFile.value = file
+}
+
+const handleCoReadSelect = (e: Event) => {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) selectedCoReadFile.value = file
+}
+
+const clearCoReadFile = () => {
+  selectedCoReadFile.value = null
+  if (coReadFileInput.value) coReadFileInput.value.value = ''
+}
+
+const startCoReading = async () => {
+  const file = selectedCoReadFile.value
+  if (!file) return
+  if (!detectCoReadFormat(file.name)) {
+    ElMessage.warning(t('coRead.unsupportedFormat'))
+    return
+  }
+  if (!isLoggedIn()) {
+    emit('co-read-login')
+    return
+  }
+  coReadStarting.value = true
+  try {
+    coReadingStore.resetSession()
+    const parsed = await parseCoReadFile(file)
+    coReadFileStore.setParsed(file, parsed.chapters, parsed.fileHash, parsed.format)
+    coReadFileStore.setReturnTo('landing')
+    await router.push({ name: 'co-reading' })
+  } catch {
+    ElMessage.error(t('coRead.parseFailed'))
+  } finally {
+    coReadStarting.value = false
+  }
 }
 
 const selectQuickExample = (example: { id: string; prompt: string }) => {
