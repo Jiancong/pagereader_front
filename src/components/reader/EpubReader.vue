@@ -7,6 +7,7 @@
       >
         <div ref="viewerRef" class="epub-reader__viewer"></div>
       </div>
+      <div v-if="coReadInline" ref="overlayRef" class="epub-reader__co-read-overlay"></div>
       <div v-if="loading" class="epub-reader__overlay">{{ t('reader.loading') }}</div>
       <div v-else-if="loadError" class="epub-reader__overlay epub-reader__overlay--error">
         {{ loadError }}
@@ -39,7 +40,7 @@ import ePub, { type Book, type Rendition } from 'epubjs'
 import type { CoReadAnnotation } from '@/types/coReading'
 import {
   pageTextFromBody,
-  syncCoReadInlineAnnotations,
+  syncCoReadOverlayAnnotations,
   type CoReadInlineLabels,
   type CoReadInlineStatus,
 } from '@/utils/coReadInlineAnnotations'
@@ -73,6 +74,7 @@ const { t } = useI18n()
 
 const rootRef = ref<HTMLElement | null>(null)
 const viewerRef = ref<HTMLElement | null>(null)
+const overlayRef = ref<HTMLElement | null>(null)
 const loading = ref(true)
 const loadError = ref('')
 const currentPage = ref(1)
@@ -206,8 +208,13 @@ watch(
 )
 
 function applyCoReadInline() {
-  if (!props.coReadInline?.labels || !currentViewDoc?.body) return
-  syncCoReadInlineAnnotations(currentViewDoc.body, {
+  const overlay = overlayRef.value
+  if (!props.coReadInline?.labels || !overlay) return
+  const body = currentViewDoc?.body
+  if (!body) return
+  syncCoReadOverlayAnnotations({
+    body,
+    host: overlay,
     annotations: props.coReadInline.annotations,
     labels: props.coReadInline.labels,
     dark: props.colorTheme === 'dark',
@@ -285,6 +292,7 @@ onMounted(async () => {
       atStart.value = location.atStart ?? false
       atEnd.value = location.atEnd ?? false
       updatePageInfo(location)
+      applyCoReadInline()
     })
 
     rendition.on('rendered', (_section: any, view: any) => {
@@ -432,6 +440,12 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   max-width: 900px;
   background: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+.epub-reader__co-read-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
 }
 .epub-reader__overlay {
   position: absolute;
