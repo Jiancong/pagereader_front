@@ -1315,6 +1315,8 @@ export default {
     pageSyncFailed: "页内容同步失败，请翻页重试。",
     rateLimited: "请求过于频繁，请稍后再试。",
     upstreamUnavailable: "共读服务暂时不可用，请稍后重试。",
+    noAnnotationsFromServer:
+      "本页只有导读语，没有收到批注事件（多为服务端未解析出 <ANNOTATION>）。可点「重新生成本页批注」或联系后端查看 annotations_parsed。",
     chatPlaceholder: "继续和 AI 书友聊聊本章…",
     chatSend: "发送",
     readerMissingChapter: "无法加载本章内容",

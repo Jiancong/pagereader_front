@@ -42,6 +42,7 @@ export interface CoReadInlineStatus {
   loading?: boolean
   intro?: string
   errorCode?: string
+  emptyHint?: string
   onRetry?: () => void
 }
 
@@ -83,7 +84,7 @@ function kindLabel(labels: CoReadInlineLabels, kind: string): string {
 }
 
 function renderStatus(doc: Document, body: HTMLElement, labels: CoReadInlineLabels, status: CoReadInlineStatus) {
-  if (!status.loading && !status.intro && !status.errorCode) return
+  if (!status.loading && !status.intro && !status.errorCode && !status.emptyHint) return
   const box = doc.createElement("div")
   box.className = "co-read-inline-status"
   box.setAttribute(INLINE_ATTR, "status")
@@ -107,6 +108,8 @@ function renderStatus(doc: Document, body: HTMLElement, labels: CoReadInlineLabe
     box.textContent = status.intro ? `${status.intro} ${labels.loading}` : labels.loading
   } else if (status.intro) {
     box.textContent = status.intro
+  } else if (status.emptyHint) {
+    box.textContent = status.emptyHint
   } else {
     return
   }

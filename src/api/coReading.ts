@@ -36,18 +36,35 @@ export function normalizeCoReadKind(kind: unknown): CoReadAnnotationKind {
 }
 
 /** wire(annotationId/paragraph_index) → internal(id/paragraphIndex) */
+function resolveParagraphIndex(d: Record<string, unknown>, anchor: Record<string, unknown>): number {
+  const raw =
+    anchor.paragraph_index ??
+    anchor.paragraphIndex ??
+    anchor.anchor_paragraph ??
+    d.anchor_paragraph ??
+    d.paragraph_index ??
+    d.paragraphIndex ??
+    0
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : 0
+}
+
 export function normalizeAnnotationAnchorEvent(data: unknown): Partial<CoReadAnnotation> & { id: string } {
   const d = (data ?? {}) as Record<string, unknown>
   const a = (d.anchor ?? {}) as Record<string, unknown>
+  const paragraphIndex = resolveParagraphIndex(d, a)
+  const quote =
+    typeof a.quote === "string"
+      ? a.quote
+      : typeof d.quote === "string"
+        ? d.quote
+        : undefined
   return {
     id: String(d.annotationId ?? d.id ?? "").trim(),
     chapterIndex: typeof d.chapterIndex === "number" ? d.chapterIndex : undefined,
     pageIndex: typeof d.pageIndex === "number" ? d.pageIndex : undefined,
     kind: normalizeCoReadKind(d.kind),
-    anchor: {
-      paragraphIndex: Number(a.paragraph_index ?? a.paragraphIndex ?? 0),
-      quote: typeof a.quote === "string" ? a.quote : undefined,
-    },
+    anchor: { paragraphIndex, quote },
     content: typeof d.content === "string" ? d.content : "",
   }
 }

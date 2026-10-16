@@ -138,8 +138,16 @@ export function useCoReadingController() {
           },
           onAnnotationDelta: (data) => store.appendAnnotationDelta(data.id, data.delta),
           onAnnotationDone: (data) => store.finalizeAnnotation(data.id, data.content),
-          onChapterDone: () => {
+          onChapterDone: (data) => {
             store.chapterOpenDone = true
+            const page = lastReportedPage.value
+            const localCount = store.annotations.filter(
+              (a) =>
+                a.chapterIndex === chapterIndex &&
+                (page < 1 || a.pageIndex === undefined || a.pageIndex === page),
+            ).length
+            const wireCount = typeof data.annotationCount === "number" ? data.annotationCount : null
+            store.pageOpenEmpty = wireCount !== null ? wireCount === 0 : localCount === 0
           },
           onError: handleOpenSseError,
         },
@@ -226,6 +234,7 @@ export function useCoReadingController() {
     store.chapterOpenDone = false
     store.clearPageOpenError()
     store.pageIntroText = ""
+    store.pageOpenEmpty = false
     void runChapterOpenStream(store.currentChapterIndex)
     const percent = pageTotal ? Math.min(100, Math.round((page / pageTotal) * 100)) : 0
     void coReadingApi.reportProgress(store.sessionId, store.currentChapterIndex, percent).catch(() => undefined)

@@ -38,6 +38,8 @@ export const useCoReadingStore = defineStore("co-reading", {
     /** SSE error code，如 generation_interrupted */
     pageOpenError: "" as string,
     pageIntroText: "" as string,
+    /** open 结束但无任何 annotation_*（多为后端解析 LLM 为 0 条） */
+    pageOpenEmpty: false,
   }),
   getters: {
     totalChapters: (s) => s.chapters.length,
@@ -64,6 +66,7 @@ export const useCoReadingStore = defineStore("co-reading", {
       this.chapterOpenDone = false
       this.pageOpenError = ""
       this.pageIntroText = ""
+      this.pageOpenEmpty = false
     },
     setFromParse(fileName: string, chapters: CoReadChapter[]) {
       this.fileName = fileName

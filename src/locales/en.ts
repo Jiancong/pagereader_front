@@ -1337,6 +1337,8 @@ export default {
     pageSyncFailed: "Could not sync page text. Try turning the page again.",
     rateLimited: "Too many requests. Please try again later.",
     upstreamUnavailable: "Co-reading service is temporarily unavailable.",
+    noAnnotationsFromServer:
+      "Only the intro line arrived—no annotation events (often annotations_parsed=0 on the server). Try regenerate or check the Agent parser.",
     chatPlaceholder: "Keep chatting about this chapter…",
     chatSend: "Send",
     readerMissingChapter: "Could not load this chapter",

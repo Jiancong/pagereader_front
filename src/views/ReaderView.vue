@@ -388,6 +388,13 @@ const coReadInlinePayload = computed(() => {
       loading: coReadStore.openingChapter && coReadChapterAnnotations.value.length === 0,
       intro: coReadStore.pageIntroText || undefined,
       errorCode: coReadStore.pageOpenError || undefined,
+      emptyHint:
+        coReadStore.pageOpenEmpty &&
+        !coReadStore.openingChapter &&
+        coReadChapterAnnotations.value.length === 0 &&
+        !coReadStore.pageOpenError
+          ? t('coRead.noAnnotationsFromServer')
+          : undefined,
       onRetry: () => {
         void onCoReadRetryPage()
       },
