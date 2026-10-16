@@ -12,7 +12,7 @@
 |------|------|
 | 落地页 / 工作区 **在线阅读** Tab 内 | 子选项：`在线阅读` / `沉浸式共读`（同一上传区，非独立 Tab） |
 | 阅读中心 `ReaderHubView.vue` | `LocalReaderUploadPanel` 内同样模式切换 |
-| 章内阅读 | **复用** `EpubReader` 分页（`initialSpineIndex`）；翻页上报 `POST .../chapters/{n}/page`（可选） |
+| 章内阅读 | **完整复用** `ReaderView`（工具栏/缩放/TTS/分页）；`?coRead=1`；EPUB 用 `initialSpineIndex`；翻页 `POST .../chapters/{n}/page`（可选） |
 
 i18n 新键（en / zh-CN）：
 

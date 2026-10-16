@@ -17,7 +17,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
           <span class="rv-btn__label">{{ t('reader.back') }}</span>
         </button>
-        <div class="reader-view__title" :title="headerTitle">{{ headerTitle }}</div>
+        <div class="reader-view__title-block">
+          <div class="reader-view__title" :title="headerTitle">{{ headerTitle }}</div>
+          <p v-if="coReadMode && coReadChapterLabel" class="reader-view__subtitle">{{ coReadChapterLabel }}</p>
+        </div>
       </div>
 
       <div class="reader-view__controls">
@@ -96,7 +99,17 @@
         </button>
 
         <button
-          v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown)"
+          v-if="coReadMode && hasSource"
+          type="button"
+          class="rv-btn rv-btn--sm"
+          :title="t('coRead.chapterNav')"
+          @click="coReadNavOpen = true"
+        >
+          <List class="h-4 w-4" />
+        </button>
+
+        <button
+          v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown) && !coReadMode"
           class="rv-btn rv-btn--sm rv-btn--workspace"
           :title="t('reader.saveBookWorkspaceTitle')"
           @click="onSaveToWorkspace"
@@ -129,9 +142,11 @@
     <EpubReader
       v-else-if="isEpub && file"
       ref="epubReaderRef"
+      :key="coReadMode ? `co-read-${coReadChapterKey}` : 'epub-default'"
       :file="file"
       :scale="scale"
       :color-theme="theme"
+      :initial-spine-index="coReadMode ? coReadSpineIndex : undefined"
       @page-change="onPageChange"
       @page-count="onPageCount"
       @page-ready="onReaderPageReady"
@@ -232,6 +247,46 @@
       </button>
     </footer>
 
+    <template v-if="coReadMode && hasSource">
+      <CoReadChapterNav
+        :open="coReadNavOpen"
+        :chapters="coReadStore.chapters"
+        :current-index="coReadStore.currentChapterIndex"
+        @close="coReadNavOpen = false"
+        @select="onCoReadSelectChapter"
+      />
+      <div v-if="coReadStore.phase === 'reading' || coReadStore.phase === 'discussing'" class="reader-view__co-read">
+        <CoReadAnnotationStrip
+          v-if="coReadStore.phase === 'reading' && coReadChapterAnnotations.length"
+          :annotations="coReadChapterAnnotations"
+          @draft="onCoReadDraft"
+        />
+        <CoReadReplyTray
+          v-if="coReadStore.phase === 'reading' && coReadChapterOpenDone"
+          :reply-count="coReadReplyCount"
+          :loading="coReadStore.repliesSending"
+          @send="onCoReadSendReplies"
+        />
+        <CoReadChatPanel
+          v-if="coReadStore.phase === 'discussing'"
+          :messages="coReadStore.chatMessages"
+          :chat-loading="coReadChatLoading"
+          @send="onCoReadChatSend"
+        />
+        <div v-if="coReadStore.phase === 'discussing'" class="reader-view__co-read-next">
+          <button type="button" class="rv-btn rv-btn--primary w-full justify-center" @click="onCoReadNextChapter">
+            {{ coReadStore.isLastChapter ? t('coRead.finishBook') : t('coRead.nextChapter') }}
+          </button>
+        </div>
+      </div>
+      <div
+        v-if="coReadStore.openingChapter"
+        class="pointer-events-none fixed inset-x-0 bottom-32 z-20 flex justify-center"
+      >
+        <span class="rounded-full bg-card px-4 py-2 text-xs shadow-lg">{{ t('coRead.loadingAnnotations') }}</span>
+      </div>
+    </template>
+
   </div>
 </template>
 
@@ -239,7 +294,13 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, List } from 'lucide-vue-next'
+import CoReadChapterNav from '@/components/coReading/CoReadChapterNav.vue'
+import CoReadAnnotationStrip from '@/components/coReading/CoReadAnnotationStrip.vue'
+import CoReadReplyTray from '@/components/coReading/CoReadReplyTray.vue'
+import CoReadChatPanel from '@/components/coReading/CoReadChatPanel.vue'
+import { useCoReadingController, syncCoReadFileToReaderStore } from '@/composables/useCoReadingController'
+import { useCoReadingStore } from '@/stores/coReading'
 import { useReaderColorTheme } from '@/composables/useReaderColorTheme'
 import { ElMessage } from 'element-plus'
 import PdfReader from '@/components/reader/PdfReader.vue'
@@ -257,6 +318,26 @@ const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 const store = useReaderFileStore()
+const coReadStore = useCoReadingStore()
+const coReadMode = computed(() => String(route.query.coRead || '') === '1')
+const coReadNavOpen = ref(false)
+const {
+  coReadChapterLabel,
+  coReadSpineIndex,
+  chapterAnnotations: coReadChapterAnnotations,
+  replyDraftCount: coReadReplyCount,
+  chapterOpenDone: coReadChapterOpenDone,
+  chatLoading: coReadChatLoading,
+  onDraft: onCoReadDraft,
+  reportReaderPage,
+  onSendReplies: onCoReadSendReplies,
+  onChatSend: onCoReadChatSend,
+  onNextChapter: onCoReadNextChapter,
+  onSelectChapter: onCoReadSelectChapter,
+} = useCoReadingController()
+const coReadChapterKey = computed(
+  () => `${coReadStore.currentChapterIndex}-${coReadSpineIndex.value ?? 0}`,
+)
 const { theme, isDark, toggleTheme } = useReaderColorTheme()
 
 const file = computed(() => store.file)
@@ -488,6 +569,12 @@ function onWheel(e: WheelEvent) {
 function onPageChange(page: number) {
   const changed = currentPage.value !== page
   currentPage.value = page
+  if (coReadMode.value) {
+    void (async () => {
+      const text = await getCurrentPageText()
+      await reportReaderPage(page, pageCount.value, text)
+    })()
+  }
   // TTS 自动翻页时不打断
   if (ttsAutoTurning) return
   // 用户手动翻页：停止当前朗读，并跟随到新页面继续
@@ -576,6 +663,9 @@ function goBack() {
 }
 
 onMounted(() => {
+  if (coReadMode.value && !store.file) {
+    syncCoReadFileToReaderStore()
+  }
   if (!store.file) {
     navigateAfterReaderClose(router, {
       query: route.query,
@@ -636,14 +726,42 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
 }
-.reader-view__title {
+.reader-view__title-block {
   flex: 1;
   min-width: 0;
+}
+.reader-view__title {
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.reader-view__subtitle {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reader-view__co-read {
+  flex-shrink: 0;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.reader-view__co-read-next {
+  padding: 12px 16px;
+}
+.reader-view--night .reader-view__co-read {
+  background: #0a0a0a;
+  border-top-color: #111827;
+}
+.reader-view--night .reader-view__subtitle {
+  color: #9ca3af;
 }
 .reader-view__controls {
   display: flex;

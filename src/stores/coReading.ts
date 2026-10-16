@@ -34,6 +34,7 @@ export const useCoReadingStore = defineStore("co-reading", {
     sessionError: "" as string,
     openingChapter: false,
     repliesSending: false,
+    chapterOpenDone: false,
   }),
   getters: {
     totalChapters: (s) => s.chapters.length,
