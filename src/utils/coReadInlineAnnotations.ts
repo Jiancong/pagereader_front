@@ -233,13 +233,11 @@ function renderAnnotationMarker(
 
   btn.addEventListener("mouseenter", () => {
     const rect = pop.getBoundingClientRect()
-    const docEl = doc.documentElement
     if (rect.top < 8) {
       pop.classList.add("co-read-inline-popover--below")
     } else {
       pop.classList.remove("co-read-inline-popover--below")
     }
-    void docEl
   })
 
   return host
@@ -302,7 +300,6 @@ function insertMarkerAtTextOffset(para: HTMLElement, endOffset: number, marker: 
  * 定位 marker 位置：
  * 1. 优先在**全页所有段落**中匹配 anchor.quote（quote 是 LLM 引用的原文，最可靠）；
  * 2. 找不到时回退 paragraph_index 段落末尾。
- * 返回 { para, end }；para 为 null 表示无需插入。
  */
 function locateMarker(
   anchors: HTMLElement[],
