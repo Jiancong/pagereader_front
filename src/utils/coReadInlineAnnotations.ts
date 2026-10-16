@@ -245,35 +245,30 @@ function renderAnnotationMarker(
   return host
 }
 
-/** 与 POST /page 切段一致：仅用 paragraph_index 定位段落（不在全书 DOM 里搜 quote） */
-function paragraphForAnnotation(anchors: HTMLElement[], ann: CoReadAnnotation): HTMLElement | null {
-  const idx = Math.max(0, ann.anchor.paragraphIndex)
-  if (anchors[idx]) return anchors[idx]
-  return anchors.length ? anchors[Math.min(idx, anchors.length - 1)] : null
-}
-
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
-/** 后端 quote 可能被截断；用前若干词做空白容错匹配 */
-function findQuoteMatchEnd(rawText: string, quote: string): number {
+/** 后端 quote 可能被截断；用前若干词做空白容错匹配，返回 [start, end) */
+function findQuoteMatchRange(rawText: string, quote: string): [number, number] | null {
   const words = quote
     .replace(/\u00a0/g, " ")
     .trim()
     .split(/\s+/)
     .filter(Boolean)
-  if (!words.length) return -1
+  if (!words.length) return null
   for (let n = words.length; n >= 2; n--) {
     const part = words.slice(0, n).map(escapeRegExp).join("\\s+")
-    const re = new RegExp(part, "i")
-    const m = rawText.match(re)
-    if (m && m.index !== undefined) return m.index + m[0].length
+    const m = rawText.match(new RegExp(part, "i"))
+    if (m && m.index !== undefined) return [m.index, m.index + m[0].length]
   }
-  const single = escapeRegExp(words[0])
-  const m = rawText.match(new RegExp(single, "i"))
-  if (m && m.index !== undefined) return m.index + m[0].length
-  return -1
+  // 单词兜底：至少 4 个字符，避免 "The" 这类短词误配
+  const single = words[0]
+  if (single.length >= 4) {
+    const m = rawText.match(new RegExp(escapeRegExp(single), "i"))
+    if (m && m.index !== undefined) return [m.index, m.index + m[0].length]
+  }
+  return null
 }
 
 function insertMarkerAtTextOffset(para: HTMLElement, endOffset: number, marker: HTMLElement): boolean {
@@ -303,20 +298,29 @@ function insertMarkerAtTextOffset(para: HTMLElement, endOffset: number, marker: 
   return false
 }
 
-/** 在 anchor.quote 结束位置插入 marker（仅在该 paragraph_index 段落内查找） */
-function insertMarkerAfterQuote(para: HTMLElement, quote: string, marker: HTMLElement): boolean {
-  const raw = para.textContent || ""
-  const end = findQuoteMatchEnd(raw, quote)
-  if (end < 0) return false
-  return insertMarkerAtTextOffset(para, end, marker)
+/**
+ * 定位 marker 位置：
+ * 1. 优先在**全页所有段落**中匹配 anchor.quote（quote 是 LLM 引用的原文，最可靠）；
+ * 2. 找不到时回退 paragraph_index 段落末尾。
+ * 返回 { para, end }；para 为 null 表示无需插入。
+ */
+function locateMarker(
+  anchors: HTMLElement[],
+  ann: CoReadAnnotation,
+): { para: HTMLElement; end: number } | null {
+  const quote = ann.anchor.quote?.trim()
+  if (quote) {
+    for (const para of anchors) {
+      const range = findQuoteMatchRange(para.textContent || "", quote)
+      if (range) return { para, end: range[1] }
+    }
+  }
+  const idx = Math.max(0, ann.anchor.paragraphIndex)
+  const para = anchors[Math.min(idx, anchors.length - 1)]
+  return para ? { para, end: -1 } : null
 }
 
-function quoteMatchEndForSort(para: HTMLElement, quote: string | undefined): number {
-  if (!quote?.trim()) return -1
-  return findQuoteMatchEnd(para.textContent || "", quote)
-}
-
-/** 在 body 内按 paragraph_index + quote 挂载 marker（不插入块级批注，避免挤版） */
+/** 在 body 内按 quote（优先）/ paragraph_index（回退）挂载 marker（不插入块级批注，避免挤版） */
 export function syncCoReadInlineAnnotations(body: HTMLElement, opts: SyncCoReadInlineOptions) {
   const doc = body.ownerDocument
   if (!doc) return
@@ -328,20 +332,22 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: SyncCoReadI
   const anchors = collectParagraphAnchors(body)
   if (!anchors.length) return
 
-  const items = opts.annotations
-    .map((ann) => ({ ann, para: paragraphForAnnotation(anchors, ann) }))
-    .filter((x): x is { ann: CoReadAnnotation; para: HTMLElement } => Boolean(x.para))
-
-  items.sort((a, b) => {
-    const ea = quoteMatchEndForSort(a.para, a.ann.anchor.quote) ?? -1
-    const eb = quoteMatchEndForSort(b.para, b.ann.anchor.quote) ?? -1
-    return eb - ea
-  })
-
-  for (const { ann, para } of items) {
+  // 同段内按 end 从大到小插入，避免 splitText 后偏移失效
+  const byPara = new Map<HTMLElement, { end: number; marker: HTMLElement }[]>()
+  for (const ann of opts.annotations) {
+    const loc = locateMarker(anchors, ann)
+    if (!loc) continue
     const marker = renderAnnotationMarker(doc, ann, opts.labels, opts.onDraft)
-    const quote = ann.anchor.quote?.trim()
-    if (quote && insertMarkerAfterQuote(para, quote, marker)) continue
-    para.appendChild(marker)
+    const list = byPara.get(loc.para) ?? []
+    list.push({ end: loc.end, marker })
+    byPara.set(loc.para, list)
+  }
+
+  for (const [para, list] of byPara.entries()) {
+    list.sort((a, b) => b.end - a.end)
+    for (const { end, marker } of list) {
+      if (end >= 0 && insertMarkerAtTextOffset(para, end, marker)) continue
+      para.appendChild(marker)
+    }
   }
 }
