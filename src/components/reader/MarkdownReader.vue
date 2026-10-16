@@ -16,19 +16,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
+import type { CoReadAnnotation } from '@/types/coReading'
+import {
+  pageTextFromBody,
+  syncCoReadInlineAnnotations,
+  type CoReadInlineLabels,
+  type CoReadInlineStatus,
+} from '@/utils/coReadInlineAnnotations'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 
 import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
 
 const props = withDefaults(
-  defineProps<{ file: File; scale?: number; colorTheme?: ReaderColorTheme }>(),
-  { colorTheme: 'light' },
+  defineProps<{
+    file: File
+    scale?: number
+    colorTheme?: ReaderColorTheme
+    coReadInline?: {
+      annotations: CoReadAnnotation[]
+      labels: CoReadInlineLabels
+      status?: CoReadInlineStatus
+    } | null
+  }>(),
+  { colorTheme: 'light', coReadInline: null },
 )
 const emit = defineEmits<{
   'page-change': [page: number]
   'page-count': [count: number]
+  'co-read-draft': [annotationId: string, text: string]
 }>()
 
 const { t } = useI18n()
@@ -44,8 +61,30 @@ marked.setOptions({
   breaks: true,
 })
 
+function applyCoReadInline() {
+  const root = articleRef.value
+  if (!props.coReadInline?.labels || !root) return
+  syncCoReadInlineAnnotations(root, {
+    annotations: props.coReadInline.annotations,
+    labels: props.coReadInline.labels,
+    dark: props.colorTheme === 'dark',
+    status: props.coReadInline.status,
+    onDraft: (id, text) => emit('co-read-draft', id, text),
+  })
+}
+
+watch(
+  () => props.coReadInline,
+  () => applyCoReadInline(),
+  { deep: true },
+)
+
 function getPageText(): string {
-  return articleRef.value?.innerText ?? ''
+  const root = articleRef.value
+  if (!root) return ''
+  const structured = pageTextFromBody(root)
+  if (structured) return structured
+  return root.innerText ?? ''
 }
 
 function isAtEnd(): boolean {
@@ -66,6 +105,7 @@ onMounted(async () => {
     emit('page-count', 1)
     emit('page-change', 1)
     await nextTick()
+    applyCoReadInline()
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e)
     loading.value = false

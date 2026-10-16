@@ -109,6 +109,17 @@
         </button>
 
         <button
+          v-if="coReadMode && hasSource && coReadStore.phase === 'reading'"
+          type="button"
+          class="rv-btn rv-btn--sm"
+          :disabled="coReadStore.openingChapter"
+          :title="t('coRead.regeneratePage')"
+          @click="onCoReadRegeneratePage"
+        >
+          {{ t('coRead.regeneratePage') }}
+        </button>
+
+        <button
           v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown) && !coReadMode"
           class="rv-btn rv-btn--sm rv-btn--workspace"
           :title="t('reader.saveBookWorkspaceTitle')"
@@ -126,66 +137,92 @@
       <button class="rv-btn rv-btn--primary" @click="goBack">{{ t('reader.backToHub') }}</button>
     </div>
 
-    <!-- PDF 阅读器 -->
-    <PdfReader
-      v-else-if="isPdf"
-      ref="pdfReaderRef"
-      :object-url="objectUrl"
-      :scale="scale"
-      :color-theme="theme"
-      @page-change="onPageChange"
-      @page-count="onPageCount"
-      @page-ready="onReaderPageReady"
-    />
+    <div
+      v-else-if="hasKnownReader"
+      class="reader-view__content"
+      :class="{ 'reader-view__content--co-read-pdf': coReadShowPdfSidePanel }"
+    >
+      <!-- PDF 阅读器 -->
+      <PdfReader
+        v-if="isPdf"
+        ref="pdfReaderRef"
+        :object-url="objectUrl"
+        :scale="scale"
+        :color-theme="theme"
+        @page-change="onPageChange"
+        @page-count="onPageCount"
+        @page-ready="onReaderPageReady"
+      />
 
-    <!-- EPUB 阅读器 -->
-    <EpubReader
-      v-else-if="isEpub && file"
-      ref="epubReaderRef"
-      :key="coReadMode ? `co-read-${coReadChapterKey}` : 'epub-default'"
-      :file="file"
-      :scale="scale"
-      :color-theme="theme"
-      :initial-spine-index="coReadMode ? coReadSpineIndex : undefined"
-      @page-change="onPageChange"
-      @page-count="onPageCount"
-      @page-ready="onReaderPageReady"
-      @zoom="applyZoomDelta"
-    />
+      <!-- EPUB 阅读器 -->
+      <EpubReader
+        v-else-if="isEpub && file"
+        ref="epubReaderRef"
+        :key="coReadMode ? `co-read-${coReadChapterKey}` : 'epub-default'"
+        :file="file"
+        :scale="scale"
+        :color-theme="theme"
+        :initial-spine-index="coReadMode ? coReadSpineIndex : undefined"
+        :co-read-inline="coReadInlinePayload"
+        @page-change="onPageChange"
+        @page-count="onPageCount"
+        @page-ready="onReaderPageReady"
+        @zoom="applyZoomDelta"
+        @co-read-draft="onCoReadDraft"
+      />
 
-    <!-- MOBI 阅读器 -->
-    <MobiReader
-      v-else-if="isMobi && file"
-      ref="mobiReaderRef"
-      :file="file"
-      :scale="scale"
-      :color-theme="theme"
-      @page-change="onPageChange"
-      @page-count="onPageCount"
-      @page-ready="onReaderPageReady"
-      @zoom="applyZoomDelta"
-    />
+      <!-- MOBI 阅读器 -->
+      <MobiReader
+        v-else-if="isMobi && file"
+        ref="mobiReaderRef"
+        :file="file"
+        :scale="scale"
+        :color-theme="theme"
+        :co-read-inline="coReadInlinePayload"
+        @page-change="onPageChange"
+        @page-count="onPageCount"
+        @page-ready="onReaderPageReady"
+        @zoom="applyZoomDelta"
+        @co-read-draft="onCoReadDraft"
+      />
 
-    <!-- XLSX 阅读器 -->
-    <XlsxReader
-      v-else-if="isXlsx && file"
-      ref="xlsxReaderRef"
-      :file="file"
-      :scale="scale"
-      @page-change="onPageChange"
-      @page-count="onPageCount"
-    />
+      <!-- XLSX 阅读器 -->
+      <XlsxReader
+        v-else-if="isXlsx && file"
+        ref="xlsxReaderRef"
+        :file="file"
+        :scale="scale"
+        @page-change="onPageChange"
+        @page-count="onPageCount"
+      />
 
-    <!-- Markdown 阅读器 -->
-    <MarkdownReader
-      v-else-if="isMarkdown && file"
-      ref="markdownReaderRef"
-      :file="file"
-      :scale="scale"
-      :color-theme="theme"
-      @page-change="onPageChange"
-      @page-count="onPageCount"
-    />
+      <!-- Markdown 阅读器 -->
+      <MarkdownReader
+        v-else-if="isMarkdown && file"
+        ref="markdownReaderRef"
+        :file="file"
+        :scale="scale"
+        :color-theme="theme"
+        :co-read-inline="coReadInlinePayload"
+        @page-change="onPageChange"
+        @page-count="onPageCount"
+        @co-read-draft="onCoReadDraft"
+      />
+
+      <CoReadAnnotationStrip
+        v-if="coReadShowPdfSidePanel"
+        class="reader-view__co-read-side"
+        :annotations="coReadChapterAnnotations"
+        :intro-text="coReadStore.pageIntroText"
+        :page-error="coReadStore.pageOpenError"
+        :loading="coReadStore.openingChapter"
+        show-regenerate
+        :regenerate-disabled="coReadStore.openingChapter"
+        @draft="onCoReadDraft"
+        @retry="onCoReadRetryPage"
+        @regenerate="onCoReadRegeneratePage"
+      />
+    </div>
 
     <!-- 未知格式 -->
     <div v-else class="reader-view__unsupported">
@@ -255,19 +292,7 @@
         @close="coReadNavOpen = false"
         @select="onCoReadSelectChapter"
       />
-      <div v-if="coReadStore.phase === 'reading' || coReadStore.phase === 'discussing'" class="reader-view__co-read">
-        <CoReadAnnotationStrip
-          v-if="coReadStore.phase === 'reading'"
-          :annotations="coReadChapterAnnotations"
-          :intro-text="coReadStore.pageIntroText"
-          :page-error="coReadStore.pageOpenError"
-          :loading="coReadStore.openingChapter"
-          show-regenerate
-          :regenerate-disabled="coReadStore.openingChapter"
-          @draft="onCoReadDraft"
-          @retry="onCoReadRetryPage"
-          @regenerate="onCoReadRegeneratePage"
-        />
+      <div v-if="coReadStore.phase === 'reading' || coReadStore.phase === 'discussing'" class="reader-view__co-read-tray">
         <CoReadReplyTray
           v-if="coReadStore.phase === 'reading' && coReadChapterOpenDone"
           :reply-count="coReadReplyCount"
@@ -286,12 +311,6 @@
           </button>
         </div>
       </div>
-      <div
-        v-if="coReadStore.openingChapter"
-        class="pointer-events-none fixed inset-x-0 bottom-32 z-20 flex justify-center"
-      >
-        <span class="rounded-full bg-card px-4 py-2 text-xs shadow-lg">{{ t('coRead.loadingAnnotations') }}</span>
-      </div>
     </template>
 
   </div>
@@ -307,6 +326,7 @@ import CoReadAnnotationStrip from '@/components/coReading/CoReadAnnotationStrip.
 import CoReadReplyTray from '@/components/coReading/CoReadReplyTray.vue'
 import CoReadChatPanel from '@/components/coReading/CoReadChatPanel.vue'
 import { useCoReadingController, syncCoReadFileToReaderStore } from '@/composables/useCoReadingController'
+import { useCoReadInlineLabels } from '@/composables/useCoReadInlineLabels'
 import { useCoReadingStore } from '@/stores/coReading'
 import { useReaderColorTheme } from '@/composables/useReaderColorTheme'
 import { ElMessage } from 'element-plus'
@@ -347,6 +367,33 @@ const {
 const coReadChapterKey = computed(
   () => `${coReadStore.currentChapterIndex}-${coReadSpineIndex.value ?? 0}`,
 )
+const coReadInlineLabels = useCoReadInlineLabels()
+const hasKnownReader = computed(
+  () =>
+    isPdf.value ||
+    (isEpub.value && Boolean(file.value)) ||
+    (isMobi.value && Boolean(file.value)) ||
+    (isXlsx.value && Boolean(file.value)) ||
+    (isMarkdown.value && Boolean(file.value)),
+)
+const coReadShowPdfSidePanel = computed(
+  () => coReadMode.value && isPdf.value && coReadStore.phase === 'reading',
+)
+const coReadInlinePayload = computed(() => {
+  if (!coReadMode.value || coReadStore.phase !== 'reading' || isPdf.value) return null
+  return {
+    annotations: coReadChapterAnnotations.value,
+    labels: coReadInlineLabels.value,
+    status: {
+      loading: coReadStore.openingChapter && coReadChapterAnnotations.value.length === 0,
+      intro: coReadStore.pageIntroText || undefined,
+      errorCode: coReadStore.pageOpenError || undefined,
+      onRetry: () => {
+        void onCoReadRetryPage()
+      },
+    },
+  }
+})
 const { theme, isDark, toggleTheme } = useReaderColorTheme()
 
 const file = computed(() => store.file)
@@ -755,19 +802,41 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.reader-view__co-read {
+.reader-view__content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.reader-view__content--co-read-pdf {
+  flex-direction: row;
+}
+.reader-view__content--co-read-pdf > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.reader-view__co-read-side {
+  flex-shrink: 0;
+  width: min(100%, 360px);
+  max-height: none !important;
+  border-top: none !important;
+  border-left: 1px solid #e5e7eb;
+  overflow-y: auto;
+}
+.reader-view__co-read-tray {
   flex-shrink: 0;
   border-top: 1px solid #e5e7eb;
   background: #fff;
-  max-height: 40vh;
-  overflow-y: auto;
 }
 .reader-view__co-read-next {
   padding: 12px 16px;
 }
-.reader-view--night .reader-view__co-read {
+.reader-view--night .reader-view__co-read-tray {
   background: #0a0a0a;
   border-top-color: #111827;
+}
+.reader-view--night .reader-view__co-read-side {
+  border-left-color: #111827;
 }
 .reader-view--night .reader-view__subtitle {
   color: #9ca3af;

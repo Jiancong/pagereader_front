@@ -16,14 +16,26 @@ import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
 import { applyReaderDocColorTheme } from '@/utils/readerNightDocStyle'
 import { useI18n } from 'vue-i18n'
 import 'foliate-js/view.js'
+import type { CoReadAnnotation } from '@/types/coReading'
+import {
+  pageTextFromBody,
+  syncCoReadInlineAnnotations,
+  type CoReadInlineLabels,
+  type CoReadInlineStatus,
+} from '@/utils/coReadInlineAnnotations'
 
 const props = withDefaults(
   defineProps<{
     file: File
     scale?: number
     colorTheme?: ReaderColorTheme
+    coReadInline?: {
+      annotations: CoReadAnnotation[]
+      labels: CoReadInlineLabels
+      status?: CoReadInlineStatus
+    } | null
   }>(),
-  { colorTheme: 'light' },
+  { colorTheme: 'light', coReadInline: null },
 )
 
 const emit = defineEmits<{
@@ -31,6 +43,7 @@ const emit = defineEmits<{
   'page-count': [count: number]
   'page-ready': []
   zoom: [delta: number]
+  'co-read-draft': [annotationId: string, text: string]
 }>()
 
 const { t } = useI18n()
@@ -83,14 +96,41 @@ function syncDocTheme(doc: Document) {
   applyReaderDocColorTheme(doc, props.colorTheme === 'dark' ? 'dark' : 'light')
 }
 
+function activeDoc(): Document | null {
+  try {
+    return (view?.renderer?.getContents?.()?.doc as Document | undefined) ?? null
+  } catch {
+    return null
+  }
+}
+
+function applyCoReadInline() {
+  const doc = activeDoc()
+  if (!props.coReadInline?.labels || !doc?.body) return
+  syncCoReadInlineAnnotations(doc.body, {
+    annotations: props.coReadInline.annotations,
+    labels: props.coReadInline.labels,
+    dark: props.colorTheme === 'dark',
+    status: props.coReadInline.status,
+    onDraft: (id, text) => emit('co-read-draft', id, text),
+  })
+}
+
 function onLoad(e: Event) {
   const doc = (e as CustomEvent).detail?.doc
   if (doc) {
     attachToDoc(doc)
     syncDocTheme(doc)
+    applyCoReadInline()
   }
   emit('page-ready')
 }
+
+watch(
+  () => props.coReadInline,
+  () => applyCoReadInline(),
+  { deep: true },
+)
 
 watch(
   () => props.colorTheme,
@@ -114,6 +154,7 @@ function onRelocate(e: Event) {
   atEnd = page >= location.total
   emit('page-change', page)
   emit('page-count', location.total)
+  applyCoReadInline()
   emit('page-ready')
 }
 
@@ -161,14 +202,11 @@ function goToPage(page: number) {
 }
 
 function getPageText(): string {
-  if (!view) return ''
-  try {
-    const doc: Document | undefined = view.renderer?.getContents?.()?.doc
-    if (!doc) return ''
-    return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim()
-  } catch {
-    return ''
-  }
+  const doc = activeDoc()
+  if (!doc?.body) return ''
+  const structured = pageTextFromBody(doc.body)
+  if (structured) return structured
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
 }
 
 defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd })

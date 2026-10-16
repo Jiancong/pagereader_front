@@ -36,6 +36,13 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
 import { useI18n } from 'vue-i18n'
 import ePub, { type Book, type Rendition } from 'epubjs'
+import type { CoReadAnnotation } from '@/types/coReading'
+import {
+  pageTextFromBody,
+  syncCoReadInlineAnnotations,
+  type CoReadInlineLabels,
+  type CoReadInlineStatus,
+} from '@/utils/coReadInlineAnnotations'
 
 const props = withDefaults(
   defineProps<{
@@ -44,8 +51,14 @@ const props = withDefaults(
     colorTheme?: ReaderColorTheme
     /** 打开时定位到 spine 章节（沉浸式共读按章跳转） */
     initialSpineIndex?: number
+    /** 共读：批注嵌入当前页文档 */
+    coReadInline?: {
+      annotations: CoReadAnnotation[]
+      labels: CoReadInlineLabels
+      status?: CoReadInlineStatus
+    } | null
   }>(),
-  { colorTheme: 'light' },
+  { colorTheme: 'light', coReadInline: null },
 )
 
 const emit = defineEmits<{
@@ -53,6 +66,7 @@ const emit = defineEmits<{
   'page-count': [count: number]
   'page-ready': []
   zoom: [delta: number]
+  'co-read-draft': [annotationId: string, text: string]
 }>()
 
 const { t } = useI18n()
@@ -191,6 +205,25 @@ watch(
   () => applyEpubColorTheme(),
 )
 
+function applyCoReadInline() {
+  if (!props.coReadInline?.labels || !currentViewDoc?.body) return
+  syncCoReadInlineAnnotations(currentViewDoc.body, {
+    annotations: props.coReadInline.annotations,
+    labels: props.coReadInline.labels,
+    dark: props.colorTheme === 'dark',
+    status: props.coReadInline.status,
+    onDraft: (id, text) => emit('co-read-draft', id, text),
+  })
+}
+
+watch(
+  () => props.coReadInline,
+  () => {
+    applyCoReadInline()
+  },
+  { deep: true },
+)
+
 onMounted(async () => {
   try {
     // iOS Safari 旧版本 File.arrayBuffer() 可能缺失，用 slice+FileReader 兜底
@@ -259,6 +292,7 @@ onMounted(async () => {
       if (doc) {
         currentViewDoc = doc
         attachToDoc(doc)
+        applyCoReadInline()
       }
 
       if (book && book.locations.length() === 0) {
@@ -341,21 +375,22 @@ function goToPage(page: number) {
 }
 
 function getPageText(): string {
-  // 优先使用 rendered 事件缓存的文档
-  if (currentViewDoc) {
-    const text = (currentViewDoc.body?.textContent || '').replace(/\s+/g, ' ').trim()
-    if (text) return text
-  }
-  // 回退：尝试从 rendition.views() 获取
-  if (!rendition) return ''
+  const doc = getActiveViewDocument()
+  if (!doc?.body) return ''
+  const structured = pageTextFromBody(doc.body)
+  if (structured) return structured
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
+}
+
+function getActiveViewDocument(): Document | null {
+  if (currentViewDoc) return currentViewDoc
+  if (!rendition) return null
   try {
     const views = rendition.views()
     const view: any = Array.isArray(views) ? views[0] : (views as any)?._views?.[0]
-    const doc: Document | undefined = view?.document
-    if (!doc) return ''
-    return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim()
+    return (view?.document as Document | undefined) ?? null
   } catch {
-    return ''
+    return null
   }
 }
 
