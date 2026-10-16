@@ -76,14 +76,17 @@ function ensureStyles(doc: Document, dark: boolean) {
 .co-read-inline-host{position:relative;display:inline;vertical-align:baseline;white-space:nowrap;margin:0 0 0 .15em;line-height:inherit}
 .co-read-inline-marker{
   display:inline-flex;align-items:center;justify-content:center;
-  width:1.15em;height:1.15em;padding:0;margin:0;border:none;border-radius:50%;
-  background:${dark ? "rgba(37,99,235,.45)" : "rgba(37,99,235,.28)"};
-  color:${accent};font-size:.55em;line-height:1;cursor:pointer;vertical-align:super;
-  box-shadow:0 0 0 1px ${popBorder};transition:transform .12s,background .12s
+  width:1.35em;height:1.35em;padding:0;margin:0 0 0 .12em;border:none;border-radius:8px;
+  background:linear-gradient(145deg,${dark ? "#3b82f6" : "#2563eb"},${dark ? "#6366f1" : "#4f46e5"});
+  color:#fff;line-height:0;cursor:pointer;vertical-align:-0.15em;
+  box-shadow:0 0 0 2px ${dark ? "rgba(147,197,253,.35)" : "rgba(37,99,235,.25)"},0 2px 8px rgba(37,99,235,.45);
+  transition:transform .12s,box-shadow .12s;animation:co-read-marker-pulse 2.2s ease-in-out infinite
 }
+.co-read-inline-marker svg{width:.85em;height:.85em;display:block;fill:currentColor}
 .co-read-inline-marker:hover,.co-read-inline-host:focus-within .co-read-inline-marker{
-  transform:scale(1.08);background:${dark ? "rgba(37,99,235,.65)" : "rgba(37,99,235,.45)"}
+  transform:scale(1.12);box-shadow:0 0 0 3px rgba(96,165,250,.55),0 4px 14px rgba(37,99,235,.55)
 }
+@keyframes co-read-marker-pulse{0%,100%{box-shadow:0 0 0 2px ${dark ? "rgba(147,197,253,.35)" : "rgba(37,99,235,.25)"},0 2px 8px rgba(37,99,235,.4)}50%{box-shadow:0 0 0 4px rgba(96,165,250,.45),0 2px 12px rgba(37,99,235,.55)}}
 .co-read-inline-popover{
   visibility:hidden;opacity:0;pointer-events:none;
   position:absolute;left:0;bottom:calc(100% + 8px);z-index:10001;
@@ -173,7 +176,8 @@ function renderAnnotationMarker(
   const label = kindLabel(labels, ann.kind)
   btn.title = `${labels.annotationTitle}: ${label}`
   btn.setAttribute("aria-label", btn.title)
-  btn.textContent = "●"
+  btn.innerHTML =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/></svg>'
   btn.addEventListener("click", stopReaderNav)
   btn.addEventListener("mousedown", stopReaderNav)
   host.appendChild(btn)
@@ -241,7 +245,78 @@ function renderAnnotationMarker(
   return host
 }
 
-/** 在 body 内按段落索引挂载 marker（不插入块级批注，避免挤版） */
+/** 与 POST /page 切段一致：仅用 paragraph_index 定位段落（不在全书 DOM 里搜 quote） */
+function paragraphForAnnotation(anchors: HTMLElement[], ann: CoReadAnnotation): HTMLElement | null {
+  const idx = Math.max(0, ann.anchor.paragraphIndex)
+  if (anchors[idx]) return anchors[idx]
+  return anchors.length ? anchors[Math.min(idx, anchors.length - 1)] : null
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+/** 后端 quote 可能被截断；用前若干词做空白容错匹配 */
+function findQuoteMatchEnd(rawText: string, quote: string): number {
+  const words = quote
+    .replace(/\u00a0/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (!words.length) return -1
+  for (let n = words.length; n >= 2; n--) {
+    const part = words.slice(0, n).map(escapeRegExp).join("\\s+")
+    const re = new RegExp(part, "i")
+    const m = rawText.match(re)
+    if (m && m.index !== undefined) return m.index + m[0].length
+  }
+  const single = escapeRegExp(words[0])
+  const m = rawText.match(new RegExp(single, "i"))
+  if (m && m.index !== undefined) return m.index + m[0].length
+  return -1
+}
+
+function insertMarkerAtTextOffset(para: HTMLElement, endOffset: number, marker: HTMLElement): boolean {
+  if (endOffset < 0) return false
+  const doc = para.ownerDocument
+  if (!doc) return false
+  const walker = doc.createTreeWalker(para, NodeFilter.SHOW_TEXT)
+  let pos = 0
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text
+    const text = node.textContent || ""
+    const len = text.length
+    if (pos + len >= endOffset) {
+      const splitAt = Math.min(len, Math.max(0, endOffset - pos))
+      if (splitAt >= len) {
+        const parent = node.parentNode
+        if (!parent) return false
+        parent.insertBefore(marker, node.nextSibling)
+      } else {
+        const after = node.splitText(splitAt)
+        node.parentNode?.insertBefore(marker, after)
+      }
+      return true
+    }
+    pos += len
+  }
+  return false
+}
+
+/** 在 anchor.quote 结束位置插入 marker（仅在该 paragraph_index 段落内查找） */
+function insertMarkerAfterQuote(para: HTMLElement, quote: string, marker: HTMLElement): boolean {
+  const raw = para.textContent || ""
+  const end = findQuoteMatchEnd(raw, quote)
+  if (end < 0) return false
+  return insertMarkerAtTextOffset(para, end, marker)
+}
+
+function quoteMatchEndForSort(para: HTMLElement, quote: string | undefined): number {
+  if (!quote?.trim()) return -1
+  return findQuoteMatchEnd(para.textContent || "", quote)
+}
+
+/** 在 body 内按 paragraph_index + quote 挂载 marker（不插入块级批注，避免挤版） */
 export function syncCoReadInlineAnnotations(body: HTMLElement, opts: SyncCoReadInlineOptions) {
   const doc = body.ownerDocument
   if (!doc) return
@@ -253,30 +328,20 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: SyncCoReadI
   const anchors = collectParagraphAnchors(body)
   if (!anchors.length) return
 
-  const byPara = new Map<number, CoReadAnnotation[]>()
-  for (const ann of opts.annotations) {
-    const p = resolveParagraphIndex(anchors, ann)
-    if (!byPara.has(p)) byPara.set(p, [])
-    byPara.get(p)!.push(ann)
-  }
+  const items = opts.annotations
+    .map((ann) => ({ ann, para: paragraphForAnnotation(anchors, ann) }))
+    .filter((x): x is { ann: CoReadAnnotation; para: HTMLElement } => Boolean(x.para))
 
-  for (const [pIdx, list] of byPara.entries()) {
-    const anchor = anchors[pIdx]
-    if (!anchor) continue
-    for (const ann of list) {
-      anchor.appendChild(renderAnnotationMarker(doc, ann, opts.labels, opts.onDraft))
-    }
-  }
-}
+  items.sort((a, b) => {
+    const ea = quoteMatchEndForSort(a.para, a.ann.anchor.quote) ?? -1
+    const eb = quoteMatchEndForSort(b.para, b.ann.anchor.quote) ?? -1
+    return eb - ea
+  })
 
-function resolveParagraphIndex(anchors: HTMLElement[], ann: CoReadAnnotation): number {
-  const raw = Math.max(0, ann.anchor.paragraphIndex)
-  if (anchors[raw]) return raw
-  const quote = ann.anchor.quote?.trim()
-  if (quote) {
-    const needle = quote.slice(0, 48)
-    const hit = anchors.findIndex((el) => (el.textContent || "").includes(needle))
-    if (hit >= 0) return hit
+  for (const { ann, para } of items) {
+    const marker = renderAnnotationMarker(doc, ann, opts.labels, opts.onDraft)
+    const quote = ann.anchor.quote?.trim()
+    if (quote && insertMarkerAfterQuote(para, quote, marker)) continue
+    para.appendChild(marker)
   }
-  return Math.min(raw, anchors.length - 1)
 }
