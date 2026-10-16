@@ -10,9 +10,9 @@
 
 | 位置 | 改动 |
 |------|------|
-| 落地页 `GeneratorSection.vue` Tab 列表 | `read`（在线阅读）后新增 `{ id: 'coRead', label: t('landing.tabCoRead'), icon: BookHeart }` |
-| 工作区 `WorkspaceGenerator.vue` Tab | 同上新增 co-read tab |
-| 阅读中心 `ReaderHubView.vue` | `LocalReaderUploadPanel` 内增加模式选择：`在线阅读` / `沉浸式共读`（默认在线阅读） |
+| 落地页 / 工作区 **在线阅读** Tab 内 | 子选项：`在线阅读` / `沉浸式共读`（同一上传区，非独立 Tab） |
+| 阅读中心 `ReaderHubView.vue` | `LocalReaderUploadPanel` 内同样模式切换 |
+| 章内阅读 | **复用** `EpubReader` 分页（`initialSpineIndex`）；翻页上报 `POST .../chapters/{n}/page`（可选） |
 
 i18n 新键（en / zh-CN）：
 

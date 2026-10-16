@@ -185,6 +185,23 @@ export async function reportProgress(
   })
 }
 
+/** 分页伴读：每翻一页上报当前页文本（BFF/Python 可选实现，未实现时静默失败） */
+export async function reportPageRead(
+  sessionId: string,
+  chapterNumber: number,
+  payload: { pageIndex: number; pageTotal?: number; text?: string },
+): Promise<void> {
+  try {
+    await requestJsonOkPayload("POST", `/co-reading/sessions/${sessionId}/chapters/${chapterNumber}/page`, {
+      pageIndex: payload.pageIndex,
+      pageTotal: payload.pageTotal,
+      text: payload.text,
+    })
+  } catch {
+    /* optional endpoint */
+  }
+}
+
 export async function getSession(sessionId: string): Promise<CoReadSessionDetail> {
   const payload = await requestJsonOkPayload<
     { ok: true; session?: CoReadSessionDetail } & Partial<CoReadSessionDetail>

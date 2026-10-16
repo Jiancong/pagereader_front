@@ -14,6 +14,8 @@ export interface CoReadChapter {
   title: string
   paragraphs: string[]
   charCount: number
+  /** EPUB spine 序号，用于原生分页阅读器定位章节 */
+  epubSpineIndex?: number
 }
 
 export interface CoReadChapterMeta {

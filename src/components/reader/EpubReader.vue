@@ -42,6 +42,8 @@ const props = withDefaults(
     file: File
     scale?: number
     colorTheme?: ReaderColorTheme
+    /** 打开时定位到 spine 章节（沉浸式共读按章跳转） */
+    initialSpineIndex?: number
   }>(),
   { colorTheme: 'light' },
 )
@@ -270,7 +272,12 @@ onMounted(async () => {
       emit('page-ready')
     })
 
-    await rendition.display()
+    const spineIdx = props.initialSpineIndex
+    if (typeof spineIdx === 'number' && spineIdx >= 0) {
+      await rendition.display(spineIdx)
+    } else {
+      await rendition.display()
+    }
     loading.value = false
     await nextTick()
     uninstallUnloadShim()

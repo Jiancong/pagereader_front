@@ -1333,6 +1333,7 @@ export default {
     loadingAnnotations: "Your AI buddy is reading this chapter…",
     chatPlaceholder: "Keep chatting about this chapter…",
     chatSend: "Send",
+    readerMissingChapter: "Could not load this chapter",
     kind: {
       reaction: "Reaction",
       suspicion: "Suspicion",

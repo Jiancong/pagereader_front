@@ -1311,6 +1311,7 @@ export default {
     loadingAnnotations: "AI 书友正在读这一章…",
     chatPlaceholder: "继续和 AI 书友聊聊本章…",
     chatSend: "发送",
+    readerMissingChapter: "无法加载本章内容",
     kind: {
       reaction: "有感而发",
       suspicion: "存疑",

@@ -48,7 +48,7 @@
     </div>
 
     <template v-else-if="currentChapter">
-      <div class="relative flex flex-1 min-h-0">
+      <div class="relative flex min-h-0 flex-1 flex-col sm:flex-row">
         <CoReadChapterNav
           :open="navOpen"
           :chapters="store.chapters"
@@ -56,12 +56,22 @@
           @close="navOpen = false"
           @select="onSelectChapter"
         />
-        <CoReadChapterPane
+        <CoReadReaderStage
           v-if="store.phase === 'reading'"
+          :file="fileStore.file"
+          :format="fileStore.format"
           :chapter="currentChapter"
+          :chapter-index="store.currentChapterIndex"
+          :epub-spine-index="currentChapter?.epubSpineIndex"
           :annotations="chapterAnnotations"
           @draft="onDraft"
           @scroll="onScroll"
+          @page-change="onReaderPageChange"
+        />
+        <CoReadAnnotationStrip
+          v-if="store.phase === 'reading' && fileStore.format === 'epub' && chapterAnnotations.length"
+          :annotations="chapterAnnotations"
+          @draft="onDraft"
         />
       </div>
 
@@ -110,7 +120,8 @@ import { useI18n } from 'vue-i18n'
 import { ArrowLeft, BookHeart, ChevronRight, List, Loader2 } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import CoReadSetup from '@/components/coReading/CoReadSetup.vue'
-import CoReadChapterPane from '@/components/coReading/CoReadChapterPane.vue'
+import CoReadReaderStage from '@/components/coReading/CoReadReaderStage.vue'
+import CoReadAnnotationStrip from '@/components/coReading/CoReadAnnotationStrip.vue'
 import CoReadReplyTray from '@/components/coReading/CoReadReplyTray.vue'
 import CoReadChatPanel from '@/components/coReading/CoReadChatPanel.vue'
 import CoReadChapterNav from '@/components/coReading/CoReadChapterNav.vue'
@@ -134,6 +145,7 @@ const creatingSession = ref(false)
 const chapterOpenDone = ref(false)
 const chatLoading = ref(false)
 const lastReportedScroll = ref(-1)
+const lastReportedPage = ref(-1)
 let openAbort: AbortController | null = null
 let streamAbort: AbortController | null = null
 let progressTimer: ReturnType<typeof setTimeout> | null = null
@@ -198,6 +210,7 @@ async function openChapterStream(chapterIndex: number) {
   if (!store.sessionId) return
   openAbort?.abort()
   openAbort = new AbortController()
+  lastReportedPage.value = -1
   store.openingChapter = true
   chapterOpenDone.value = false
   store.annotations = store.annotations.filter((a) => a.chapterIndex !== chapterIndex)
@@ -280,6 +293,23 @@ function onScroll(percent: number) {
     lastReportedScroll.value = percent
     void coReadingApi.reportProgress(store.sessionId, store.currentChapterIndex, percent).catch(() => undefined)
   }, 2000)
+}
+
+function onReaderPageChange(payload: { page: number; pageTotal: number; text: string }) {
+  if (!store.sessionId) return
+  if (payload.page === lastReportedPage.value) return
+  lastReportedPage.value = payload.page
+  const chapterNumber = chapterApiNumber(store.currentChapterIndex)
+  const snippet = payload.text.slice(0, 8000)
+  void coReadingApi.reportPageRead(store.sessionId, chapterNumber, {
+    pageIndex: payload.page,
+    pageTotal: payload.pageTotal,
+    text: snippet,
+  })
+  const percent = payload.pageTotal
+    ? Math.min(100, Math.round((payload.page / payload.pageTotal) * 100))
+    : 0
+  void coReadingApi.reportProgress(store.sessionId, store.currentChapterIndex, percent).catch(() => undefined)
 }
 
 async function onSendReplies() {

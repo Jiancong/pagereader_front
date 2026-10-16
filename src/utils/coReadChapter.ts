@@ -263,6 +263,7 @@ async function parseEpubChapters(file: File): Promise<CoReadChapter[]> {
         title,
         paragraphs: paragraphs.length ? paragraphs : [text.trim() || ""],
         charCount: text.length,
+        epubSpineIndex: i,
       })
       item.unload?.()
     } catch {
