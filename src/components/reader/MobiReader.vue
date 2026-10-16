@@ -2,6 +2,7 @@
   <div class="mobi-reader" :class="{ 'mobi-reader--night': colorTheme === 'dark' }">
     <div class="mobi-reader__zoom-wrap" :style="{ zoom: scale }">
       <div ref="containerRef" class="mobi-reader__container"></div>
+      <div v-if="coReadInline" ref="overlayRef" class="mobi-reader__co-read-overlay"></div>
     </div>
     <div v-if="loading" class="mobi-reader__overlay">{{ t('reader.loading') }}</div>
     <div v-else-if="loadError" class="mobi-reader__overlay mobi-reader__overlay--error">
@@ -19,7 +20,7 @@ import 'foliate-js/view.js'
 import type { CoReadAnnotation } from '@/types/coReading'
 import {
   pageTextFromBody,
-  syncCoReadInlineAnnotations,
+  syncCoReadOverlayAnnotations,
   type CoReadInlineLabels,
   type CoReadInlineStatus,
 } from '@/utils/coReadInlineAnnotations'
@@ -49,6 +50,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const containerRef = ref<HTMLElement | null>(null)
+const overlayRef = ref<HTMLElement | null>(null)
 const loading = ref(true)
 const loadError = ref('')
 
@@ -105,9 +107,12 @@ function activeDoc(): Document | null {
 }
 
 function applyCoReadInline() {
+  const overlay = overlayRef.value
   const doc = activeDoc()
-  if (!props.coReadInline?.labels || !doc?.body) return
-  syncCoReadInlineAnnotations(doc.body, {
+  if (!props.coReadInline?.labels || !overlay || !doc?.body) return
+  syncCoReadOverlayAnnotations({
+    body: doc.body,
+    host: overlay,
     annotations: props.coReadInline.annotations,
     labels: props.coReadInline.labels,
     dark: props.colorTheme === 'dark',
@@ -222,6 +227,7 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd })
   overflow: auto;
 }
 .mobi-reader__zoom-wrap {
+  position: relative;
   flex: 1;
   display: flex;
   min-height: 0;

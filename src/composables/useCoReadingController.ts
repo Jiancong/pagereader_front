@@ -34,8 +34,9 @@ export function useCoReadingController() {
   const creatingSession = ref(false)
   const chatLoading = ref(false)
   const lastReportedPage = ref(-1)
-  let openAbort: AbortController | null = null
-  let streamAbort: AbortController | null = null
+let openAbort: AbortController | null = null
+let streamAbort: AbortController | null = null
+let lastProgressSentAt = 0
 
   const currentChapter = computed(() => store.getCachedChapter(store.currentChapterIndex))
   const coReadSpineIndex = computed(() => currentChapter.value?.epubSpineIndex)
@@ -236,8 +237,13 @@ export function useCoReadingController() {
     store.pageIntroText = ""
     store.pageOpenEmpty = false
     void runChapterOpenStream(store.currentChapterIndex)
+    // progress BFF 限流 ≤1 次/10s；EPUB resize/relocated 会重复触发 page-change
+    const now = Date.now()
     const percent = pageTotal ? Math.min(100, Math.round((page / pageTotal) * 100)) : 0
-    void coReadingApi.reportProgress(store.sessionId, store.currentChapterIndex, percent).catch(() => undefined)
+    if (now - lastProgressSentAt >= 10000) {
+      lastProgressSentAt = now
+      void coReadingApi.reportProgress(store.sessionId, store.currentChapterIndex, percent).catch(() => undefined)
+    }
   }
 
   async function retryCurrentPageOpen() {
