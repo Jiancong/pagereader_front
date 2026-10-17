@@ -209,6 +209,57 @@ watch(
   () => applyEpubColorTheme(),
 )
 
+/**
+ * epubjs 用 Range.getBoundingClientRect() 量分页宽度。CSS 多栏时这个宽度只有第一栏，
+ * iframe 不会变宽，next() 会以为本章已经到头。这里改用各栏 client rect / scrollWidth 把整章撑开。
+ */
+function repairPaginatedColumns(view: any) {
+  const contents = view?.contents
+  const doc = contents?.document as Document | undefined
+  const layout = view?.layout
+  if (!doc?.body || !layout || typeof view.reframe !== 'function') return
+  if (layout.name === 'pre-paginated') return
+  const flow = layout._flow || layout.props?.flow
+  if (flow && flow !== 'paginated') return
+
+  const columnWidth = Number(layout.columnWidth) || Number(layout.width) || 0
+  const gap = Number(layout.gap) || 0
+  if (!columnWidth) return
+
+  const origin = doc.body.getBoundingClientRect().left
+  const range = doc.createRange()
+  range.selectNodeContents(doc.body)
+  const rects = range.getClientRects()
+  const lefts: number[] = []
+  let maxRight = 0
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i]
+    if (r.width < 1 || r.height < 1) continue
+    const left = r.left - origin
+    if (r.right - origin > maxRight) maxRight = r.right - origin
+    if (!lefts.some((x) => Math.abs(x - left) < 12)) lefts.push(left)
+  }
+  lefts.sort((a, b) => a - b)
+  const measuredStride = lefts.length >= 2 ? lefts[1] - lefts[0] : 0
+  const stride = Math.round(measuredStride >= columnWidth * 0.5 ? measuredStride : columnWidth + gap)
+  const scrollW = Math.max(doc.body.scrollWidth || 0, doc.documentElement?.scrollWidth || 0)
+  const contentWidth = Math.max(maxRight, scrollW)
+  if (stride < 1 || contentWidth <= stride + 8) return
+
+  layout.delta = stride
+  layout.pageWidth = stride
+  if (layout.props) {
+    layout.props.delta = stride
+    layout.props.pageWidth = stride
+  }
+  const pages = Math.ceil((contentWidth - 1) / stride)
+  const target = pages * stride
+  contents.textWidth = () => target
+  if (Math.abs((view._width || 0) - target) > 2) {
+    view.reframe(target, view._height || layout.height)
+  }
+}
+
 function applyCoReadInline() {
   const overlay = overlayRef.value
   if (!props.coReadInline?.labels || !overlay) return
@@ -250,6 +301,11 @@ onMounted(async () => {
 
     book = ePub(data)
     await book.ready
+    // 沙箱 iframe 不允许脚本。书里的 <script> 会在 about:srcdoc 里被浏览器拒绝并刷屏，阅读用不到它们。
+    book.spine.hooks.serialize.register((output: string, section: { output?: string }) => {
+      if (!output || !/<script\b/i.test(output)) return
+      section.output = output.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    })
 
     // 等待 DOM 就绪（iOS Safari 有时 onMounted 时 ref 还未挂载）
     await nextTick()
@@ -303,7 +359,10 @@ onMounted(async () => {
         currentViewDoc = doc
         attachToDoc(doc)
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => applyCoReadInline())
+          requestAnimationFrame(() => {
+            repairPaginatedColumns(view)
+            applyCoReadInline()
+          })
         })
       }
 
