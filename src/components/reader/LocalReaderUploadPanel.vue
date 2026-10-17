@@ -3,26 +3,6 @@
     <div class="local-reader-upload__header">
       <h3 class="local-reader-upload__title">{{ t('reader.localTitle') }}</h3>
       <p class="local-reader-upload__hint">{{ t('reader.localHint') }}</p>
-      <div class="local-reader-upload__modes" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="uploadMode === 'read'"
-          :class="['local-reader-upload__mode', uploadMode === 'read' ? 'local-reader-upload__mode--active' : '']"
-          @click="uploadMode = 'read'"
-        >
-          {{ t('reader.modeOnlineRead') }}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="uploadMode === 'coRead'"
-          :class="['local-reader-upload__mode', uploadMode === 'coRead' ? 'local-reader-upload__mode--active' : '']"
-          @click="uploadMode = 'coRead'"
-        >
-          {{ t('reader.modeCoRead') }}
-        </button>
-      </div>
     </div>
 
     <div
@@ -54,8 +34,8 @@
       </div>
       <template v-else>
         <BookOpen class="local-reader-upload__empty-icon" />
-        <p class="local-reader-upload__empty-title">{{ emptyPickLabel }}</p>
-        <p class="local-reader-upload__empty-formats">{{ emptyFormatsLabel }}</p>
+        <p class="local-reader-upload__empty-title">{{ t('reader.localPickFile') }}</p>
+        <p class="local-reader-upload__empty-formats">{{ t('reader.localFormats') }}</p>
       </template>
     </div>
 
@@ -66,9 +46,8 @@
       @click="onStart"
     >
       <Loader2 v-if="starting" class="h-5 w-5 animate-spin" />
-      <BookHeart v-else-if="uploadMode === 'coRead'" class="h-5 w-5" />
       <BookOpen v-else class="h-5 w-5" />
-      {{ startButtonLabel }}
+      {{ t('reader.localStart') }}
     </button>
   </section>
 </template>
@@ -77,13 +56,9 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { BookOpen, BookHeart, X, Loader2 } from 'lucide-vue-next'
+import { BookOpen, X, Loader2 } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
-import { isLoggedIn } from '@/api'
 import { useReaderFileStore } from '@/stores/reader'
-import { useCoReadFileStore } from '@/stores/coReadFile'
-import { useCoReadingStore } from '@/stores/coReading'
-import { detectCoReadFormat, parseCoReadFile } from '@/utils/coReadChapter'
 
 const props = withDefaults(
   defineProps<{
@@ -98,30 +73,14 @@ const emit = defineEmits<{ start: [file: File]; 'open-login': [] }>()
 const { t } = useI18n()
 const router = useRouter()
 const readerFileStore = useReaderFileStore()
-const coReadFileStore = useCoReadFileStore()
-const coReadingStore = useCoReadingStore()
 
-const uploadMode = ref<'read' | 'coRead'>('read')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
 const isDragging = ref(false)
 const starting = ref(false)
 
-const fileAccept = computed(() =>
-  uploadMode.value === 'coRead'
-    ? '.txt,.md,.markdown,.mdown,.mkd,.epub,text/plain,text/markdown,application/epub+zip'
-    : '.pdf,.epub,.mobi,.azw,.azw3,.xlsx,.xls,.md,.markdown,.mdown,.mkd,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/markdown,text/plain',
-)
-
-const emptyPickLabel = computed(() =>
-  uploadMode.value === 'coRead' ? t('reader.coReadPickFile') : t('reader.localPickFile'),
-)
-const emptyFormatsLabel = computed(() =>
-  uploadMode.value === 'coRead' ? t('reader.coReadFormats') : t('reader.localFormats'),
-)
-const startButtonLabel = computed(() =>
-  uploadMode.value === 'coRead' ? t('reader.coReadStart') : t('reader.localStart'),
-)
+const fileAccept =
+  '.pdf,.epub,.mobi,.azw,.azw3,.xlsx,.xls,.md,.markdown,.mdown,.mkd,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/markdown,text/plain'
 
 const sizeLabel = computed(() => {
   const size = selectedFile.value?.size
@@ -151,37 +110,6 @@ async function onStart() {
   if (!selectedFile.value) return
   if (selectedFile.value.size === 0) {
     ElMessage.warning(t('reader.localStart'))
-    return
-  }
-  if (uploadMode.value === 'coRead') {
-    if (!detectCoReadFormat(selectedFile.value.name)) {
-      ElMessage.warning(t('coRead.unsupportedFormat'))
-      return
-    }
-    if (!isLoggedIn()) {
-      emit('open-login')
-      return
-    }
-    starting.value = true
-    try {
-      coReadingStore.resetSession()
-      const parsed = await parseCoReadFile(selectedFile.value)
-      coReadFileStore.setParsed(
-        selectedFile.value,
-        parsed.chapters,
-        parsed.fileHash,
-        parsed.format,
-      )
-      coReadFileStore.setReturnTo('reader-hub')
-      emit('start', selectedFile.value)
-      if (props.autoOpen) {
-        await router.push({ name: 'co-reading' })
-      }
-    } catch {
-      ElMessage.error(t('coRead.parseFailed'))
-    } finally {
-      starting.value = false
-    }
     return
   }
   readerFileStore.setFile(selectedFile.value)

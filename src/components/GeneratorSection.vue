@@ -311,35 +311,10 @@
             </button>
           </div>
 
-          <!-- 在线阅读（含沉浸式共读） -->
           <div v-else-if="activeTab === 'read'" class="space-y-6">
             <div class="mb-6">
               <h3 class="text-lg font-semibold text-foreground">{{ t('landing.readTitle') }}</h3>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {{ readMode === 'coRead' ? t('reader.coReadSubtitle') : t('landing.readHint') }}
-              </p>
-              <div class="mt-4 inline-flex rounded-xl border border-border bg-secondary/30 p-1">
-                <button
-                  type="button"
-                  :class="[
-                    'rounded-lg px-4 py-2 text-sm font-medium transition',
-                    readMode === 'online' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground',
-                  ]"
-                  @click="readMode = 'online'"
-                >
-                  {{ t('reader.modeOnlineRead') }}
-                </button>
-                <button
-                  type="button"
-                  :class="[
-                    'rounded-lg px-4 py-2 text-sm font-medium transition',
-                    readMode === 'coRead' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground',
-                  ]"
-                  @click="readMode = 'coRead'"
-                >
-                  {{ t('reader.modeCoRead') }}
-                </button>
-              </div>
+              <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.readHint') }}</p>
             </div>
 
             <div
@@ -360,8 +335,7 @@
                 @change="handleReaderSelect"
               />
               <div v-if="selectedReaderFile" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-center">
-                <BookHeart v-if="readMode === 'coRead'" class="h-10 w-10 flex-shrink-0 text-primary" />
-                <BookOpen v-else class="h-10 w-10 flex-shrink-0 text-primary" />
+                <BookOpen class="h-10 w-10 flex-shrink-0 text-primary" />
                 <div class="min-w-0 flex-1 text-left">
                   <p class="break-words font-medium text-foreground">{{ selectedReaderFile.name }}</p>
                   <p class="text-sm text-muted-foreground">{{ formatFileSize(selectedReaderFile.size) }}</p>
@@ -375,25 +349,19 @@
                 </button>
               </div>
               <template v-else>
-                <BookHeart v-if="readMode === 'coRead'" class="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <BookOpen v-else class="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <p class="mt-4 font-medium text-foreground">
-                  {{ readMode === 'coRead' ? t('reader.coReadPickFile') : t('landing.readPickFile') }}
-                </p>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  {{ readMode === 'coRead' ? t('reader.coReadFormats') : t('landing.readFormats') }}
-                </p>
+                <BookOpen class="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <p class="mt-4 font-medium text-foreground">{{ t('landing.readPickFile') }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ t('landing.readFormats') }}</p>
               </template>
             </div>
 
             <button
-              :disabled="!selectedReaderFile || (readMode === 'coRead' && coReadStarting)"
+              :disabled="!selectedReaderFile"
               class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-              @click="readMode === 'coRead' ? startCoReading() : startReading()"
+              @click="startReading()"
             >
-              <BookHeart v-if="readMode === 'coRead' && !coReadStarting" class="h-5 w-5" />
-              <BookOpen v-else-if="readMode === 'online'" class="h-5 w-5" />
-              {{ readMode === 'coRead' ? t('reader.coReadStart') : t('landing.readStart') }}
+              <BookOpen class="h-5 w-5" />
+              {{ t('landing.readStart') }}
             </button>
           </div>
         </div>
@@ -407,12 +375,8 @@
 import { ref, computed, watch, markRaw, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages, Globe, BookOpen, BookHeart } from 'lucide-vue-next'
+import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages, Globe, BookOpen } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
-import { isLoggedIn } from '@/api'
-import { useCoReadFileStore } from '@/stores/coReadFile'
-import { useCoReadingStore } from '@/stores/coReading'
-import { detectCoReadFormat, parseCoReadFile } from '@/utils/coReadChapter'
 import {
   gtmGenerateIntent,
   gtmGeneratorTabSelect,
@@ -432,11 +396,8 @@ const { t } = useI18n()
 const router = useRouter()
 const translateFileStore = useTranslateFileStore()
 const readerFileStore = useReaderFileStore()
-const coReadFileStore = useCoReadFileStore()
-const coReadingStore = useCoReadingStore()
 const emit = defineEmits<{
   start: [payload: { mode: string; prompt: string }]
-  'co-read-login': []
 }>()
 
 const activeTab = ref<TabId>('upload')
@@ -454,14 +415,9 @@ const translateMode = ref<'pdf' | 'url'>('pdf')
 const translateUrl = ref('')
 const showDemoVideo = ref(false)
 const selectedReaderFile = ref<File | null>(null)
-const readMode = ref<'online' | 'coRead'>('online')
-const coReadStarting = ref(false)
 
-const readFileAccept = computed(() =>
-  readMode.value === 'coRead'
-    ? '.txt,.md,.markdown,.mdown,.mkd,.epub,text/plain,text/markdown,application/epub+zip'
-    : '.pdf,.epub,.mobi,.azw,.azw3,.xlsx,.xls,.md,.markdown,.mdown,.mkd,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/markdown,text/plain',
-)
+const readFileAccept =
+  '.pdf,.epub,.mobi,.azw,.azw3,.xlsx,.xls,.md,.markdown,.mdown,.mkd,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/markdown,text/plain'
 const readerFileInput = ref<HTMLInputElement | null>(null)
 const isDraggingReader = ref(false)
 
@@ -678,31 +634,6 @@ const startReading = () => {
   readerFileStore.setFile(selectedReaderFile.value)
   readerFileStore.setReturnNavigation('workspace')
   router.push({ name: 'reader-open', query: { returnTo: 'workspace' } })
-}
-
-const startCoReading = async () => {
-  const file = selectedReaderFile.value
-  if (!file) return
-  if (!detectCoReadFormat(file.name)) {
-    ElMessage.warning(t('coRead.unsupportedFormat'))
-    return
-  }
-  if (!isLoggedIn()) {
-    emit('co-read-login')
-    return
-  }
-  coReadStarting.value = true
-  try {
-    coReadingStore.resetSession()
-    const parsed = await parseCoReadFile(file)
-    coReadFileStore.setParsed(file, parsed.chapters, parsed.fileHash, parsed.format)
-    coReadFileStore.setReturnTo('landing')
-    await router.push({ name: 'co-reading' })
-  } catch {
-    ElMessage.error(t('coRead.parseFailed'))
-  } finally {
-    coReadStarting.value = false
-  }
 }
 
 const selectQuickExample = (example: { id: string; prompt: string }) => {

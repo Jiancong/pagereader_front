@@ -77,8 +77,7 @@ const routes = [
   {
     path: "/co-reading",
     name: "co-reading",
-    component: () => import("./views/CoReadingView.vue"),
-    meta: { requiresAuth: true },
+    redirect: { name: "reader" },
   },
   {
     path: "/debug-ppt",

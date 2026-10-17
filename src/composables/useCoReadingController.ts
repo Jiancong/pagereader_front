@@ -6,7 +6,7 @@ import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
 import { useRouter } from "vue-router"
 import * as coReadingApi from "@/api/coReading"
-import { chapterApiNumber, parseCoReadFile, wireChapterToStoreIndex } from "@/utils/coReadChapter"
+import { chapterApiNumber, parseCoReadFile, sha256HexFile, wireChapterToStoreIndex } from "@/utils/coReadChapter"
 import { ApiError } from "@/api/client"
 import { useCoReadingStore } from "@/stores/coReading"
 import { useCoReadFileStore } from "@/stores/coReadFile"
@@ -78,7 +78,7 @@ let lastProgressSentAt = 0
     if (!store.sessionId) return
     if (store.chapterTextUploaded[chapterIndex]) return
     const ch = store.getCachedChapter(chapterIndex)
-    if (!ch) return
+    if (!ch?.paragraphs.length) return
     const n = chapterApiNumber(chapterIndex)
     await coReadingApi.uploadChapterText(store.sessionId, n, ch.paragraphs)
     store.chapterTextUploaded[chapterIndex] = true
@@ -261,6 +261,39 @@ let lastProgressSentAt = 0
     } finally {
       creatingSession.value = false
     }
+  }
+
+  let pageCoReadFileKey = ""
+
+  /** 整本书当作一章，批注按阅读器页码走 /page + /open，不跳章、不换阅读器 */
+  async function startPageCoRead(file: File, format: string) {
+    const key = `${file.name}:${file.size}:${file.lastModified}`
+    if (store.sessionId && pageCoReadFileKey === key) {
+      store.phase = "reading"
+      store.currentChapterIndex = 0
+      return
+    }
+    const fileHash = await sha256HexFile(file)
+    const { sessionId } = await coReadingApi.createSession({
+      fileHash,
+      fileName: file.name,
+      format: format || "epub",
+      chapters: [{ index: 0, title: file.name, charCount: Math.max(1, file.size) }],
+      startChapter: 1,
+    })
+    store.resetSession()
+    store.fileName = file.name
+    store.chapters = [{ index: 0, title: file.name, paragraphs: [], charCount: file.size }]
+    store.setSessionCreated(sessionId, 0)
+    store.phase = "reading"
+    pageCoReadFileKey = key
+  }
+
+  function stopPageCoRead() {
+    openAbort?.abort()
+    streamAbort?.abort()
+    store.openingChapter = false
+    store.phase = "idle"
   }
 
   function onDraft(annotationId: string, text: string) {
@@ -489,6 +522,8 @@ let lastProgressSentAt = 0
     onStartSession,
     onDraft,
     reportReaderPage,
+    startPageCoRead,
+    stopPageCoRead,
     onSendReplies,
     onChatSend,
     onNextChapter,

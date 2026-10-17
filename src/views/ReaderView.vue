@@ -19,7 +19,6 @@
         </button>
         <div class="reader-view__title-block">
           <div class="reader-view__title" :title="headerTitle">{{ headerTitle }}</div>
-          <p v-if="coReadMode && coReadChapterLabel" class="reader-view__subtitle">{{ coReadChapterLabel }}</p>
         </div>
       </div>
 
@@ -99,13 +98,17 @@
         </button>
 
         <button
-          v-if="coReadMode && hasSource"
+          v-if="canToggleCoRead"
           type="button"
-          class="rv-btn rv-btn--sm"
-          :title="t('coRead.chapterNav')"
-          @click="coReadNavOpen = true"
+          class="rv-btn rv-btn--sm rv-btn--co-read"
+          :class="{ 'rv-btn--co-read--on': coReadMode }"
+          :disabled="coReadBusy"
+          :title="t('reader.coReadToggleHint')"
+          @click="onTogglePageCoRead"
         >
-          <List class="h-4 w-4" />
+          <Loader2 v-if="coReadBusy" class="h-4 w-4 animate-spin" />
+          <BookHeart v-else class="h-4 w-4" />
+          <span class="rv-btn--co-read-label">{{ t('reader.modeCoRead') }}</span>
         </button>
 
         <button
@@ -158,11 +161,9 @@
       <EpubReader
         v-else-if="isEpub && file"
         ref="epubReaderRef"
-        :key="coReadMode ? `co-read-${coReadChapterKey}` : 'epub-default'"
         :file="file"
         :scale="scale"
         :color-theme="theme"
-        :initial-spine-index="coReadMode ? coReadSpineIndex : undefined"
         :co-read-inline="coReadInlinePayload"
         @page-change="onPageChange"
         @page-count="onPageCount"
@@ -285,13 +286,6 @@
     </footer>
 
     <template v-if="coReadMode && hasSource">
-      <CoReadChapterNav
-        :open="coReadNavOpen"
-        :chapters="coReadStore.chapters"
-        :current-index="coReadStore.currentChapterIndex"
-        @close="coReadNavOpen = false"
-        @select="onCoReadSelectChapter"
-      />
       <div v-if="coReadStore.phase === 'reading' || coReadStore.phase === 'discussing'" class="reader-view__co-read-tray">
         <CoReadReplyTray
           v-if="coReadStore.phase === 'reading' && coReadChapterOpenDone"
@@ -305,11 +299,6 @@
           :chat-loading="coReadChatLoading"
           @send="onCoReadChatSend"
         />
-        <div v-if="coReadStore.phase === 'discussing'" class="reader-view__co-read-next">
-          <button type="button" class="rv-btn rv-btn--primary w-full justify-center" @click="onCoReadNextChapter">
-            {{ coReadStore.isLastChapter ? t('coRead.finishBook') : t('coRead.nextChapter') }}
-          </button>
-        </div>
       </div>
     </template>
 
@@ -320,12 +309,11 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, List } from 'lucide-vue-next'
-import CoReadChapterNav from '@/components/coReading/CoReadChapterNav.vue'
+import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, BookHeart } from 'lucide-vue-next'
 import CoReadAnnotationStrip from '@/components/coReading/CoReadAnnotationStrip.vue'
 import CoReadReplyTray from '@/components/coReading/CoReadReplyTray.vue'
 import CoReadChatPanel from '@/components/coReading/CoReadChatPanel.vue'
-import { useCoReadingController, syncCoReadFileToReaderStore } from '@/composables/useCoReadingController'
+import { useCoReadingController } from '@/composables/useCoReadingController'
 import { useCoReadInlineLabels } from '@/composables/useCoReadInlineLabels'
 import { useCoReadingStore } from '@/stores/coReading'
 import { useReaderColorTheme } from '@/composables/useReaderColorTheme'
@@ -346,27 +334,25 @@ const route = useRoute()
 const { t } = useI18n()
 const store = useReaderFileStore()
 const coReadStore = useCoReadingStore()
-const coReadMode = computed(() => String(route.query.coRead || '') === '1')
-const coReadNavOpen = ref(false)
+const coReadMode = computed(() => coReadStore.phase === 'reading' && Boolean(coReadStore.sessionId))
+const coReadBusy = ref(false)
+const canToggleCoRead = computed(
+  () => hasSource.value && (isPdf.value || isEpub.value || isMobi.value || isMarkdown.value),
+)
 const {
-  coReadChapterLabel,
-  coReadSpineIndex,
   chapterAnnotations: coReadChapterAnnotations,
   replyDraftCount: coReadReplyCount,
   chapterOpenDone: coReadChapterOpenDone,
   chatLoading: coReadChatLoading,
   onDraft: onCoReadDraft,
   reportReaderPage,
+  startPageCoRead,
+  stopPageCoRead,
   onSendReplies: onCoReadSendReplies,
   onChatSend: onCoReadChatSend,
-  onNextChapter: onCoReadNextChapter,
-  onSelectChapter: onCoReadSelectChapter,
   retryCurrentPageOpen: onCoReadRetryPage,
   forceRegenerateCurrentPage: onCoReadRegeneratePage,
 } = useCoReadingController()
-const coReadChapterKey = computed(
-  () => `${coReadStore.currentChapterIndex}-${coReadSpineIndex.value ?? 0}`,
-)
 const coReadInlineLabels = useCoReadInlineLabels()
 const hasKnownReader = computed(
   () =>
@@ -461,6 +447,29 @@ function onReaderPageReady() {
   pageReadySignal.value++
   if (coReadMode.value && currentPage.value >= 1) {
     void reportVisibleCoReadPage(currentPage.value)
+  }
+}
+
+async function onTogglePageCoRead() {
+  if (coReadBusy.value) return
+  if (coReadMode.value) {
+    stopPageCoRead()
+    return
+  }
+  const current = file.value
+  if (!current) return
+  if (!isLoggedIn()) {
+    ElMessage.warning(t('reader.coReadLoginRequired'))
+    return
+  }
+  coReadBusy.value = true
+  try {
+    await startPageCoRead(current, store.format || 'epub')
+    await reportVisibleCoReadPage(currentPage.value)
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : t('coRead.sessionFailed'))
+  } finally {
+    coReadBusy.value = false
   }
 }
 
@@ -732,9 +741,6 @@ function goBack() {
 }
 
 onMounted(() => {
-  if (coReadMode.value && !store.file) {
-    syncCoReadFileToReaderStore()
-  }
   if (!store.file) {
     navigateAfterReaderClose(router, {
       query: route.query,
@@ -996,11 +1002,21 @@ onBeforeUnmount(() => {
 .rv-btn--auto-advance:hover {
   background: #1f2937;
 }
-.rv-btn--auto-advance--on {
+.rv-btn--auto-advance--on,
+.rv-btn--co-read--on {
   border-color: #6366f1;
   color: #a5b4fc;
 }
-.rv-btn--auto-advance--on:hover {
+.rv-btn--co-read {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.rv-btn--co-read-label {
+  white-space: nowrap;
+}
+.rv-btn--auto-advance--on:hover,
+.rv-btn--co-read--on:hover {
   background: #1e1b4b;
 }
 .rv-btn--auto-advance-label {
