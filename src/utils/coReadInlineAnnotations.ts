@@ -305,7 +305,7 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
   box-shadow:0 12px 40px rgba(0,0,0,.35);word-wrap:break-word;overflow-wrap:anywhere;
   visibility:hidden;opacity:0;pointer-events:none;transition:opacity .15s ease,visibility .15s;z-index:3
 }
-.co-read-host:hover .co-read-pop,.co-read-host:focus-within .co-read-pop,.co-read-pop:hover{visibility:visible;opacity:1;pointer-events:auto}
+.co-read-host:hover > .co-read-pop,.co-read-host:focus-within > .co-read-pop,.co-read-pop:hover{visibility:visible;opacity:1;pointer-events:auto}
 .co-read-pop--below{transform:translateY(10px)}
 .co-read-pop__head{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${accent};margin:0 0 8px}
 .co-read-pop__quote{margin:0 0 8px;padding-left:10px;border-left:3px solid ${accent};font-size:12px;font-style:italic;color:${muted};word-wrap:break-word;overflow-wrap:anywhere}
@@ -575,7 +575,6 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
   const hostDoc = opts.host.ownerDocument
   if (!hostDoc) return
   ensureOverlayStyles(hostDoc, !!opts.dark)
-  opts.host.classList.add("co-read-host")
 
   let root = opts.host.querySelector(":scope > .co-read-ovl-root") as HTMLElement | null
   if (!root) {
