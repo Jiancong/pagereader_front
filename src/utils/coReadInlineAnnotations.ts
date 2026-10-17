@@ -263,9 +263,12 @@ export interface CoReadOverlayOptions extends CommonOptions {
 }
 
 function ensureOverlayStyles(doc: Document, dark: boolean) {
-  if (doc.getElementById(OVL_STYLE_ID)) return
-  const style = doc.createElement("style")
-  style.id = OVL_STYLE_ID
+  let style = doc.getElementById(OVL_STYLE_ID) as HTMLStyleElement | null
+  const existed = !!style
+  if (!style) {
+    style = doc.createElement("style")
+    style.id = OVL_STYLE_ID
+  }
   const popBg = dark ? "rgba(15, 23, 42, 0.92)" : "rgba(255, 255, 255, 0.95)"
   const popBorder = dark ? "rgba(147, 197, 253, 0.45)" : "rgba(147, 197, 253, 0.9)"
   const text = dark ? "#e5e7eb" : "#1f2937"
@@ -292,6 +295,7 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
 }
 .co-read-marker svg{width:13px;height:13px;display:block;fill:currentColor}
 .co-read-marker:hover{transform:scale(1.15);z-index:2}
+.co-read-hl{position:absolute;pointer-events:none;border-radius:2px;background:${dark ? "rgba(147,197,253,.28)" : "rgba(37,99,235,.18)"}}
 @keyframes co-read-marker-pulse{0%,100%{box-shadow:0 0 0 2px rgba(255,255,255,.3),0 2px 10px rgba(37,99,235,.45)}50%{box-shadow:0 0 0 5px rgba(96,165,250,.4),0 2px 14px rgba(37,99,235,.6)}}
 .co-read-pop{
   position:absolute;width:min(320px,calc(100% - 16px));max-height:min(380px,60%);overflow:auto;
@@ -311,7 +315,7 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
 .co-read-pop__reply:disabled{opacity:.55}
 .co-read-pop__sent{font-size:11px;color:#9ca3af;margin:4px 0 0}
 `
-  doc.head.appendChild(style)
+  if (!existed) doc.head.appendChild(style)
 }
 
 function rawOffsetsToRange(doc: Document, el: HTMLElement, start: number, end: number): Range | null {
@@ -488,6 +492,69 @@ function pinFromRange(range: Range, host: HTMLElement): PinPoint | null {
   return null
 }
 
+const MARKER_SIZE = 22
+
+/** quote 右缘同一行是否还有后续文字（有则行内 icon 会挡住它） */
+function textFollowsOnSameLine(quoteRange: Range): boolean {
+  const doc = quoteRange.endContainer.ownerDocument
+  if (!doc?.body) return false
+  const qRects = quoteRange.getClientRects()
+  let q: DOMRect | null = null
+  for (let i = qRects.length - 1; i >= 0; i--) {
+    const r = qRects[i]
+    if (r.width > 0 && r.height > 0) {
+      q = r
+      break
+    }
+  }
+  if (!q) return false
+  const rest = doc.createRange()
+  try {
+    rest.setStart(quoteRange.endContainer, quoteRange.endOffset)
+    rest.setEnd(doc.body, doc.body.childNodes.length)
+  } catch {
+    return false
+  }
+  const mid = (q.top + q.bottom) / 2
+  const rects = rest.getClientRects()
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i]
+    if (r.width < 8 || r.height < 2) continue
+    if (r.left < q.right - 1) continue
+    if (mid >= r.top && mid <= r.bottom) return true
+  }
+  return false
+}
+
+/** 正文右内边距里的 icon 左缘；页边放不下时返回 null */
+function gutterIconLeft(body: HTMLElement, host: HTMLElement): number | null {
+  const doc = body.ownerDocument
+  if (!doc) return null
+  const padR = parseFloat(doc.defaultView?.getComputedStyle(body).paddingRight || "0") || 0
+  if (padR < MARKER_SIZE + 6) return null
+  const map = frameMap(doc, host)
+  const br = body.getBoundingClientRect()
+  return map.originX + (br.right - padR + 4) * map.scaleX
+}
+
+function appendQuoteHighlight(root: HTMLElement, hostDoc: Document, range: Range, host: HTMLElement) {
+  const doc = range.startContainer.ownerDocument
+  if (!doc) return
+  const map = frameMap(doc, host)
+  const rects = range.getClientRects()
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i]
+    if (r.width < 1 || r.height < 1 || !rectInFrameView(r, map)) continue
+    const hl = hostDoc.createElement("div")
+    hl.className = "co-read-hl"
+    hl.style.left = `${map.originX + r.left * map.scaleX}px`
+    hl.style.top = `${map.originY + r.top * map.scaleY}px`
+    hl.style.width = `${Math.max(1, r.width * map.scaleX)}px`
+    hl.style.height = `${Math.max(1, r.height * map.scaleY)}px`
+    root.appendChild(hl)
+  }
+}
+
 function pinFromElementEnd(el: HTMLElement, host: HTMLElement): PinPoint {
   const doc = el.ownerDocument
   if (doc) {
@@ -528,6 +595,7 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
   const hostW = opts.host.clientWidth || hostRect.width
   const hostH = opts.host.clientHeight || hostRect.height
   const anchors = collectParagraphAnchors(opts.body)
+  const gutterSlots: number[] = []
 
   for (const ann of opts.annotations) {
     const host = hostDoc.createElement("span")
@@ -542,8 +610,25 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
       pin = pinFromElementEnd(para, opts.host)
     }
     const lineH = pin.lineH
-    const mx = Math.max(4, Math.min(pin.x, hostW - 26))
-    const my = Math.max(2, pin.y)
+    let mx = Math.max(4, Math.min(pin.x, hostW - MARKER_SIZE - 4))
+    let my = Math.max(2, pin.y + Math.round(lineH / 2) - MARKER_SIZE / 2)
+    if (range && textFollowsOnSameLine(range)) {
+      const gx = gutterIconLeft(opts.body, opts.host)
+      if (gx != null) {
+        appendQuoteHighlight(root, hostDoc, range, opts.host)
+        mx = Math.max(4, Math.min(gx, hostW - MARKER_SIZE - 4))
+        let gy = my
+        for (let n = 0; n < 6; n++) {
+          if (!gutterSlots.some((s) => Math.abs(s - gy) < MARKER_SIZE - 2)) break
+          gy = Math.max(2, gy - MARKER_SIZE - 2)
+        }
+        gutterSlots.push(gy)
+        my = gy
+      } else {
+        mx = Math.max(4, Math.min(pin.x - MARKER_SIZE / 2, hostW - MARKER_SIZE - 4))
+        my = Math.max(2, pin.y - MARKER_SIZE + 4)
+      }
+    }
 
     const btn = hostDoc.createElement("button")
     btn.type = "button"
@@ -553,7 +638,7 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     btn.setAttribute("aria-label", btn.title)
     btn.innerHTML = markerSvg()
     btn.style.left = `${mx}px`
-    btn.style.top = `${Math.max(2, my + Math.round(lineH / 2) - 11)}px`
+    btn.style.top = `${my}px`
     btn.addEventListener("click", stopEvent)
     btn.addEventListener("mousedown", stopEvent)
     host.appendChild(btn)
@@ -561,10 +646,10 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     const pop = buildPopoverContent(hostDoc, ann, opts.labels, opts.onDraft)
     const popLeft = Math.max(4, Math.min(mx - 40, hostW - 324))
     if (my > hostH * 0.55) {
-      pop.style.bottom = `${Math.max(8, hostH - my + 12)}px`
+      pop.style.bottom = `${Math.max(8, hostH - (my + MARKER_SIZE) + 8)}px`
     } else {
       pop.classList.add("co-read-pop--below")
-      pop.style.top = `${my + lineH + 12}px`
+      pop.style.top = `${my + MARKER_SIZE + 8}px`
     }
     pop.style.left = `${popLeft}px`
     host.appendChild(pop)
