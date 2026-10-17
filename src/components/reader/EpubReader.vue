@@ -5,9 +5,11 @@
         class="epub-reader__zoom"
         :style="epubZoomStyle"
       >
-        <div ref="viewerRef" class="epub-reader__viewer"></div>
+        <div class="epub-reader__viewer-shell">
+          <div ref="viewerRef" class="epub-reader__viewer"></div>
+          <div v-if="coReadInline" ref="overlayRef" class="epub-reader__co-read-overlay"></div>
+        </div>
       </div>
-      <div v-if="coReadInline" ref="overlayRef" class="epub-reader__co-read-overlay"></div>
       <div v-if="loading" class="epub-reader__overlay">{{ t('reader.loading') }}</div>
       <div v-else-if="loadError" class="epub-reader__overlay epub-reader__overlay--error">
         {{ loadError }}
@@ -300,7 +302,9 @@ onMounted(async () => {
       if (doc) {
         currentViewDoc = doc
         attachToDoc(doc)
-        applyCoReadInline()
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => applyCoReadInline())
+        })
       }
 
       if (book && book.locations.length() === 0) {
@@ -334,6 +338,7 @@ onMounted(async () => {
         renderedWidth = width
         renderedHeight = height
         rendition.resize(width, height)
+        requestAnimationFrame(() => applyCoReadInline())
       }
     })
     resizeObserver.observe(viewerRef.value!)
@@ -432,12 +437,20 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
     transform-origin: top center;
   }
 }
+.epub-reader__viewer-shell {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: 900px;
+  display: flex;
+}
 .epub-reader__viewer {
   flex: 1;
   width: 100%;
   height: 100%;
   min-height: 0;
-  max-width: 900px;
   background: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }

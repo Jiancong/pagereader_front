@@ -11,12 +11,22 @@ const OVL_STYLE_ID = "co-read-ovl-styles"
 const INLINE_ATTR = "data-co-read-inline-root"
 
 export function collectParagraphAnchors(body: HTMLElement): HTMLElement[] {
-  const nodes = body.querySelectorAll("p, li, blockquote, h1, h2, h3, h4, h5, h6, pre")
   const blocks: HTMLElement[] = []
-  nodes.forEach((el) => {
-    const text = (el.textContent || "").trim()
-    if (text) blocks.push(el as HTMLElement)
+  const seen = new Set<HTMLElement>()
+  const push = (el: HTMLElement) => {
+    if (seen.has(el)) return
+    if (!(el.textContent || "").trim()) return
+    seen.add(el)
+    blocks.push(el)
+  }
+  body.querySelectorAll("p, li, blockquote, h1, h2, h3, h4, h5, h6, pre").forEach((el) => {
+    push(el as HTMLElement)
   })
+  if (blocks.length === 0) {
+    for (const el of Array.from(body.children)) {
+      if (el instanceof HTMLElement) push(el)
+    }
+  }
   if (blocks.length === 0 && (body.textContent || "").trim()) {
     blocks.push(body)
   }
@@ -65,26 +75,77 @@ function escapeRegExp(s: string): string {
 function quoteWords(quote: string): string[] {
   return quote
     .replace(/\u00a0/g, " ")
+    .replace(/[\u2018\u2019\u201c\u201d]/g, "'")
     .trim()
     .split(/\s+/)
+    .map((w) => w.replace(/^[^\w]+|[^\w]+$/g, ""))
     .filter(Boolean)
 }
 
-/** quote 可能被后端截断；用前若干词做空白容错匹配，返回 [start, end)（失败 null） */
-function findQuoteMatchRange(rawText: string, quote: string): [number, number] | null {
+/** EPUB 内文：去软连字符、折叠空白，并保留 norm 下标 → raw 下标映射 */
+function buildNormIndexMap(raw: string): { norm: string; normToRaw: number[] } {
+  const normToRaw: number[] = []
+  let norm = ""
+  let inWs = false
+  for (let ri = 0; ri < raw.length; ri++) {
+    const ch = raw[ri]
+    if (ch === "\u00ad") continue
+    let c = ch === "\u00a0" ? " " : ch
+    if (/\s/.test(c)) {
+      if (!inWs && norm.length > 0) {
+        norm += " "
+        normToRaw.push(ri)
+        inWs = true
+      }
+    } else {
+      inWs = false
+      norm += c.toLowerCase()
+      normToRaw.push(ri)
+    }
+  }
+  return { norm, normToRaw }
+}
+
+/** quote 可能被后端截断；在 norm 串上匹配，返回 raw [start, end) */
+function findQuoteMatchRangeRaw(rawText: string, quote: string): [number, number] | null {
+  const { norm, normToRaw } = buildNormIndexMap(rawText)
+  if (!norm || !normToRaw.length) return null
   const words = quoteWords(quote)
   if (!words.length) return null
-  for (let n = words.length; n >= 2; n--) {
-    const part = words.slice(0, n).map(escapeRegExp).join("\\s+")
-    const m = rawText.match(new RegExp(part, "i"))
-    if (m && m.index !== undefined) return [m.index, m.index + m[0].length]
+
+  const tryNormSpan = (normStart: number, normEnd: number): [number, number] | null => {
+    if (normStart < 0 || normEnd <= normStart || normEnd > norm.length) return null
+    const rawStart = normToRaw[normStart]
+    const rawEnd = normToRaw[normEnd - 1]
+    if (rawStart === undefined || rawEnd === undefined) return null
+    return [rawStart, rawEnd + 1]
   }
-  const single = words[0]
+
+  for (let n = words.length; n >= 2; n--) {
+    const part = words
+      .slice(0, n)
+      .map((w) => escapeRegExp(w.toLowerCase()))
+      .join("\\s+")
+    const m = norm.match(new RegExp(part))
+    if (m && m.index !== undefined) {
+      const span = tryNormSpan(m.index, m.index + m[0].length)
+      if (span) return span
+    }
+  }
+  const single = words[0].toLowerCase()
   if (single.length >= 4) {
-    const m = rawText.match(new RegExp(escapeRegExp(single), "i"))
-    if (m && m.index !== undefined) return [m.index, m.index + m[0].length]
+    const m = norm.match(new RegExp(escapeRegExp(single)))
+    if (m && m.index !== undefined) {
+      const span = tryNormSpan(m.index, m.index + m[0].length)
+      if (span) return span
+    }
   }
   return null
+}
+
+/** @deprecated inline 模式仍用简单匹配 */
+function findQuoteMatchRange(rawText: string, quote: string): [number, number] | null {
+  return findQuoteMatchRangeRaw(rawText, quote)
 }
 
 function kindLabel(labels: CoReadInlineLabels, kind: string): string {
@@ -253,11 +314,8 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
   doc.head.appendChild(style)
 }
 
-/** 在 body 中只读定位 quote 的 Range（不改 DOM） */
-function quoteRangeIn(body: HTMLElement, quote: string): Range | null {
-  const doc = body.ownerDocument
-  if (!doc) return null
-  const walker = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT)
+function rawOffsetsToRange(doc: Document, el: HTMLElement, start: number, end: number): Range | null {
+  const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT)
   const nodes: { node: Text; start: number; end: number }[] = []
   let acc = 0
   while (walker.nextNode()) {
@@ -266,22 +324,99 @@ function quoteRangeIn(body: HTMLElement, quote: string): Range | null {
     nodes.push({ node, start: acc, end: acc + len })
     acc += len
   }
-  const full = nodes.map((n) => n.node.textContent || "").join("")
-  const range = findQuoteMatchRange(full, quote)
-  if (!range) return null
   const at = (offset: number) => {
     for (const n of nodes) {
       if (offset >= n.start && offset <= n.end) return { node: n.node, offset: offset - n.start }
     }
+    if (nodes.length && offset === acc) {
+      const last = nodes[nodes.length - 1]
+      return { node: last.node, offset: (last.node.textContent || "").length }
+    }
     return null
   }
-  const s = at(range[0])
-  const e = at(range[1])
+  const s = at(start)
+  const e = at(end)
   if (!s || !e) return null
   const r = doc.createRange()
-  r.setStart(s.node, s.offset)
-  r.setEnd(e.node, e.offset)
-  return r
+  try {
+    r.setStart(s.node, s.offset)
+    r.setEnd(e.node, e.offset)
+    return r
+  } catch {
+    return null
+  }
+}
+
+function quoteRangeInElement(el: HTMLElement, quote: string): Range | null {
+  const doc = el.ownerDocument
+  if (!doc) return null
+  const raw = el.textContent || ""
+  const span = findQuoteMatchRangeRaw(raw, quote)
+  if (!span) return null
+  return rawOffsetsToRange(doc, el, span[0], span[1])
+}
+
+/** 优先 paragraph_index 段落，再扫全页（只读，不改 DOM） */
+function quoteRangeForAnnotation(body: HTMLElement, ann: CoReadAnnotation): Range | null {
+  const quote = ann.anchor.quote?.trim()
+  if (!quote) return null
+  const anchors = collectParagraphAnchors(body)
+  const idx = Math.max(0, ann.anchor.paragraphIndex)
+  const tryList: HTMLElement[] = []
+  if (anchors[idx]) tryList.push(anchors[idx])
+  for (let i = 0; i < anchors.length; i++) {
+    if (i !== idx) tryList.push(anchors[i])
+  }
+  if (!anchors.length) tryList.push(body)
+  for (const el of tryList) {
+    const r = quoteRangeInElement(el, quote)
+    if (r) return r
+  }
+  return null
+}
+
+interface PinPoint {
+  x: number
+  y: number
+  lineH: number
+}
+
+function hostOffset(host: HTMLElement) {
+  const hr = host.getBoundingClientRect()
+  return { left: hr.left, top: hr.top, width: hr.width, height: hr.height }
+}
+
+/** quote 末尾：取最后一行 client rect 的右缘，避免整段 union box 导致 Y 偏移 */
+function pinFromRange(range: Range, host: HTMLElement): PinPoint | null {
+  const { left: hl, top: ht } = hostOffset(host)
+  const rects = range.getClientRects()
+  for (let i = rects.length - 1; i >= 0; i--) {
+    const r = rects[i]
+    if (r.width > 0 || r.height > 0) {
+      const lineH = Math.max(14, r.height)
+      return { x: r.right - hl, y: r.top - ht, lineH }
+    }
+  }
+  const union = range.getBoundingClientRect()
+  if (union.width > 0 || union.height > 0) {
+    const lineH = Math.max(14, union.height)
+    return { x: union.right - hl, y: union.top - ht, lineH }
+  }
+  return null
+}
+
+function pinFromElementEnd(el: HTMLElement, host: HTMLElement): PinPoint {
+  const doc = el.ownerDocument
+  if (doc) {
+    const r = doc.createRange()
+    r.selectNodeContents(el)
+    const pin = pinFromRange(r, host)
+    if (pin) return pin
+  }
+  const { left: hl, top: ht } = hostOffset(host)
+  const pr = el.getBoundingClientRect()
+  const lineH = Math.max(14, pr.height)
+  return { x: pr.right - hl, y: pr.top - ht, lineH }
 }
 
 export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
@@ -304,44 +439,26 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     root.appendChild(status)
   }
 
-  const bodyWin = opts.body.ownerDocument.defaultView
-  const frame = (bodyWin?.frameElement as HTMLElement | null) ?? null
   const hostRect = opts.host.getBoundingClientRect()
-  let baseX = 0
-  let baseY = 0
-  if (frame) {
-    const fr = frame.getBoundingClientRect()
-    baseX = fr.left - hostRect.left + (bodyWin?.scrollX || 0)
-    baseY = fr.top - hostRect.top + (bodyWin?.scrollY || 0)
-  } else {
-    const br = opts.body.getBoundingClientRect()
-    baseX = br.left - hostRect.left
-    baseY = br.top - hostRect.top
-  }
   const hostW = hostRect.width
   const hostH = hostRect.height
+  const anchors = collectParagraphAnchors(opts.body)
 
   for (const ann of opts.annotations) {
     const host = hostDoc.createElement("span")
     host.className = "co-read-host"
     host.setAttribute(INLINE_ATTR, ann.id)
 
-    const quote = ann.anchor.quote?.trim() || ""
-    const range = quote ? quoteRangeIn(opts.body, quote) : null
-    let mx: number
-    let my: number
-    let lineH = 18
-    if (range) {
-      const rect = range.getBoundingClientRect()
-      mx = baseX + rect.right
-      my = baseY + rect.top
-      lineH = Math.max(14, rect.height)
-    } else {
-      mx = hostW / 2
-      my = baseY + 8
+    const range = quoteRangeForAnnotation(opts.body, ann)
+    let pin: PinPoint | null = range ? pinFromRange(range, opts.host) : null
+    if (!pin) {
+      const idx = Math.max(0, ann.anchor.paragraphIndex)
+      const para = anchors[Math.min(idx, anchors.length - 1)] ?? opts.body
+      pin = pinFromElementEnd(para, opts.host)
     }
-    mx = Math.max(4, Math.min(mx, hostW - 26))
-    my = Math.max(2, my)
+    const lineH = pin.lineH
+    const mx = Math.max(4, Math.min(pin.x, hostW - 26))
+    const my = Math.max(2, pin.y)
 
     const btn = hostDoc.createElement("button")
     btn.type = "button"
