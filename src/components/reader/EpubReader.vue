@@ -303,7 +303,6 @@ function repairPaginatedColumns(view: any) {
   if (flow && flow !== 'paginated') return
 
   const columnWidth = Number(layout.columnWidth) || Number(layout.width) || 0
-  const gap = Number(layout.gap) || 0
   if (!columnWidth) return
 
   const origin = doc.body.getBoundingClientRect().left
@@ -312,19 +311,29 @@ function repairPaginatedColumns(view: any) {
   const rects = range.getClientRects()
   const lefts: number[] = []
   let maxRight = 0
+  const minJump = columnWidth * 0.55
   for (let i = 0; i < rects.length; i++) {
     const r = rects[i]
-    if (r.width < 1 || r.height < 1) continue
+    if (r.width < 8 || r.height < 8) continue
     const left = r.left - origin
     if (r.right - origin > maxRight) maxRight = r.right - origin
-    if (!lefts.some((x) => Math.abs(x - left) < 12)) lefts.push(left)
+    lefts.push(left)
   }
   lefts.sort((a, b) => a - b)
-  const measuredStride = lefts.length >= 2 ? lefts[1] - lefts[0] : 0
-  const stride = Math.round(measuredStride >= columnWidth * 0.5 ? measuredStride : columnWidth + gap)
+  const columnStarts: number[] = []
+  for (const x of lefts) {
+    if (!columnStarts.length || x - columnStarts[columnStarts.length - 1] >= minJump) {
+      columnStarts.push(x)
+    }
+  }
+  const diffs: number[] = []
+  for (let i = 1; i < columnStarts.length; i++) diffs.push(columnStarts[i] - columnStarts[i - 1])
+  diffs.sort((a, b) => a - b)
+  // 栏距是相邻栏起点之差。不要再加 column-gap：epubjs 的 gap 已经算进栏宽，多加会把视口停在两栏中间。
+  const stride = Math.round(diffs.length ? diffs[Math.floor(diffs.length / 2)] : columnWidth)
   const scrollW = Math.max(doc.body.scrollWidth || 0, doc.documentElement?.scrollWidth || 0)
   const contentWidth = Math.max(maxRight, scrollW)
-  if (stride < 1 || contentWidth <= stride + 8) return
+  if (stride < columnWidth * 0.5 || contentWidth <= stride + 8) return
 
   layout.delta = stride
   layout.pageWidth = stride
@@ -337,6 +346,13 @@ function repairPaginatedColumns(view: any) {
   contents.textWidth = () => target
   if (Math.abs((view._width || 0) - target) > 2) {
     view.reframe(target, view._height || layout.height)
+  }
+  const manager = (rendition as { manager?: { container?: HTMLElement; scrollTo?: (x: number, y: number) => void } } | null)
+    ?.manager
+  const scrollLeft = manager?.container?.scrollLeft || 0
+  const snapped = Math.round(scrollLeft / stride) * stride
+  if (manager?.scrollTo && Math.abs(snapped - scrollLeft) > 1) {
+    manager.scrollTo(snapped, 0)
   }
 }
 
