@@ -108,7 +108,87 @@ function currentScale() {
   return typeof s === 'number' && s > 0 ? s : 1
 }
 
+/** epubjs locations 默认每 200 字一格，一屏会跨好多格，页码就会从 7 跳到 14。这里改按可见页计数。 */
+const sectionPageTotals = new Map<number, number>()
+const locationCounts = new Map<number, number>()
+let locationCountsReady = false
+let pendingSectionPage = 0
+
+function ensureLocationCounts() {
+  if (locationCountsReady || !book || book.locations.length() === 0) return
+  const list = (book.locations as { _locations?: string[] })._locations
+  if (!list?.length) return
+  locationCounts.clear()
+  for (const cfi of list) {
+    const m = String(cfi).match(/\/6\/(\d+)/)
+    if (!m) continue
+    const spineIndex = Number(m[1]) / 2 - 1
+    if (spineIndex < 0) continue
+    locationCounts.set(spineIndex, (locationCounts.get(spineIndex) || 0) + 1)
+  }
+  locationCountsReady = true
+}
+
+function pagesInSpine(index: number, locationsPerPage: number): number {
+  const measured = sectionPageTotals.get(index)
+  if (measured && measured > 0) return measured
+  const locs = locationCounts.get(index) || 0
+  if (locs <= 0) return 1
+  if (!(locationsPerPage > 0)) return 1
+  return Math.max(1, Math.round(locs / locationsPerPage))
+}
+
+function locationsPerVisiblePage(spineIndex: number, sectionTotal: number): number {
+  ensureLocationCounts()
+  const locs = locationCounts.get(spineIndex) || 0
+  if (sectionTotal > 0 && locs > 0) return locs / sectionTotal
+  for (const [idx, total] of sectionPageTotals) {
+    const n = locationCounts.get(idx) || 0
+    if (total > 0 && n > 0) return n / total
+  }
+  return 0
+}
+
+function bookVisualPages(spineIndex: number, pageInSection: number, sectionTotal: number) {
+  const perPage = locationsPerVisiblePage(spineIndex, sectionTotal)
+  const spineLen = (book?.spine as { length?: number } | undefined)?.length || spineIndex + 1
+  let before = 0
+  let total = 0
+  for (let i = 0; i < spineLen; i++) {
+    const count = i === spineIndex ? sectionTotal : pagesInSpine(i, perPage)
+    if (i < spineIndex) before += count
+    total += count
+  }
+  return { page: before + pageInSection, total: Math.max(total, before + pageInSection) }
+}
+
+function locateVisualPage(page: number): { spineIndex: number; pageInSection: number } | null {
+  if (!book?.spine?.length) return null
+  const perPage = locationsPerVisiblePage(0, sectionPageTotals.get(0) || 0)
+  const spineLen = (book.spine as { length?: number }).length || 0
+  let cursor = 0
+  for (let i = 0; i < spineLen; i++) {
+    const count = pagesInSpine(i, perPage)
+    if (page <= cursor + count) {
+      return { spineIndex: i, pageInSection: Math.max(1, page - cursor) }
+    }
+    cursor += count
+  }
+  return null
+}
+
 function updatePageInfo(location: any) {
+  const spineIndex = location?.start?.index
+  const displayed = location?.start?.displayed
+  if (book && typeof spineIndex === 'number' && displayed?.total > 0 && displayed?.page > 0) {
+    sectionPageTotals.set(spineIndex, displayed.total)
+    const visual = bookVisualPages(spineIndex, displayed.page, displayed.total)
+    currentPage.value = visual.page
+    pageTotal.value = visual.total
+    emit('page-change', visual.page)
+    emit('page-count', visual.total)
+    return
+  }
   if (!book || book.locations.length() === 0 || !location?.start?.cfi) return
   const loc = Number(book.locations.locationFromCfi(location.start.cfi))
   if (!Number.isFinite(loc) || loc < 0) return
@@ -361,6 +441,13 @@ onMounted(async () => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             repairPaginatedColumns(view)
+            if (pendingSectionPage > 1) {
+              const pageWidth = view?.layout?.pageWidth || view?.layout?.delta
+              const manager = (rendition as { manager?: { scrollTo?: (x: number, y: number) => void } } | null)?.manager
+              if (pageWidth && manager?.scrollTo) manager.scrollTo((pendingSectionPage - 1) * pageWidth, 0)
+              pendingSectionPage = 0
+            }
+            ;(rendition as { reportLocation?: () => void } | null)?.reportLocation?.()
             applyCoReadInline()
           })
         })
@@ -441,9 +528,25 @@ function prev() {
 }
 function goToPage(page: number) {
   if (!book || !rendition || !pageTotal.value) return
-  const target = Math.min(Math.max(Math.trunc(page), 1), pageTotal.value) - 1
-  const cfi = book.locations.cfiFromLocation(target)
-  if (cfi) rendition.display(cfi)
+  const target = Math.min(Math.max(Math.trunc(page), 1), pageTotal.value)
+  const pos = locateVisualPage(target)
+  if (!pos) {
+    const cfi = book.locations.cfiFromLocation(target - 1)
+    if (cfi) rendition.display(cfi)
+    return
+  }
+  const current = rendition.currentLocation() as { start?: { index?: number } } | undefined
+  const manager = (rendition as { manager?: { layout?: { pageWidth?: number; delta?: number }; scrollTo?: (x: number, y: number) => void }; reportLocation?: () => void })
+  if (current?.start?.index === pos.spineIndex) {
+    const pageWidth = manager.manager?.layout?.pageWidth || manager.manager?.layout?.delta
+    if (pageWidth && manager.manager?.scrollTo) {
+      manager.manager.scrollTo((pos.pageInSection - 1) * pageWidth, 0)
+      manager.reportLocation?.()
+    }
+    return
+  }
+  pendingSectionPage = pos.pageInSection
+  void rendition.display(pos.spineIndex)
 }
 
 function getPageText(): string {
