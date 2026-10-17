@@ -221,7 +221,7 @@ function buildStatusContent(
   const box = doc.createElement("div")
   box.className = "co-read-status"
 
-  if (status.errorCode === "generation_interrupted") {
+  if (status.errorCode === "generation_interrupted" || status.errorCode === "chapter_text_missing") {
     const msg = doc.createElement("span")
     msg.textContent = labels.generationFailed || "Failed"
     box.appendChild(msg)

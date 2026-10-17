@@ -459,6 +459,15 @@ async function getCurrentPageText(): Promise<string> {
 
 function onReaderPageReady() {
   pageReadySignal.value++
+  if (coReadMode.value && currentPage.value >= 1) {
+    void reportVisibleCoReadPage(currentPage.value)
+  }
+}
+
+async function reportVisibleCoReadPage(page: number) {
+  const text = await waitForPageTextReady()
+  if (currentPage.value !== page || !text.trim()) return
+  await reportReaderPage(page, pageCount.value, text)
 }
 
 function isReaderAtEnd(): boolean {
@@ -633,10 +642,7 @@ function onPageChange(page: number) {
   const changed = currentPage.value !== page
   currentPage.value = page
   if (coReadMode.value) {
-    void (async () => {
-      const text = await getCurrentPageText()
-      await reportReaderPage(page, pageCount.value, text)
-    })()
+    void reportVisibleCoReadPage(page)
   }
   // TTS 自动翻页时不打断
   if (ttsAutoTurning) return

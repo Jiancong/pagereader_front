@@ -12,6 +12,7 @@ import { useCoReadingStore } from "@/stores/coReading"
 import { useCoReadFileStore } from "@/stores/coReadFile"
 import { useReaderFileStore } from "@/stores/reader"
 import type { ReaderReturnTo } from "@/utils/readerReturnRoute"
+import type { CoReadAnnotationKind } from "@/types/coReading"
 
 export function syncCoReadFileToReaderStore() {
   const coReadFile = useCoReadFileStore()
@@ -34,6 +35,7 @@ export function useCoReadingController() {
   const creatingSession = ref(false)
   const chatLoading = ref(false)
   const lastReportedPage = ref(-1)
+  let lastPageReport: { page: number; pageTotal: number; text: string } | null = null
 let openAbort: AbortController | null = null
 let streamAbort: AbortController | null = null
 let lastProgressSentAt = 0
@@ -117,44 +119,93 @@ let lastProgressSentAt = 0
     store.openingChapter = true
     if (!opts?.force) store.clearPageOpenError()
     const n = chapterApiNumber(chapterIndex)
+    const callbacks = {
+      shouldAcceptPage: (pageIndex?: number) =>
+        pageIndex === undefined || expectedPage < 1 || pageIndex === expectedPage,
+      onChatIntro: (data: { delta: string }) => store.appendPageIntro(data.delta),
+      onAnnotationAnchor: (data: {
+        id: string
+        chapterIndex?: number
+        pageIndex?: number
+        anchor?: { paragraphIndex: number; quote?: string }
+        kind?: CoReadAnnotationKind
+        content?: string
+      }) => {
+        store.upsertAnnotation({
+          id: data.id,
+          chapterIndex: wireChapterToStoreIndex(data.chapterIndex, chapterIndex),
+          pageIndex: data.pageIndex,
+          anchor: data.anchor ?? { paragraphIndex: 0 },
+          kind: data.kind ?? "reaction",
+          content: data.content ?? "",
+          streaming: true,
+        })
+      },
+      onAnnotationDelta: (data: { id: string; delta: string }) =>
+        store.appendAnnotationDelta(data.id, data.delta),
+      onAnnotationDone: (data: { id: string; content?: string }) =>
+        store.finalizeAnnotation(data.id, data.content),
+      onChapterDone: (data: { annotationCount?: number }) => {
+        store.chapterOpenDone = true
+        const page = lastReportedPage.value
+        const localCount = store.annotations.filter(
+          (a) =>
+            a.chapterIndex === chapterIndex &&
+            (page < 1 || a.pageIndex === undefined || a.pageIndex === page),
+        ).length
+        const wireCount = typeof data.annotationCount === "number" ? data.annotationCount : null
+        store.pageOpenEmpty = wireCount !== null ? wireCount === 0 : localCount === 0
+      },
+    }
+    let pageTextMissing = false
     try {
       void ensureChapterTextUploaded(chapterIndex)
       await coReadingApi.openChapter(
         store.sessionId,
         n,
         {
-          shouldAcceptPage: (pageIndex) =>
-            pageIndex === undefined || expectedPage < 1 || pageIndex === expectedPage,
-          onChatIntro: (data) => store.appendPageIntro(data.delta),
-          onAnnotationAnchor: (data) => {
-            store.upsertAnnotation({
-              id: data.id,
-              chapterIndex: wireChapterToStoreIndex(data.chapterIndex, chapterIndex),
-              pageIndex: data.pageIndex,
-              anchor: data.anchor ?? { paragraphIndex: 0 },
-              kind: data.kind ?? "reaction",
-              content: data.content ?? "",
-              streaming: true,
-            })
+          ...callbacks,
+          onError: (msg, data) => {
+            const code = String((data as { code?: string })?.code ?? "")
+            if (code === "chapter_text_missing") {
+              pageTextMissing = true
+              return
+            }
+            handleOpenSseError(msg, data)
           },
-          onAnnotationDelta: (data) => store.appendAnnotationDelta(data.id, data.delta),
-          onAnnotationDone: (data) => store.finalizeAnnotation(data.id, data.content),
-          onChapterDone: (data) => {
-            store.chapterOpenDone = true
-            const page = lastReportedPage.value
-            const localCount = store.annotations.filter(
-              (a) =>
-                a.chapterIndex === chapterIndex &&
-                (page < 1 || a.pageIndex === undefined || a.pageIndex === page),
-            ).length
-            const wireCount = typeof data.annotationCount === "number" ? data.annotationCount : null
-            store.pageOpenEmpty = wireCount !== null ? wireCount === 0 : localCount === 0
-          },
-          onError: handleOpenSseError,
         },
         signal,
-        { force: opts?.force, retryOnce: true },
+        { force: opts?.force, retryOnce: false },
       )
+      if (pageTextMissing && !signal.aborted && lastPageReport?.text) {
+        await coReadingApi.reportPageRead(store.sessionId, n, {
+          pageIndex: lastPageReport.page,
+          pageTotal: lastPageReport.pageTotal,
+          text: lastPageReport.text,
+        })
+        if (signal.aborted) return
+        pageTextMissing = false
+        await coReadingApi.openChapter(
+          store.sessionId,
+          n,
+          {
+            ...callbacks,
+            onError: (msg, data) => {
+              const code = String((data as { code?: string })?.code ?? "")
+              if (code === "chapter_text_missing") {
+                pageTextMissing = true
+                return
+              }
+              handleOpenSseError(msg, data)
+            },
+          },
+          signal,
+          { force: opts?.force, retryOnce: false },
+        )
+      }
+      if (pageTextMissing) {
+        store.pageOpenError = "chapter_text_missing"
+      }
       if (!store.chapterOpenDone) store.chapterOpenDone = true
     } catch (e) {
       if (signal.aborted) return
@@ -175,6 +226,7 @@ let lastProgressSentAt = 0
     store.currentChapterIndex = chapterIndex
     store.phase = "reading"
     lastReportedPage.value = -1
+    lastPageReport = null
     store.chapterOpenDone = false
     store.clearPageOpenError()
     store.pageIntroText = ""
@@ -217,17 +269,21 @@ let lastProgressSentAt = 0
 
   async function reportReaderPage(page: number, pageTotal: number, text: string) {
     if (!store.sessionId) return
-    if (page === lastReportedPage.value) return
+    const body = text.trim().slice(0, 8000)
+    if (!body) return
+    if (page === lastReportedPage.value && lastPageReport?.text === body) return
     lastReportedPage.value = page
+    lastPageReport = { page, pageTotal, text: body }
     const chapterNumber = chapterApiNumber(store.currentChapterIndex)
     try {
       await coReadingApi.reportPageRead(store.sessionId, chapterNumber, {
         pageIndex: page,
         pageTotal,
-        text: text.slice(0, 8000),
+        text: body,
       })
     } catch (e) {
       lastReportedPage.value = -1
+      lastPageReport = null
       ElMessage.error(e instanceof ApiError ? e.message : t("coRead.pageSyncFailed"))
       return
     }
@@ -246,6 +302,16 @@ let lastProgressSentAt = 0
     }
   }
 
+  async function repostLastPage(): Promise<void> {
+    if (!store.sessionId || !lastPageReport?.text) return
+    const n = chapterApiNumber(store.currentChapterIndex)
+    await coReadingApi.reportPageRead(store.sessionId, n, {
+      pageIndex: lastPageReport.page,
+      pageTotal: lastPageReport.pageTotal,
+      text: lastPageReport.text,
+    })
+  }
+
   async function retryCurrentPageOpen() {
     if (!store.sessionId || lastReportedPage.value < 1) return
     store.clearPageOpenError()
@@ -258,6 +324,12 @@ let lastProgressSentAt = 0
     )
     store.chapterOpenDone = false
     store.pageIntroText = ""
+    try {
+      await repostLastPage()
+    } catch (e) {
+      ElMessage.error(e instanceof ApiError ? e.message : t("coRead.pageSyncFailed"))
+      return
+    }
     await runChapterOpenStream(store.currentChapterIndex)
   }
 
@@ -273,6 +345,12 @@ let lastProgressSentAt = 0
     )
     store.chapterOpenDone = false
     store.pageIntroText = ""
+    try {
+      await repostLastPage()
+    } catch (e) {
+      ElMessage.error(e instanceof ApiError ? e.message : t("coRead.pageSyncFailed"))
+      return
+    }
     await runChapterOpenStream(store.currentChapterIndex, { force: true })
   }
 
