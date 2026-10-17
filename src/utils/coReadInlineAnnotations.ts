@@ -381,27 +381,110 @@ interface PinPoint {
   lineH: number
 }
 
-function hostOffset(host: HTMLElement) {
-  const hr = host.getBoundingClientRect()
-  return { left: hr.left, top: hr.top, width: hr.width, height: hr.height }
+/**
+ * iframe 内 Range.getClientRects() 相对 iframe 视口（少数浏览器已是顶层视口）。
+ * overlay 的 left/top 是宿主 CSS 像素。两者直接相减会被钳到左上角。
+ */
+interface FrameMap {
+  originX: number
+  originY: number
+  scaleX: number
+  scaleY: number
+  topLevel: boolean
+  viewLeft: number
+  viewTop: number
+  viewRight: number
+  viewBottom: number
 }
 
-/** quote 末尾：取最后一行 client rect 的右缘，避免整段 union box 导致 Y 偏移 */
-function pinFromRange(range: Range, host: HTMLElement): PinPoint | null {
-  const { left: hl, top: ht } = hostOffset(host)
-  const rects = range.getClientRects()
-  for (let i = rects.length - 1; i >= 0; i--) {
-    const r = rects[i]
-    if (r.width > 0 || r.height > 0) {
-      const lineH = Math.max(14, r.height)
-      return { x: r.right - hl, y: r.top - ht, lineH }
+function frameMap(doc: Document, host: HTMLElement): FrameMap {
+  const hostRect = host.getBoundingClientRect()
+  const toHostX = host.clientWidth / (hostRect.width || host.clientWidth || 1)
+  const toHostY = host.clientHeight / (hostRect.height || host.clientHeight || 1)
+  const frame = (doc.defaultView?.frameElement as HTMLElement | null) ?? null
+  if (!frame) {
+    return {
+      originX: -hostRect.left * toHostX,
+      originY: -hostRect.top * toHostY,
+      scaleX: toHostX,
+      scaleY: toHostY,
+      topLevel: true,
+      viewLeft: 0,
+      viewTop: 0,
+      viewRight: hostRect.width,
+      viewBottom: hostRect.height,
     }
   }
-  const union = range.getBoundingClientRect()
-  if (union.width > 0 || union.height > 0) {
-    const lineH = Math.max(14, union.height)
-    return { x: union.right - hl, y: union.top - ht, lineH }
+  const fr = frame.getBoundingClientRect()
+  const viewW = frame.clientWidth || fr.width || 1
+  const viewH = frame.clientHeight || fr.height || 1
+  const de = doc.documentElement.getBoundingClientRect()
+  const topLevel =
+    Math.abs(de.left - fr.left) < 4 &&
+    Math.abs(de.top - fr.top) < 4 &&
+    (Math.abs(fr.left) > 8 || Math.abs(fr.top) > 8)
+  if (topLevel) {
+    return {
+      originX: -hostRect.left * toHostX,
+      originY: -hostRect.top * toHostY,
+      scaleX: toHostX,
+      scaleY: toHostY,
+      topLevel: true,
+      viewLeft: fr.left,
+      viewTop: fr.top,
+      viewRight: fr.right,
+      viewBottom: fr.bottom,
+    }
   }
+  const iframeScaleX = fr.width / viewW
+  const iframeScaleY = fr.height / viewH
+  return {
+    originX: (fr.left - hostRect.left) * toHostX,
+    originY: (fr.top - hostRect.top) * toHostY,
+    scaleX: iframeScaleX * toHostX,
+    scaleY: iframeScaleY * toHostY,
+    topLevel: false,
+    viewLeft: 0,
+    viewTop: 0,
+    viewRight: viewW,
+    viewBottom: viewH,
+  }
+}
+
+function rectInFrameView(r: DOMRect, map: FrameMap): boolean {
+  if (r.width <= 0 && r.height <= 0) return false
+  return r.right > map.viewLeft + 1 && r.bottom > map.viewTop + 1 && r.left < map.viewRight - 1 && r.top < map.viewBottom - 1
+}
+
+/** quote 末尾右缘，坐标已换成 overlay 的 CSS 像素 */
+function pinFromClientRect(r: DOMRect, map: FrameMap): PinPoint {
+  return {
+    x: map.originX + r.right * map.scaleX + 4,
+    y: map.originY + r.top * map.scaleY,
+    lineH: Math.max(14, r.height * map.scaleY),
+  }
+}
+
+function pinFromRects(rects: DOMRectList | DOMRect[], doc: Document, host: HTMLElement): PinPoint | null {
+  const map = frameMap(doc, host)
+  let fallback: DOMRect | null = null
+  for (let i = rects.length - 1; i >= 0; i--) {
+    const r = rects[i]
+    if (r.width <= 0 && r.height <= 0) continue
+    if (!fallback) fallback = r
+    if (rectInFrameView(r, map)) return pinFromClientRect(r, map)
+  }
+  return fallback ? pinFromClientRect(fallback, map) : null
+}
+
+/** quote 末尾：取最后一行可见 client rect 的右缘，避免整段 union box 导致 Y 偏移 */
+function pinFromRange(range: Range, host: HTMLElement): PinPoint | null {
+  const doc = range.startContainer.ownerDocument
+  if (!doc) return null
+  const fromLines = pinFromRects(range.getClientRects(), doc, host)
+  if (fromLines) return fromLines
+  const union = range.getBoundingClientRect()
+  if (union.width > 0 || union.height > 0) return pinFromRects([union], doc, host)
   return null
 }
 
@@ -412,11 +495,13 @@ function pinFromElementEnd(el: HTMLElement, host: HTMLElement): PinPoint {
     r.selectNodeContents(el)
     const pin = pinFromRange(r, host)
     if (pin) return pin
+    const pr = el.getBoundingClientRect()
+    if (pr.width > 0 || pr.height > 0) {
+      const mapped = pinFromRects([pr], doc, host)
+      if (mapped) return mapped
+    }
   }
-  const { left: hl, top: ht } = hostOffset(host)
-  const pr = el.getBoundingClientRect()
-  const lineH = Math.max(14, pr.height)
-  return { x: pr.right - hl, y: pr.top - ht, lineH }
+  return { x: 8, y: 8, lineH: 18 }
 }
 
 export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
@@ -440,8 +525,8 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
   }
 
   const hostRect = opts.host.getBoundingClientRect()
-  const hostW = hostRect.width
-  const hostH = hostRect.height
+  const hostW = opts.host.clientWidth || hostRect.width
+  const hostH = opts.host.clientHeight || hostRect.height
   const anchors = collectParagraphAnchors(opts.body)
 
   for (const ann of opts.annotations) {
