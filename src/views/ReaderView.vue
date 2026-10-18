@@ -430,9 +430,8 @@ const showTtsControls = computed(
 const canGoPrev = computed(() => currentPage.value > 1)
 
 const canGoNext = computed(() => {
-  if (isReaderAtEnd()) return false
   if (pageCount.value > 0) return currentPage.value < pageCount.value
-  return true
+  return !isReaderAtEnd()
 })
 
 async function getCurrentPageText(): Promise<string> {

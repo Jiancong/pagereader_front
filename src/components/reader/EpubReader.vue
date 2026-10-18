@@ -113,6 +113,7 @@ const sectionPageTotals = new Map<number, number>()
 const locationCounts = new Map<number, number>()
 let locationCountsReady = false
 let pendingSectionPage = 0
+let pendingSectionEnd = false
 
 function ensureLocationCounts() {
   if (locationCountsReady || !book || book.locations.length() === 0) return
@@ -409,15 +410,9 @@ onMounted(async () => {
       throw new Error('Viewer element not ready')
     }
 
-    const rect = viewerRef.value.getBoundingClientRect()
-    const scale = currentScale()
-    // iOS Safari 有时返回 0 尺寸，用父容器兜底
-    const parentEl = viewerRef.value.parentElement
-    const parentRect = parentEl?.getBoundingClientRect()
-    const fallbackW = parentRect?.width || window.innerWidth || 800
-    const fallbackH = parentRect?.height || window.innerHeight || 600
-    const w = Math.max(1, Math.floor((rect.width || fallbackW) / scale))
-    const h = Math.max(1, Math.floor((rect.height || fallbackH) / scale))
+    const frame = measureFrame()
+    const w = frame.width
+    const h = frame.height
     renderedWidth = w
     renderedHeight = h
 
@@ -443,9 +438,8 @@ onMounted(async () => {
     applyEpubColorTheme()
 
     rendition.on('relocated', (location: any) => {
-      atStart.value = location.atStart ?? false
-      atEnd.value = location.atEnd ?? false
       updatePageInfo(location)
+      syncEnds()
       applyCoReadInline()
     })
 
@@ -457,13 +451,18 @@ onMounted(async () => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             repairPaginatedColumns(view)
-            if (pendingSectionPage > 1) {
-              const pageWidth = view?.layout?.pageWidth || view?.layout?.delta
-              const manager = (rendition as { manager?: { scrollTo?: (x: number, y: number) => void } } | null)?.manager
+            const pageWidth = view?.layout?.pageWidth || view?.layout?.delta
+            const manager = (rendition as { manager?: { container?: HTMLElement; scrollTo?: (x: number, y: number) => void } } | null)?.manager
+            if (pendingSectionEnd && pageWidth && manager?.scrollTo && manager.container) {
+              const maxLeft = Math.max(0, manager.container.scrollWidth - pageWidth)
+              manager.scrollTo(maxLeft, 0)
+              pendingSectionEnd = false
+            } else if (pendingSectionPage > 1) {
               if (pageWidth && manager?.scrollTo) manager.scrollTo((pendingSectionPage - 1) * pageWidth, 0)
               pendingSectionPage = 0
             }
             ;(rendition as { reportLocation?: () => void } | null)?.reportLocation?.()
+            syncEnds()
             applyCoReadInline()
           })
         })
@@ -489,21 +488,14 @@ onMounted(async () => {
     loading.value = false
     await nextTick()
     uninstallUnloadShim()
+    applyFrameSize()
 
+    const stageEl = rootRef.value?.querySelector('.epub-reader__stage')
     resizeObserver = new ResizeObserver(() => {
-      if (rendition && viewerRef.value) {
-        const s = currentScale()
-        const rect = viewerRef.value.getBoundingClientRect()
-        const width = Math.max(1, Math.floor(rect.width / s))
-        const height = Math.max(1, Math.floor(rect.height / s))
-        if (width === renderedWidth && height === renderedHeight) return
-        renderedWidth = width
-        renderedHeight = height
-        rendition.resize(width, height)
-        requestAnimationFrame(() => applyCoReadInline())
-      }
+      applyFrameSize()
+      requestAnimationFrame(() => applyCoReadInline())
     })
-    resizeObserver.observe(viewerRef.value!)
+    if (stageEl) resizeObserver.observe(stageEl)
   } catch (e) {
     uninstallUnloadShim()
     loadError.value = e instanceof Error ? e.message : String(e)
@@ -514,16 +506,7 @@ onMounted(async () => {
 // iOS Safari 14 以下没有 ResizeObserver，用 window resize 兜底
 if (typeof ResizeObserver === 'undefined') {
   window.addEventListener('resize', () => {
-    if (rendition && viewerRef.value) {
-      const s = currentScale()
-      const rect = viewerRef.value.getBoundingClientRect()
-      const width = Math.max(1, Math.floor(rect.width / s))
-      const height = Math.max(1, Math.floor(rect.height / s))
-      if (width === renderedWidth && height === renderedHeight) return
-      renderedWidth = width
-      renderedHeight = height
-      rendition.resize(width, height)
-    }
+    applyFrameSize()
   })
 }
 
@@ -536,11 +519,98 @@ onBeforeUnmount(() => {
   book?.destroy()
 })
 
+function managerBox(): {
+  container?: HTMLElement
+  layout?: { delta?: number; pageWidth?: number }
+  scrollBy?: (x: number, y: number, silent?: boolean) => void
+} | null {
+  return (rendition as { manager?: {
+    container?: HTMLElement
+    layout?: { delta?: number; pageWidth?: number }
+    scrollBy?: (x: number, y: number, silent?: boolean) => void
+  } } | null)?.manager ?? null
+}
+
+function pageTurnDelta(): number {
+  const manager = managerBox()
+  const delta = Number(manager?.layout?.delta || manager?.layout?.pageWidth || 0)
+  if (delta > 8) return delta
+  return manager?.container?.clientWidth || 0
+}
+
+function syncEnds() {
+  const container = managerBox()?.container
+  const loc = rendition?.currentLocation() as { start?: { index?: number } } | undefined
+  const index = loc?.start?.index
+  const section = typeof index === 'number' ? book?.spine.get(index) : undefined
+  const remainForward = container ? container.scrollWidth - container.scrollLeft - container.clientWidth : 0
+  const remainBack = container ? container.scrollLeft : 0
+  atEnd.value = remainForward <= 8 && !section?.next()
+  atStart.value = remainBack <= 8 && !section?.prev()
+}
+
+/** 视口高度按阅读区算，不用 window.innerHeight，避免栏高超出底栏、末行被裁且翻页跳过这段 */
+function measureFrame(): { width: number; height: number } {
+  const stage = rootRef.value?.querySelector('.epub-reader__stage') as HTMLElement | null
+  const s = currentScale()
+  const pad = 24
+  const rect = stage?.getBoundingClientRect()
+  const width = Math.floor(((rect?.width || 0) - pad) / s)
+  const height = Math.floor(((rect?.height || 0) - pad) / s)
+  if (width > 40 && height > 40) return { width, height }
+  const viewerRect = viewerRef.value?.getBoundingClientRect()
+  return {
+    width: Math.max(1, Math.floor((viewerRect?.width || 320) / s)),
+    height: Math.max(1, Math.floor((viewerRect?.height || 480) / s)),
+  }
+}
+
+function applyFrameSize() {
+  if (!rendition) return
+  const size = measureFrame()
+  if (Math.abs(size.width - renderedWidth) <= 2 && Math.abs(size.height - renderedHeight) <= 2) return
+  renderedWidth = size.width
+  renderedHeight = size.height
+  rendition.resize(size.width, size.height)
+}
+
 function next() {
-  rendition?.next()
+  if (!rendition) return
+  const delta = pageTurnDelta()
+  const container = managerBox()?.container
+  const remain = container ? container.scrollWidth - container.scrollLeft - container.clientWidth : 0
+  if (delta > 0 && remain > 8) {
+    managerBox()?.scrollBy?.(Math.min(delta, remain), 0, false)
+    ;(rendition as { reportLocation?: () => void }).reportLocation?.()
+    return
+  }
+  const loc = rendition.currentLocation() as { start?: { index?: number } } | undefined
+  const index = loc?.start?.index
+  const nxt = typeof index === 'number' ? book?.spine.get(index)?.next() : undefined
+  if (typeof nxt?.index === 'number') {
+    void rendition.display(nxt.index)
+    return
+  }
+  void rendition.next()
 }
 function prev() {
-  rendition?.prev()
+  if (!rendition) return
+  const delta = pageTurnDelta()
+  const container = managerBox()?.container
+  if (delta > 0 && container && container.scrollLeft > 8) {
+    managerBox()?.scrollBy?.(-Math.min(delta, container.scrollLeft), 0, false)
+    ;(rendition as { reportLocation?: () => void }).reportLocation?.()
+    return
+  }
+  const loc = rendition.currentLocation() as { start?: { index?: number } } | undefined
+  const index = loc?.start?.index
+  const previous = typeof index === 'number' ? book?.spine.get(index)?.prev() : undefined
+  if (typeof previous?.index === 'number') {
+    pendingSectionEnd = true
+    void rendition.display(previous.index)
+    return
+  }
+  void rendition.prev()
 }
 function goToPage(page: number) {
   if (!book || !rendition || !pageTotal.value) return
@@ -593,7 +663,9 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   display: flex;
   flex-direction: column;
   flex: 1;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
   background: #f3f4f6;
 }
 .epub-reader__stage {
@@ -602,12 +674,14 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   min-height: 0;
   display: flex;
   padding: 12px;
-  overflow: auto;
+  overflow: hidden;
 }
 .epub-reader__zoom {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
   display: flex;
   justify-content: center;
   /* iOS Safari 不支持 CSS zoom 属性，用 transform 兜底 */
@@ -619,9 +693,12 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   position: relative;
   flex: 1;
   width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   max-width: 900px;
+  max-height: 100%;
+  overflow: hidden;
   display: flex;
 }
 .epub-reader__viewer {
@@ -629,6 +706,8 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   width: 100%;
   height: 100%;
   min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
   background: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
@@ -652,6 +731,8 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   color: #dc2626;
 }
 .epub-reader__nav {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
