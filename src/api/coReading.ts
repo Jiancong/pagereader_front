@@ -286,17 +286,39 @@ export async function reportProgress(
   })
 }
 
-/** 同步当前页文本（翻页后必须先成功再 open） */
+export interface PageReadResult {
+  ok: true
+  page_index?: number
+  pageIndex?: number
+  stored_chars?: number
+  storedChars?: number
+  deduped?: boolean
+}
+
+/** 页正文已落库：ok 且 stored_chars > 0（兼容 camelCase） */
+export function pageReadStored(res: PageReadResult | null | undefined): boolean {
+  if (!res?.ok) return false
+  const n = res.stored_chars ?? res.storedChars
+  return typeof n === "number" && n > 0
+}
+
+/** 同步当前页文本。open 必须等本次 HTTP 响应且 pageReadStored 为真 */
 export async function reportPageRead(
   sessionId: string,
   chapterNumber: number,
-  payload: { pageIndex: number; pageTotal?: number; text?: string },
-): Promise<void> {
-  await requestJsonOkPayload("POST", `/co-reading/sessions/${sessionId}/chapters/${chapterNumber}/page`, {
-    pageIndex: payload.pageIndex,
-    pageTotal: payload.pageTotal,
-    text: payload.text,
-  })
+  payload: { pageIndex: number; pageTotal: number; text: string },
+  signal?: AbortSignal,
+): Promise<PageReadResult> {
+  return requestJsonOkPayload<PageReadResult>(
+    "POST",
+    `/co-reading/sessions/${sessionId}/chapters/${chapterNumber}/page`,
+    {
+      pageIndex: payload.pageIndex,
+      pageTotal: payload.pageTotal,
+      text: payload.text,
+    },
+    { signal },
+  )
 }
 
 export async function getSession(sessionId: string): Promise<CoReadSessionDetail> {

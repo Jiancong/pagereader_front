@@ -36,9 +36,12 @@ export function useCoReadingController() {
   const chatLoading = ref(false)
   const lastReportedPage = ref(-1)
   let lastPageReport: { page: number; pageTotal: number; text: string } | null = null
-let openAbort: AbortController | null = null
-let streamAbort: AbortController | null = null
-let lastProgressSentAt = 0
+  let openAbort: AbortController | null = null
+  let streamAbort: AbortController | null = null
+  let lastProgressSentAt = 0
+  /** 翻页代际：只有最新一次 /page 成功后才能 open，避免 open 读到尚未落库的游标 */
+  let pageReportGeneration = 0
+  let pagePostAbort: AbortController | null = null
 
   const currentChapter = computed(() => store.getCachedChapter(store.currentChapterIndex))
   const coReadSpineIndex = computed(() => currentChapter.value?.epubSpineIndex)
@@ -109,9 +112,14 @@ let lastProgressSentAt = 0
     ElMessage.error(msg || t("coRead.openFailed"))
   }
 
-  /** 当前页 open（SSE）；翻页会先 abort 上一条流 */
-  async function runChapterOpenStream(chapterIndex: number, opts?: { force?: boolean }) {
-    if (!store.sessionId) return
+  type OpenStreamResult = "ok" | "missing" | "aborted"
+
+  /** 当前页 open 一次（SSE）。不在这里补 /page，避免和尚未返回的 page 请求交错。 */
+  async function runChapterOpenStream(
+    chapterIndex: number,
+    opts?: { force?: boolean },
+  ): Promise<OpenStreamResult> {
+    if (!store.sessionId) return "aborted"
     openAbort?.abort()
     openAbort = new AbortController()
     const signal = openAbort.signal
@@ -177,47 +185,70 @@ let lastProgressSentAt = 0
         signal,
         { force: opts?.force, retryOnce: false },
       )
-      if (pageTextMissing && !signal.aborted && lastPageReport?.text) {
-        await coReadingApi.reportPageRead(store.sessionId, n, {
-          pageIndex: lastPageReport.page,
-          pageTotal: lastPageReport.pageTotal,
-          text: lastPageReport.text,
-        })
-        if (signal.aborted) return
-        pageTextMissing = false
-        await coReadingApi.openChapter(
-          store.sessionId,
-          n,
-          {
-            ...callbacks,
-            onError: (msg, data) => {
-              const code = String((data as { code?: string })?.code ?? "")
-              if (code === "chapter_text_missing") {
-                pageTextMissing = true
-                return
-              }
-              handleOpenSseError(msg, data)
-            },
-          },
-          signal,
-          { force: opts?.force, retryOnce: false },
-        )
-      }
-      if (pageTextMissing) {
-        store.pageOpenError = "chapter_text_missing"
-      }
+      if (signal.aborted) return "aborted"
+      if (pageTextMissing) return "missing"
       if (!store.chapterOpenDone) store.chapterOpenDone = true
+      return "ok"
     } catch (e) {
-      if (signal.aborted) return
+      if (signal.aborted) return "aborted"
       if (e instanceof ApiError && e.code === 429) {
         ElMessage.warning(t("coRead.rateLimited"))
       } else {
         ElMessage.error(e instanceof ApiError ? e.message : t("coRead.openFailed"))
       }
       store.chapterOpenDone = true
+      return "ok"
     } finally {
       if (!signal.aborted) store.openingChapter = false
     }
+  }
+
+  function isAbortError(e: unknown): boolean {
+    return typeof e === "object" && e !== null && (e as { name?: string }).name === "AbortError"
+  }
+
+  async function postReaderPage(
+    page: number,
+    pageTotal: number,
+    text: string,
+  ): Promise<coReadingApi.PageReadResult | null> {
+    if (!store.sessionId) return null
+    pagePostAbort?.abort()
+    const controller = new AbortController()
+    pagePostAbort = controller
+    const chapterNumber = chapterApiNumber(store.currentChapterIndex)
+    return coReadingApi.reportPageRead(
+      store.sessionId,
+      chapterNumber,
+      { pageIndex: page, pageTotal, text },
+      controller.signal,
+    )
+  }
+
+  /**
+   * chapter_text_missing：用当前页非空正文再 await 一次 /page，stored_chars > 0 后再 open 一次。
+   * 没有正文则静默，不再连打 open。
+   */
+  async function recoverMissingPageThenOpen(
+    generation: number,
+    opts?: { force?: boolean },
+  ): Promise<void> {
+    const report = lastPageReport
+    const text = report?.text.trim() ?? ""
+    if (!text || generation !== pageReportGeneration) return
+    let res: coReadingApi.PageReadResult | null = null
+    try {
+      res = await postReaderPage(report!.page, report!.pageTotal, text)
+    } catch (e) {
+      if (generation !== pageReportGeneration || isAbortError(e)) return
+      ElMessage.error(e instanceof ApiError ? e.message : t("coRead.pageSyncFailed"))
+      return
+    }
+    if (generation !== pageReportGeneration) return
+    if (!coReadingApi.pageReadStored(res)) return
+    const result = await runChapterOpenStream(store.currentChapterIndex, opts)
+    if (generation !== pageReportGeneration) return
+    if (result === "missing") store.pageOpenError = "chapter_text_missing"
   }
 
   /** 先打开书籍（ReaderView），AI 批注在后台 streaming */
@@ -290,6 +321,8 @@ let lastProgressSentAt = 0
   }
 
   function stopPageCoRead() {
+    pageReportGeneration += 1
+    pagePostAbort?.abort()
     openAbort?.abort()
     streamAbort?.abort()
     store.openingChapter = false
@@ -300,91 +333,104 @@ let lastProgressSentAt = 0
     store.saveDraft(annotationId, store.currentChapterIndex, text)
   }
 
-  async function reportReaderPage(page: number, pageTotal: number, text: string) {
-    if (!store.sessionId) return
-    const body = text.trim().slice(0, 8000)
-    if (!body) return
-    if (page === lastReportedPage.value && lastPageReport?.text === body) return
-    lastReportedPage.value = page
-    lastPageReport = { page, pageTotal, text: body }
-    const chapterNumber = chapterApiNumber(store.currentChapterIndex)
-    try {
-      await coReadingApi.reportPageRead(store.sessionId, chapterNumber, {
-        pageIndex: page,
-        pageTotal,
-        text: body,
-      })
-    } catch (e) {
-      lastReportedPage.value = -1
-      lastPageReport = null
-      ElMessage.error(e instanceof ApiError ? e.message : t("coRead.pageSyncFailed"))
-      return
-    }
+  function clearPageAnnotations() {
     store.annotations = store.annotations.filter((a) => a.chapterIndex !== store.currentChapterIndex)
     store.chapterOpenDone = false
     store.clearPageOpenError()
     store.pageIntroText = ""
     store.pageOpenEmpty = false
-    void runChapterOpenStream(store.currentChapterIndex)
-    // progress BFF 限流 ≤1 次/10s；EPUB resize/relocated 会重复触发 page-change
-    const now = Date.now()
-    const percent = pageTotal ? Math.min(100, Math.round((page / pageTotal) * 100)) : 0
-    if (now - lastProgressSentAt >= 10000) {
-      lastProgressSentAt = now
-      void coReadingApi.reportProgress(store.sessionId, store.currentChapterIndex, percent).catch(() => undefined)
-    }
   }
 
-  async function repostLastPage(): Promise<void> {
-    if (!store.sessionId || !lastPageReport?.text) return
-    const n = chapterApiNumber(store.currentChapterIndex)
-    await coReadingApi.reportPageRead(store.sessionId, n, {
-      pageIndex: lastPageReport.page,
-      pageTotal: lastPageReport.pageTotal,
-      text: lastPageReport.text,
-    })
+  function noteReadingProgress(page: number, pageTotal: number) {
+    if (!store.sessionId) return
+    const now = Date.now()
+    const percent = pageTotal ? Math.min(100, Math.round((page / pageTotal) * 100)) : 0
+    if (now - lastProgressSentAt < 10000) return
+    lastProgressSentAt = now
+    void coReadingApi.reportProgress(store.sessionId, store.currentChapterIndex, percent).catch(() => undefined)
+  }
+
+  /** 等本次 /page 返回且 stored_chars > 0，再 open 一次。过期翻页不再 open。 */
+  async function openIfPageStored(
+    generation: number,
+    res: coReadingApi.PageReadResult | null,
+    opts?: { force?: boolean },
+  ) {
+    if (generation !== pageReportGeneration) return
+    if (!coReadingApi.pageReadStored(res)) return
+    const result = await runChapterOpenStream(store.currentChapterIndex, opts)
+    if (generation !== pageReportGeneration) return
+    if (result === "missing") await recoverMissingPageThenOpen(generation, opts)
+  }
+
+  async function reportReaderPage(page: number, pageTotal: number, text: string) {
+    if (!store.sessionId) return
+    const body = (text || "").trim().slice(0, 8000)
+    if (!body) return
+    if (!Number.isFinite(page) || page < 1) return
+    if (!Number.isFinite(pageTotal) || pageTotal < 1) return
+    if (page === lastReportedPage.value && lastPageReport?.text === body) return
+
+    const generation = ++pageReportGeneration
+    openAbort?.abort()
+    lastReportedPage.value = page
+    lastPageReport = { page, pageTotal, text: body }
+    clearPageAnnotations()
+
+    let res: coReadingApi.PageReadResult | null = null
+    try {
+      res = await postReaderPage(page, pageTotal, body)
+    } catch (e) {
+      if (generation !== pageReportGeneration || isAbortError(e)) return
+      lastReportedPage.value = -1
+      lastPageReport = null
+      ElMessage.error(e instanceof ApiError ? e.message : t("coRead.pageSyncFailed"))
+      return
+    }
+    if (generation !== pageReportGeneration) return
+    if (!coReadingApi.pageReadStored(res)) {
+      lastReportedPage.value = -1
+      lastPageReport = null
+      return
+    }
+    noteReadingProgress(page, pageTotal)
+    await openIfPageStored(generation, res)
   }
 
   async function retryCurrentPageOpen() {
-    if (!store.sessionId || lastReportedPage.value < 1) return
-    store.clearPageOpenError()
-    store.annotations = store.annotations.filter(
-      (a) =>
-        !(
-          a.chapterIndex === store.currentChapterIndex &&
-          (a.pageIndex === undefined || a.pageIndex === lastReportedPage.value)
-        ),
-    )
-    store.chapterOpenDone = false
-    store.pageIntroText = ""
-    try {
-      await repostLastPage()
-    } catch (e) {
-      ElMessage.error(e instanceof ApiError ? e.message : t("coRead.pageSyncFailed"))
-      return
-    }
-    await runChapterOpenStream(store.currentChapterIndex)
+    await regenerateCurrentPage(false)
   }
 
   async function forceRegenerateCurrentPage() {
-    if (!store.sessionId || lastReportedPage.value < 1) return
-    store.clearPageOpenError()
+    await regenerateCurrentPage(true)
+  }
+
+  async function regenerateCurrentPage(force: boolean) {
+    const report = lastPageReport
+    if (!store.sessionId || !report?.text.trim() || report.page < 1 || report.pageTotal < 1) return
+    const generation = ++pageReportGeneration
+    openAbort?.abort()
     store.annotations = store.annotations.filter(
       (a) =>
         !(
           a.chapterIndex === store.currentChapterIndex &&
-          (a.pageIndex === undefined || a.pageIndex === lastReportedPage.value)
+          (a.pageIndex === undefined || a.pageIndex === report.page)
         ),
     )
     store.chapterOpenDone = false
+    store.clearPageOpenError()
     store.pageIntroText = ""
+    store.pageOpenEmpty = false
+
+    let res: coReadingApi.PageReadResult | null = null
     try {
-      await repostLastPage()
+      res = await postReaderPage(report.page, report.pageTotal, report.text)
     } catch (e) {
+      if (generation !== pageReportGeneration || isAbortError(e)) return
       ElMessage.error(e instanceof ApiError ? e.message : t("coRead.pageSyncFailed"))
       return
     }
-    await runChapterOpenStream(store.currentChapterIndex, { force: true })
+    await openIfPageStored(generation, res, force ? { force: true } : undefined)
   }
 
   async function onSendReplies() {
@@ -503,6 +549,7 @@ let lastProgressSentAt = 0
   }
 
   onBeforeUnmount(() => {
+    pagePostAbort?.abort()
     openAbort?.abort()
     streamAbort?.abort()
   })

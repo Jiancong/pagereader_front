@@ -663,7 +663,11 @@ function onPageChange(page: number) {
   }
 }
 function onPageCount(count: number) {
+  const prev = pageCount.value
   pageCount.value = count
+  if (coReadMode.value && prev < 1 && count >= 1 && currentPage.value >= 1) {
+    void reportVisibleCoReadPage(currentPage.value)
+  }
 }
 function goToPage(page: number) {
   if (!Number.isFinite(page) || !pageCount.value) return
