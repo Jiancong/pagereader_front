@@ -1656,3 +1656,21 @@
   overflow: visible;
   -webkit-line-clamp: unset;
 }
+
+/* 排版卡片要按真实高度自适应字号（--ppt-card-fit），行数截断会让测量失真且截字，全部放开 */
+.ppt-editorial-brutalist .ppt-card-typography .ppt-brutalist-card-body,
+.ppt-editorial-brutalist .ppt-card-typography .ppt-brutalist-card h3 {
+  display: block;
+  overflow: hidden;
+  -webkit-line-clamp: unset;
+  overflow-wrap: break-word;
+}
+
+/* 自适应收缩系数作用在标题与正文字号上 */
+.ppt-editorial-brutalist .ppt-card-typography.ppt-brutalist-card h3 {
+  font-size: calc(var(--ppt-card-typo-title-fs) * var(--ppt-card-fit, 1));
+}
+
+.ppt-editorial-brutalist .ppt-card-typography.ppt-brutalist-card .ppt-brutalist-card-body {
+  font-size: calc(var(--ppt-card-typo-body-fs) * var(--ppt-card-fit, 1));
+}

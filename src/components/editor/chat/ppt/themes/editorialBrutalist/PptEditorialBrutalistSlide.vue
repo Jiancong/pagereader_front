@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, inject } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import PptMarkdownInline from "@/components/editor/chat/PptMarkdownInline.vue";
 import PptTableBlock from "@/components/editor/chat/PptTableBlock.vue";
 import PptBrutalistDataChart from "../../charts/PptBrutalistDataChart.vue";
+import { fitCardTypography } from "../../shared/cardTypographyFit";
 import { pptClassicContextKey } from "../../pptClassicContext";
 import { pptSlideEditorKey } from "../../pptSlideContext";
 import type { PptSlide } from "../../types";
@@ -100,6 +101,27 @@ const onHeroMetricBlur = classic.onHeroMetricBlur;
 
 const documentFigure = computed(() => normalizeDocumentFigure(props.slide));
 
+/* 卡片字号自适应：字符估字号不知道实际行高，渲染后按溢出情况逐卡收缩 */
+const rootRef = ref<HTMLElement | null>(null);
+let fitRaf = 0;
+let fitObserver: ResizeObserver | null = null;
+
+function scheduleFit() {
+  cancelAnimationFrame(fitRaf);
+  fitRaf = requestAnimationFrame(() => fitCardTypography(rootRef.value));
+}
+
+onMounted(() => {
+  scheduleFit();
+  fitObserver = new ResizeObserver(scheduleFit);
+  if (rootRef.value) fitObserver.observe(rootRef.value);
+});
+watch(() => props.slide, scheduleFit, { deep: true });
+onBeforeUnmount(() => {
+  cancelAnimationFrame(fitRaf);
+  fitObserver?.disconnect();
+});
+
 const slideClass = computed(() => [
   `ppt-editorial-brutalist--${props.slide.layout}`,
   `ppt-editorial-brutalist--${editorialBrutalistLayout(props.slide)}`,
@@ -119,7 +141,7 @@ const slideClass = computed(() => [
 </script>
 
 <template>
-  <div class="ppt-slide ppt-editorial-brutalist" :class="slideClass">
+  <div ref="rootRef" class="ppt-slide ppt-editorial-brutalist" :class="slideClass">
                 <template v-if="editorialBrutalistLayout(slide) === 'hero' && slide.layout === 'section'">
                   <div class="ppt-brutalist-hero">
                     <p class="ppt-brutalist-kicker">{{ editorialBrutalistKicker(slide) }}</p>
