@@ -749,6 +749,7 @@ import {
   resetPptExportSession,
   stitchCanvasesVertically,
 } from "@/utils/pptExportHtml2Canvas";
+import { fitCardTypography } from "./ppt/shared/cardTypographyFit";
 import type { PptPageReference } from "@/utils/pptInlineMarkdown";
 import {
   buildPptxBulletTextRuns,
@@ -5145,6 +5146,25 @@ function injectPptExportStyles(bodyFontCss: string, headingFontCss?: string): HT
       display: block !important;
       gap: 0 !important;
     }
+    /* brutalist 卡片文本：html2canvas 不能正确绘制 -webkit-box 截断，会切成半行字。
+       导出期间放开截断/裁剪，字号交给 fitCardTypography 收缩适配 */
+    .ppt-slide-wrapper .ppt-brutalist-card,
+    .ppt-slide-wrapper .ppt-brutalist-card h3,
+    .ppt-slide-wrapper .ppt-brutalist-card-body,
+    .ppt-slide-wrapper .ppt-brutalist-point-title,
+    .ppt-slide-wrapper .ppt-brutalist-point-body {
+      overflow: visible !important;
+    }
+    .ppt-slide-wrapper .ppt-brutalist-card h3,
+    .ppt-slide-wrapper .ppt-brutalist-card-body,
+    .ppt-slide-wrapper .ppt-brutalist-point-title,
+    .ppt-slide-wrapper .ppt-brutalist-point-body {
+      display: block !important;
+      -webkit-line-clamp: unset !important;
+      white-space: normal !important;
+      overflow-wrap: break-word !important;
+      word-break: break-word !important;
+    }
     .ppt-slide-wrapper .ppt-bullet-item {
       display: block !important;
       position: relative !important;
@@ -5222,6 +5242,8 @@ async function capturePptSlideToCanvas(
   const bodyCss = pptBodyFontCss.value;
   const headingCss = pptHeadingFontCss.value;
   const restoreTypography = pinPptExportTypography(target);
+  // 导出样式（放开 -webkit-box 截断）注入后重算卡片字号，让文本真正放进冻结的卡片盒子里
+  fitCardTypography(target);
   try {
     return await html2canvas(target, {
       backgroundColor,
