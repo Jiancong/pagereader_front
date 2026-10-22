@@ -5,7 +5,7 @@
         class="epub-reader__zoom"
         :style="epubZoomStyle"
       >
-        <div class="epub-reader__viewer-shell">
+        <div ref="viewerShellRef" class="epub-reader__viewer-shell">
           <div ref="viewerRef" class="epub-reader__viewer"></div>
           <div v-if="coReadInline" ref="overlayRef" class="epub-reader__co-read-overlay"></div>
         </div>
@@ -75,6 +75,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const rootRef = ref<HTMLElement | null>(null)
+const viewerShellRef = ref<HTMLElement | null>(null)
 const viewerRef = ref<HTMLElement | null>(null)
 const overlayRef = ref<HTMLElement | null>(null)
 const loading = ref(true)
@@ -290,6 +291,15 @@ watch(
   () => applyEpubColorTheme(),
 )
 
+// 缩放只改 zoom/transform，stage 尺寸不变，ResizeObserver 不会触发；必须主动按新 scale 重算视口
+watch(
+  () => props.scale,
+  () => {
+    applyFrameSize()
+    requestAnimationFrame(() => applyCoReadInline())
+  },
+)
+
 /**
  * epubjs 用 Range.getBoundingClientRect() 量分页宽度。CSS 多栏时这个宽度只有第一栏，
  * iframe 不会变宽，next() 会以为本章已经到头。这里改用各栏 client rect / scrollWidth 把整章撑开。
@@ -410,7 +420,7 @@ onMounted(async () => {
       throw new Error('Viewer element not ready')
     }
 
-    const frame = measureFrame()
+    const frame = await waitForMeasureFrame()
     const w = frame.width
     const h = frame.height
     renderedWidth = w
@@ -450,6 +460,14 @@ onMounted(async () => {
         attachToDoc(doc)
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
+            const frame = measureFrame()
+            const layoutW = Number(view?.layout?.width) || 0
+            if (layoutW > 0 && Math.abs(layoutW - frame.width) > 8) {
+              renderedWidth = 0
+              renderedHeight = 0
+              applyFrameSize()
+              return
+            }
             repairPaginatedColumns(view)
             const pageWidth = view?.layout?.pageWidth || view?.layout?.delta
             const manager = (rendition as { manager?: { container?: HTMLElement; scrollTo?: (x: number, y: number) => void } } | null)?.manager
@@ -490,12 +508,11 @@ onMounted(async () => {
     uninstallUnloadShim()
     applyFrameSize()
 
-    const stageEl = rootRef.value?.querySelector('.epub-reader__stage')
     resizeObserver = new ResizeObserver(() => {
       applyFrameSize()
       requestAnimationFrame(() => applyCoReadInline())
     })
-    if (stageEl) resizeObserver.observe(stageEl)
+    if (viewerShellRef.value) resizeObserver.observe(viewerShellRef.value)
   } catch (e) {
     uninstallUnloadShim()
     loadError.value = e instanceof Error ? e.message : String(e)
@@ -551,18 +568,40 @@ function syncEnds() {
 
 /** 视口高度按阅读区算，不用 window.innerHeight，避免栏高超出底栏、末行被裁且翻页跳过这段 */
 function measureFrame(): { width: number; height: number } {
-  const stage = rootRef.value?.querySelector('.epub-reader__stage') as HTMLElement | null
   const s = currentScale()
-  const pad = 24
-  const rect = stage?.getBoundingClientRect()
-  const width = Math.floor(((rect?.width || 0) - pad) / s)
-  const height = Math.floor(((rect?.height || 0) - pad) / s)
-  if (width > 40 && height > 40) return { width, height }
-  const viewerRect = viewerRef.value?.getBoundingClientRect()
-  return {
-    width: Math.max(1, Math.floor((viewerRect?.width || 320) / s)),
-    height: Math.max(1, Math.floor((viewerRect?.height || 480) / s)),
+  // 以 viewer-shell 为准（max-width 限制实际页宽）。stage 在宽屏下远大于可见页，
+  // 若误用 stage 会把 column-width 设成 2000+，外层 900px 裁切后每行右侧缺字。
+  const shell = viewerShellRef.value
+  const shellRect = shell?.getBoundingClientRect()
+  let width = Math.floor((shellRect?.width || 0) / s)
+  let height = Math.floor((shellRect?.height || 0) / s)
+  if (shell && width > 0) {
+    const maxW = shell.ownerDocument.defaultView?.getComputedStyle(shell).maxWidth
+    if (maxW && maxW !== 'none') {
+      const cap = parseFloat(maxW)
+      if (Number.isFinite(cap) && cap > 0) width = Math.min(width, Math.floor(cap))
+    }
   }
+  if (width > 40 && height > 40) return { width, height }
+
+  const viewerRect = viewerRef.value?.getBoundingClientRect()
+  width = Math.floor((viewerRect?.width || 0) / s)
+  height = Math.floor((viewerRect?.height || 0) / s)
+  if (width > 40 && height > 40) return { width, height }
+
+  return {
+    width: Math.max(1, Math.min(900, width || Math.floor(320 / s))),
+    height: Math.max(1, height || Math.floor(480 / s)),
+  }
+}
+
+async function waitForMeasureFrame(maxAttempts = 40): Promise<{ width: number; height: number }> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const frame = measureFrame()
+    if (frame.width > 40 && frame.height > 40) return frame
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  }
+  return measureFrame()
 }
 
 function applyFrameSize() {
