@@ -610,6 +610,7 @@ import {
   gtmFileExt,
 } from "@/composables/useGtmDataLayer"
 import { isAppDebugEnabled, isOnlineReadEnabled } from "@/config/appDebug"
+import { registerLocalSession } from "@/utils/sessionScope"
 
 const emit = defineEmits<{
   "project-started": [projectId: string]
@@ -1538,10 +1539,15 @@ const runStream = async (
   }
 }
 
-const newProjectId = () =>
-  typeof crypto !== "undefined" && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `proj-${Date.now()}-${Math.random().toString(16).slice(2)}`
+const newProjectId = () => {
+  const id =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `proj-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  // 登记为本域会话（Session 隔离 spec §3）：之后 URL 携带该 id 时归属校验可通过
+  registerLocalSession(id)
+  return id
+}
 
 const startTask = (task: GeneratorTask) => {
   task.errorMsg = null

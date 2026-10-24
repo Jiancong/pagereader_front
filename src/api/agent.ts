@@ -5,6 +5,7 @@ import { buildUrl, ApiError, postJson } from "./client"
 import { clearToken, getToken } from "./token"
 import { getSavedLocale } from "@/composables/useAppLocale"
 import { getApiContextHeaders } from "@/utils/apiRequestContext"
+import { getScopedSessionId } from "@/utils/sessionScope"
 import { ReponseCodes } from "@/request/response-codes"
 import type {
   ChatStreamCancelReq,
@@ -17,7 +18,7 @@ import type {
 import { isNovelStreamPayload } from "@/utils/novelStream"
 import { isOutlineStreamPayload } from "@/utils/outlineStream"
 
-const SESSION_KEY = "pr_session_id"
+// 旧版全局会话 key "pr_session_id" 已弃用；迁移逻辑见 utils/sessionScope（LEGACY_GLOBAL_PID_KEY）
 
 /** 工作区 queue → 后端 chat_stream mode */
 export function mapQueueToGenerationMode(queue?: PptQueue): string | undefined {
@@ -80,16 +81,14 @@ export function buildChatStreamBody(req: ChatStreamReq): Record<string, unknown>
   return body
 }
 
+/**
+ * 会话 id 按「域 × 浏览器标签页」隔离（见 utils/sessionScope）：
+ * - 不再用全局 localStorage 单键（旧 `pr_session_id` 首次初始化时迁移进本域登记表）；
+ * - 新 tab / 隐私模式得到新 pid，同域刷新续用。
+ */
 export function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return ""
-  let id = window.localStorage.getItem(SESSION_KEY)
-  if (!id) {
-    id =
-      window.crypto?.randomUUID?.() ??
-      `sess-${Date.now()}-${Math.random().toString(16).slice(2)}`
-    window.localStorage.setItem(SESSION_KEY, id)
-  }
-  return id
+  return getScopedSessionId()
 }
 
 export interface ChatStreamCallbacks {

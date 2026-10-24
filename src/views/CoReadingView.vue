@@ -52,6 +52,7 @@ import CoReadSetup from '@/components/coReading/CoReadSetup.vue'
 import { useCoReadingController } from '@/composables/useCoReadingController'
 import { useCoReadingStore } from '@/stores/coReading'
 import { useCoReadFileStore } from '@/stores/coReadFile'
+import { logSessionAdoption } from '@/utils/sessionScope'
 
 defineOptions({ name: 'CoReadingView' })
 
@@ -82,6 +83,8 @@ onMounted(async () => {
   }
   const sessionQuery = String(route.query.session || '').trim()
   if (sessionQuery) {
+    // 共读分享链接：接管为当前标签页会话，打一行可观测日志（Session 隔离 spec §6）
+    logSessionAdoption('url', sessionQuery)
     store.resetSession()
     await restoreSession(sessionQuery)
     return
