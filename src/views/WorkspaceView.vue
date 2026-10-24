@@ -131,6 +131,8 @@ import { createFreshExpertSessionId, getOrCreateExpertSessionId } from '@/api/bo
 import { resolveFeedOpenTarget } from '@/utils/feedOpen'
 import { recordBookExpertOpen } from '@/utils/bookExpertEngagement'
 import { resolveProjectDisplayTitle } from '@/utils/resolveProjectDisplayTitle'
+// Session 隔离 spec：本域新建/接管的 projectId 需登记归属，之后 URL 携带才可通过 §3 校验
+import { registerLocalSession } from '@/utils/sessionScope'
 
 import { provideAssetsRefreshBus } from '@/composables/useAssetsRefreshBus'
 
@@ -291,8 +293,10 @@ onMounted(async () => {
   await loadProjects()
 
   // 从社区 Fork 后跳转：/workspace?project=<newId> 直接打开该项目
+  // fork 是本域用户主动发起、后端新建的会话（spec §4 分叉流程），登记归属后接管
   const target = String(route.query.project || '').trim()
   if (target) {
+    registerLocalSession(target)
     openProject(target)
     router.replace({ name: 'workspace' })
   }
@@ -452,9 +456,13 @@ const openExploreItem = (item) => {
 }
 
 function newExpertProjectId() {
-  return typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `expert-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const id =
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `expert-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  // 本域生成的会话 id 登记归属（spec §3），供归属校验通过
+  registerLocalSession(id)
+  return id
 }
 
 function onSelectExpert(expert) {
