@@ -1246,12 +1246,11 @@ onBeforeUnmount(() => {
     display: none;
     flex: none;
     width: 100%;
+    box-sizing: border-box;
+    align-items: center;
     gap: 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    flex-wrap: wrap;
+    overflow: visible;
     padding: 8px 0 4px;
     margin-top: 6px;
     border-top: 1px solid #374151;
@@ -1259,8 +1258,8 @@ onBeforeUnmount(() => {
   .reader-view__controls--mobile-open {
     display: flex;
   }
-  .reader-view__controls::-webkit-scrollbar {
-    display: none;
+  .reader-view__controls > * {
+    flex-shrink: 0;
   }
   .reader-view__content {
     flex: 1 1 auto;
@@ -1270,41 +1269,51 @@ onBeforeUnmount(() => {
     display: none;
   }
   .rv-btn--back {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 10px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 8px;
     justify-content: center;
   }
   .rv-btn--sm {
     min-width: 40px;
     min-height: 40px;
-    padding: 8px 12px;
+    padding: 8px 10px;
+    justify-content: center;
+    line-height: 1;
   }
   .rv-page-input {
     width: 48px;
     min-height: 36px;
     font-size: 14px;
   }
-  /* EPUB 底部已有翻页栏，顶部隐藏重复页码控件 */
-  .reader-view--epub .rv-field--pages {
+  /* 移动端底部已有统一翻页栏，顶部隐藏重复页码控件 */
+  .rv-field--pages {
     display: none;
   }
+  .rv-btn--theme-label,
   .rv-btn--tts-label,
   .rv-btn--auto-advance-label,
+  .rv-btn--co-read-label,
   .rv-btn--workspace-label {
     display: none;
   }
+  .rv-btn--theme,
   .rv-btn--tts,
   .rv-btn--auto-advance,
+  .rv-btn--co-read,
   .rv-btn--workspace {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 10px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 8px;
     justify-content: center;
   }
   .rv-tts-voice-select {
-    max-width: 120px;
-    min-height: 44px;
+    flex: 1 1 140px;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 40px;
+    padding: 6px 8px;
+    font-size: 12px;
   }
 }
 </style>
