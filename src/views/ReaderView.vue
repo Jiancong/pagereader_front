@@ -12,17 +12,32 @@
   >
     <!-- 顶部工具栏 -->
     <header class="reader-view__toolbar">
-      <div class="reader-view__head">
-        <button class="rv-btn rv-btn--back" @click="goBack" :aria-label="t('reader.back')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-          <span class="rv-btn__label">{{ t('reader.back') }}</span>
-        </button>
-        <div class="reader-view__title-block">
-          <div class="reader-view__title" :title="headerTitle">{{ headerTitle }}</div>
+      <div class="reader-view__toolbar-row">
+        <div class="reader-view__head">
+          <button class="rv-btn rv-btn--back" @click="goBack" :aria-label="t('reader.back')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+            <span class="rv-btn__label">{{ t('reader.back') }}</span>
+          </button>
+          <div class="reader-view__title-block">
+            <div class="reader-view__title" :title="headerTitle">{{ headerTitle }}</div>
+          </div>
         </div>
+        <button
+          v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown)"
+          type="button"
+          class="rv-btn rv-btn--sm rv-btn--mobile-tools"
+          :aria-label="t('reader.moreTools')"
+          :aria-expanded="mobileToolsOpen"
+          @click="mobileToolsOpen = !mobileToolsOpen"
+        >
+          <MoreHorizontal class="h-5 w-5" />
+        </button>
       </div>
 
-      <div class="reader-view__controls">
+      <div
+        class="reader-view__controls"
+        :class="{ 'reader-view__controls--mobile-open': mobileToolsOpen }"
+      >
         <div v-if="hasSource && (isPdf || isEpub || isMobi || isXlsx || isMarkdown)" class="rv-field rv-field--pages">
           <button class="rv-btn rv-btn--sm" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">‹</button>
           <input
@@ -309,7 +324,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, BookHeart } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, BookHeart, MoreHorizontal } from 'lucide-vue-next'
 import CoReadAnnotationStrip from '@/components/coReading/CoReadAnnotationStrip.vue'
 import CoReadReplyTray from '@/components/coReading/CoReadReplyTray.vue'
 import CoReadChatPanel from '@/components/coReading/CoReadChatPanel.vue'
@@ -400,6 +415,21 @@ const hasSource = computed(() => Boolean(store.file))
 const headerTitle = computed(() => store.file?.name ?? '')
 
 const scale = ref(1.2)
+const mobileToolsOpen = ref(false)
+const MOBILE_LAYOUT_MQ = '(max-width: 767px)'
+let mobileLayoutMq: MediaQueryList | null = null
+
+function applyMobileScalePreference() {
+  if (typeof window === 'undefined') return
+  if (window.matchMedia(MOBILE_LAYOUT_MQ).matches) {
+    scale.value = 1
+  }
+}
+
+function onMobileLayoutChange() {
+  applyMobileScalePreference()
+  if (!mobileLayoutMq?.matches) mobileToolsOpen.value = false
+}
 const pdfReaderRef = ref<InstanceType<typeof PdfReader> | null>(null)
 const epubReaderRef = ref<InstanceType<typeof EpubReader> | null>(null)
 const mobiReaderRef = ref<InstanceType<typeof MobiReader> | null>(null)
@@ -754,13 +784,14 @@ onMounted(() => {
     store.clearReturnNavigation()
     return
   }
-  if (window.innerWidth < 768) {
-    scale.value = 1
-  }
+  applyMobileScalePreference()
+  mobileLayoutMq = window.matchMedia(MOBILE_LAYOUT_MQ)
+  mobileLayoutMq.addEventListener('change', onMobileLayoutChange)
   window.addEventListener('keydown', onKeyDown)
 })
 
 onBeforeUnmount(() => {
+  mobileLayoutMq?.removeEventListener('change', onMobileLayoutChange)
   window.removeEventListener('keydown', onKeyDown)
   ttsAdvanceToken++
   if (speakFollowTimer) clearTimeout(speakFollowTimer)
@@ -783,6 +814,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   background: #3a3a3a;
   overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
 }
 .reader-view--night {
   background: #0a0a0a;
@@ -796,6 +829,12 @@ onBeforeUnmount(() => {
   color: #e5e7eb;
   border-bottom: 1px solid #111827;
   flex-shrink: 0;
+}
+.reader-view__toolbar-row {
+  display: contents;
+}
+.rv-btn--mobile-tools {
+  display: none;
 }
 .reader-view__head {
   display: flex;
@@ -1115,10 +1154,10 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
-    padding: 10px 12px;
-    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    padding: 6px 8px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
     background: #1f2937;
     border-top: 1px solid #111827;
     color: #e5e7eb;
@@ -1129,8 +1168,8 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    min-height: 48px;
-    padding: 8px 12px;
+    min-height: 40px;
+    padding: 6px 10px;
     border-radius: 8px;
     border: 1px solid #374151;
     background: #111827;
@@ -1146,17 +1185,17 @@ onBeforeUnmount(() => {
   }
   .reader-view__mobile-bar-center {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     flex-shrink: 0;
   }
   .reader-view__mobile-bar-btn--tts {
-    min-width: 52px;
-    min-height: 52px;
+    min-width: 40px;
+    min-height: 40px;
     max-width: none;
     flex: none;
-    border-radius: 50%;
+    border-radius: 8px;
     padding: 0;
   }
   .reader-view__mobile-bar-btn--tts-active {
@@ -1175,19 +1214,36 @@ onBeforeUnmount(() => {
   }
 
   .reader-view__toolbar {
+    position: relative;
     flex-direction: column;
     align-items: stretch;
+    gap: 0;
+    padding: 6px 8px;
+    padding-top: max(6px, env(safe-area-inset-top));
+  }
+  .reader-view__toolbar-row {
+    display: flex;
+    align-items: center;
     gap: 8px;
-    padding: 8px 10px;
-    padding-top: max(8px, env(safe-area-inset-top));
+    min-height: 40px;
+  }
+  .rv-btn--mobile-tools {
+    display: inline-flex;
+    flex-shrink: 0;
+    min-width: 40px;
+    min-height: 40px;
+    justify-content: center;
+    padding: 8px;
   }
   .reader-view__head {
-    flex: none;
+    flex: 1;
+    min-width: 0;
   }
   .reader-view__title {
     font-size: 13px;
   }
   .reader-view__controls {
+    display: none;
     flex: none;
     width: 100%;
     gap: 8px;
@@ -1196,10 +1252,19 @@ onBeforeUnmount(() => {
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    padding-bottom: 2px;
+    padding: 8px 0 4px;
+    margin-top: 6px;
+    border-top: 1px solid #374151;
+  }
+  .reader-view__controls--mobile-open {
+    display: flex;
   }
   .reader-view__controls::-webkit-scrollbar {
     display: none;
+  }
+  .reader-view__content {
+    flex: 1 1 auto;
+    min-height: 0;
   }
   .rv-btn--back .rv-btn__label {
     display: none;

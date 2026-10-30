@@ -995,6 +995,7 @@ export default {
   },
   reader: {
     back: "返回",
+    moreTools: "更多工具",
     loading: "正在加载文档…",
     page: "页码",
     prev: "上一页",

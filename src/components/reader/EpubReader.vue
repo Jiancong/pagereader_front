@@ -827,13 +827,19 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
 @media (max-width: 767px) {
   .epub-reader__stage {
     padding: 0;
+    align-items: stretch;
   }
   .epub-reader__zoom {
     width: 100%;
+    max-height: none;
+  }
+  .epub-reader__viewer-shell {
+    max-width: none;
   }
   .epub-reader__viewer {
     max-width: none;
     box-shadow: none;
+    border-radius: 0;
   }
   .epub-reader__nav {
     gap: 10px;

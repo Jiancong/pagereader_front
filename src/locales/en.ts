@@ -1017,6 +1017,7 @@ export default {
   },
   reader: {
     back: "Back",
+    moreTools: "More tools",
     loading: "Loading document…",
     page: "Page number",
     prev: "Previous",
