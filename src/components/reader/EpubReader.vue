@@ -852,6 +852,12 @@ if (typeof window !== 'undefined') {
     // eslint-disable-next-line no-console
     console.info(`[epub] debug ${debugEnabled ? 'ON' : 'OFF'}`)
   }
+  // ?debug=1 时自动开启探针（配合 eruda 真机查看）
+  try {
+    if (/(?:^|[?&])debug=1(?:&|$)/.test(window.location.search)) debugEnabled = true
+  } catch {
+    /* ignore */
+  }
 }
 
 function markFlipActivity() {
@@ -879,7 +885,32 @@ function applyFrameSize() {
     dbg('resize SKIPPED (same size, cooldown)')
     return
   }
+  const widthChanged = Math.abs(size.width - renderedWidth) > 2
+  const heightChanged = Math.abs(size.height - renderedHeight) > 2
+  if (!widthChanged && !heightChanged) return
+
+  // 移动端浏览器工具栏收起/展开会让视口高度反复变化；仅高度变化时延迟处理，
+  // 高度来回抖动（未在延迟窗口内定格）就取消，避免 resize→display 的连环闪动
+  if (!widthChanged && heightChanged && isMobileViewport()) {
+    if (heightOnlyTimer) window.clearTimeout(heightOnlyTimer)
+    dbg('resize DEFERRED (height-only)', { to: `${size.width}x${size.height}` })
+    heightOnlyTimer = window.setTimeout(() => {
+      heightOnlyTimer = null
+      performFrameResize()
+    }, 600)
+    return
+  }
+  performFrameResize()
+}
+
+let heightOnlyTimer: number | null = null
+
+/** 实际执行 resize：保存横向页码 → rendition.resize → 下一帧按新页宽还原 */
+function performFrameResize() {
+  if (!rendition || resizing) return
+  const size = measureFrame()
   if (Math.abs(size.width - renderedWidth) <= 2 && Math.abs(size.height - renderedHeight) <= 2) return
+  const sig = `${size.width}x${size.height}`
   lastResizeSig = sig
   lastResizeAt = Date.now()
   dbg('resize START', { from: `${renderedWidth}x${renderedHeight}`, to: `${size.width}x${size.height}` })
