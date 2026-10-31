@@ -564,6 +564,11 @@ onMounted(async () => {
     applyEpubColorTheme()
 
     rendition.on('relocated', (location: any) => {
+      dbg('relocated', {
+        spine: location?.start?.index,
+        page: location?.start?.displayed?.page,
+        total: location?.start?.displayed?.total,
+      })
       updatePageInfo(location)
       syncEnds()
       applyCoReadInline()
@@ -723,15 +728,50 @@ let resizing = false
 /** 翻页静默期截止时间：翻页动作后短时间内不做 resize，避免与滚动抢位置 */
 let flipGuardUntil = 0
 
+/**
+ * 翻页回滚排查探针。控制台执行 `__epubDebug(true)` 开启，
+ * 复现一次翻页即可看到 relocated / resize / scroll 的完整时序。
+ */
+let debugEnabled = false
+function dbg(tag: string, extra?: Record<string, unknown>) {
+  if (!debugEnabled) return
+  const m = managerBox()
+  const c = m?.container
+  const delta = Number(m?.layout?.delta || m?.layout?.pageWidth || 0)
+  const left = c?.scrollLeft ?? -1
+  const page = delta > 8 ? Math.round(left / delta) + 1 : -1
+  // eslint-disable-next-line no-console
+  console.log(`[epub] ${tag}`, {
+    page,
+    left,
+    delta,
+    scrollW: c?.scrollWidth ?? -1,
+    clientW: c?.clientWidth ?? -1,
+    guard: Math.max(0, Math.round(flipGuardUntil - Date.now())),
+    ...extra,
+  })
+}
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __epubDebug?: (on: boolean) => void }).__epubDebug = (on: boolean) => {
+    debugEnabled = !!on
+    // eslint-disable-next-line no-console
+    console.info(`[epub] debug ${debugEnabled ? 'ON' : 'OFF'}`)
+  }
+}
+
 function markFlipActivity() {
   flipGuardUntil = Date.now() + 600
 }
 
 function applyFrameSize() {
   if (!rendition || resizing) return
-  if (Date.now() < flipGuardUntil) return
+  if (Date.now() < flipGuardUntil) {
+    dbg('resize SKIPPED (guard)')
+    return
+  }
   const size = measureFrame()
   if (Math.abs(size.width - renderedWidth) <= 2 && Math.abs(size.height - renderedHeight) <= 2) return
+  dbg('resize START', { from: `${renderedWidth}x${renderedHeight}`, to: `${size.width}x${size.height}` })
   renderedWidth = size.width
   renderedHeight = size.height
 
@@ -743,6 +783,7 @@ function applyFrameSize() {
 
   resizing = true
   rendition.resize(size.width, size.height)
+  dbg('resize DONE (epub re-anchored)')
   // resize 是同步重新分页 + display，下一帧把位置按新页宽还原
   requestAnimationFrame(() => {
     resizing = false
@@ -753,6 +794,7 @@ function applyFrameSize() {
     if (delta > 8) {
       const target = savedPage > 0 ? savedPage * delta : Math.min(savedLeft, c.scrollWidth - delta)
       if (Math.abs(target - c.scrollLeft) > 2) {
+        dbg('resize RESTORE', { from: c.scrollLeft, to: target })
         m?.scrollTo?.(Math.max(0, target), 0)
         ;(rendition as { reportLocation?: () => void } | null)?.reportLocation?.()
       }
@@ -763,10 +805,12 @@ function applyFrameSize() {
 }
 
 function next() {
+  dbg('next() called')
   markFlipActivity()
   withPageFlip('next', turnNext)
 }
 function prev() {
+  dbg('prev() called')
   markFlipActivity()
   withPageFlip('prev', turnPrev)
 }
