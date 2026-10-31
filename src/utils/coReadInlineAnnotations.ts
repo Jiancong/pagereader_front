@@ -455,9 +455,84 @@ function frameMap(doc: Document, host: HTMLElement): FrameMap {
   }
 }
 
-function rectInFrameView(r: DOMRect, map: FrameMap): boolean {
+interface VisibleWindow {
+  x0: number
+  x1: number
+  y0: number
+  y1: number
+}
+
+/**
+ * 当前可见「页」在 iframe 视口坐标系中的窗口。
+ * epub.js 整章渲染进 iframe 后由宿主容器横向滚动分页，iframe 视口包含所有栏；
+ * 可见页 = 宿主 overlay 可视区反投影回 iframe 坐标的横向切片。
+ */
+function visibleWindowInFrame(doc: Document, host: HTMLElement): VisibleWindow {
+  const map = frameMap(doc, host)
+  const hostRect = host.getBoundingClientRect()
+  const hostW = host.clientWidth || hostRect.width || 0
+  const hostH = host.clientHeight || hostRect.height || 0
+  if (map.topLevel) {
+    return {
+      x0: map.viewLeft,
+      x1: map.viewLeft + (hostW / (map.scaleX || 1)),
+      y0: map.viewTop,
+      y1: map.viewTop + (hostH / (map.scaleY || 1)),
+    }
+  }
+  const sx = map.scaleX || 1
+  const sy = map.scaleY || 1
+  return {
+    x0: Math.max(map.viewLeft, -map.originX / sx),
+    x1: Math.min(map.viewRight, (hostW - map.originX) / sx),
+    y0: Math.max(map.viewTop, -map.originY / sy),
+    y1: Math.min(map.viewBottom, (hostH - map.originY) / sy),
+  }
+}
+
+function rectInVisibleWindow(r: DOMRect, win: VisibleWindow): boolean {
   if (r.width <= 0 && r.height <= 0) return false
-  return r.right > map.viewLeft + 1 && r.bottom > map.viewTop + 1 && r.left < map.viewRight - 1 && r.top < map.viewBottom - 1
+  return r.right > win.x0 + 1 && r.bottom > win.y0 + 1 && r.left < win.x1 - 1 && r.top < win.y1 - 1
+}
+
+/** 元素的任一行 rect 落在可见页窗口内（跨栏段落按可见部分算） */
+function elementInVisibleWindow(el: HTMLElement, win: VisibleWindow): boolean {
+  const doc = el.ownerDocument
+  if (!doc) return false
+  const range = doc.createRange()
+  range.selectNodeContents(el)
+  const rects = range.getClientRects()
+  for (let i = 0; i < rects.length; i++) {
+    if (rectInVisibleWindow(rects[i], win)) return true
+  }
+  return rectInVisibleWindow(el.getBoundingClientRect(), win)
+}
+
+/** Range 的任一行 rect 落在可见页窗口内 */
+function rangeHasRectInWindow(range: Range, win: VisibleWindow): boolean {
+  const rects = range.getClientRects()
+  for (let i = 0; i < rects.length; i++) {
+    if (rectInVisibleWindow(rects[i], win)) return true
+  }
+  const union = range.getBoundingClientRect()
+  return rectInVisibleWindow(union, win)
+}
+
+/**
+ * 仅提取当前可见「页」的文本（epub.js 多栏分页下 body 文本是整章的，
+ * 直接取整章会让后端为其它页生成批注、icon 也定位到隐藏栏）。
+ */
+export function pageTextFromVisiblePage(body: HTMLElement, host: HTMLElement): string {
+  const doc = body.ownerDocument
+  if (!doc) return ""
+  const win = visibleWindowInFrame(doc, host)
+  const parts: string[] = []
+  for (const el of collectParagraphAnchors(body)) {
+    if (!elementInVisibleWindow(el, win)) continue
+    const t = (el.textContent || "").trim()
+    if (t) parts.push(t)
+  }
+  return parts.join("\n\n")
 }
 
 /** quote 末尾右缘，坐标已换成 overlay 的 CSS 像素 */
@@ -472,11 +547,13 @@ function pinFromClientRect(r: DOMRect, map: FrameMap): PinPoint {
 function pinFromRects(rects: DOMRectList | DOMRect[], doc: Document, host: HTMLElement): PinPoint | null {
   const map = frameMap(doc, host)
   let fallback: DOMRect | null = null
+  const win = visibleWindowInFrame(doc, host)
   for (let i = rects.length - 1; i >= 0; i--) {
     const r = rects[i]
     if (r.width <= 0 && r.height <= 0) continue
     if (!fallback) fallback = r
-    if (rectInFrameView(r, map)) return pinFromClientRect(r, map)
+    // 跨栏 Range 的 rects 含隐藏栏；只取可见页窗口内的 rect 定位
+    if (rectInVisibleWindow(r, win)) return pinFromClientRect(r, map)
   }
   return fallback ? pinFromClientRect(fallback, map) : null
 }
@@ -541,10 +618,11 @@ function appendQuoteHighlight(root: HTMLElement, hostDoc: Document, range: Range
   const doc = range.startContainer.ownerDocument
   if (!doc) return
   const map = frameMap(doc, host)
+  const win = visibleWindowInFrame(doc, host)
   const rects = range.getClientRects()
   for (let i = 0; i < rects.length; i++) {
     const r = rects[i]
-    if (r.width < 1 || r.height < 1 || !rectInFrameView(r, map)) continue
+    if (r.width < 1 || r.height < 1 || !rectInVisibleWindow(r, win)) continue
     const hl = hostDoc.createElement("div")
     hl.className = "co-read-hl"
     hl.style.left = `${map.originX + r.left * map.scaleX}px`
@@ -595,6 +673,8 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
   const hostH = opts.host.clientHeight || hostRect.height
   const anchors = collectParagraphAnchors(opts.body)
   const gutterSlots: number[] = []
+  const bodyDoc = opts.body.ownerDocument
+  const win = bodyDoc ? visibleWindowInFrame(bodyDoc, opts.host) : null
 
   for (const ann of opts.annotations) {
     const host = hostDoc.createElement("span")
@@ -602,10 +682,13 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     host.setAttribute(INLINE_ATTR, ann.id)
 
     const range = quoteRangeForAnnotation(opts.body, ann)
+    // quote 在其它页（隐藏栏）时不在本页渲染，避免 icon 被钳到边缘堆叠
+    if (range && win && !rangeHasRectInWindow(range, win)) continue
     let pin: PinPoint | null = range ? pinFromRange(range, opts.host) : null
     if (!pin) {
       const idx = Math.max(0, ann.anchor.paragraphIndex)
       const para = anchors[Math.min(idx, anchors.length - 1)] ?? opts.body
+      if (win && !elementInVisibleWindow(para, win)) continue
       pin = pinFromElementEnd(para, opts.host)
     }
     const lineH = pin.lineH

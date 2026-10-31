@@ -20,6 +20,7 @@ import 'foliate-js/view.js'
 import type { CoReadAnnotation } from '@/types/coReading'
 import {
   pageTextFromBody,
+  pageTextFromVisiblePage,
   syncCoReadOverlayAnnotations,
   type CoReadInlineLabels,
   type CoReadInlineStatus,
@@ -209,6 +210,16 @@ function goToPage(page: number) {
 function getPageText(): string {
   const doc = activeDoc()
   if (!doc?.body) return ''
+  // 与 EpubReader 一致：按当前可见屏取词，避免整本文本串页（foliate 分页同样适用）
+  const overlay = overlayRef.value
+  if (overlay) {
+    try {
+      const visible = pageTextFromVisiblePage(doc.body, overlay)
+      if (visible) return visible
+    } catch {
+      /* 测量失败退回全文 */
+    }
+  }
   const structured = pageTextFromBody(doc.body)
   if (structured) return structured
   return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()

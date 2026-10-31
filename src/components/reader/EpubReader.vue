@@ -42,6 +42,7 @@ import ePub, { type Book, type Rendition } from 'epubjs'
 import type { CoReadAnnotation } from '@/types/coReading'
 import {
   pageTextFromBody,
+  pageTextFromVisiblePage,
   syncCoReadOverlayAnnotations,
   type CoReadInlineLabels,
   type CoReadInlineStatus,
@@ -798,6 +799,17 @@ function goToPage(page: number) {
 function getPageText(): string {
   const doc = getActiveViewDocument()
   if (!doc?.body) return ''
+  // 共读/TTS 都按「当前屏」取词：epub.js 整章渲染进 iframe 多栏分屏，
+  // 直接取 body 会把其它页的文本也送出去（后端批注串页、icon 定位到隐藏栏）。
+  const overlay = overlayRef.value
+  if (overlay) {
+    try {
+      const visible = pageTextFromVisiblePage(doc.body, overlay)
+      if (visible) return visible
+    } catch {
+      /* 测量失败退回整章文本 */
+    }
+  }
   const structured = pageTextFromBody(doc.body)
   if (structured) return structured
   return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
