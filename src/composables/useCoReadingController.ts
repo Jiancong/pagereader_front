@@ -42,6 +42,8 @@ export function useCoReadingController() {
   /** 翻页代际：只有最新一次 /page 成功后才能 open，避免 open 读到尚未落库的游标 */
   let pageReportGeneration = 0
   let pagePostAbort: AbortController | null = null
+  /** 同页上报节流：重渲染/measure 抖动会让同页文本微变，无限重开 open 流（回归防护） */
+  let lastReportAt = 0
 
   const currentChapter = computed(() => store.getCachedChapter(store.currentChapterIndex))
   const coReadSpineIndex = computed(() => currentChapter.value?.epubSpineIndex)
@@ -363,6 +365,11 @@ export function useCoReadingController() {
     if (result === "missing") await recoverMissingPageThenOpen(generation, opts)
   }
 
+  /** 该页码是否已上报过（供渲染回调跳过同页重复上报） */
+  function hasReportedPage(page: number): boolean {
+    return page >= 1 && page === lastReportedPage.value
+  }
+
   async function reportReaderPage(page: number, pageTotal: number, text: string) {
     if (!store.sessionId) return
     const body = (text || "").trim().slice(0, 8000)
@@ -370,11 +377,15 @@ export function useCoReadingController() {
     if (!Number.isFinite(page) || page < 1) return
     if (!Number.isFinite(pageTotal) || pageTotal < 1) return
     if (page === lastReportedPage.value && lastPageReport?.text === body) return
+    // 同页短时间内的重复上报直接忽略：可见页文本会随滚动/重渲染微变，
+    // 若放开会让 /page + /open 无限重启（表现为批注反复清空重载）
+    if (page === lastReportedPage.value && Date.now() - lastReportAt < 1500) return
 
     const generation = ++pageReportGeneration
     openAbort?.abort()
     lastReportedPage.value = page
     lastPageReport = { page, pageTotal, text: body }
+    lastReportAt = Date.now()
     clearPageAnnotations()
 
     let res: coReadingApi.PageReadResult | null = null
@@ -581,5 +592,6 @@ export function useCoReadingController() {
     navigateToReaderView,
     retryCurrentPageOpen,
     forceRegenerateCurrentPage,
+    hasReportedPage,
   }
 }

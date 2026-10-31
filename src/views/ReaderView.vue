@@ -361,6 +361,7 @@ const {
   chatLoading: coReadChatLoading,
   onDraft: onCoReadDraft,
   reportReaderPage,
+  hasReportedPage: hasCoReadReportedPage,
   startPageCoRead,
   stopPageCoRead,
   onSendReplies: onCoReadSendReplies,
@@ -474,7 +475,7 @@ async function getCurrentPageText(): Promise<string> {
 
 function onReaderPageReady() {
   pageReadySignal.value++
-  if (coReadMode.value && currentPage.value >= 1) {
+  if (coReadMode.value && currentPage.value >= 1 && !hasCoReadReportedPage(currentPage.value)) {
     void reportVisibleCoReadPage(currentPage.value)
   }
 }
@@ -679,7 +680,9 @@ function onWheel(e: WheelEvent) {
 function onPageChange(page: number) {
   const changed = currentPage.value !== page
   currentPage.value = page
-  if (coReadMode.value) {
+  // 仅在真正换页时上报：同一页的重渲染/relocated 不重开批注生成，
+  // 否则可见页文本微变会触发 /page + /open 反复重启（不断刷新重载的回归根因）
+  if (coReadMode.value && changed) {
     void reportVisibleCoReadPage(page)
   }
   // TTS 自动翻页时不打断
