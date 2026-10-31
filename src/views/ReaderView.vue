@@ -6,10 +6,30 @@
       'reader-view--mobi': isMobi,
       'reader-view--pdf': isPdf,
       'reader-view--night': isDark,
+      'reader-view--co-read-immersive': coReadMode && !coReadChromeVisible,
     }"
     @contextmenu="onContextMenu"
     @wheel="onWheel"
   >
+    <!-- 沉浸共读模式下的右上角轻量悬浮唤醒丸（不占布局高度，点击可临时呼出工具栏或退出伴读） -->
+    <div v-if="coReadMode" class="reader-view__co-read-fab">
+      <button
+        type="button"
+        class="reader-view__co-read-fab-btn"
+        :title="coReadChromeVisible ? t('reader.moreTools') : t('reader.moreTools')"
+        @click.stop="coReadChromeVisible = !coReadChromeVisible"
+      >
+        <MoreHorizontal class="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        class="reader-view__co-read-fab-btn reader-view__co-read-fab-btn--exit"
+        :title="t('reader.modeCoRead')"
+        @click.stop="onTogglePageCoRead"
+      >
+        <BookHeart class="h-4 w-4" />
+      </button>
+    </div>
     <!-- 顶部工具栏 -->
     <header class="reader-view__toolbar">
       <div class="reader-view__toolbar-row">
@@ -159,8 +179,8 @@
       v-else-if="hasKnownReader"
       class="reader-view__content"
       :class="{ 'reader-view__content--co-read-pdf': coReadShowPdfSidePanel }"
-      @pointerdown.capture="mobileToolsOpen = false"
-      @touchstart.capture="mobileToolsOpen = false"
+      @pointerdown.capture="mobileToolsOpen = false; coReadChromeVisible = false"
+      @touchstart.capture="mobileToolsOpen = false; coReadChromeVisible = false"
     >
       <!-- PDF 阅读器 -->
       <PdfReader
@@ -303,7 +323,10 @@
     </footer>
 
     <template v-if="coReadMode && hasSource">
-      <div v-if="coReadStore.phase === 'reading' || coReadStore.phase === 'discussing'" class="reader-view__co-read-tray">
+      <div
+        v-if="coReadStore.phase === 'discussing' || (coReadStore.phase === 'reading' && coReadChapterOpenDone && (coReadReplyCount > 0 || coReadChromeVisible))"
+        class="reader-view__co-read-tray"
+      >
         <CoReadReplyTray
           v-if="coReadStore.phase === 'reading' && coReadChapterOpenDone"
           :reply-count="coReadReplyCount"
@@ -419,6 +442,8 @@ const headerTitle = computed(() => store.file?.name ?? '')
 
 const scale = ref(1.2)
 const mobileToolsOpen = ref(false)
+/** 沉浸共读模式下默认隐藏上下工具栏，点击右上角悬浮唤醒钮才临时展开 */
+const coReadChromeVisible = ref(false)
 const MOBILE_LAYOUT_MQ = '(max-width: 767px)'
 let mobileLayoutMq: MediaQueryList | null = null
 
@@ -483,8 +508,9 @@ function onReaderPageReady() {
 }
 
 async function onTogglePageCoRead() {
-  // 移动端点击沉浸共读后自动收起顶部展开工具栏，避免挡住阅读区或引起高度变化
+  // 移动端点击沉浸共读后自动收起顶部展开工具栏，进入无上下栏的沉浸阅读
   mobileToolsOpen.value = false
+  coReadChromeVisible.value = false
   if (coReadBusy.value) return
   if (coReadMode.value) {
     stopPageCoRead()
@@ -826,6 +852,52 @@ onBeforeUnmount(() => {
 }
 .reader-view--night {
   background: #0a0a0a;
+}
+/* 沉浸式 AI 伴读：默认隐藏顶部工具栏、移动端底栏和阅读器内置底栏，留出全屏阅读与批注空间 */
+.reader-view--co-read-immersive .reader-view__toolbar,
+.reader-view--co-read-immersive .reader-view__mobile-bar,
+.reader-view--co-read-immersive :deep(.epub-reader__nav) {
+  display: none !important;
+}
+.reader-view__co-read-fab {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: 12px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  opacity: 0.72;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+.reader-view__co-read-fab:hover,
+.reader-view__co-read-fab:focus-within {
+  opacity: 1;
+  background: rgba(17, 24, 39, 0.85);
+}
+.reader-view__co-read-fab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+.reader-view__co-read-fab-btn--exit {
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.22);
 }
 .reader-view__toolbar {
   display: flex;

@@ -308,24 +308,37 @@ function onDocTouchCancel(e: TouchEvent) {
   finishSwipe(e)
 }
 
-/** 移动端翻页前播放一次 3D 翻书动效，动画过半时执行真实翻页；桌面端保持瞬时翻页 */
+let flipTurnTimer: number | null = null
+let flipCleanTimer: number | null = null
+
+/** 翻页时播放拟真 3D 翻书动效（含卷页高光与书脊阴影），在折页中点切换真实页内容 */
 function withPageFlip(direction: 'next' | 'prev', turn: () => void) {
-  if (!isMobileViewport()) {
-    turn()
-    return
-  }
   const el = viewerRef.value
   if (!el) {
     turn()
     return
+  }
+  if (flipTurnTimer) {
+    window.clearTimeout(flipTurnTimer)
+    flipTurnTimer = null
+  }
+  if (flipCleanTimer) {
+    window.clearTimeout(flipCleanTimer)
+    flipCleanTimer = null
   }
   const cls = direction === 'next' ? 'epub-flip--next' : 'epub-flip--prev'
   el.classList.remove('epub-flip--next', 'epub-flip--prev')
   // 强制回流，让连续滑动时动画能重新播放
   void el.offsetWidth
   el.classList.add(cls)
-  window.setTimeout(turn, 140)
-  window.setTimeout(() => el.classList.remove(cls), 360)
+  flipTurnTimer = window.setTimeout(() => {
+    flipTurnTimer = null
+    turn()
+  }, 190)
+  flipCleanTimer = window.setTimeout(() => {
+    flipCleanTimer = null
+    el.classList.remove(cls)
+  }, 440)
 }
 
 function attachToDoc(doc: Document) {
@@ -1099,8 +1112,10 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   max-height: 100%;
   overflow: hidden;
   display: flex;
+  perspective: 1800px;
 }
 .epub-reader__viewer {
+  position: relative;
   flex: 1;
   width: 100%;
   height: 100%;
@@ -1109,43 +1124,128 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   overflow: hidden;
   background: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  transform-style: preserve-3d;
+  will-change: transform, box-shadow;
 }
-/* 移动端翻书动效：3D 翻页。下一页自右缘翻入（origin 左侧），上一页自左缘翻回 */
+/* 卷页折痕高光与书脊阴影遮罩 */
+.epub-reader__viewer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+  opacity: 0;
+}
+/* 拟真 3D 翻书动效：前半段旧页沿书脊掀起翻出，中点切换新页后从对侧铺平落定 */
 .epub-reader__viewer.epub-flip--next {
   transform-origin: left center;
-  animation: epub-flip-next 0.34s ease-in-out;
+  animation: epub-flip-next 0.44s cubic-bezier(0.22, 0.61, 0.36, 1);
   backface-visibility: hidden;
+}
+.epub-reader__viewer.epub-flip--next::after {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.24) 0%,
+    rgba(0, 0, 0, 0.06) 18%,
+    rgba(255, 255, 255, 0.28) 46%,
+    rgba(0, 0, 0, 0.18) 78%,
+    rgba(0, 0, 0, 0.32) 100%
+  );
+  animation: epub-curl-shade-next 0.44s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .epub-reader__viewer.epub-flip--prev {
   transform-origin: right center;
-  animation: epub-flip-prev 0.34s ease-in-out;
+  animation: epub-flip-prev 0.44s cubic-bezier(0.22, 0.61, 0.36, 1);
   backface-visibility: hidden;
+}
+.epub-reader__viewer.epub-flip--prev::after {
+  background: linear-gradient(
+    270deg,
+    rgba(0, 0, 0, 0.24) 0%,
+    rgba(0, 0, 0, 0.06) 18%,
+    rgba(255, 255, 255, 0.28) 46%,
+    rgba(0, 0, 0, 0.18) 78%,
+    rgba(0, 0, 0, 0.32) 100%
+  );
+  animation: epub-curl-shade-prev 0.44s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 @keyframes epub-flip-next {
   0% {
-    transform: perspective(1600px) rotateY(0deg);
+    transform: rotateY(0deg) translateX(0) scale(1);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   }
-  45% {
-    transform: perspective(1600px) rotateY(-16deg) scale(0.985);
+  43% {
+    transform: rotateY(-54deg) translateX(-3%) scale(0.975);
+    box-shadow: 24px 0 36px -8px rgba(0, 0, 0, 0.38);
+  }
+  47% {
+    transform: rotateY(20deg) translateX(2.5%) scale(0.985);
+    box-shadow: -18px 0 28px -6px rgba(0, 0, 0, 0.28);
   }
   100% {
-    transform: perspective(1600px) rotateY(0deg);
+    transform: rotateY(0deg) translateX(0) scale(1);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   }
 }
 @keyframes epub-flip-prev {
   0% {
-    transform: perspective(1600px) rotateY(0deg);
+    transform: rotateY(0deg) translateX(0) scale(1);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   }
-  45% {
-    transform: perspective(1600px) rotateY(16deg) scale(0.985);
+  43% {
+    transform: rotateY(54deg) translateX(3%) scale(0.975);
+    box-shadow: -24px 0 36px -8px rgba(0, 0, 0, 0.38);
+  }
+  47% {
+    transform: rotateY(-20deg) translateX(-2.5%) scale(0.985);
+    box-shadow: 18px 0 28px -6px rgba(0, 0, 0, 0.28);
   }
   100% {
-    transform: perspective(1600px) rotateY(0deg);
+    transform: rotateY(0deg) translateX(0) scale(1);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  }
+}
+@keyframes epub-curl-shade-next {
+  0% {
+    opacity: 0;
+    transform: translateX(35%);
+  }
+  43% {
+    opacity: 0.9;
+    transform: translateX(-15%);
+  }
+  47% {
+    opacity: 0.75;
+    transform: translateX(20%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-40%);
+  }
+}
+@keyframes epub-curl-shade-prev {
+  0% {
+    opacity: 0;
+    transform: translateX(-35%);
+  }
+  43% {
+    opacity: 0.9;
+    transform: translateX(15%);
+  }
+  47% {
+    opacity: 0.75;
+    transform: translateX(-20%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(40%);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .epub-reader__viewer.epub-flip--next,
-  .epub-reader__viewer.epub-flip--prev {
+  .epub-reader__viewer.epub-flip--prev,
+  .epub-reader__viewer.epub-flip--next::after,
+  .epub-reader__viewer.epub-flip--prev::after {
     animation: none;
   }
 }
