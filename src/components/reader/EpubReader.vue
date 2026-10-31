@@ -576,14 +576,6 @@ onMounted(async () => {
         attachToDoc(doc)
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            const frame = measureFrame()
-            const layoutW = Number(view?.layout?.width) || 0
-            if (layoutW > 0 && Math.abs(layoutW - frame.width) > 8) {
-              renderedWidth = 0
-              renderedHeight = 0
-              applyFrameSize()
-              return
-            }
             repairPaginatedColumns(view)
             const pageWidth = view?.layout?.pageWidth || view?.layout?.delta
             const manager = (rendition as { manager?: { container?: HTMLElement; scrollTo?: (x: number, y: number) => void } } | null)?.manager
@@ -720,19 +712,62 @@ async function waitForMeasureFrame(maxAttempts = 40): Promise<{ width: number; h
   return measureFrame()
 }
 
+/**
+ * 调整 iframe 尺寸。
+ * 注意：epub.js 的 rendition.onResized 会在 resize 后执行 display(location.start.cfi)，
+ * 把阅读位置拉回「当前 location 起点」。若在翻页瞬间触发 resize，就会出现
+ * 「翻到下一页又刷回上一页」。因此翻页静默期内直接跳过 resize，
+ * 其余情况下 resize 前后保存并恢复横向位置与页码。
+ */
+let resizing = false
+/** 翻页静默期截止时间：翻页动作后短时间内不做 resize，避免与滚动抢位置 */
+let flipGuardUntil = 0
+
+function markFlipActivity() {
+  flipGuardUntil = Date.now() + 600
+}
+
 function applyFrameSize() {
-  if (!rendition) return
+  if (!rendition || resizing) return
+  if (Date.now() < flipGuardUntil) return
   const size = measureFrame()
   if (Math.abs(size.width - renderedWidth) <= 2 && Math.abs(size.height - renderedHeight) <= 2) return
   renderedWidth = size.width
   renderedHeight = size.height
+
+  const manager = managerBox()
+  const container = manager?.container
+  const savedLeft = container?.scrollLeft || 0
+  const savedDelta = Number(manager?.layout?.delta || manager?.layout?.pageWidth || 0)
+  const savedPage = savedDelta > 8 ? Math.round(savedLeft / savedDelta) : 0
+
+  resizing = true
   rendition.resize(size.width, size.height)
+  // resize 是同步重新分页 + display，下一帧把位置按新页宽还原
+  requestAnimationFrame(() => {
+    resizing = false
+    const m = managerBox()
+    const c = m?.container
+    if (!c) return
+    const delta = Number(m?.layout?.delta || m?.layout?.pageWidth || 0)
+    if (delta > 8) {
+      const target = savedPage > 0 ? savedPage * delta : Math.min(savedLeft, c.scrollWidth - delta)
+      if (Math.abs(target - c.scrollLeft) > 2) {
+        m?.scrollTo?.(Math.max(0, target), 0)
+        ;(rendition as { reportLocation?: () => void } | null)?.reportLocation?.()
+      }
+    }
+    syncEnds()
+    applyCoReadInline()
+  })
 }
 
 function next() {
+  markFlipActivity()
   withPageFlip('next', turnNext)
 }
 function prev() {
+  markFlipActivity()
   withPageFlip('prev', turnPrev)
 }
 function turnNext() {
@@ -775,6 +810,7 @@ function turnPrev() {
 }
 function goToPage(page: number) {
   if (!book || !rendition || !pageTotal.value) return
+  markFlipActivity()
   const target = Math.min(Math.max(Math.trunc(page), 1), pageTotal.value)
   const pos = locateVisualPage(target)
   if (!pos) {
