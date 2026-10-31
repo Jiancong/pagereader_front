@@ -483,11 +483,37 @@ function repairPaginatedColumns(view: any) {
   }
 }
 
-function applyCoReadInline() {
+/** 用户正在与 overlay 交互（浮层打开/输入中）时，抑制全量重建，避免焦点丢失与闪烁循环 */
+function overlayHasInteraction(overlay: HTMLElement): boolean {
+  const doc = overlay.ownerDocument
+  const active = doc?.activeElement
+  if (active && overlay.contains(active)) {
+    const tag = (active.tagName || "").toLowerCase()
+    if (tag === "textarea" || tag === "input") return true
+  }
+  const focused = overlay.querySelector(".co-read-host:focus-within")
+  return Boolean(focused)
+}
+
+/** 主动结束 overlay 交互（翻页前调用），让随后的重建/重排能正常进行 */
+function releaseOverlayInteraction() {
+  const overlay = overlayRef.value
+  if (!overlay) return
+  const doc = overlay.ownerDocument
+  const active = doc?.activeElement
+  if (active && overlay.contains(active) && typeof (active as HTMLElement).blur === "function") {
+    ;(active as HTMLElement).blur()
+  }
+}
+
+function applyCoReadInline(force = false) {
   const overlay = overlayRef.value
   if (!props.coReadInline?.labels || !overlay) return
   const body = currentViewDoc?.body
   if (!body) return
+  // 关键：overlay 重建会销毁正在输入的 textarea 和已展开的浮层。
+  // 华为等移动浏览器上这会造成「点击 icon → 重建 → 焦点异常 → 再重建」的无限刷新。
+  if (!force && overlayHasInteraction(overlay)) return
   syncCoReadOverlayAnnotations({
     body,
     host: overlay,
@@ -499,12 +525,30 @@ function applyCoReadInline() {
   })
 }
 
+/**
+ * 只在「批注集合结构」变化时重建 overlay：
+ * 流式追加内容（content/myReply/streaming）不应触发 DOM 重建，
+ * 否则拖拽输入时会不停闪烁。用 id+quote+kind+content 的轻量签名判断。
+ */
+function coReadPayloadSignature(): string {
+  const p = props.coReadInline
+  if (!p) return ""
+  const parts: string[] = []
+  for (const a of p.annotations) {
+    parts.push(`${a.id}|${a.kind}|${a.anchor?.paragraphIndex ?? 0}|${a.anchor?.quote ?? ""}|${a.content ?? ""}`)
+  }
+  const s = p.status
+  parts.push(
+    `status:${s?.loading ? 1 : 0}|${s?.errorCode ?? ""}|${s?.emptyHint ?? ""}|${s?.intro ?? ""}`,
+  )
+  return parts.join("~")
+}
+
 watch(
-  () => props.coReadInline,
+  coReadPayloadSignature,
   () => {
     applyCoReadInline()
   },
-  { deep: true },
 )
 
 onMounted(async () => {
@@ -571,6 +615,7 @@ onMounted(async () => {
       })
       updatePageInfo(location)
       syncEnds()
+      // 交互中（浮层打开/输入）不强制重建，避免销毁 textarea 触发键盘开合循环
       applyCoReadInline()
     })
 
@@ -769,6 +814,14 @@ function applyFrameSize() {
     dbg('resize SKIPPED (guard)')
     return
   }
+  // 用户在浮层输入时（移动端软键盘会改变可视高度）不重新分页：
+  // 否则 resize → epub display(cfi) → 重建 overlay → 焦点丢失 → 键盘收起
+  // → 尺寸再次变化，形成无限刷新循环。
+  const ov = overlayRef.value
+  if (ov && overlayHasInteraction(ov)) {
+    dbg('resize SKIPPED (interaction)')
+    return
+  }
   const size = measureFrame()
   if (Math.abs(size.width - renderedWidth) <= 2 && Math.abs(size.height - renderedHeight) <= 2) return
   dbg('resize START', { from: `${renderedWidth}x${renderedHeight}`, to: `${size.width}x${size.height}` })
@@ -806,11 +859,13 @@ function applyFrameSize() {
 
 function next() {
   dbg('next() called')
+  releaseOverlayInteraction()
   markFlipActivity()
   withPageFlip('next', turnNext)
 }
 function prev() {
   dbg('prev() called')
+  releaseOverlayInteraction()
   markFlipActivity()
   withPageFlip('prev', turnPrev)
 }
