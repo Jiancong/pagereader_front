@@ -222,11 +222,19 @@ function onDocWheel(e: WheelEvent) {
 }
 
 // ── 移动端滑动翻页 + 翻书动效 ─────────────────────────────────────────────
-const SWIPE_MIN_PX = 64
-const SWIPE_MAX_MS = 800
+// 注意：epub iframe 内容横向可滚动（多栏 body 超宽），手机浏览器会把横滑判定为
+// 原生滚动并接管手势（touchend 可能被 touchcancel 替代）。因此：
+// 1) 注入 touch-action:none 禁掉内容区原生触摸滚动，把横滑还给 JS；
+// 2) touchmove 持续跟踪触点，touchcancel 也能完成翻页判定。
+const SWIPE_MIN_PX = 56
+const SWIPE_MAX_MS = 1000
+const TOUCH_STYLE_ID = 'page2top-epub-touch-style'
 let touchStartX = 0
 let touchStartY = 0
+let touchLastX = 0
+let touchLastY = 0
 let touchStartAt = 0
+let touchLogged = false
 
 function isMobileViewport(): boolean {
   try {
@@ -236,28 +244,66 @@ function isMobileViewport(): boolean {
   }
 }
 
+/** 禁用 iframe 内容的原生触摸滚动/手势接管，否则部分手机浏览器（如华为）横滑不派发 touchend */
+function ensureTouchStyle(doc: Document) {
+  if (typeof doc.getElementById !== 'function' || doc.getElementById(TOUCH_STYLE_ID)) return
+  const style = doc.createElement('style')
+  style.id = TOUCH_STYLE_ID
+  style.textContent = 'html, body { touch-action: none !important; }'
+  ;(doc.head || doc.documentElement).appendChild(style)
+}
+
 function onDocTouchStart(e: TouchEvent) {
   const t = e.touches[0]
   if (!t) return
   touchStartX = t.clientX
   touchStartY = t.clientY
+  touchLastX = t.clientX
+  touchLastY = t.clientY
   touchStartAt = Date.now()
+  if (!touchLogged) {
+    touchLogged = true
+    try {
+      console.info('[Reader] touch swipe ready (mobile)')
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
-function onDocTouchEnd(e: TouchEvent) {
-  const t = e.changedTouches[0]
+function onDocTouchMove(e: TouchEvent) {
+  const t = e.touches[0]
   if (!t) return
+  touchLastX = t.clientX
+  touchLastY = t.clientY
+}
+
+/** 用最终触点做滑动判定；touchend / touchcancel 都走这里 */
+function finishSwipe(e: TouchEvent) {
   // 正在拖选文字（划词批注/复制）时不翻页
   const doc = (e.target as Node | null)?.ownerDocument
   if (doc && String(doc.getSelection?.()?.toString() || '').trim()) return
-  const dx = t.clientX - touchStartX
-  const dy = t.clientY - touchStartY
+  const dx = touchLastX - touchStartX
+  const dy = touchLastY - touchStartY
   const dt = Date.now() - touchStartAt
   // 快速、明显横向的滑动才算翻页；纵向滚动与长按（选词/菜单）不触发
   if (dt > SWIPE_MAX_MS || Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.6) return
   // 右→左滑 = 向右翻书（下一页）；左→右滑 = 向左翻书（上一页）
   if (dx < 0) next()
   else prev()
+}
+
+function onDocTouchEnd(e: TouchEvent) {
+  const t = e.changedTouches[0]
+  if (t) {
+    touchLastX = t.clientX
+    touchLastY = t.clientY
+  }
+  finishSwipe(e)
+}
+
+function onDocTouchCancel(e: TouchEvent) {
+  finishSwipe(e)
 }
 
 /** 移动端翻页前播放一次 3D 翻书动效，动画过半时执行真实翻页；桌面端保持瞬时翻页 */
@@ -287,8 +333,11 @@ function attachToDoc(doc: Document) {
   doc.addEventListener('contextmenu', onDocContextMenu, true)
   doc.addEventListener('wheel', onDocWheel, { capture: true, passive: false })
   // 移动端滑动翻页：epub 内容渲染在 iframe 内，touch 事件只能在文档内部捕获
+  ensureTouchStyle(doc)
   doc.addEventListener('touchstart', onDocTouchStart, { capture: true, passive: true })
+  doc.addEventListener('touchmove', onDocTouchMove, { capture: true, passive: true })
   doc.addEventListener('touchend', onDocTouchEnd, { capture: true, passive: true })
+  doc.addEventListener('touchcancel', onDocTouchCancel, { capture: true, passive: true })
 }
 function detachFromDoc(doc: Document) {
   if (!trackedDocs.has(doc)) return
@@ -297,7 +346,9 @@ function detachFromDoc(doc: Document) {
   doc.removeEventListener('contextmenu', onDocContextMenu, true)
   doc.removeEventListener('wheel', onDocWheel, true)
   doc.removeEventListener('touchstart', onDocTouchStart, true)
+  doc.removeEventListener('touchmove', onDocTouchMove, true)
   doc.removeEventListener('touchend', onDocTouchEnd, true)
+  doc.removeEventListener('touchcancel', onDocTouchCancel, true)
 }
 
 /**
