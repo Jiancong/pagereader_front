@@ -897,6 +897,28 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     btn.addEventListener("touchstart", stopEvent, { passive: true })
     host.appendChild(btn)
 
+    // 桌面端 hover 浮层：鼠标离开图标后延迟关闭（260ms 宽限），
+    // 让指针能移入气泡内点击 note 输入框；期间移入气泡则取消关闭。
+    let hoverCloseTimer = 0
+    const openByHover = () => {
+      const view = hostDoc.defaultView
+      if (hoverCloseTimer && view) view.clearTimeout(hoverCloseTimer)
+      hoverCloseTimer = 0
+      host.classList.add("co-read-host--hover")
+    }
+    const scheduleCloseByHover = () => {
+      const view = hostDoc.defaultView
+      if (hoverCloseTimer && view) view.clearTimeout(hoverCloseTimer)
+      hoverCloseTimer = view
+        ? view.setTimeout(() => {
+            hoverCloseTimer = 0
+            host.classList.remove("co-read-host--hover")
+          }, 260)
+        : 0
+    }
+    btn.addEventListener("mouseenter", openByHover)
+    btn.addEventListener("mouseleave", scheduleCloseByHover)
+
     const pop = buildPopoverContent(hostDoc, ann, opts.labels, opts.onDraft)
     const popLeft = Math.max(4, Math.min(mx - 40, hostW - 324))
     if (my > hostH * 0.55) {
