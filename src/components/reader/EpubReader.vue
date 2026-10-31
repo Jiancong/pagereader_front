@@ -221,12 +221,74 @@ function onDocWheel(e: WheelEvent) {
   emit('zoom', e.deltaY > 0 ? -0.1 : 0.1)
 }
 
+// ── 移动端滑动翻页 + 翻书动效 ─────────────────────────────────────────────
+const SWIPE_MIN_PX = 64
+const SWIPE_MAX_MS = 800
+let touchStartX = 0
+let touchStartY = 0
+let touchStartAt = 0
+
+function isMobileViewport(): boolean {
+  try {
+    return window.matchMedia('(max-width: 767px)').matches
+  } catch {
+    return false
+  }
+}
+
+function onDocTouchStart(e: TouchEvent) {
+  const t = e.touches[0]
+  if (!t) return
+  touchStartX = t.clientX
+  touchStartY = t.clientY
+  touchStartAt = Date.now()
+}
+
+function onDocTouchEnd(e: TouchEvent) {
+  const t = e.changedTouches[0]
+  if (!t) return
+  // 正在拖选文字（划词批注/复制）时不翻页
+  const doc = (e.target as Node | null)?.ownerDocument
+  if (doc && String(doc.getSelection?.()?.toString() || '').trim()) return
+  const dx = t.clientX - touchStartX
+  const dy = t.clientY - touchStartY
+  const dt = Date.now() - touchStartAt
+  // 快速、明显横向的滑动才算翻页；纵向滚动与长按（选词/菜单）不触发
+  if (dt > SWIPE_MAX_MS || Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.6) return
+  // 右→左滑 = 向右翻书（下一页）；左→右滑 = 向左翻书（上一页）
+  if (dx < 0) next()
+  else prev()
+}
+
+/** 移动端翻页前播放一次 3D 翻书动效，动画过半时执行真实翻页；桌面端保持瞬时翻页 */
+function withPageFlip(direction: 'next' | 'prev', turn: () => void) {
+  if (!isMobileViewport()) {
+    turn()
+    return
+  }
+  const el = viewerRef.value
+  if (!el) {
+    turn()
+    return
+  }
+  const cls = direction === 'next' ? 'epub-flip--next' : 'epub-flip--prev'
+  el.classList.remove('epub-flip--next', 'epub-flip--prev')
+  // 强制回流，让连续滑动时动画能重新播放
+  void el.offsetWidth
+  el.classList.add(cls)
+  window.setTimeout(turn, 140)
+  window.setTimeout(() => el.classList.remove(cls), 360)
+}
+
 function attachToDoc(doc: Document) {
   if (trackedDocs.has(doc)) return
   trackedDocs.add(doc)
   doc.addEventListener('keydown', onDocKeyDown, true)
   doc.addEventListener('contextmenu', onDocContextMenu, true)
   doc.addEventListener('wheel', onDocWheel, { capture: true, passive: false })
+  // 移动端滑动翻页：epub 内容渲染在 iframe 内，touch 事件只能在文档内部捕获
+  doc.addEventListener('touchstart', onDocTouchStart, { capture: true, passive: true })
+  doc.addEventListener('touchend', onDocTouchEnd, { capture: true, passive: true })
 }
 function detachFromDoc(doc: Document) {
   if (!trackedDocs.has(doc)) return
@@ -234,6 +296,8 @@ function detachFromDoc(doc: Document) {
   doc.removeEventListener('keydown', onDocKeyDown, true)
   doc.removeEventListener('contextmenu', onDocContextMenu, true)
   doc.removeEventListener('wheel', onDocWheel, true)
+  doc.removeEventListener('touchstart', onDocTouchStart, true)
+  doc.removeEventListener('touchend', onDocTouchEnd, true)
 }
 
 /**
@@ -614,6 +678,12 @@ function applyFrameSize() {
 }
 
 function next() {
+  withPageFlip('next', turnNext)
+}
+function prev() {
+  withPageFlip('prev', turnPrev)
+}
+function turnNext() {
   if (!rendition) return
   const delta = pageTurnDelta()
   const container = managerBox()?.container
@@ -632,7 +702,7 @@ function next() {
   }
   void rendition.next()
 }
-function prev() {
+function turnPrev() {
   if (!rendition) return
   const delta = pageTurnDelta()
   const container = managerBox()?.container
@@ -749,6 +819,45 @@ defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
   overflow: hidden;
   background: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+/* 移动端翻书动效：3D 翻页。下一页自右缘翻入（origin 左侧），上一页自左缘翻回 */
+.epub-reader__viewer.epub-flip--next {
+  transform-origin: left center;
+  animation: epub-flip-next 0.34s ease-in-out;
+  backface-visibility: hidden;
+}
+.epub-reader__viewer.epub-flip--prev {
+  transform-origin: right center;
+  animation: epub-flip-prev 0.34s ease-in-out;
+  backface-visibility: hidden;
+}
+@keyframes epub-flip-next {
+  0% {
+    transform: perspective(1600px) rotateY(0deg);
+  }
+  45% {
+    transform: perspective(1600px) rotateY(-16deg) scale(0.985);
+  }
+  100% {
+    transform: perspective(1600px) rotateY(0deg);
+  }
+}
+@keyframes epub-flip-prev {
+  0% {
+    transform: perspective(1600px) rotateY(0deg);
+  }
+  45% {
+    transform: perspective(1600px) rotateY(16deg) scale(0.985);
+  }
+  100% {
+    transform: perspective(1600px) rotateY(0deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .epub-reader__viewer.epub-flip--next,
+  .epub-reader__viewer.epub-flip--prev {
+    animation: none;
+  }
 }
 .epub-reader__co-read-overlay {
   position: absolute;
