@@ -366,6 +366,34 @@ function rawOffsetsToRange(doc: Document, el: HTMLElement, start: number, end: n
   }
 }
 
+function quoteRangeInElement(el: HTMLElement, quote: string): Range | null {
+  const doc = el.ownerDocument
+  if (!doc) return null
+  const raw = el.textContent || ""
+  const span = findQuoteMatchRangeRaw(raw, quote)
+  if (!span) return null
+  return rawOffsetsToRange(doc, el, span[0], span[1])
+}
+
+/** 优先在 paragraphIndex 段落、再扫全页及 body 查找 quote Range */
+function quoteRangeInBodyFallback(body: HTMLElement, ann: CoReadAnnotation): Range | null {
+  const quote = ann.anchor.quote?.trim()
+  if (!quote) return null
+  const anchors = collectParagraphAnchors(body)
+  const idx = Math.max(0, ann.anchor.paragraphIndex)
+  const tryList: HTMLElement[] = []
+  if (anchors[idx]) tryList.push(anchors[idx])
+  for (let i = 0; i < anchors.length; i++) {
+    if (i !== idx) tryList.push(anchors[i])
+  }
+  tryList.push(body)
+  for (const el of tryList) {
+    const r = quoteRangeInElement(el, quote)
+    if (r) return r
+  }
+  return null
+}
+
 /** 在当前页可见文本中定位引文；引文若跨页被切开，取本页可见的那一段 */
 function quoteRangeOnVisiblePage(
   el: HTMLElement,
@@ -507,83 +535,29 @@ interface VisibleWindow {
   y1: number
 }
 
-/** 找到 iframe 最近的滚动视口（epub.js 的 .epub-container），它才是真正的「一页」窗口 */
-function scrollViewportOf(frame: HTMLElement): HTMLElement | null {
-  const doc = frame.ownerDocument
-  let el: HTMLElement | null = frame.parentElement
-  for (let depth = 0; depth < 8 && el; depth++) {
-    const cls = el.className
-    if (typeof cls === "string" && /\bepub-container\b/.test(cls)) return el
-    let style: CSSStyleDeclaration | null = null
-    try {
-      style = doc.defaultView?.getComputedStyle(el) ?? null
-    } catch {
-      style = null
-    }
-    const ox = style?.overflowX || ""
-    const scrollable = ox === "auto" || ox === "scroll" || style?.overflow === "auto" || style?.overflow === "scroll"
-    if (scrollable && el.scrollWidth > el.clientWidth + 4) return el
-    el = el.parentElement
-  }
-  return null
-}
-
 /**
- * 当前可见「页」在 iframe 视口坐标系中的窗口。
- * epub.js 整章渲染进 iframe 后由宿主容器横向滚动分页，iframe 视口包含所有栏。
- * 直接以 iframe 的**滚动视口**（.epub-container）投影出可见矩形，这是权威值：
- * 之前按 overlay 反投影在 zoom/缩放下会算出偏大的窗口，导致整段都被当成可见。
+ * 当前可见「页」在 iframe Range.getClientRects() 坐标系中的窗口。
+ * 直接用 frameMap(doc, host) 的精确逆变换将宿主可视区 [0, hostW] × [0, hostH]
+ * 反投影回 Range 坐标系——与 pinFromClientRect 数学恒等，无论 topLevel 与否、
+ * 无论 zoom 缩放多少，凡在当前页可见的文字必落在 [x0, x1] × [y0, y1] 内。
  */
 function visibleWindowInFrame(doc: Document, host: HTMLElement): VisibleWindow {
-  const frame = (doc.defaultView?.frameElement as HTMLElement | null) ?? null
-  if (frame) {
-    const viewport = scrollViewportOf(frame)
-    if (viewport) {
-      const vr = viewport.getBoundingClientRect()
-      const fr = frame.getBoundingClientRect()
-      const frameW = frame.clientWidth || fr.width || 1
-      const frameH = frame.clientHeight || fr.height || 1
-      const scaleX = (fr.width || frameW) / frameW
-      const scaleY = (fr.height || frameH) / frameH
-      if (scaleX > 0 && scaleY > 0) {
-        return {
-          x0: (vr.left - fr.left) / scaleX,
-          x1: (vr.right - fr.left) / scaleX,
-          y0: (vr.top - fr.top) / scaleY,
-          y1: (vr.bottom - fr.top) / scaleY,
-        }
-      }
-    }
-  }
-  return visibleWindowFromHost(doc, host)
-}
-
-/** 兜底：按宿主 overlay 可视区反投影 */
-function visibleWindowFromHost(doc: Document, host: HTMLElement): VisibleWindow {
   const map = frameMap(doc, host)
   const hostRect = host.getBoundingClientRect()
-  const hostW = host.clientWidth || hostRect.width || 0
-  const hostH = host.clientHeight || hostRect.height || 0
-  if (map.topLevel) {
-    return {
-      x0: map.viewLeft,
-      x1: map.viewLeft + (hostW / (map.scaleX || 1)),
-      y0: map.viewTop,
-      y1: map.viewTop + (hostH / (map.scaleY || 1)),
-    }
-  }
+  const hostW = host.clientWidth || hostRect.width || 1
+  const hostH = host.clientHeight || hostRect.height || 1
   const sx = map.scaleX || 1
   const sy = map.scaleY || 1
   return {
-    x0: Math.max(map.viewLeft, -map.originX / sx),
-    x1: Math.min(map.viewRight, (hostW - map.originX) / sx),
-    y0: Math.max(map.viewTop, -map.originY / sy),
-    y1: Math.min(map.viewBottom, (hostH - map.originY) / sy),
+    x0: -map.originX / sx,
+    x1: (hostW - map.originX) / sx,
+    y0: -map.originY / sy,
+    y1: (hostH - map.originY) / sy,
   }
 }
 
 function rectInVisibleWindow(r: DOMRect, win: VisibleWindow): boolean {
-  if (r.width <= 0 && r.height <= 0) return false
+  if (r.width < 1 || r.height < 1) return false
   return r.right > win.x0 + 1 && r.bottom > win.y0 + 1 && r.left < win.x1 - 1 && r.top < win.y1 - 1
 }
 
@@ -605,22 +579,22 @@ export function pageTextFromVisiblePage(body: HTMLElement, host: HTMLElement): s
   return parts.join("\n\n")
 }
 
-/** Range 中最后一个非空行 rect */
+/** Range 中最后一个有实际宽高的行 rect（忽略首尾换行产生的 width=0 零宽 rect） */
 function lastRectOf(range: Range): DOMRect | null {
   const rects = range.getClientRects()
   for (let i = rects.length - 1; i >= 0; i--) {
     const r = rects[i]
-    if (r.width > 0 || r.height > 0) return r
+    if (r.width >= 1 && r.height >= 1) return r
   }
   return null
 }
 
-/** Range 中第一个非空行 rect */
+/** Range 中第一个有实际宽高的行 rect（忽略首尾换行产生的 width=0 零宽 rect） */
 function firstRectOf(range: Range): DOMRect | null {
   const rects = range.getClientRects()
   for (let i = 0; i < rects.length; i++) {
     const r = rects[i]
-    if (r.width > 0 || r.height > 0) return r
+    if (r.width >= 1 && r.height >= 1) return r
   }
   return null
 }
@@ -849,6 +823,11 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
       for (const para of ordered) {
         range = quoteRangeOnVisiblePage(para.el, para.span, quote)
         if (range) break
+      }
+      // 兜底：若二分切片未覆盖（如单页章节/div 容器），直接在段落或 body 中匹配 quote，
+      // 再由 pinFromRange 校验其真实文字 rect 是否落在当前可见屏内
+      if (!range) {
+        range = quoteRangeInBodyFallback(opts.body, ann)
       }
     }
     if (!range) continue

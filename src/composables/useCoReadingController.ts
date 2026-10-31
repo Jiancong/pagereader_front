@@ -130,6 +130,7 @@ export function useCoReadingController() {
     store.openingChapter = true
     if (!opts?.force) store.clearPageOpenError()
     const n = chapterApiNumber(chapterIndex)
+    let replayedFromCache = false
     const callbacks = {
       shouldAcceptPage: (pageIndex?: number) =>
         pageIndex === undefined || expectedPage < 1 || pageIndex === expectedPage,
@@ -156,7 +157,8 @@ export function useCoReadingController() {
         store.appendAnnotationDelta(data.id, data.delta),
       onAnnotationDone: (data: { id: string; content?: string }) =>
         store.finalizeAnnotation(data.id, data.content),
-      onChapterDone: (data: { annotationCount?: number }) => {
+      onChapterDone: (data: { annotationCount?: number; replayed?: boolean }) => {
+        if (data.replayed) replayedFromCache = true
         store.chapterOpenDone = true
         const page = lastReportedPage.value
         const localCount = store.annotations.filter(
@@ -190,6 +192,22 @@ export function useCoReadingController() {
       )
       if (signal.aborted) return "aborted"
       if (pageTextMissing) return "missing"
+      // 若后端直接 replayed 了之前在中文界面下缓存的批注，而当前界面已切为英文，
+      // 自动清掉本页中文缓存并以 force=true 按当前语言重新生成一次
+      if (replayedFromCache && !opts?.force && getSavedLocale() === "en") {
+        const pageAnns = store.annotations.filter(
+          (a) =>
+            a.chapterIndex === chapterIndex &&
+            (expectedPage < 1 || a.pageIndex === undefined || a.pageIndex === expectedPage),
+        )
+        const hasChineseReplayed = pageAnns.some((a) => /[\u4e00-\u9fff]/.test(a.content || ""))
+        if (hasChineseReplayed) {
+          store.annotations = store.annotations.filter((a) => !pageAnns.includes(a))
+          store.pageIntroText = ""
+          store.chapterOpenDone = false
+          return await runChapterOpenStream(chapterIndex, { force: true })
+        }
+      }
       if (!store.chapterOpenDone) store.chapterOpenDone = true
       return "ok"
     } catch (e) {
@@ -312,7 +330,9 @@ export function useCoReadingController() {
       store.currentChapterIndex = 0
       return
     }
-    const fileHash = await sha256HexFile(file)
+    const rawHash = await sha256HexFile(file)
+    // 英文与中文会话隔离不同 fileHash（保持 64 位合法 hex），防止英文界面下后端回放旧中文 session 缓存
+    const fileHash = locale === "en" && rawHash.length >= 4 ? `${rawHash.slice(0, -2)}e1` : rawHash
     const { sessionId } = await coReadingApi.createSession({
       fileHash,
       fileName: file.name,

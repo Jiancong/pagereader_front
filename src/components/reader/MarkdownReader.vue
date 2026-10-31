@@ -273,7 +273,7 @@ function patchCoReadText() {
   }
 }
 
-watch(coReadPayloadSignature, () => applyCoReadInline())
+watch(coReadPayloadSignature, () => applyCoReadInline(), { flush: 'post' })
 watch(
   () => {
     const p = props.coReadInline
@@ -283,6 +283,7 @@ watch(
     return `${n}|${p.status?.intro?.length ?? 0}`
   },
   () => patchCoReadText(),
+  { flush: 'post' },
 )
 watch(
   () => props.colorTheme,

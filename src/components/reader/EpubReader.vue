@@ -7,7 +7,7 @@
       >
         <div ref="viewerShellRef" class="epub-reader__viewer-shell">
           <div ref="viewerRef" class="epub-reader__viewer"></div>
-          <div v-if="coReadInline" ref="overlayRef" class="epub-reader__co-read-overlay"></div>
+          <div v-show="Boolean(coReadInline)" ref="overlayRef" class="epub-reader__co-read-overlay"></div>
         </div>
       </div>
       <div v-if="loading" class="epub-reader__overlay">{{ t('reader.loading') }}</div>
@@ -526,8 +526,12 @@ function releaseOverlayInteraction() {
 
 function applyCoReadInline(force = false) {
   const overlay = overlayRef.value
-  if (!props.coReadInline?.labels || !overlay) return
-  const body = currentViewDoc?.body
+  if (!overlay) return
+  if (!props.coReadInline?.labels) {
+    overlay.textContent = ''
+    return
+  }
+  const body = currentViewDoc?.body || getActiveViewDocument()?.body
   if (!body) return
   // 关键：overlay 重建会销毁正在输入的 textarea 和已展开的浮层。
   // 华为等移动浏览器上这会造成「点击 icon → 重建 → 焦点异常 → 再重建」的无限刷新。
@@ -591,6 +595,7 @@ watch(
   () => {
     applyCoReadInline()
   },
+  { flush: 'post' },
 )
 
 // 流式文本变化：只做原地文本更新，绝不重建 DOM
@@ -605,6 +610,7 @@ watch(
   () => {
     patchCoReadText()
   },
+  { flush: 'post' },
 )
 
 onMounted(async () => {
