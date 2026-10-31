@@ -595,6 +595,8 @@
             'ppt-editing': isEditing,
             'ppt-palette-light': isLightPalette,
             'ppt-scheme-dark': isDarkScheme,
+            // 护眼（深色）滤镜：导出时摘除，避免 html2canvas 把反相画进成品图
+            'ppt-slide-wrapper--eye-care': eyeCareMode && !exporting,
           },
         ]"
         :style="slideWrapperStyle"
@@ -8481,36 +8483,35 @@ defineExpose({
   }
 
   &:hover {
-    background: rgba(52, 168, 83, 0.2);
-    border-color: rgba(134, 200, 148, 0.45);
+    background: rgba(138, 92, 246, 0.22);
+    border-color: rgba(167, 139, 250, 0.45);
     color: #fff;
   }
 
   &.ppt-eye-care-btn--active {
-    background: rgba(52, 168, 83, 0.28);
-    border-color: rgba(134, 200, 148, 0.55);
-    color: #d5f2dc;
+    background: rgba(138, 92, 246, 0.28);
+    border-color: rgba(167, 139, 250, 0.55);
+    color: #e9e4ff;
   }
 }
 
-/* 护眼模式：舞台背景与幻灯片叠加豆沙绿滤镜（multiply 保文字对比度）。
+/* 护眼模式（深色）：幻灯片反相为黑底浅字，色相回正；图片/视频二次反相还原原色。
    非 full screen 分支需覆盖移动端 @media 内的高优先级深色舞台背景 */
 .ppt-viewer--eye-care .ppt-stage,
 .ppt-viewer--eye-care:fullscreen .ppt-stage,
 .ppt-viewer--eye-care:-webkit-full-screen .ppt-stage,
 .ppt-viewer--eye-care.ppt-viewer--presentation .ppt-stage,
 .ppt-viewer--eye-care:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-stage {
-  background: #b9d4b2;
+  background: #1a1d27;
 }
 
-.ppt-viewer--eye-care .ppt-slide-wrapper::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  background: rgba(198, 232, 200, 0.28);
-  mix-blend-mode: multiply;
-  pointer-events: none;
+.ppt-slide-wrapper--eye-care {
+  filter: invert(0.92) hue-rotate(180deg);
+  background: #0d1017;
+}
+
+.ppt-slide-wrapper--eye-care :is(img, video) {
+  filter: invert(0.92) hue-rotate(180deg);
 }
 
 /* 关闭按钮 */
