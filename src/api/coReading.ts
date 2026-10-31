@@ -136,7 +136,7 @@ export async function openChapter(
       method: "POST",
       credentials: "include",
       headers: buildAuthStreamHeaders(),
-      body: JSON.stringify({ force: !!opts?.force, uiLocale: resolveUiLocale(), locale: resolveUiLocale() }),
+      body: JSON.stringify({ force: !!opts?.force, uiLocale: resolveUiLocale() }),
       signal,
     })
     await consumeFetchSse(
@@ -222,7 +222,7 @@ export async function sendReplies(
     method: "POST",
     credentials: "include",
     headers: buildAuthStreamHeaders(),
-    body: JSON.stringify({ replies, uiLocale: resolveUiLocale(), locale: resolveUiLocale() }),
+    body: JSON.stringify({ replies, uiLocale: resolveUiLocale() }),
     signal,
   })
   await consumeFetchSse(
@@ -258,7 +258,7 @@ export async function sendChat(
     method: "POST",
     credentials: "include",
     headers: buildAuthStreamHeaders(),
-    body: JSON.stringify({ text, uiLocale: resolveUiLocale(), locale: resolveUiLocale() }),
+    body: JSON.stringify({ text, uiLocale: resolveUiLocale() }),
     signal,
   })
   await consumeFetchSse(
@@ -317,7 +317,6 @@ export async function reportPageRead(
       pageTotal: payload.pageTotal,
       text: payload.text,
       uiLocale: resolveUiLocale(),
-      locale: resolveUiLocale(),
     },
     { signal },
   )

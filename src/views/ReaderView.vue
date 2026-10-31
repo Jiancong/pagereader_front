@@ -536,8 +536,10 @@ async function onTogglePageCoRead() {
 
 async function reportVisibleCoReadPage(page: number) {
   const text = await waitForPageTextReady()
-  if (currentPage.value !== page || !text.trim()) return
-  await reportReaderPage(page, pageCount.value, text)
+  if (!text.trim()) return
+  const activePage = currentPage.value >= 1 ? currentPage.value : Math.max(1, page)
+  const total = Math.max(activePage, pageCount.value || 1)
+  await reportReaderPage(activePage, total, text)
 }
 
 function isReaderAtEnd(): boolean {
@@ -854,30 +856,36 @@ onBeforeUnmount(() => {
 .reader-view--night {
   background: #0a0a0a;
 }
-/* 沉浸式 AI 伴读：默认隐藏顶部工具栏、移动端底栏和阅读器内置底栏，留出全屏阅读与批注空间 */
-.reader-view--co-read-immersive .reader-view__toolbar,
-.reader-view--co-read-immersive .reader-view__mobile-bar,
-.reader-view--co-read-immersive :deep(.epub-reader__nav),
-.reader-view--co-read-immersive :deep(.markdown-reader__nav) {
-  display: none !important;
-}
+/* 沉浸式 AI 伴读：仅在移动端默认隐藏顶部工具栏、底栏和阅读器内置底栏，
+   桌面端保留顶栏（避免桌面端开启伴读时隐藏工具栏引发容器高度突变和 epub resize 重排） */
 .reader-view__co-read-fab {
-  position: fixed;
-  top: max(10px, env(safe-area-inset-top));
-  right: 12px;
-  z-index: 60;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border-radius: 999px;
-  background: rgba(17, 24, 39, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  opacity: 0.72;
-  transition: opacity 0.2s ease, background 0.2s ease;
+  display: none;
+}
+@media (max-width: 767px) {
+  .reader-view--co-read-immersive .reader-view__toolbar,
+  .reader-view--co-read-immersive .reader-view__mobile-bar,
+  .reader-view--co-read-immersive :deep(.epub-reader__nav),
+  .reader-view--co-read-immersive :deep(.markdown-reader__nav) {
+    display: none !important;
+  }
+  .reader-view__co-read-fab {
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    right: 12px;
+    z-index: 60;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 999px;
+    background: rgba(17, 24, 39, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    opacity: 0.72;
+    transition: opacity 0.2s ease, background 0.2s ease;
+  }
 }
 .reader-view__co-read-fab:hover,
 .reader-view__co-read-fab:focus-within {

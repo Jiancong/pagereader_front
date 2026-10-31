@@ -1040,16 +1040,15 @@ function goToPage(page: number) {
 function getPageText(): string {
   const doc = getActiveViewDocument()
   if (!doc?.body) return ''
-  // 共读/TTS 都按「当前屏」取词：epub.js 整章渲染进 iframe 多栏分屏，
-  // 直接取 body 会把其它页的文本也送出去（后端批注串页、icon 定位到隐藏栏）。
-  const overlay = overlayRef.value
-  if (overlay) {
+  // 共读/TTS 都按「当前屏」取词：用始终挂载的 viewerShellRef/viewerRef 测量可见窗口，
+  // 避免刚开启伴读时 v-if="coReadInline" 的 overlayRef 尚未挂载或宽高为 0 导致返回空串。
+  const hostEl = overlayRef.value || viewerShellRef.value || viewerRef.value
+  if (hostEl) {
     try {
-      // overlay 已挂载 = 共读模式：只信可见页结果。
-      // 宁可返回空（本轮不上报）也不能退回整章，否则会把下一页内容发给后端。
-      return pageTextFromVisiblePage(doc.body, overlay)
+      const visible = pageTextFromVisiblePage(doc.body, hostEl)
+      if (visible && visible.trim()) return visible
     } catch {
-      return ''
+      /* 测量异常时回退整章文本，保证伴读不会静默罢工 */
     }
   }
   const structured = pageTextFromBody(doc.body)

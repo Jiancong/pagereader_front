@@ -210,13 +210,14 @@ function goToPage(page: number) {
 function getPageText(): string {
   const doc = activeDoc()
   if (!doc?.body) return ''
-  // 与 EpubReader 一致：按当前可见屏取词，避免整本/整章文本串页
+  // 与 EpubReader 一致：按当前可见屏取词，若过渡帧为空则回退段落文本
   const overlay = overlayRef.value
   if (overlay) {
     try {
-      return pageTextFromVisiblePage(doc.body, overlay)
+      const visible = pageTextFromVisiblePage(doc.body, overlay)
+      if (visible && visible.trim()) return visible
     } catch {
-      return ''
+      /* ignore */
     }
   }
   const structured = pageTextFromBody(doc.body)

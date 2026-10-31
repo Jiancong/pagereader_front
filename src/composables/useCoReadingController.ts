@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n"
 import { ElMessage } from "element-plus"
 import { useRouter } from "vue-router"
 import * as coReadingApi from "@/api/coReading"
+import { getSavedLocale } from "@/composables/useAppLocale"
 import { chapterApiNumber, parseCoReadFile, sha256HexFile, wireChapterToStoreIndex } from "@/utils/coReadChapter"
 import { ApiError } from "@/api/client"
 import { useCoReadingStore } from "@/stores/coReading"
@@ -300,7 +301,12 @@ export function useCoReadingController() {
 
   /** 整本书当作一章，批注按阅读器页码走 /page + /open，不跳章、不换阅读器 */
   async function startPageCoRead(file: File, format: string) {
-    const key = `${file.name}:${file.size}:${file.lastModified}`
+    const locale = getSavedLocale() === "en" ? "en" : "zh"
+    const key = `${file.name}:${file.size}:${file.lastModified}:${locale}`
+    // 重置上一次上报缓存，保证重开伴读时当前页必定触发上报与 open
+    lastReportedPage.value = -1
+    lastPageReport = null
+    lastReportAt = 0
     if (store.sessionId && pageCoReadFileKey === key) {
       store.phase = "reading"
       store.currentChapterIndex = 0
@@ -313,6 +319,7 @@ export function useCoReadingController() {
       format: format || "epub",
       chapters: [{ index: 0, title: file.name, charCount: Math.max(1, file.size) }],
       startChapter: 1,
+      uiLocale: locale,
     })
     store.resetSession()
     store.fileName = file.name
@@ -327,6 +334,9 @@ export function useCoReadingController() {
     pagePostAbort?.abort()
     openAbort?.abort()
     streamAbort?.abort()
+    lastReportedPage.value = -1
+    lastPageReport = null
+    lastReportAt = 0
     store.openingChapter = false
     store.phase = "idle"
   }
