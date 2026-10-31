@@ -351,32 +351,62 @@ function rawOffsetsToRange(doc: Document, el: HTMLElement, start: number, end: n
   }
 }
 
-function quoteRangeInElement(el: HTMLElement, quote: string): Range | null {
+/** 在当前页可见文本中定位引文；引文若跨页被切开，取本页可见的那一段 */
+function quoteRangeOnVisiblePage(
+  el: HTMLElement,
+  span: { start: number; end: number },
+  quote: string,
+): Range | null {
   const doc = el.ownerDocument
   if (!doc) return null
-  const raw = el.textContent || ""
-  const span = findQuoteMatchRangeRaw(raw, quote)
-  if (!span) return null
-  return rawOffsetsToRange(doc, el, span[0], span[1])
-}
+  const full = el.textContent || ""
+  const visibleText = full.slice(span.start, span.end)
+  if (!visibleText.trim()) return null
 
-/** 优先 paragraph_index 段落，再扫全页（只读，不改 DOM） */
-function quoteRangeForAnnotation(body: HTMLElement, ann: CoReadAnnotation): Range | null {
-  const quote = ann.anchor.quote?.trim()
-  if (!quote) return null
-  const anchors = collectParagraphAnchors(body)
-  const idx = Math.max(0, ann.anchor.paragraphIndex)
-  const tryList: HTMLElement[] = []
-  if (anchors[idx]) tryList.push(anchors[idx])
-  for (let i = 0; i < anchors.length; i++) {
-    if (i !== idx) tryList.push(anchors[i])
-  }
-  if (!anchors.length) tryList.push(body)
-  for (const el of tryList) {
-    const r = quoteRangeInElement(el, quote)
+  const map = (range: [number, number]): [number, number] => [range[0] + span.start, range[1] + span.start]
+
+  const whole = findQuoteMatchRangeRaw(visibleText, quote)
+  if (whole) {
+    const [s, e] = map(whole)
+    const r = rawOffsetsToRange(doc, el, s, e)
     if (r) return r
   }
+
+  // 引文跨页：本页只含其一段。用两端片段去匹配可见文本，命中即用该片段
+  const words = quoteWords(quote)
+  if (words.length >= 2) {
+    const head = words.slice(0, Math.ceil(words.length / 2)).join(" ")
+    const tail = words.slice(Math.floor(words.length / 2)).join(" ")
+    for (const part of [head, tail]) {
+      const m = findQuoteMatchRangeRaw(visibleText, part)
+      if (!m) continue
+      const [s, e] = map(m)
+      const r = rawOffsetsToRange(doc, el, s, e)
+      if (r) return r
+    }
+  }
   return null
+}
+
+interface PageParagraph {
+  el: HTMLElement
+  span: { start: number; end: number }
+}
+
+/** 本页可见段落及其可见字符区间（顺序与发送给后端的页面文本一致） */
+function visiblePageParagraphs(body: HTMLElement, win: VisibleWindow | null): PageParagraph[] {
+  const list: PageParagraph[] = []
+  for (const el of collectParagraphAnchors(body)) {
+    if (!win) {
+      list.push({ el, span: { start: 0, end: (el.textContent || "").length } })
+      continue
+    }
+    const span = visibleSliceSpan(el, win)
+    if (!span) continue
+    if (!(el.textContent || "").slice(span.start, span.end).trim()) continue
+    list.push({ el, span })
+  }
+  return list
 }
 
 interface PinPoint {
@@ -495,29 +525,6 @@ function rectInVisibleWindow(r: DOMRect, win: VisibleWindow): boolean {
   return r.right > win.x0 + 1 && r.bottom > win.y0 + 1 && r.left < win.x1 - 1 && r.top < win.y1 - 1
 }
 
-/** 元素的任一行 rect 落在可见页窗口内（跨栏段落按可见部分算） */
-function elementInVisibleWindow(el: HTMLElement, win: VisibleWindow): boolean {
-  const doc = el.ownerDocument
-  if (!doc) return false
-  const range = doc.createRange()
-  range.selectNodeContents(el)
-  const rects = range.getClientRects()
-  for (let i = 0; i < rects.length; i++) {
-    if (rectInVisibleWindow(rects[i], win)) return true
-  }
-  return rectInVisibleWindow(el.getBoundingClientRect(), win)
-}
-
-/** Range 的任一行 rect 落在可见页窗口内 */
-function rangeHasRectInWindow(range: Range, win: VisibleWindow): boolean {
-  const rects = range.getClientRects()
-  for (let i = 0; i < rects.length; i++) {
-    if (rectInVisibleWindow(rects[i], win)) return true
-  }
-  const union = range.getBoundingClientRect()
-  return rectInVisibleWindow(union, win)
-}
-
 /**
  * 仅提取当前可见「页」的文本（epub.js 多栏分页下 body 文本是整章的，
  * 直接取整章会让后端为其它页生成批注、icon 也定位到隐藏栏）。
@@ -557,17 +564,17 @@ function firstRectOf(range: Range): DOMRect | null {
 }
 
 /**
- * 段落在可见页内的文本切片。
+ * 段落在可见页内的**字符区间** [start, end)。
  * 横向分页（LTR）下文本线性流过各栏：段落的可见部分是原始文本的连续区间
  * [S, E)。「range(0, offset) 的末行 rect 在窗口内」随 offset 单调（从 true 翻到
  * false 后不再回来），「range(offset, end) 的首行 rect 在窗口内」随 offset 单调
- * （从 false 翻到 true），均可二分。
+ * （从 false 翻到 true），均可二分。返回 null 表示本页不可见。
  */
-function visibleSliceOfElement(el: HTMLElement, win: VisibleWindow): string {
+function visibleSliceSpan(el: HTMLElement, win: VisibleWindow): { start: number; end: number } | null {
   const doc = el.ownerDocument
-  if (!doc) return ""
+  if (!doc) return null
   const full = el.textContent || ""
-  if (!full.trim()) return ""
+  if (!full.trim()) return null
 
   const prefixEndRect = (offset: number): DOMRect | null => {
     if (offset <= 0) return null
@@ -591,7 +598,7 @@ function visibleSliceOfElement(el: HTMLElement, win: VisibleWindow): string {
   const total = full.length
   const headVisible = suffixStartsInWin(0)
   const tailVisible = prefixEndsInWin(total)
-  if (headVisible && tailVisible) return full
+  if (headVisible && tailVisible) return { start: 0, end: total }
 
   // E：最后一个使前缀末行仍在窗口内的 offset（predicate 随 offset 单调 true→false）
   let endCut = total
@@ -608,7 +615,7 @@ function visibleSliceOfElement(el: HTMLElement, win: VisibleWindow): string {
         hi = mid - 1
       }
     }
-    if (endCut < 0) return ""
+    if (endCut < 0) return null
   }
 
   // S：第一个使后缀首行回到窗口内的 offset（predicate 随 offset 单调 false→true）
@@ -625,10 +632,16 @@ function visibleSliceOfElement(el: HTMLElement, win: VisibleWindow): string {
         lo = mid + 1
       }
     }
-    if (startCut <= 0) return ""
+    if (startCut <= 0) return null
   }
 
-  return full.slice(startCut, endCut).trim()
+  return { start: startCut, end: endCut }
+}
+
+function visibleSliceOfElement(el: HTMLElement, win: VisibleWindow): string {
+  const span = visibleSliceSpan(el, win)
+  if (!span) return ""
+  return (el.textContent || "").slice(span.start, span.end).trim()
 }
 
 /** quote 末尾右缘，坐标已换成 overlay 的 CSS 像素 */
@@ -642,16 +655,15 @@ function pinFromClientRect(r: DOMRect, map: FrameMap): PinPoint {
 
 function pinFromRects(rects: DOMRectList | DOMRect[], doc: Document, host: HTMLElement): PinPoint | null {
   const map = frameMap(doc, host)
-  let fallback: DOMRect | null = null
   const win = visibleWindowInFrame(doc, host)
   for (let i = rects.length - 1; i >= 0; i--) {
     const r = rects[i]
     if (r.width <= 0 && r.height <= 0) continue
-    if (!fallback) fallback = r
-    // 跨栏 Range 的 rects 含隐藏栏；只取可见页窗口内的 rect 定位
+    // 跨栏 Range 的 rects 含隐藏栏；只取可见页窗口内的 rect 定位。
+    // 找不到可见 rect 时返回 null（宁可本页不画，也不要钉到屏外坐标）
     if (rectInVisibleWindow(r, win)) return pinFromClientRect(r, map)
   }
-  return fallback ? pinFromClientRect(fallback, map) : null
+  return null
 }
 
 /** quote 末尾：取最后一行可见 client rect 的右缘，避免整段 union box 导致 Y 偏移 */
@@ -729,22 +741,6 @@ function appendQuoteHighlight(root: HTMLElement, hostDoc: Document, range: Range
   }
 }
 
-function pinFromElementEnd(el: HTMLElement, host: HTMLElement): PinPoint {
-  const doc = el.ownerDocument
-  if (doc) {
-    const r = doc.createRange()
-    r.selectNodeContents(el)
-    const pin = pinFromRange(r, host)
-    if (pin) return pin
-    const pr = el.getBoundingClientRect()
-    if (pr.width > 0 || pr.height > 0) {
-      const mapped = pinFromRects([pr], doc, host)
-      if (mapped) return mapped
-    }
-  }
-  return { x: 8, y: 8, lineH: 18 }
-}
-
 export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
   const hostDoc = opts.host.ownerDocument
   if (!hostDoc) return
@@ -770,28 +766,32 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
   const gutterSlots: number[] = []
   const bodyDoc = opts.body.ownerDocument
   const win = bodyDoc ? visibleWindowInFrame(bodyDoc, opts.host) : null
-  // 后端 paragraphIndex 相对「我们发送的页面文本」；兜底定位必须用同一份
-  // 页面段落列表（可见切片非空的段落），否则会钉到错误段落
-  const pageAnchors: HTMLElement[] = []
-  for (const el of collectParagraphAnchors(opts.body)) {
-    if (!win || visibleSliceOfElement(el, win)) pageAnchors.push(el)
-  }
+  // 当前页可见段落（含可见字符区间），顺序与发送给后端的页面文本一致
+  const pageParagraphs = visiblePageParagraphs(opts.body, win)
 
   for (const ann of opts.annotations) {
     const host = hostDoc.createElement("span")
     host.className = "co-read-host"
     host.setAttribute(INLINE_ATTR, ann.id)
 
-    const range = quoteRangeForAnnotation(opts.body, ann)
-    // quote 在其它页（隐藏栏）时不在本页渲染，避免 icon 被钳到边缘堆叠
-    if (range && win && !rangeHasRectInWindow(range, win)) continue
-    let pin: PinPoint | null = range ? pinFromRange(range, opts.host) : null
-    if (!pin) {
+    // 只在本页可见文本内定位引文：找不到引文说明该批注属于其它页，
+    // 绝不能兜底钉到某个段落（否则 icon 会飘到标题等无关位置）
+    const quote = ann.anchor.quote?.trim()
+    let range: Range | null = null
+    if (quote) {
       const idx = Math.max(0, ann.anchor.paragraphIndex)
-      const para = pageAnchors[Math.min(idx, pageAnchors.length - 1)] ?? opts.body
-      if (win && !elementInVisibleWindow(para, win)) continue
-      pin = pinFromElementEnd(para, opts.host)
+      const ordered = [
+        ...pageParagraphs.slice(idx, idx + 1),
+        ...pageParagraphs.filter((_, i) => i !== idx),
+      ]
+      for (const para of ordered) {
+        range = quoteRangeOnVisiblePage(para.el, para.span, quote)
+        if (range) break
+      }
     }
+    if (!range) continue
+    const pin: PinPoint | null = pinFromRange(range, opts.host)
+    if (!pin) continue
     const lineH = pin.lineH
     let mx = Math.max(4, Math.min(pin.x, hostW - MARKER_SIZE - 4))
     let my = Math.max(2, pin.y + Math.round(lineH / 2) - MARKER_SIZE / 2)
