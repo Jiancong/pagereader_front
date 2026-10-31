@@ -132,7 +132,7 @@
           class="rv-btn rv-btn--sm"
           :disabled="coReadStore.openingChapter"
           :title="t('coRead.regeneratePage')"
-          @click="onCoReadRegeneratePage"
+          @click="mobileToolsOpen = false; onCoReadRegeneratePage()"
         >
           {{ t('coRead.regeneratePage') }}
         </button>
@@ -159,6 +159,8 @@
       v-else-if="hasKnownReader"
       class="reader-view__content"
       :class="{ 'reader-view__content--co-read-pdf': coReadShowPdfSidePanel }"
+      @pointerdown.capture="mobileToolsOpen = false"
+      @touchstart.capture="mobileToolsOpen = false"
     >
       <!-- PDF 阅读器 -->
       <PdfReader
@@ -481,6 +483,8 @@ function onReaderPageReady() {
 }
 
 async function onTogglePageCoRead() {
+  // 移动端点击沉浸共读后自动收起顶部展开工具栏，避免挡住阅读区或引起高度变化
+  mobileToolsOpen.value = false
   if (coReadBusy.value) return
   if (coReadMode.value) {
     stopPageCoRead()
