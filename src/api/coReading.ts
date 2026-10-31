@@ -83,10 +83,19 @@ export interface CreateCoReadSessionBody {
   uiLocale?: "zh" | "en"
 }
 
+function localeFields(explicit?: "zh" | "en") {
+  const loc = explicit || resolveUiLocale()
+  return {
+    uiLocale: loc,
+    ui_locale: loc,
+    locale: loc === "en" ? "en" : "zh-CN",
+  }
+}
+
 export async function createSession(body: CreateCoReadSessionBody): Promise<{ sessionId: string }> {
   const payload = await requestJsonOkPayload<{ ok: true; sessionId: string }>("POST", "/co-reading/sessions", {
     ...body,
-    uiLocale: body.uiLocale || resolveUiLocale(),
+    ...localeFields(body.uiLocale),
   })
   return { sessionId: payload.sessionId }
 }
@@ -136,7 +145,7 @@ export async function openChapter(
       method: "POST",
       credentials: "include",
       headers: buildAuthStreamHeaders(),
-      body: JSON.stringify({ force: !!opts?.force, uiLocale: resolveUiLocale() }),
+      body: JSON.stringify({ force: !!opts?.force, ...localeFields() }),
       signal,
     })
     await consumeFetchSse(
@@ -222,7 +231,7 @@ export async function sendReplies(
     method: "POST",
     credentials: "include",
     headers: buildAuthStreamHeaders(),
-    body: JSON.stringify({ replies, uiLocale: resolveUiLocale() }),
+    body: JSON.stringify({ replies, ...localeFields() }),
     signal,
   })
   await consumeFetchSse(
@@ -258,7 +267,7 @@ export async function sendChat(
     method: "POST",
     credentials: "include",
     headers: buildAuthStreamHeaders(),
-    body: JSON.stringify({ text, uiLocale: resolveUiLocale() }),
+    body: JSON.stringify({ text, ...localeFields() }),
     signal,
   })
   await consumeFetchSse(
@@ -316,7 +325,7 @@ export async function reportPageRead(
       pageIndex: payload.pageIndex,
       pageTotal: payload.pageTotal,
       text: payload.text,
-      uiLocale: resolveUiLocale(),
+      ...localeFields(),
     },
     { signal },
   )
