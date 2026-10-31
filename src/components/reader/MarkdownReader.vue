@@ -204,7 +204,7 @@ function buildPaginatedPages(rawText: string, fileName: string): { htmlPages: st
 
 /** 用户正在批注卡片内交互/输入时不重建 DOM，避免丢焦点 */
 function articleHasInteraction(root: HTMLElement): boolean {
-  if (root.querySelector('.co-read-inline-host--open')) return true
+  if (root.querySelector('.co-read-inline-host--open, .co-read-inline-host--hover')) return true
   const doc = root.ownerDocument
   const active = doc?.activeElement
   if (active && root.contains(active)) {
@@ -217,7 +217,9 @@ function articleHasInteraction(root: HTMLElement): boolean {
 function releaseArticleInteraction() {
   const root = articleRef.value
   if (!root) return
-  root.querySelectorAll('.co-read-inline-host--open').forEach((el) => el.classList.remove('co-read-inline-host--open'))
+  root.querySelectorAll('.co-read-inline-host--open, .co-read-inline-host--hover').forEach((el) => {
+    el.classList.remove('co-read-inline-host--open', 'co-read-inline-host--hover')
+  })
   const active = root.ownerDocument?.activeElement as HTMLElement | null
   if (active && root.contains(active) && typeof active.blur === 'function') {
     active.blur()

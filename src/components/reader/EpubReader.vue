@@ -499,7 +499,7 @@ function repairPaginatedColumns(view: any) {
 
 /** 用户正在与 overlay 交互（浮层打开/输入中）时，抑制全量重建，避免焦点丢失与闪烁循环 */
 function overlayHasInteraction(overlay: HTMLElement): boolean {
-  if (overlay.querySelector(".co-read-host--open")) return true
+  if (overlay.querySelector(".co-read-host--open, .co-read-host--hover")) return true
   const doc = overlay.ownerDocument
   const active = doc?.activeElement
   if (active && overlay.contains(active)) {
@@ -514,7 +514,9 @@ function overlayHasInteraction(overlay: HTMLElement): boolean {
 function releaseOverlayInteraction() {
   const overlay = overlayRef.value
   if (!overlay) return
-  overlay.querySelectorAll(".co-read-host--open").forEach((el) => el.classList.remove("co-read-host--open"))
+  overlay.querySelectorAll(".co-read-host--open, .co-read-host--hover").forEach((el) => {
+    el.classList.remove("co-read-host--open", "co-read-host--hover")
+  })
   const doc = overlay.ownerDocument
   const active = doc?.activeElement
   if (active && overlay.contains(active) && typeof (active as HTMLElement).blur === "function") {

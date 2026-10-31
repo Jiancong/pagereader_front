@@ -320,10 +320,7 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
   box-shadow:0 12px 40px rgba(0,0,0,.35);word-wrap:break-word;overflow-wrap:anywhere;
   visibility:hidden;opacity:0;pointer-events:none;transition:opacity .15s ease,visibility .15s;z-index:3
 }
-.co-read-host--open > .co-read-pop,.co-read-host:focus-within > .co-read-pop{visibility:visible;opacity:1;pointer-events:auto}
-@media (hover:hover) and (pointer:fine){
-.co-read-host:hover > .co-read-pop,.co-read-pop:hover{visibility:visible;opacity:1;pointer-events:auto}
-}
+.co-read-host--open > .co-read-pop,.co-read-host--hover > .co-read-pop,.co-read-host:focus-within > .co-read-pop{visibility:visible;opacity:1;pointer-events:auto}
 .co-read-pop--below{transform:translateY(10px)}
 .co-read-pop__head{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${accent};margin:0 0 8px}
 .co-read-pop__quote{margin:0 0 8px;padding-left:10px;border-left:3px solid ${accent};font-size:12px;font-style:italic;color:${muted};word-wrap:break-word;overflow-wrap:anywhere}
@@ -909,6 +906,8 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
       pop.style.top = `${my + MARKER_SIZE + 8}px`
     }
     pop.style.left = `${popLeft}px`
+    pop.addEventListener("mouseenter", openByHover)
+    pop.addEventListener("mouseleave", scheduleCloseByHover)
     host.appendChild(pop)
 
     root.appendChild(host)
@@ -959,10 +958,8 @@ function ensureInlineStyles(doc: Document, dark: boolean) {
 .co-read-inline-host:focus-within .co-read-inline-popover{
   visibility:visible;opacity:1;pointer-events:auto
 }
-@media (hover:hover) and (pointer:fine){
-.co-read-inline-host:hover .co-read-inline-popover{
+.co-read-inline-host--hover .co-read-inline-popover{
   visibility:visible;opacity:1;pointer-events:auto
-}
 }
 .co-read-inline-popover--below{bottom:auto;top:calc(100% + 8px)}
 `
@@ -1067,6 +1064,28 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: CommonOptio
     btn.addEventListener("mousedown", stopEvent)
     btn.addEventListener("touchstart", stopEvent, { passive: true })
     host.appendChild(btn)
+
+    // 桌面端 hover 浮层：离开图标后延迟关闭，允许鼠标移入气泡写 note
+    let inlineHoverTimer = 0
+    const openByHoverInline = () => {
+      if (inlineHoverTimer) {
+        doc.defaultView?.clearTimeout(inlineHoverTimer)
+        inlineHoverTimer = 0
+      }
+      host.classList.add("co-read-inline-host--hover")
+    }
+    const closeByHoverInline = () => {
+      if (inlineHoverTimer) doc.defaultView?.clearTimeout(inlineHoverTimer)
+      inlineHoverTimer = doc.defaultView?.setTimeout(() => {
+        inlineHoverTimer = 0
+        host.classList.remove("co-read-inline-host--hover")
+      }, 260) ?? 0
+    }
+    btn.addEventListener("mouseenter", openByHoverInline)
+    btn.addEventListener("mouseleave", closeByHoverInline)
+    pop.addEventListener("mouseenter", openByHoverInline)
+    pop.addEventListener("mouseleave", closeByHoverInline)
+
     host.appendChild(pop)
 
     const list = byPara.get(loc.para) ?? []
