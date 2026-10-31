@@ -521,6 +521,8 @@ function rangeHasRectInWindow(range: Range, win: VisibleWindow): boolean {
 /**
  * 仅提取当前可见「页」的文本（epub.js 多栏分页下 body 文本是整章的，
  * 直接取整章会让后端为其它页生成批注、icon 也定位到隐藏栏）。
+ * 跨页段落按可见窗口切片：只送本页真正可见的连续文本，避免把下一页的段尾
+ * 也送出去（后端会为它生成批注，钉在段落可见末尾像凭空出现）。
  */
 export function pageTextFromVisiblePage(body: HTMLElement, host: HTMLElement): string {
   const doc = body.ownerDocument
@@ -528,11 +530,105 @@ export function pageTextFromVisiblePage(body: HTMLElement, host: HTMLElement): s
   const win = visibleWindowInFrame(doc, host)
   const parts: string[] = []
   for (const el of collectParagraphAnchors(body)) {
-    if (!elementInVisibleWindow(el, win)) continue
-    const t = (el.textContent || "").trim()
+    const t = visibleSliceOfElement(el, win)
     if (t) parts.push(t)
   }
   return parts.join("\n\n")
+}
+
+/** Range 中最后一个非空行 rect */
+function lastRectOf(range: Range): DOMRect | null {
+  const rects = range.getClientRects()
+  for (let i = rects.length - 1; i >= 0; i--) {
+    const r = rects[i]
+    if (r.width > 0 || r.height > 0) return r
+  }
+  return null
+}
+
+/** Range 中第一个非空行 rect */
+function firstRectOf(range: Range): DOMRect | null {
+  const rects = range.getClientRects()
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i]
+    if (r.width > 0 || r.height > 0) return r
+  }
+  return null
+}
+
+/**
+ * 段落在可见页内的文本切片。
+ * 横向分页（LTR）下文本线性流过各栏：段落的可见部分是原始文本的连续区间
+ * [S, E)。「range(0, offset) 的末行 rect 在窗口内」随 offset 单调（从 true 翻到
+ * false 后不再回来），「range(offset, end) 的首行 rect 在窗口内」随 offset 单调
+ * （从 false 翻到 true），均可二分。
+ */
+function visibleSliceOfElement(el: HTMLElement, win: VisibleWindow): string {
+  const doc = el.ownerDocument
+  if (!doc) return ""
+  const full = el.textContent || ""
+  if (!full.trim()) return ""
+
+  const prefixEndRect = (offset: number): DOMRect | null => {
+    if (offset <= 0) return null
+    const r = rawOffsetsToRange(doc, el, 0, offset)
+    return r ? lastRectOf(r) : null
+  }
+  const suffixStartRect = (offset: number): DOMRect | null => {
+    if (offset >= full.length) return null
+    const r = rawOffsetsToRange(doc, el, offset, full.length)
+    return r ? firstRectOf(r) : null
+  }
+  const prefixEndsInWin = (offset: number): boolean => {
+    const r = prefixEndRect(offset)
+    return !!r && rectInVisibleWindow(r, win)
+  }
+  const suffixStartsInWin = (offset: number): boolean => {
+    const r = suffixStartRect(offset)
+    return !!r && rectInVisibleWindow(r, win)
+  }
+
+  const total = full.length
+  const headVisible = suffixStartsInWin(0)
+  const tailVisible = prefixEndsInWin(total)
+  if (headVisible && tailVisible) return full
+
+  // E：最后一个使前缀末行仍在窗口内的 offset（predicate 随 offset 单调 true→false）
+  let endCut = total
+  if (!tailVisible) {
+    let lo = 1
+    let hi = total
+    endCut = -1
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      if (prefixEndsInWin(mid)) {
+        endCut = mid
+        lo = mid + 1
+      } else {
+        hi = mid - 1
+      }
+    }
+    if (endCut < 0) return ""
+  }
+
+  // S：第一个使后缀首行回到窗口内的 offset（predicate 随 offset 单调 false→true）
+  let startCut = 0
+  if (!headVisible) {
+    let lo = 1
+    let hi = Math.max(0, endCut - 1)
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      if (suffixStartsInWin(mid)) {
+        startCut = mid
+        hi = mid - 1
+      } else {
+        lo = mid + 1
+      }
+    }
+    if (startCut <= 0) return ""
+  }
+
+  return full.slice(startCut, endCut).trim()
 }
 
 /** quote 末尾右缘，坐标已换成 overlay 的 CSS 像素 */
@@ -671,10 +767,15 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
   const hostRect = opts.host.getBoundingClientRect()
   const hostW = opts.host.clientWidth || hostRect.width
   const hostH = opts.host.clientHeight || hostRect.height
-  const anchors = collectParagraphAnchors(opts.body)
   const gutterSlots: number[] = []
   const bodyDoc = opts.body.ownerDocument
   const win = bodyDoc ? visibleWindowInFrame(bodyDoc, opts.host) : null
+  // 后端 paragraphIndex 相对「我们发送的页面文本」；兜底定位必须用同一份
+  // 页面段落列表（可见切片非空的段落），否则会钉到错误段落
+  const pageAnchors: HTMLElement[] = []
+  for (const el of collectParagraphAnchors(opts.body)) {
+    if (!win || visibleSliceOfElement(el, win)) pageAnchors.push(el)
+  }
 
   for (const ann of opts.annotations) {
     const host = hostDoc.createElement("span")
@@ -687,7 +788,7 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     let pin: PinPoint | null = range ? pinFromRange(range, opts.host) : null
     if (!pin) {
       const idx = Math.max(0, ann.anchor.paragraphIndex)
-      const para = anchors[Math.min(idx, anchors.length - 1)] ?? opts.body
+      const para = pageAnchors[Math.min(idx, pageAnchors.length - 1)] ?? opts.body
       if (win && !elementInVisibleWindow(para, win)) continue
       pin = pinFromElementEnd(para, opts.host)
     }
