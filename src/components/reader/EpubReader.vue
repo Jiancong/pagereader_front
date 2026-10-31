@@ -257,6 +257,7 @@ function ensureTouchStyle(doc: Document) {
 function onDocTouchStart(e: TouchEvent) {
   const t = e.touches[0]
   if (!t) return
+  releaseOverlayInteraction()
   touchStartX = t.clientX
   touchStartY = t.clientY
   touchLastX = t.clientX
@@ -411,8 +412,8 @@ watch(
 watch(
   () => props.scale,
   () => {
-    applyFrameSize()
-    requestAnimationFrame(() => applyCoReadInline())
+    applyFrameSize(true)
+    requestAnimationFrame(() => applyCoReadInline(true))
   },
 )
 
@@ -485,6 +486,7 @@ function repairPaginatedColumns(view: any) {
 
 /** 用户正在与 overlay 交互（浮层打开/输入中）时，抑制全量重建，避免焦点丢失与闪烁循环 */
 function overlayHasInteraction(overlay: HTMLElement): boolean {
+  if (overlay.querySelector(".co-read-host--open")) return true
   const doc = overlay.ownerDocument
   const active = doc?.activeElement
   if (active && overlay.contains(active)) {
@@ -495,10 +497,11 @@ function overlayHasInteraction(overlay: HTMLElement): boolean {
   return Boolean(focused)
 }
 
-/** 主动结束 overlay 交互（翻页前调用），让随后的重建/重排能正常进行 */
+/** 主动结束 overlay 交互（翻页/点书页空白处调用），让随后的重建/重排能正常进行 */
 function releaseOverlayInteraction() {
   const overlay = overlayRef.value
   if (!overlay) return
+  overlay.querySelectorAll(".co-read-host--open").forEach((el) => el.classList.remove("co-read-host--open"))
   const doc = overlay.ownerDocument
   const active = doc?.activeElement
   if (active && overlay.contains(active) && typeof (active as HTMLElement).blur === "function") {
@@ -709,9 +712,15 @@ onMounted(async () => {
       // 但某些移动浏览器会因滚动条/软键盘抖动重复回调，这里统一过滤。
       const entry = entries[0]
       const box = entry?.contentRect
-      const sig = box ? `${Math.round(box.width)}x${Math.round(box.height)}` : ''
+      const w = box ? Math.round(box.width) : 0
+      const h = box ? Math.round(box.height) : 0
+      const sig = box ? `${w}x${h}` : ''
       if (sig && sig === lastShellSig) return
+      const widthChanged = Math.abs(w - lastShellWidth) > 40 || lastShellWidth === 0
       if (sig) lastShellSig = sig
+      if (w > 0) lastShellWidth = w
+      // 移动端高度抖动（键盘/工具栏/伴读底栏）既不 resize 也不重算 overlay
+      if (isMobileViewport() && !widthChanged) return
       applyFrameSize()
       requestAnimationFrame(() => applyCoReadInline())
     })
@@ -822,6 +831,7 @@ let lastResizeSig = ''
 let lastResizeAt = 0
 /** 最近一次观察到的 shell 内容尺寸，过滤重复回调 */
 let lastShellSig = ''
+let lastShellWidth = 0
 
 /**
  * 翻页回滚排查探针。控制台执行 `__epubDebug(true)` 开启，
@@ -864,46 +874,38 @@ function markFlipActivity() {
   flipGuardUntil = Date.now() + 600
 }
 
-function applyFrameSize() {
+function applyFrameSize(force = false) {
   if (!rendition || resizing) return
-  if (Date.now() < flipGuardUntil) {
+  if (!force && Date.now() < flipGuardUntil) {
     dbg('resize SKIPPED (guard)')
     return
   }
-  // 用户在浮层输入时（移动端软键盘会改变可视高度）不重新分页：
-  // 否则 resize → epub display(cfi) → 重建 overlay → 焦点丢失 → 键盘收起
-  // → 尺寸再次变化，形成无限刷新循环。
+  // 用户在浮层输入或浮层展开时不重新分页
   const ov = overlayRef.value
-  if (ov && overlayHasInteraction(ov)) {
+  if (!force && ov && overlayHasInteraction(ov)) {
     dbg('resize SKIPPED (interaction)')
     return
   }
   const size = measureFrame()
   // 环形保护：同一尺寸在短时间内只处理一次，杜绝 ResizeObserver 反馈环
   const sig = `${size.width}x${size.height}`
-  if (sig === lastResizeSig && Date.now() - lastResizeAt < 800) {
+  if (!force && sig === lastResizeSig && Date.now() - lastResizeAt < 800) {
     dbg('resize SKIPPED (same size, cooldown)')
     return
   }
-  const widthChanged = Math.abs(size.width - renderedWidth) > 2
-  const heightChanged = Math.abs(size.height - renderedHeight) > 2
-  if (!widthChanged && !heightChanged) return
+  const widthDelta = Math.abs(size.width - renderedWidth)
+  const heightDelta = Math.abs(size.height - renderedHeight)
+  if (!force && widthDelta <= 2 && heightDelta <= 2) return
 
-  // 移动端浏览器工具栏收起/展开会让视口高度反复变化；仅高度变化时延迟处理，
-  // 高度来回抖动（未在延迟窗口内定格）就取消，避免 resize→display 的连环闪动
-  if (!widthChanged && heightChanged && isMobileViewport()) {
-    if (heightOnlyTimer) window.clearTimeout(heightOnlyTimer)
-    dbg('resize DEFERRED (height-only)', { to: `${size.width}x${size.height}` })
-    heightOnlyTimer = window.setTimeout(() => {
-      heightOnlyTimer = null
-      performFrameResize()
-    }, 600)
+  // 移动端结构性防刷：手机上用户不会拖动窗口，视口高度变化（华为浏览器地址栏/底栏伸缩、
+  // 共读底栏出现、点击 icon 弹出键盘）一律不调 rendition.resize()，
+  // 只有横竖屏旋转（宽度变化 > 40px）或主动缩放（force=true）才重排，彻底断绝 resize→display 死循环。
+  if (!force && isMobileViewport() && renderedWidth > 0 && widthDelta <= 40) {
+    dbg('resize SKIPPED (mobile height/minor jitter)', { from: `${renderedWidth}x${renderedHeight}`, to: sig })
     return
   }
   performFrameResize()
 }
-
-let heightOnlyTimer: number | null = null
 
 /** 实际执行 resize：保存横向页码 → rendition.resize → 下一帧按新页宽还原 */
 function performFrameResize() {

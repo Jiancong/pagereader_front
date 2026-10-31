@@ -320,7 +320,10 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
   box-shadow:0 12px 40px rgba(0,0,0,.35);word-wrap:break-word;overflow-wrap:anywhere;
   visibility:hidden;opacity:0;pointer-events:none;transition:opacity .15s ease,visibility .15s;z-index:3
 }
-.co-read-host:hover > .co-read-pop,.co-read-host:focus-within > .co-read-pop,.co-read-pop:hover{visibility:visible;opacity:1;pointer-events:auto}
+.co-read-host--open > .co-read-pop,.co-read-host:focus-within > .co-read-pop{visibility:visible;opacity:1;pointer-events:auto}
+@media (hover:hover) and (pointer:fine){
+.co-read-host:hover > .co-read-pop,.co-read-pop:hover{visibility:visible;opacity:1;pointer-events:auto}
+}
 .co-read-pop--below{transform:translateY(10px)}
 .co-read-pop__head{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${accent};margin:0 0 8px}
 .co-read-pop__quote{margin:0 0 8px;padding-left:10px;border-left:3px solid ${accent};font-size:12px;font-style:italic;color:${muted};word-wrap:break-word;overflow-wrap:anywhere}
@@ -884,8 +887,17 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     btn.innerHTML = markerSvg()
     btn.style.left = `${mx}px`
     btn.style.top = `${my}px`
-    btn.addEventListener("click", stopEvent)
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation()
+      e.preventDefault()
+      const wasOpen = host.classList.contains("co-read-host--open")
+      root?.querySelectorAll(".co-read-host--open").forEach((el) => {
+        if (el !== host) el.classList.remove("co-read-host--open")
+      })
+      host.classList.toggle("co-read-host--open", !wasOpen)
+    })
     btn.addEventListener("mousedown", stopEvent)
+    btn.addEventListener("touchstart", stopEvent, { passive: true })
     host.appendChild(btn)
 
     const pop = buildPopoverContent(hostDoc, ann, opts.labels, opts.onDraft)
