@@ -29,6 +29,15 @@
       >
         <BookHeart class="h-4 w-4" />
       </button>
+      <button
+        v-if="coReadStore.phase === 'discussing'"
+        type="button"
+        class="reader-view__co-read-fab-btn"
+        :title="t('coRead.chatPanelChat')"
+        @click.stop="coReadChatOpen = !coReadChatOpen"
+      >
+        <MessageCircle class="h-4 w-4" />
+      </button>
     </div>
     <!-- 顶部工具栏 -->
     <header class="reader-view__toolbar">
@@ -325,20 +334,23 @@
 
     <template v-if="coReadMode && hasSource">
       <div
-        v-if="coReadStore.phase === 'discussing' || (coReadStore.phase === 'reading' && coReadChapterOpenDone && (coReadReplyCount > 0 || coReadChromeVisible))"
+        v-if="coReadStore.phase === 'reading' && coReadChapterOpenDone && (coReadReplyCount > 0 || coReadChromeVisible)"
         class="reader-view__co-read-tray"
       >
         <CoReadReplyTray
-          v-if="coReadStore.phase === 'reading' && coReadChapterOpenDone"
           :reply-count="coReadReplyCount"
           :loading="coReadStore.repliesSending"
           @send="onCoReadSendReplies"
         />
+      </div>
+      <div v-else-if="coReadStore.phase === 'discussing' && coReadChatOpen" class="reader-view__co-read-tray">
         <CoReadChatPanel
-          v-if="coReadStore.phase === 'discussing'"
           :messages="coReadStore.chatMessages"
           :chat-loading="coReadChatLoading"
+          :replies="coReadReplyRecords"
+          :kind-label="coReadInlineLabels.kind"
           @send="onCoReadChatSend"
+          @close="coReadChatOpen = false"
         />
       </div>
     </template>
@@ -350,7 +362,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, BookHeart, MoreHorizontal } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, BookHeart, MoreHorizontal, MessageCircle } from 'lucide-vue-next'
 import CoReadAnnotationStrip from '@/components/coReading/CoReadAnnotationStrip.vue'
 import CoReadReplyTray from '@/components/coReading/CoReadReplyTray.vue'
 import CoReadChatPanel from '@/components/coReading/CoReadChatPanel.vue'
@@ -396,6 +408,19 @@ const {
   forceRegenerateCurrentPage: onCoReadRegeneratePage,
 } = useCoReadingController()
 const coReadInlineLabels = useCoReadInlineLabels()
+/** 「记录」页签的数据源：已写/已发送的批注留言 */
+const coReadReplyRecords = computed(() =>
+  coReadChapterAnnotations.value
+    .filter((a) => String(a.myReply || '').trim())
+    .map((a) => ({ id: a.id, kind: a.kind, myReply: String(a.myReply || ''), replySent: a.replySent })),
+)
+// 进入讨论阶段（发送留言后）自动展开对话栏
+watch(
+  () => coReadStore.phase,
+  (phase) => {
+    if (phase === 'discussing') coReadChatOpen.value = true
+  },
+)
 const hasKnownReader = computed(
   () =>
     isPdf.value ||
@@ -445,6 +470,8 @@ const scale = ref(1.2)
 const mobileToolsOpen = ref(false)
 /** 沉浸共读模式下默认隐藏上下工具栏，点击右上角悬浮唤醒钮才临时展开 */
 const coReadChromeVisible = ref(false)
+/** 沉浸共读的对话栏（记录/对话）显隐；进入讨论阶段自动展开，可手动关闭 */
+const coReadChatOpen = ref(false)
 const MOBILE_LAYOUT_MQ = '(max-width: 767px)'
 let mobileLayoutMq: MediaQueryList | null = null
 
@@ -512,6 +539,7 @@ async function onTogglePageCoRead() {
   // 移动端点击沉浸共读后自动收起顶部展开工具栏，进入无上下栏的沉浸阅读
   mobileToolsOpen.value = false
   coReadChromeVisible.value = false
+  coReadChatOpen.value = false
   if (coReadBusy.value) return
   if (coReadMode.value) {
     stopPageCoRead()

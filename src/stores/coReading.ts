@@ -12,11 +12,26 @@ import type {
 import { wireChapterToStoreIndex } from "@/utils/coReadChapter"
 
 const DRAFT_PREFIX = "page2top.coReading.draft."
+const CHAT_CACHE_PREFIX = "page2top.coReading.chat."
 const LAST_SESSION_KEY = "page2top.coReading.lastSession"
 const CHAPTER_CACHE_MAX = 3
+const CHAT_CACHE_LIMIT = 500
 
 function draftKey(sessionId: string, chapterIndex: number) {
   return `${DRAFT_PREFIX}${sessionId}.${chapterIndex}`
+}
+
+function chatCacheKey(sessionId: string) {
+  return `${CHAT_CACHE_PREFIX}${sessionId}`
+}
+
+interface PersistedChatEntry {
+  id: string
+  chapterIndex: number
+  role: "user" | "assistant"
+  text: string
+  annotationId?: string
+  ts: number
 }
 
 export const useCoReadingStore = defineStore("co-reading", {
@@ -100,6 +115,8 @@ export const useCoReadingStore = defineStore("co-reading", {
       } catch {
         /* ignore */
       }
+      // 会话建立时立即恢复该用户对此书的本地对话记录
+      this.loadPersistedChat()
     },
     loadDraftsForChapter(chapterIndex: number) {
       if (!this.sessionId) return
@@ -178,7 +195,49 @@ export const useCoReadingStore = defineStore("co-reading", {
       if (ann) ann.replySent = true
     },
     clearChapterDiscussion() {
-      this.chatMessages = []
+      // 保留历史记录（对话栏有「记录」页签展示），仅在显式清空时调用
+    },
+    /** 将当前对话写入 localStorage（按 sessionId 持久化，重开伴读自动恢复） */
+    persistChat() {
+      if (!this.sessionId || typeof localStorage === "undefined") return
+      try {
+        const list: PersistedChatEntry[] = this.chatMessages
+          .filter((m) => (m.text || "").trim())
+          .map((m) => ({
+            id: m.id,
+            chapterIndex: this.currentChapterIndex,
+            role: m.role,
+            text: m.text,
+            annotationId: m.annotationId,
+            ts: Number(m.id.split("-")[1]) || Date.now(),
+          }))
+        localStorage.setItem(chatCacheKey(this.sessionId), JSON.stringify(list.slice(-CHAT_CACHE_LIMIT)))
+      } catch {
+        /* ignore */
+      }
+    },
+    /** 从 localStorage 恢复对话（与服务端 chatByChapter 合并，本地优先） */
+    loadPersistedChat() {
+      if (!this.sessionId || typeof localStorage === "undefined") return
+      try {
+        const raw = localStorage.getItem(chatCacheKey(this.sessionId))
+        if (!raw) return
+        const list = JSON.parse(raw) as PersistedChatEntry[]
+        if (!Array.isArray(list)) return
+        const existing = new Set(this.chatMessages.map((m) => m.id))
+        for (const entry of list) {
+          if (existing.has(entry.id)) continue
+          this.chatMessages.push({
+            id: entry.id,
+            role: entry.role,
+            text: entry.text,
+            annotationId: entry.annotationId,
+            streaming: false,
+          })
+        }
+      } catch {
+        /* ignore */
+      }
     },
     appendChatDelta(role: "user" | "assistant", delta: string, opts?: { annotationId?: string; messageId?: string }) {
       const id = opts?.messageId || (role === "assistant" ? "assistant-stream" : "user-stream")
@@ -198,6 +257,7 @@ export const useCoReadingStore = defineStore("co-reading", {
     finalizeChatStream(messageId: string) {
       const msg = this.chatMessages.find((m) => m.id === messageId)
       if (msg) msg.streaming = false
+      this.persistChat()
     },
     addUserChatMessage(text: string) {
       this.chatMessages.push({
@@ -205,6 +265,7 @@ export const useCoReadingStore = defineStore("co-reading", {
         role: "user",
         text,
       })
+      this.persistChat()
     },
     applySessionDetail(detail: CoReadSessionDetail, localChapters?: CoReadChapter[]) {
       this.sessionId = detail.sessionId
@@ -236,6 +297,8 @@ export const useCoReadingStore = defineStore("co-reading", {
       const chKey = String(this.currentChapterIndex + 1)
       const hist = chatBy[chKey] || chatBy[String(this.currentChapterIndex)] || []
       this.chatMessages = hist.map((m) => ({ ...m, streaming: false }))
+      // 合并本地持久化的对话（跨次打开都在）；本地为主、服务端补缺
+      this.loadPersistedChat()
       this.phase = "reading"
     },
     annotationsForParagraph(chapterIndex: number, paragraphIndex: number) {

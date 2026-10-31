@@ -1329,6 +1329,10 @@ export default {
       "本页只有导读语，没有收到批注事件（多为服务端未解析出 <ANNOTATION>）。可点「重新生成本页批注」或联系后端查看 annotations_parsed。",
     chatPlaceholder: "继续和 AI 书友聊聊本章…",
     chatSend: "发送",
+    chatPanelChat: "对话",
+    chatPanelRecords: "记录",
+    chatPanelClose: "收起对话栏",
+    chatPanelRecordsEmpty: "还没有留言记录。在批注气泡里写下你的想法并发送后，会保存在这里。",
     readerMissingChapter: "无法加载本章内容",
     kind: {
       reaction: "有感而发",
