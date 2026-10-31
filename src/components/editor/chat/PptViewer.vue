@@ -5,7 +5,7 @@
   >
   <div
     class="ppt-viewer"
-    :class="{ 'ppt-viewer--presentation': isPresentationFullscreen }"
+    :class="{ 'ppt-viewer--presentation': isPresentationFullscreen, 'ppt-viewer--eye-care': eyeCareMode }"
     ref="viewerRef"
     tabindex="0"
   >
@@ -472,6 +472,20 @@
             </button>
           </div>
         </div>
+        <button
+          type="button"
+          class="ppt-eye-care-btn"
+          :class="{ 'ppt-eye-care-btn--active': eyeCareMode }"
+          :title="eyeCareMode ? t('agent.pptEyeCareOn') : t('agent.pptEyeCareOff')"
+          :aria-pressed="eyeCareMode"
+          @click="toggleEyeCare"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M8 3C4.36 3 1.26 5.42.14 8c1.12 2.58 4.22 5 7.86 5s6.74-2.42 7.86-5C14.74 5.42 11.64 3 8 3zm0 8.6A3.6 3.6 0 1 1 8 5.4a3.6 3.6 0 0 1 0 6.2zM8 6.4A1.6 1.6 0 1 0 8 9.6 1.6 1.6 0 0 0 8 6.4z" />
+            <path d="M13.6 1.2a.7.7 0 0 1 .2 1l-1 1.3a.7.7 0 1 1-1.1-.85l1-1.3a.7.7 0 0 1 .9-.15z" />
+          </svg>
+          <span>{{ t("agent.pptEyeCare") }}</span>
+        </button>
         <input
           v-if="showCoverUpload"
           ref="coverInputRef"
@@ -930,6 +944,25 @@ const coverUploading = ref(false);
 const isPresentationFullscreen = ref(false);
 const presentationScale = ref(1);
 let slideWrapperResizeObserver: ResizeObserver | null = null;
+
+// 护眼模式：豆沙绿滤镜叠在幻灯片上，减轻长时间阅读的视觉疲劳（状态本地持久化）
+const EYE_CARE_STORAGE_KEY = "ppt_eye_care";
+const eyeCareMode = ref(false);
+if (typeof window !== "undefined") {
+  try {
+    eyeCareMode.value = window.localStorage.getItem(EYE_CARE_STORAGE_KEY) === "1";
+  } catch {
+    /* ignore */
+  }
+}
+function toggleEyeCare() {
+  eyeCareMode.value = !eyeCareMode.value;
+  try {
+    window.localStorage.setItem(EYE_CARE_STORAGE_KEY, eyeCareMode.value ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
 
 const pptContextMenuVisible = ref(false);
 const pptContextMenuX = ref(0);
@@ -8426,6 +8459,58 @@ defineExpose({
     border-color: rgba(167, 139, 250, 0.55);
     color: #e9e4ff;
   }
+}
+
+/* 护眼模式按钮：样式对齐全屏按钮，激活态用护眼绿 */
+.ppt-eye-care-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: rgba(52, 168, 83, 0.2);
+    border-color: rgba(134, 200, 148, 0.45);
+    color: #fff;
+  }
+
+  &.ppt-eye-care-btn--active {
+    background: rgba(52, 168, 83, 0.28);
+    border-color: rgba(134, 200, 148, 0.55);
+    color: #d5f2dc;
+  }
+}
+
+/* 护眼模式：舞台背景与幻灯片叠加豆沙绿滤镜（multiply 保文字对比度）。
+   非 full screen 分支需覆盖移动端 @media 内的高优先级深色舞台背景 */
+.ppt-viewer--eye-care .ppt-stage,
+.ppt-viewer--eye-care:fullscreen .ppt-stage,
+.ppt-viewer--eye-care:-webkit-full-screen .ppt-stage,
+.ppt-viewer--eye-care.ppt-viewer--presentation .ppt-stage,
+.ppt-viewer--eye-care:not(.ppt-viewer--presentation):not(:fullscreen):not(:-webkit-full-screen) .ppt-stage {
+  background: #b9d4b2;
+}
+
+.ppt-viewer--eye-care .ppt-slide-wrapper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  background: rgba(198, 232, 200, 0.28);
+  mix-blend-mode: multiply;
+  pointer-events: none;
 }
 
 /* 关闭按钮 */
