@@ -526,28 +526,66 @@ function applyCoReadInline(force = false) {
 }
 
 /**
- * 只在「批注集合结构」变化时重建 overlay：
- * 流式追加内容（content/myReply/streaming）不应触发 DOM 重建，
- * 否则拖拽输入时会不停闪烁。用 id+quote+kind+content 的轻量签名判断。
+ * 只在「批注定位结构」变化时重建 overlay：id 集合、quote、paragraphIndex、kind。
+ * 绝不包含 content / intro / myReply 等流式文本字段——它们每来一个 token 就变，
+ * 若纳入签名会导致每 token 全量重建 DOM，在移动端表现为「一打开就不断刷新」。
  */
 function coReadPayloadSignature(): string {
   const p = props.coReadInline
   if (!p) return ""
   const parts: string[] = []
   for (const a of p.annotations) {
-    parts.push(`${a.id}|${a.kind}|${a.anchor?.paragraphIndex ?? 0}|${a.anchor?.quote ?? ""}|${a.content ?? ""}`)
+    parts.push(`${a.id}|${a.kind}|${a.anchor?.paragraphIndex ?? 0}|${a.anchor?.quote ?? ""}`)
   }
+  // 仅纳入影响浮层/状态块「存在与否」的布尔量，不纳入文本内容
   const s = p.status
-  parts.push(
-    `status:${s?.loading ? 1 : 0}|${s?.errorCode ?? ""}|${s?.emptyHint ?? ""}|${s?.intro ?? ""}`,
-  )
+  parts.push(`status:${s?.loading ? 1 : 0}|${s?.errorCode ?? ""}|${s?.emptyHint ? 1 : 0}`)
   return parts.join("~")
+}
+
+/** 原地更新流式文本（intro / 批注正文），不重建 DOM、不打断焦点 */
+function patchCoReadText() {
+  const overlay = overlayRef.value
+  const payload = props.coReadInline
+  if (!overlay || !payload) return
+  // 状态条文本：仅在没有 errorCode 时原地改写，避免误删「重试」按钮
+  const s = payload.status
+  const statusEl = overlay.querySelector(".co-read-status")
+  if (statusEl && !s?.errorCode) {
+    const intro = s?.intro || ""
+    const loadingText = s?.loading ? payload.labels.loading || "" : ""
+    const text = intro && loadingText ? `${intro} ${loadingText}` : intro || loadingText
+    if (text && statusEl.textContent !== text) statusEl.textContent = text
+  }
+  // 各批注浮层正文
+  for (const ann of payload.annotations) {
+    const hostEl = overlay.querySelector(`[data-co-read-inline-root="${ann.id}"]`)
+    if (!hostEl) continue
+    const bodyEl = hostEl.querySelector(".co-read-pop__body")
+    if (bodyEl && bodyEl.textContent !== (ann.content || "")) {
+      bodyEl.textContent = ann.content || ""
+    }
+  }
 }
 
 watch(
   coReadPayloadSignature,
   () => {
     applyCoReadInline()
+  },
+)
+
+// 流式文本变化：只做原地文本更新，绝不重建 DOM
+watch(
+  () => {
+    const p = props.coReadInline
+    if (!p) return ""
+    let n = 0
+    for (const a of p.annotations) n += (a.content || "").length
+    return `${n}|${p.status?.intro?.length ?? 0}`
+  },
+  () => {
+    patchCoReadText()
   },
 )
 
@@ -666,7 +704,14 @@ onMounted(async () => {
     uninstallUnloadShim()
     applyFrameSize()
 
-    resizeObserver = new ResizeObserver(() => {
+    resizeObserver = new ResizeObserver((entries) => {
+      // 只关心尺寸真的变了；overlay 增删图标等不会改变 shell 尺寸，
+      // 但某些移动浏览器会因滚动条/软键盘抖动重复回调，这里统一过滤。
+      const entry = entries[0]
+      const box = entry?.contentRect
+      const sig = box ? `${Math.round(box.width)}x${Math.round(box.height)}` : ''
+      if (sig && sig === lastShellSig) return
+      if (sig) lastShellSig = sig
       applyFrameSize()
       requestAnimationFrame(() => applyCoReadInline())
     })
@@ -772,6 +817,11 @@ async function waitForMeasureFrame(maxAttempts = 40): Promise<{ width: number; h
 let resizing = false
 /** 翻页静默期截止时间：翻页动作后短时间内不做 resize，避免与滚动抢位置 */
 let flipGuardUntil = 0
+/** 最近一次已处理的尺寸签名与时间，用于阻断 ResizeObserver 反馈环 */
+let lastResizeSig = ''
+let lastResizeAt = 0
+/** 最近一次观察到的 shell 内容尺寸，过滤重复回调 */
+let lastShellSig = ''
 
 /**
  * 翻页回滚排查探针。控制台执行 `__epubDebug(true)` 开启，
@@ -823,7 +873,15 @@ function applyFrameSize() {
     return
   }
   const size = measureFrame()
+  // 环形保护：同一尺寸在短时间内只处理一次，杜绝 ResizeObserver 反馈环
+  const sig = `${size.width}x${size.height}`
+  if (sig === lastResizeSig && Date.now() - lastResizeAt < 800) {
+    dbg('resize SKIPPED (same size, cooldown)')
+    return
+  }
   if (Math.abs(size.width - renderedWidth) <= 2 && Math.abs(size.height - renderedHeight) <= 2) return
+  lastResizeSig = sig
+  lastResizeAt = Date.now()
   dbg('resize START', { from: `${renderedWidth}x${renderedHeight}`, to: `${size.width}x${size.height}` })
   renderedWidth = size.width
   renderedHeight = size.height
