@@ -804,10 +804,11 @@ function getPageText(): string {
   const overlay = overlayRef.value
   if (overlay) {
     try {
-      const visible = pageTextFromVisiblePage(doc.body, overlay)
-      if (visible) return visible
+      // overlay 已挂载 = 共读模式：只信可见页结果。
+      // 宁可返回空（本轮不上报）也不能退回整章，否则会把下一页内容发给后端。
+      return pageTextFromVisiblePage(doc.body, overlay)
     } catch {
-      /* 测量失败退回整章文本 */
+      return ''
     }
   }
   const structured = pageTextFromBody(doc.body)

@@ -210,14 +210,13 @@ function goToPage(page: number) {
 function getPageText(): string {
   const doc = activeDoc()
   if (!doc?.body) return ''
-  // 与 EpubReader 一致：按当前可见屏取词，避免整本文本串页（foliate 分页同样适用）
+  // 与 EpubReader 一致：按当前可见屏取词，避免整本/整章文本串页
   const overlay = overlayRef.value
   if (overlay) {
     try {
-      const visible = pageTextFromVisiblePage(doc.body, overlay)
-      if (visible) return visible
+      return pageTextFromVisiblePage(doc.body, overlay)
     } catch {
-      /* 测量失败退回全文 */
+      return ''
     }
   }
   const structured = pageTextFromBody(doc.body)

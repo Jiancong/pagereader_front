@@ -110,8 +110,6 @@ function buildNormIndexMap(raw: string): { norm: string; normToRaw: number[] } {
 function findQuoteMatchRangeRaw(rawText: string, quote: string): [number, number] | null {
   const { norm, normToRaw } = buildNormIndexMap(rawText)
   if (!norm || !normToRaw.length) return null
-  const words = quoteWords(quote)
-  if (!words.length) return null
 
   const tryNormSpan = (normStart: number, normEnd: number): [number, number] | null => {
     if (normStart < 0 || normEnd <= normStart || normEnd > norm.length) return null
@@ -120,24 +118,41 @@ function findQuoteMatchRangeRaw(rawText: string, quote: string): [number, number
     if (rawStart === undefined || rawEnd === undefined) return null
     return [rawStart, rawEnd + 1]
   }
+  const findNorm = (needle: string): [number, number] | null => {
+    if (!needle) return null
+    const i = norm.indexOf(needle)
+    if (i < 0) return null
+    return tryNormSpan(i, i + needle.length)
+  }
 
-  for (let n = words.length; n >= 2; n--) {
-    const part = words
-      .slice(0, n)
-      .map((w) => escapeRegExp(w.toLowerCase()))
-      .join("\\s+")
-    const m = norm.match(new RegExp(part))
-    if (m && m.index !== undefined) {
-      const span = tryNormSpan(m.index, m.index + m[0].length)
-      if (span) return span
+  // 中文引文没有空格，quoteWords 只会得到 1 个 token，必须按前缀逐级回退匹配，
+  // 否则引文被可见页切片截断（或后端截断）时永远匹配不到。
+  const qNorm = buildNormIndexMap(quote).norm
+  if (!qNorm) return null
+  const whole = findNorm(qNorm)
+  if (whole) return whole
+
+  // 拉丁文：按词逐步缩短，容忍引文尾部差异
+  const words = quoteWords(quote)
+  if (words.length >= 2) {
+    for (let n = words.length - 1; n >= 2; n--) {
+      const part = buildNormIndexMap(
+        words.slice(0, n).map((w) => w.toLowerCase()).join(" "),
+      ).norm
+      const hit = findNorm(part)
+      if (hit) return hit
     }
   }
-  const single = words[0].toLowerCase()
-  if (single.length >= 4) {
-    const m = norm.match(new RegExp(escapeRegExp(single)))
-    if (m && m.index !== undefined) {
-      const span = tryNormSpan(m.index, m.index + m[0].length)
-      if (span) return span
+
+  // 通用前缀回退（CJK / 无空格 / 被截断）：从长到短逐步缩短，最少保留 6 个字符
+  const MIN_PREFIX = 6
+  if (qNorm.length > MIN_PREFIX) {
+    const steps = Math.min(12, qNorm.length - MIN_PREFIX)
+    for (let s = 1; s <= steps; s++) {
+      const cut = Math.round(qNorm.length - (qNorm.length - MIN_PREFIX) * (s / steps))
+      if (cut < MIN_PREFIX || cut >= qNorm.length) continue
+      const hit = findNorm(qNorm.slice(0, cut))
+      if (hit) return hit
     }
   }
   return null
@@ -492,12 +507,59 @@ interface VisibleWindow {
   y1: number
 }
 
+/** 找到 iframe 最近的滚动视口（epub.js 的 .epub-container），它才是真正的「一页」窗口 */
+function scrollViewportOf(frame: HTMLElement): HTMLElement | null {
+  const doc = frame.ownerDocument
+  let el: HTMLElement | null = frame.parentElement
+  for (let depth = 0; depth < 8 && el; depth++) {
+    const cls = el.className
+    if (typeof cls === "string" && /\bepub-container\b/.test(cls)) return el
+    let style: CSSStyleDeclaration | null = null
+    try {
+      style = doc.defaultView?.getComputedStyle(el) ?? null
+    } catch {
+      style = null
+    }
+    const ox = style?.overflowX || ""
+    const scrollable = ox === "auto" || ox === "scroll" || style?.overflow === "auto" || style?.overflow === "scroll"
+    if (scrollable && el.scrollWidth > el.clientWidth + 4) return el
+    el = el.parentElement
+  }
+  return null
+}
+
 /**
  * 当前可见「页」在 iframe 视口坐标系中的窗口。
- * epub.js 整章渲染进 iframe 后由宿主容器横向滚动分页，iframe 视口包含所有栏；
- * 可见页 = 宿主 overlay 可视区反投影回 iframe 坐标的横向切片。
+ * epub.js 整章渲染进 iframe 后由宿主容器横向滚动分页，iframe 视口包含所有栏。
+ * 直接以 iframe 的**滚动视口**（.epub-container）投影出可见矩形，这是权威值：
+ * 之前按 overlay 反投影在 zoom/缩放下会算出偏大的窗口，导致整段都被当成可见。
  */
 function visibleWindowInFrame(doc: Document, host: HTMLElement): VisibleWindow {
+  const frame = (doc.defaultView?.frameElement as HTMLElement | null) ?? null
+  if (frame) {
+    const viewport = scrollViewportOf(frame)
+    if (viewport) {
+      const vr = viewport.getBoundingClientRect()
+      const fr = frame.getBoundingClientRect()
+      const frameW = frame.clientWidth || fr.width || 1
+      const frameH = frame.clientHeight || fr.height || 1
+      const scaleX = (fr.width || frameW) / frameW
+      const scaleY = (fr.height || frameH) / frameH
+      if (scaleX > 0 && scaleY > 0) {
+        return {
+          x0: (vr.left - fr.left) / scaleX,
+          x1: (vr.right - fr.left) / scaleX,
+          y0: (vr.top - fr.top) / scaleY,
+          y1: (vr.bottom - fr.top) / scaleY,
+        }
+      }
+    }
+  }
+  return visibleWindowFromHost(doc, host)
+}
+
+/** 兜底：按宿主 overlay 可视区反投影 */
+function visibleWindowFromHost(doc: Document, host: HTMLElement): VisibleWindow {
   const map = frameMap(doc, host)
   const hostRect = host.getBoundingClientRect()
   const hostW = host.clientWidth || hostRect.width || 0
