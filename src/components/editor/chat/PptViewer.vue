@@ -474,6 +474,25 @@
         </div>
         <button
           type="button"
+          class="ppt-translate-btn"
+          :class="{ 'ppt-translate-btn--active': translateMode }"
+          :disabled="translating"
+          :title="translateMode ? t('agent.pptTranslateBack') : t('agent.pptTranslate')"
+          :aria-pressed="translateMode"
+          @click="toggleSlideTranslate"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m5 8 6 6" />
+            <path d="m4 14 6-6 2-3" />
+            <path d="M2 5h12" />
+            <path d="M7 2h1" />
+            <path d="m22 22-5-10-5 10" />
+            <path d="M14 18h6" />
+          </svg>
+          <span>{{ translating ? t("agent.pptTranslating") : translateMode ? t("agent.pptTranslateBack") : t("agent.pptTranslate") }}</span>
+        </button>
+        <button
+          type="button"
           class="ppt-eye-care-btn"
           :class="{ 'ppt-eye-care-btn--active': eyeCareMode }"
           :title="eyeCareMode ? t('agent.pptEyeCareOn') : t('agent.pptEyeCareOff')"
@@ -695,6 +714,8 @@ import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount, provide, wi
 import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
 import { authApi, projectApi } from "@/api";
+import { translateTextsInChunks } from "@/api/translation";
+import { ApiError } from "@/api/client";
 import { appendProjectConversationMessage } from "@/api/feed";
 import { annotationApi } from "@/api";
 import { isLoggedIn } from "@/api/token";
@@ -965,6 +986,122 @@ function toggleEyeCare() {
     /* ignore */
   }
 }
+
+// ── 幻灯片中英互译：DOM 文本节点原地替换，译文按页缓存，可一键还原 ───────
+const translateMode = ref(false);
+const translating = ref(false);
+interface SlideTranslationCache {
+  originals: string[];
+  translations: string[];
+  target: string;
+}
+const slideTranslationCache = new Map<string, SlideTranslationCache>();
+let translateToken = 0;
+
+/** 按当前页 CJK 占比判定翻译方向：中文页→en，其它→zh */
+function detectTranslateTarget(text: string): "zh" | "en" {
+  const clean = text.replace(/\s+/g, "");
+  if (!clean) return "zh";
+  const cjk = (text.match(/[\u3400-\u4dbf\u4e00-\u9fff]/g) || []).length;
+  return cjk / clean.length > 0.18 ? "en" : "zh";
+}
+
+/** 收集当前页幻灯片中有意义的叶子文本节点（忽略空白与 style/script） */
+function collectSlideTextNodes(wrapper: HTMLElement): Text[] {
+  const doc = wrapper.ownerDocument;
+  const walker = doc.createTreeWalker(wrapper, NodeFilter.SHOW_TEXT);
+  const out: Text[] = [];
+  let node = walker.nextNode() as Text | null;
+  while (node) {
+    const text = node.textContent || "";
+    if (text.trim().length >= 1) {
+      const parent = node.parentElement;
+      const tag = parent ? parent.tagName.toLowerCase() : "";
+      if (tag !== "style" && tag !== "script") out.push(node);
+    }
+    node = walker.nextNode() as Text | null;
+  }
+  return out;
+}
+
+function restoreSlideText(wrapper: HTMLElement, slideKey: string): boolean {
+  const cache = slideTranslationCache.get(slideKey);
+  if (!cache) return false;
+  const nodes = collectSlideTextNodes(wrapper);
+  if (nodes.length !== cache.originals.length) return false;
+  nodes.forEach((n, i) => {
+    n.textContent = cache.originals[i];
+  });
+  return true;
+}
+
+/** 对当前页幻灯片应用翻译（缓存命中则直接替换，不发请求） */
+async function applySlideTranslation() {
+  const wrapper = slideWrapperRef.value;
+  if (!wrapper) return;
+  const slideKey = `${currentSlide.value}`;
+  const nodes = collectSlideTextNodes(wrapper);
+  if (!nodes.length) return;
+  const texts = nodes.map((n) => (n.textContent || "").trim());
+  const target = detectTranslateTarget(texts.join(" "));
+  const cacheKey = `${slideKey}:${target}`;
+  const cached = slideTranslationCache.get(cacheKey);
+
+  if (
+    cached &&
+    cached.originals.length === texts.length &&
+    cached.originals.every((o, i) => o === texts[i])
+  ) {
+    nodes.forEach((n, i) => {
+      if (cached.translations[i]) n.textContent = cached.translations[i];
+    });
+    return;
+  }
+
+  const token = ++translateToken;
+  translating.value = true;
+  try {
+    const translations = await translateTextsInChunks(texts, target);
+    if (token !== translateToken) return;
+    slideTranslationCache.set(cacheKey, {
+      originals: texts,
+      translations,
+      target,
+    });
+    nodes.forEach((n, i) => {
+      if (translations[i]) n.textContent = translations[i];
+    });
+  } catch (e) {
+    if (token === translateToken) {
+      ElMessage.error(
+        e instanceof ApiError ? e.message : t("agent.pptTranslateFailed"),
+      );
+    }
+  } finally {
+    if (token === translateToken) translating.value = false;
+  }
+}
+
+function toggleSlideTranslate() {
+  translateMode.value = !translateMode.value;
+  if (!translateMode.value) {
+    const wrapper = slideWrapperRef.value;
+    if (wrapper) {
+      // 还原当前页原文；若 DOM 已被 Vue 重渲染（节点失效），直接翻页重建即可
+      restoreSlideText(wrapper, `${currentSlide.value}`);
+    }
+    return;
+  }
+  void applySlideTranslation();
+}
+
+// 切换页码时若翻译模式开启，自动对新页应用翻译
+watch(currentSlide, () => {
+  if (!translateMode.value) return;
+  void nextTick(() => {
+    void applySlideTranslation();
+  });
+});
 
 const pptContextMenuVisible = ref(false);
 const pptContextMenuX = ref(0);
@@ -8492,6 +8629,43 @@ defineExpose({
     background: rgba(138, 92, 246, 0.28);
     border-color: rgba(167, 139, 250, 0.55);
     color: #e9e4ff;
+  }
+}
+
+/* 中英互译按钮：样式与全屏/护眼按钮一致，激活态用青蓝色 */
+.ppt-translate-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(56, 189, 248, 0.2);
+    border-color: rgba(125, 211, 252, 0.45);
+    color: #fff;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: progress;
+  }
+
+  &.ppt-translate-btn--active {
+    background: rgba(56, 189, 248, 0.26);
+    border-color: rgba(125, 211, 252, 0.55);
+    color: #d6f1ff;
   }
 }
 
