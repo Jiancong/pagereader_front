@@ -681,7 +681,7 @@ const onlineReadEnabled = computed(() => isOnlineReadEnabled())
 
 const activeTab = ref<"prompt" | "upload" | "youtube" | "translate" | "read">("upload")
 const readFileAccept =
-  ".pdf,.epub,.mobi,.azw,.azw3,.xlsx,.xls,.md,.markdown,.mdown,.mkd,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/markdown,text/plain"
+  ".pdf,.epub,.mobi,.azw,.azw3,.xlsx,.xls,.txt,.md,.markdown,.mdown,.mkd,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/markdown,text/plain"
 
 function ensureDebugOnlyTabsHidden() {
   if (

@@ -417,7 +417,7 @@ const showDemoVideo = ref(false)
 const selectedReaderFile = ref<File | null>(null)
 
 const readFileAccept =
-  '.pdf,.epub,.mobi,.azw,.azw3,.xlsx,.xls,.md,.markdown,.mdown,.mkd,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/markdown,text/plain'
+  '.pdf,.epub,.mobi,.azw,.azw3,.xlsx,.xls,.txt,.md,.markdown,.mdown,.mkd,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/markdown,text/plain'
 const readerFileInput = ref<HTMLInputElement | null>(null)
 const isDraggingReader = ref(false)
 

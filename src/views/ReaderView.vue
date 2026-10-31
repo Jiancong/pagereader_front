@@ -234,7 +234,7 @@
         @page-count="onPageCount"
       />
 
-      <!-- Markdown 阅读器 -->
+      <!-- Markdown / TXT 阅读器 -->
       <MarkdownReader
         v-else-if="isMarkdown && file"
         ref="markdownReaderRef"
@@ -244,6 +244,7 @@
         :co-read-inline="coReadInlinePayload"
         @page-change="onPageChange"
         @page-count="onPageCount"
+        @page-ready="onReaderPageReady"
         @co-read-draft="onCoReadDraft"
       />
 
@@ -856,7 +857,8 @@ onBeforeUnmount(() => {
 /* 沉浸式 AI 伴读：默认隐藏顶部工具栏、移动端底栏和阅读器内置底栏，留出全屏阅读与批注空间 */
 .reader-view--co-read-immersive .reader-view__toolbar,
 .reader-view--co-read-immersive .reader-view__mobile-bar,
-.reader-view--co-read-immersive :deep(.epub-reader__nav) {
+.reader-view--co-read-immersive :deep(.epub-reader__nav),
+.reader-view--co-read-immersive :deep(.markdown-reader__nav) {
   display: none !important;
 }
 .reader-view__co-read-fab {

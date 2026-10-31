@@ -955,9 +955,14 @@ function ensureInlineStyles(doc: Document, dark: boolean) {
   box-shadow:0 12px 40px rgba(0,0,0,.35);transition:opacity .15s ease,visibility .15s;
   word-wrap:break-word;overflow-wrap:anywhere
 }
-.co-read-inline-host:hover .co-read-inline-popover,
+.co-read-inline-host--open .co-read-inline-popover,
 .co-read-inline-host:focus-within .co-read-inline-popover{
   visibility:visible;opacity:1;pointer-events:auto
+}
+@media (hover:hover) and (pointer:fine){
+.co-read-inline-host:hover .co-read-inline-popover{
+  visibility:visible;opacity:1;pointer-events:auto
+}
 }
 .co-read-inline-popover--below{bottom:auto;top:calc(100% + 8px)}
 `
@@ -1022,15 +1027,18 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: CommonOptio
         }
       }
     }
-    if (!loc) {
+    if (!loc && !quote) {
       const idx = Math.max(0, ann.anchor.paragraphIndex)
-      const para = anchors[Math.min(idx, anchors.length - 1)]
-      if (!para) continue
-      loc = { para, end: -1 }
+      const para = anchors[idx]
+      if (para) loc = { para, end: -1 }
     }
+    if (!loc) continue
     const host = doc.createElement("span")
     host.className = "co-read-inline-host"
     host.setAttribute(INLINE_ATTR, ann.id)
+
+    const pop = buildPopoverContent(doc, ann, opts.labels, opts.onDraft)
+    pop.className = "co-read-inline-popover"
 
     const btn = doc.createElement("button")
     btn.type = "button"
@@ -1038,12 +1046,27 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: CommonOptio
     btn.title = `${opts.labels.annotationTitle}: ${kindLabel(opts.labels, ann.kind)}`
     btn.setAttribute("aria-label", btn.title)
     btn.innerHTML = markerSvg()
-    btn.addEventListener("click", stopEvent)
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation()
+      e.preventDefault()
+      const wasOpen = host.classList.contains("co-read-inline-host--open")
+      body.querySelectorAll(".co-read-inline-host--open").forEach((el) => {
+        if (el !== host) el.classList.remove("co-read-inline-host--open")
+      })
+      if (!wasOpen) {
+        // 根据按钮屏幕坐标修正气泡水平与垂直方向，防止右侧/顶部溢出被裁切
+        const r = btn.getBoundingClientRect()
+        const vw = doc.defaultView?.innerWidth || 360
+        const popW = Math.min(320, vw - 24)
+        const overflowRight = r.left + popW - (vw - 12)
+        pop.style.left = overflowRight > 0 ? `${-Math.round(overflowRight)}px` : "0px"
+        pop.classList.toggle("co-read-inline-popover--below", r.top < 240)
+      }
+      host.classList.toggle("co-read-inline-host--open", !wasOpen)
+    })
     btn.addEventListener("mousedown", stopEvent)
+    btn.addEventListener("touchstart", stopEvent, { passive: true })
     host.appendChild(btn)
-
-    const pop = buildPopoverContent(doc, ann, opts.labels, opts.onDraft)
-    pop.className = "co-read-inline-popover"
     host.appendChild(pop)
 
     const list = byPara.get(loc.para) ?? []
