@@ -72,22 +72,14 @@
                   </li>
                 </ul>
 
-                <div class="mt-auto grid gap-3 sm:grid-cols-2">
+                <div class="mt-auto flex justify-center">
                   <button
                     type="button"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:text-base"
+                    class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto sm:min-w-[16rem] sm:text-base"
                     @click="emit('co-read-start')"
                   >
                     <BookOpen class="h-4 w-4" />
                     {{ t('landing.coReadingHero.ctaStart') }}
-                  </button>
-                  <button
-                    type="button"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background/80 px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/40 sm:text-base"
-                    @click="emit('expert-explore')"
-                  >
-                    <Compass class="h-4 w-4" />
-                    {{ t('landing.coReadingHero.ctaSecondary') }}
                   </button>
                 </div>
               </div>
