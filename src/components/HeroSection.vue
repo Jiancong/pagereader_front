@@ -243,14 +243,17 @@
               type="button"
               role="tab"
               class="hero-carousel-dot"
+              :class="activeSlide === index ? 'hero-carousel-dot--active' : ''"
               :aria-selected="activeSlide === index"
               :aria-label="slide.dotLabel"
+              :title="slide.dotLabel"
               @click="onDotClick(index)"
             >
               <span
                 class="hero-carousel-dot-pill"
                 :class="activeSlide === index ? 'hero-carousel-dot-pill--active' : ''"
               />
+              <span class="hero-carousel-dot-label">{{ slide.dotLabel }}</span>
             </button>
           </div>
         </div>
@@ -409,26 +412,50 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
-  min-width: 2.75rem;
-  border: none;
-  background: transparent;
-  padding: 0;
+  gap: 0.45rem;
+  min-height: 2.25rem;
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 9999px;
+  background: hsl(var(--background) / 0.55);
+  padding: 0.35rem 0.75rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hero-carousel-dot:hover {
+  border-color: hsl(var(--primary) / 0.45);
+  color: hsl(var(--foreground));
+}
+
+.hero-carousel-dot--active {
+  border-color: hsl(var(--primary) / 0.55);
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+  font-weight: 600;
+}
+
+.hero-carousel-dot-label {
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .hero-carousel-dot-pill {
   display: block;
-  height: 0.625rem;
-  width: 0.625rem;
+  flex-shrink: 0;
+  height: 0.55rem;
+  width: 0.55rem;
   border-radius: 9999px;
-  background: hsl(var(--muted-foreground) / 0.45);
-  transition: width 0.2s ease, background-color 0.2s ease;
+  background: hsl(var(--muted-foreground) / 0.55);
+  transition: width 0.22s ease, background-color 0.22s ease, box-shadow 0.22s ease;
 }
 
 .hero-carousel-dot-pill--active {
-  width: 2.5rem;
+  width: 1.5rem;
   background: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
 }
 
 .hero-carousel-dot:focus-visible {
