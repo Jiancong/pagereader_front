@@ -1337,6 +1337,7 @@ export default {
     savedReply: "已保存",
     chatAbout: "再聊一句",
     editReply: "编辑",
+    deleteReply: "删除留言",
     readerMissingChapter: "无法加载本章内容",
     kind: {
       reaction: "有感而发",

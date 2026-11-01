@@ -365,13 +365,47 @@ export function useCoReadingController() {
     store.saveDraft(annotationId, store.currentChapterIndex, text)
   }
 
-  /** 卡片内「保存」：草稿落本地并标记已保存（服务端待 BFF 提供 /replies/draft 后自动上报） */
+  /** 卡片内「保存」：优先后端持久化（挂到批注记录），失败降级本地草稿 */
   async function saveAnnotationReply(annotationId: string, text: string) {
     const body = String(text || "").trim()
     if (!annotationId || !body) return
+    const ann = store.annotations.find((a) => a.id === annotationId)
     store.saveDraft(annotationId, store.currentChapterIndex, body)
     store.markReplySaved(annotationId)
-    store.persistChat()
+    try {
+      await coReadingApi.saveAnnotationNote(store.sessionId, annotationId, {
+        text: body,
+        quote: ann?.anchor?.quote,
+        pageIndex: ann?.pageIndex,
+        paragraphIndex: ann?.anchor?.paragraphIndex ?? 0,
+      })
+    } catch (e) {
+      // 后端暂未上线/网络异常：本地草稿已兜底，不打断用户；404/405 视为接口未实现
+      const code = e instanceof ApiError ? e.code : 0
+      if (code !== 404 && code !== 405) {
+        console.warn("[co-read] save annotation note failed, kept local draft", e)
+      }
+    }
+  }
+
+  /** 卡片内「删除留言」：清空本地并同步删除后端记录 */
+  async function deleteAnnotationReply(annotationId: string) {
+    if (!annotationId) return
+    const ann = store.annotations.find((a) => a.id === annotationId)
+    store.deleteReplyDraft(annotationId, store.currentChapterIndex)
+    try {
+      await coReadingApi.saveAnnotationNote(store.sessionId, annotationId, {
+        text: "",
+        quote: ann?.anchor?.quote,
+        pageIndex: ann?.pageIndex,
+        paragraphIndex: ann?.anchor?.paragraphIndex ?? 0,
+      })
+    } catch (e) {
+      const code = e instanceof ApiError ? e.code : 0
+      if (code !== 404 && code !== 405) {
+        console.warn("[co-read] delete annotation note failed", e)
+      }
+    }
   }
 
   /** 卡片内「再聊一句」：带着该批注上下文与当前留言发起 /chat，并展开对话栏 */
@@ -640,6 +674,7 @@ export function useCoReadingController() {
     onStartSession,
     onDraft,
     saveAnnotationReply,
+    deleteAnnotationReply,
     chatAboutAnnotation,
     reportReaderPage,
     startPageCoRead,

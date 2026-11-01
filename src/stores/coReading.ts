@@ -21,6 +21,15 @@ function draftKey(sessionId: string, chapterIndex: number) {
   return `${DRAFT_PREFIX}${sessionId}.${chapterIndex}`
 }
 
+/** 稳定键：annotationId 每次生成都会变（ann_xxx），改用 页码+归一化引文 定位同一条批注的留言 */
+function stableReplyKeyOf(pageIndex: number | undefined, paragraphIndex: number, quote?: string): string {
+  const q = String(quote || "")
+    .replace(/\s+/g, "")
+    .slice(0, 64)
+  if (q) return `q${pageIndex ?? 0}_${q}`
+  return `p${pageIndex ?? 0}_${paragraphIndex}`
+}
+
 function chatCacheKey(sessionId: string) {
   return `${CHAT_CACHE_PREFIX}${sessionId}`
 }
@@ -126,45 +135,87 @@ export const useCoReadingStore = defineStore("co-reading", {
     },
     loadDraftsForChapter(chapterIndex: number) {
       if (!this.sessionId) return
+      let draftMap: Record<string, string> = {}
       try {
         const raw = localStorage.getItem(draftKey(this.sessionId, chapterIndex))
-        if (!raw) return
-        const map = JSON.parse(raw) as Record<string, string>
-        this.annotations = this.annotations.map((a) => {
-          if (a.chapterIndex !== chapterIndex) return a
-          const draft = map[a.id]
-          if (!draft) return a
-          return { ...a, myReply: draft }
-        })
+        if (raw) draftMap = JSON.parse(raw) as Record<string, string>
       } catch {
         /* ignore */
       }
-      // 恢复「已保存」标记：重开卡片时直接进 list 模式
-      this.hydrateSavedReplies()
+      let savedList: string[] = []
+      try {
+        const raw = localStorage.getItem(savedReplyKey(this.sessionId))
+        if (raw) savedList = JSON.parse(raw) as string[]
+      } catch {
+        /* ignore */
+      }
+      const savedSet = new Set(savedList)
+      this.annotations = this.annotations.map((a) => {
+        if (a.chapterIndex !== chapterIndex) return a
+        const stableKey = stableReplyKeyOf(a.pageIndex, a.anchor?.paragraphIndex ?? 0, a.anchor?.quote)
+        // 稳定键优先；旧版按 annotationId 存的草稿兜底一次
+        const draft = draftMap[stableKey] ?? draftMap[a.id] ?? ""
+        const replySaved = savedSet.has(stableKey) || savedSet.has(a.id) || !!draft.trim()
+        if (!draft.trim() && !a.myReply) return a
+        return { ...a, myReply: draft || a.myReply, replySaved }
+      })
     },
     saveDraft(annotationId: string, chapterIndex: number, text: string) {
       if (!this.sessionId) return
       const ann = this.annotations.find((a) => a.id === annotationId)
+      const stableKey = ann
+        ? stableReplyKeyOf(ann.pageIndex, ann.anchor?.paragraphIndex ?? 0, ann.anchor?.quote)
+        : null
       if (ann) ann.myReply = text
+      if (!stableKey) return
       try {
         const key = draftKey(this.sessionId, chapterIndex)
         const existing = localStorage.getItem(key)
         const map = existing ? (JSON.parse(existing) as Record<string, string>) : {}
-        if (text.trim()) map[annotationId] = text
-        else delete map[annotationId]
+        if (text.trim()) map[stableKey] = text
+        else delete map[stableKey]
         localStorage.setItem(key, JSON.stringify(map))
+      } catch {
+        /* ignore */
+      }
+    },
+    /** 删除一条已保存的留言（内容与已保存标记一并清除） */
+    deleteReplyDraft(annotationId: string, chapterIndex: number) {
+      if (!this.sessionId) return
+      const ann = this.annotations.find((a) => a.id === annotationId)
+      if (!ann) return
+      const stableKey = stableReplyKeyOf(ann.pageIndex, ann.anchor?.paragraphIndex ?? 0, ann.anchor?.quote)
+      ann.myReply = ""
+      ann.replySaved = false
+      try {
+        const key = draftKey(this.sessionId, chapterIndex)
+        const existing = localStorage.getItem(key)
+        if (existing) {
+          const map = JSON.parse(existing) as Record<string, string>
+          delete map[stableKey]
+          delete map[annotationId]
+          localStorage.setItem(key, JSON.stringify(map))
+        }
+        const raw = localStorage.getItem(savedReplyKey(this.sessionId))
+        if (raw) {
+          const list = (JSON.parse(raw) as string[]).filter((k) => k !== stableKey && k !== annotationId)
+          localStorage.setItem(savedReplyKey(this.sessionId), JSON.stringify(list))
+        }
       } catch {
         /* ignore */
       }
     },
     markReplySaved(annotationId: string) {
       const ann = this.annotations.find((a) => a.id === annotationId)
+      const stableKey = ann
+        ? stableReplyKeyOf(ann.pageIndex, ann.anchor?.paragraphIndex ?? 0, ann.anchor?.quote)
+        : null
       if (ann) ann.replySaved = true
-      if (!this.sessionId) return
+      if (!stableKey) return
       try {
         const raw = localStorage.getItem(savedReplyKey(this.sessionId))
         const list = raw ? (JSON.parse(raw) as string[]) : []
-        if (!list.includes(annotationId)) list.push(annotationId)
+        if (!list.includes(stableKey)) list.push(stableKey)
         localStorage.setItem(savedReplyKey(this.sessionId), JSON.stringify(list.slice(-500)))
       } catch {
         /* ignore */
@@ -179,9 +230,10 @@ export const useCoReadingStore = defineStore("co-reading", {
         const list = JSON.parse(raw) as string[]
         if (!Array.isArray(list)) return
         const set = new Set(list)
-        this.annotations = this.annotations.map((a) =>
-          set.has(a.id) ? { ...a, replySaved: true } : a,
-        )
+        this.annotations = this.annotations.map((a) => {
+          const stableKey = stableReplyKeyOf(a.pageIndex, a.anchor?.paragraphIndex ?? 0, a.anchor?.quote)
+          return set.has(stableKey) || set.has(a.id) ? { ...a, replySaved: true } : a
+        })
       } catch {
         /* ignore */
       }
@@ -196,7 +248,7 @@ export const useCoReadingStore = defineStore("co-reading", {
       if (!partial.id) return
       const idx = this.annotations.findIndex((a) => a.id === partial.id)
       if (idx === -1) {
-        this.annotations.push({
+        const fresh: CoReadAnnotation = {
           id: partial.id,
           chapterIndex: partial.chapterIndex ?? this.currentChapterIndex,
           pageIndex: partial.pageIndex,
@@ -204,7 +256,31 @@ export const useCoReadingStore = defineStore("co-reading", {
           kind: partial.kind ?? "reaction",
           content: partial.content ?? "",
           streaming: true,
-        })
+        }
+        // 新批注到达时立即套用本地草稿：刷新/重开后 annotationId 全新，
+        // 只有按稳定键（页码+引文）才能找回用户之前的留言
+        try {
+          const raw = localStorage.getItem(draftKey(this.sessionId, fresh.chapterIndex))
+          if (raw) {
+            const map = JSON.parse(raw) as Record<string, string>
+            const stableKey = stableReplyKeyOf(fresh.pageIndex, fresh.anchor?.paragraphIndex ?? 0, fresh.anchor?.quote)
+            const draft = map[stableKey] ?? map[fresh.id]
+            if (draft && draft.trim()) fresh.myReply = draft
+          }
+        } catch {
+          /* ignore */
+        }
+        try {
+          const raw = localStorage.getItem(savedReplyKey(this.sessionId))
+          if (raw) {
+            const list = JSON.parse(raw) as string[]
+            const stableKey = stableReplyKeyOf(fresh.pageIndex, fresh.anchor?.paragraphIndex ?? 0, fresh.anchor?.quote)
+            if (list.includes(stableKey) || list.includes(fresh.id)) fresh.replySaved = true
+          }
+        } catch {
+          /* ignore */
+        }
+        this.annotations.push(fresh)
         return
       }
       const prev = this.annotations[idx]

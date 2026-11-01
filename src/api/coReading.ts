@@ -347,3 +347,34 @@ export async function listSessions(): Promise<CoReadSessionSummary[]> {
   )
   return payload.sessions ?? []
 }
+
+/** 批注留言保存/删除请求；text 为空串表示删除该留言 */
+export interface AnnotationNoteReq {
+  text: string
+  /** 批注引文（稳定关联键：annotationId 在重新生成后会变化，后端按 session+锚点关联） */
+  quote?: string
+  pageIndex?: number
+  paragraphIndex?: number
+}
+
+/**
+ * 保存/更新某条批注的用户留言；后端把留言挂到批注记录上，
+ * 在 getSession（annotationsByChapter）与 open 回放（annotation_anchor.my_reply）中带出。
+ */
+export async function saveAnnotationNote(
+  sessionId: string,
+  annotationId: string,
+  payload: AnnotationNoteReq,
+): Promise<void> {
+  await requestJsonOkPayload(
+    "PUT",
+    `/co-reading/sessions/${sessionId}/annotations/${encodeURIComponent(annotationId)}/note`,
+    {
+      text: payload.text,
+      quote: payload.quote ?? "",
+      pageIndex: payload.pageIndex,
+      paragraphIndex: payload.paragraphIndex ?? 0,
+      ...localeFields(),
+    },
+  )
+}

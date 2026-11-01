@@ -217,6 +217,7 @@
         @zoom="applyZoomDelta"
         @co-read-draft="onCoReadDraft"
         @co-read-save="handleCoReadCardSave"
+        @co-read-delete="handleCoReadCardDelete"
         @co-read-chat="handleCoReadCardChat"
       />
 
@@ -234,6 +235,7 @@
         @zoom="applyZoomDelta"
         @co-read-draft="onCoReadDraft"
         @co-read-save="handleCoReadCardSave"
+        @co-read-delete="handleCoReadCardDelete"
         @co-read-chat="handleCoReadCardChat"
       />
 
@@ -260,6 +262,7 @@
         @page-ready="onReaderPageReady"
         @co-read-draft="onCoReadDraft"
         @co-read-save="handleCoReadCardSave"
+        @co-read-delete="handleCoReadCardDelete"
         @co-read-chat="handleCoReadCardChat"
       />
 
@@ -405,6 +408,7 @@ const {
   chatLoading: coReadChatLoading,
   onDraft: onCoReadDraft,
   saveAnnotationReply: onCoReadPersistReply,
+  deleteAnnotationReply: onCoReadDeleteReply,
   chatAboutAnnotation: onCoReadChatAbout,
   reportReaderPage,
   hasReportedPage: hasCoReadReportedPage,
@@ -436,9 +440,14 @@ async function handleCoReadCardChat(annotationId: string, text: string) {
   await onCoReadChatAbout(annotationId, text)
 }
 
-/** 批注卡片内「保存」：落本地草稿并标记已保存 */
+/** 批注卡片内「保存」：优先后端持久化，失败降级本地草稿 */
 async function handleCoReadCardSave(annotationId: string, text: string) {
   await onCoReadPersistReply(annotationId, text)
+}
+
+/** 批注卡片内「删除留言」：清空本地并同步删除后端记录 */
+async function handleCoReadCardDelete(annotationId: string) {
+  await onCoReadDeleteReply(annotationId)
 }
 const hasKnownReader = computed(
   () =>

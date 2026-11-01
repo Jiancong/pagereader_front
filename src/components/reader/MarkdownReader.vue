@@ -76,6 +76,7 @@ const emit = defineEmits<{
   'page-ready': []
   'co-read-draft': [annotationId: string, text: string]
   'co-read-save': [annotationId: string, text: string]
+  'co-read-delete': [annotationId: string]
   'co-read-chat': [annotationId: string, text: string]
 }>()
 
@@ -239,6 +240,7 @@ function applyCoReadInline(force = false) {
     status: props.coReadInline.status,
     onDraft: (id, text) => emit('co-read-draft', id, text),
     onSaveReply: (id, text) => emit('co-read-save', id, text),
+    onDeleteReply: () => emit('co-read-delete', id),
     onChatAbout: (id, text) => emit('co-read-chat', id, text),
   })
 }

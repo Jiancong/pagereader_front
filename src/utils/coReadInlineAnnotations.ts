@@ -55,6 +55,7 @@ export interface CoReadInlineLabels {
   savedReply?: string
   chatAbout?: string
   editReply?: string
+  deleteReply?: string
   closePanel?: string
 }
 
@@ -74,6 +75,8 @@ interface CommonOptions {
   onDraft: (annotationId: string, text: string) => void
   /** 保存留言（持久化到服务端/本地） */
   onSaveReply?: (annotationId: string, text: string) => void
+  /** 删除已保存的留言 */
+  onDeleteReply?: (annotationId: string) => void
   /** 就这条批注发起与 AI 书友的对话 */
   onChatAbout?: (annotationId: string, text: string) => void
 }
@@ -189,6 +192,7 @@ function buildPopoverContent(
   onDraft: (id: string, text: string) => void,
   opts?: {
     onSaveReply?: (id: string, text: string) => void
+    onDeleteReply?: () => void
     onChatAbout?: (id: string, text: string) => void
     onClose?: () => void
   },
@@ -346,6 +350,29 @@ function buildPopoverContent(
   })
   actions.appendChild(saveBtn)
 
+  // 删除留言：仅有内容时显示；清空文本并同步删除后端/本地记录
+  const deleteBtn = doc.createElement("button")
+  deleteBtn.type = "button"
+  deleteBtn.className = "co-read-pop__btn co-read-pop__btn--danger"
+  deleteBtn.textContent = labels.deleteReply || "Delete note"
+  deleteBtn.style.display = String(ann.myReply || "").trim() ? "" : "none"
+  deleteBtn.addEventListener("mousedown", stopEvent)
+  deleteBtn.addEventListener("click", (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    ta.value = ""
+    onDraft(ann.id, "")
+    ann.replySaved = false
+    opts?.onDeleteReply?.(ann.id)
+    applyMode(true)
+  })
+  actions.appendChild(deleteBtn)
+
+  const syncDeleteVisibility = () => {
+    deleteBtn.style.display = String(ta.value || ann.myReply || "").trim() ? "" : "none"
+  }
+  ta.addEventListener("input", syncDeleteVisibility)
+
   const chatBtn = doc.createElement("button")
   chatBtn.type = "button"
   chatBtn.className = "co-read-pop__btn"
@@ -482,6 +509,8 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
 .co-read-pop__btn--primary{border-color:${accent};color:${accent}}
 .co-read-pop__btn--primary:hover{background:${dark ? "rgba(147,197,253,.15)" : "rgba(37,99,235,.08)"}}
 .co-read-pop__btn--done{border-color:#22c55e;color:#16a34a;background:${dark ? "rgba(34,197,94,.15)" : "rgba(34,197,94,.1)"}}
+.co-read-pop__btn--danger{border-color:${dark ? "#7f1d1d" : "#fecaca"};color:${dark ? "#f87171" : "#dc2626"}}
+.co-read-pop__btn--danger:hover{background:${dark ? "rgba(239,68,68,.15)" : "rgba(239,68,68,.08)"}}
 .co-read-pop__quote{margin:0 0 8px;padding-left:10px;border-left:3px solid ${accent};font-size:12px;font-style:italic;color:${muted};word-wrap:break-word;overflow-wrap:anywhere}
 .co-read-pop__body{margin:0 0 8px;white-space:pre-wrap;font-size:13px;word-wrap:break-word;overflow-wrap:anywhere}
 .co-read-pop__reply-label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 4px;font-size:10px;color:${muted}}
@@ -1062,6 +1091,7 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
 
     const pop = buildPopoverContent(hostDoc, ann, opts.labels, opts.onDraft, {
       onSaveReply: opts.onSaveReply,
+      onDeleteReply: opts.onDeleteReply,
       onChatAbout: opts.onChatAbout,
       onClose: () => {
         host.classList.remove("co-read-host--open", "co-read-host--hover")
@@ -1205,6 +1235,7 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: CommonOptio
 
     const pop = buildPopoverContent(doc, ann, opts.labels, opts.onDraft, {
       onSaveReply: opts.onSaveReply,
+      onDeleteReply: opts.onDeleteReply,
       onChatAbout: opts.onChatAbout,
       onClose: () => {
         host.classList.remove("co-read-inline-host--open", "co-read-inline-host--hover")
