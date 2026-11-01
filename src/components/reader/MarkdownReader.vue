@@ -333,6 +333,7 @@ watch(
 )
 
 function getPageText(): string {
+  if (isFlipAnimating()) return ''
   const indexed = pagesText.value[currentPage.value - 1]
   if (indexed && indexed.trim()) return indexed
   const root = articleRef.value
@@ -349,6 +350,11 @@ function isAtEnd(): boolean {
 // ── 拟真 3D 翻书动效 + 移动端滑动手势 ─────────────────────────────────────
 let flipTurnTimer: number | null = null
 let flipCleanTimer: number | null = null
+
+function isFlipAnimating(): boolean {
+  const el = articleRef.value
+  return Boolean(el?.classList.contains('md-flip--next') || el?.classList.contains('md-flip--prev'))
+}
 
 function withPageFlip(direction: 'next' | 'prev', turn: () => void) {
   const el = articleRef.value
@@ -375,6 +381,10 @@ function withPageFlip(direction: 'next' | 'prev', turn: () => void) {
   flipCleanTimer = window.setTimeout(() => {
     flipCleanTimer = null
     el.classList.remove(cls)
+    requestAnimationFrame(() => {
+      if (props.coReadInline) applyCoReadInline(true)
+      emit('page-ready')
+    })
   }, 440)
 }
 

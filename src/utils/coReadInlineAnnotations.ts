@@ -1027,7 +1027,12 @@ function frameMap(doc: Document, host: HTMLElement): FrameMap {
   const viewW = frame.clientWidth || fr.width || 1
   const viewH = frame.clientHeight || fr.height || 1
   const de = doc.documentElement.getBoundingClientRect()
+  const scrollContainer =
+    (frame.parentElement?.parentElement as HTMLElement | null) ??
+    (frame.parentElement as HTMLElement | null)
+  const containerScrolled = (scrollContainer?.scrollLeft || 0) > 2
   const topLevel =
+    !containerScrolled &&
     Math.abs(de.left - fr.left) < 4 &&
     Math.abs(de.top - fr.top) < 4 &&
     (Math.abs(fr.left) > 8 || Math.abs(fr.top) > 8)

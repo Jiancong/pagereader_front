@@ -320,6 +320,11 @@ let flipTurnTimer: number | null = null
 let flipCleanTimer: number | null = null
 
 /** 翻页时播放拟真 3D 翻书动效（含卷页高光与书脊阴影），在折页中点切换真实页内容 */
+function isFlipAnimating(): boolean {
+  const el = viewerRef.value
+  return Boolean(el?.classList.contains('epub-flip--next') || el?.classList.contains('epub-flip--prev'))
+}
+
 function withPageFlip(direction: 'next' | 'prev', turn: () => void) {
   const el = viewerRef.value
   if (!el) {
@@ -346,6 +351,11 @@ function withPageFlip(direction: 'next' | 'prev', turn: () => void) {
   flipCleanTimer = window.setTimeout(() => {
     flipCleanTimer = null
     el.classList.remove(cls)
+    // 3D rotateY 动画期间 getBoundingClientRect 被压扁；落定后再重算一次本页批注
+    requestAnimationFrame(() => {
+      if (props.coReadInline) applyCoReadInline(true)
+      emit('page-ready')
+    })
   }, 440)
 }
 
@@ -1048,8 +1058,31 @@ function turnNext() {
   const container = managerBox()?.container
   const remain = container ? container.scrollWidth - container.scrollLeft - container.clientWidth : 0
   if (delta > 0 && remain > 8) {
-    managerBox()?.scrollBy?.(Math.min(delta, remain), 0, false)
+    const m = managerBox()
+    const c = m?.container
+    m?.scrollBy?.(Math.min(delta, remain), 0, false)
     ;(rendition as { reportLocation?: () => void }).reportLocation?.()
+    // 华为等移动浏览器横向 scrollBy 后 currentLocation 的 displayed.page 偶发不进位，
+    // 导致不触发 page-change、第 2 页起永远不上报伴读
+    requestAnimationFrame(() => {
+      if (!c) return
+      const pageInSec = Math.max(1, Math.round(c.scrollLeft / delta) + 1)
+      const loc = rendition?.currentLocation() as { start?: { index?: number; displayed?: { total?: number } } } | undefined
+      const spineIdx = typeof loc?.start?.index === 'number' ? loc.start.index : 0
+      const secTotal = Math.max(
+        pageInSec,
+        loc?.start?.displayed?.total || Math.max(1, Math.round(c.scrollWidth / delta)),
+      )
+      sectionPageTotals.set(spineIdx, secTotal)
+      const visual = bookVisualPages(spineIdx, pageInSec, secTotal)
+      if (visual.page !== currentPage.value) {
+        currentPage.value = visual.page
+        pageTotal.value = visual.total
+        emit('page-change', visual.page)
+        emit('page-count', visual.total)
+      }
+      syncEnds()
+    })
     return
   }
   const loc = rendition.currentLocation() as { start?: { index?: number } } | undefined
@@ -1066,8 +1099,27 @@ function turnPrev() {
   const delta = pageTurnDelta()
   const container = managerBox()?.container
   if (delta > 0 && container && container.scrollLeft > 8) {
-    managerBox()?.scrollBy?.(-Math.min(delta, container.scrollLeft), 0, false)
+    const m = managerBox()
+    m?.scrollBy?.(-Math.min(delta, container.scrollLeft), 0, false)
     ;(rendition as { reportLocation?: () => void }).reportLocation?.()
+    requestAnimationFrame(() => {
+      const pageInSec = Math.max(1, Math.round(container.scrollLeft / delta) + 1)
+      const loc = rendition?.currentLocation() as { start?: { index?: number; displayed?: { total?: number } } } | undefined
+      const spineIdx = typeof loc?.start?.index === 'number' ? loc.start.index : 0
+      const secTotal = Math.max(
+        pageInSec,
+        loc?.start?.displayed?.total || Math.max(1, Math.round(container.scrollWidth / delta)),
+      )
+      sectionPageTotals.set(spineIdx, secTotal)
+      const visual = bookVisualPages(spineIdx, pageInSec, secTotal)
+      if (visual.page !== currentPage.value) {
+        currentPage.value = visual.page
+        pageTotal.value = visual.total
+        emit('page-change', visual.page)
+        emit('page-count', visual.total)
+      }
+      syncEnds()
+    })
     return
   }
   const loc = rendition.currentLocation() as { start?: { index?: number } } | undefined
@@ -1105,6 +1157,9 @@ function goToPage(page: number) {
 }
 
 function getPageText(): string {
+  // 翻书 3D 动效进行中（rotateY ±54°）时 iframe bounding rect 被压扁，
+  // waitForPageTextReady 会等下一轮（动画结束后）再取真实当前页文本
+  if (isFlipAnimating()) return ''
   const doc = getActiveViewDocument()
   if (!doc?.body) return ''
   // 共读/TTS 都按「当前屏」取词：用始终挂载的 viewerShellRef/viewerRef 测量可见窗口，
