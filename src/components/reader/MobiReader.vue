@@ -38,6 +38,7 @@ const props = withDefaults(
       status?: CoReadInlineStatus
       chatMessages?: CoReadChatMessage[]
       chatLoading?: boolean
+      layoutRevision?: number
     } | null
   }>(),
   { colorTheme: 'light', coReadInline: null },
@@ -202,6 +203,14 @@ watch(
       .concat(p.chatLoading ? '|loading' : '')
   },
   () => patchCoReadThreads(),
+  { flush: 'post' },
+)
+
+watch(
+  () => props.coReadInline?.layoutRevision ?? 0,
+  () => {
+    requestAnimationFrame(() => applyCoReadInline())
+  },
   { flush: 'post' },
 )
 

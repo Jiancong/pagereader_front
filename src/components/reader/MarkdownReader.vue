@@ -69,6 +69,7 @@ const props = withDefaults(
       status?: CoReadInlineStatus
       chatMessages?: CoReadChatMessage[]
       chatLoading?: boolean
+      layoutRevision?: number
     } | null
   }>(),
   { colorTheme: 'light', coReadInline: null },
@@ -217,7 +218,7 @@ function articleHasInteraction(root: HTMLElement): boolean {
     const tag = (active.tagName || '').toLowerCase()
     if (tag === 'textarea' || tag === 'input') return true
   }
-  return Boolean(root.querySelector('.co-read-inline-host:focus-within'))
+  return false
 }
 
 function releaseArticleInteraction() {
@@ -320,6 +321,15 @@ watch(
 watch(
   () => props.colorTheme,
   () => applyCoReadInline(true),
+)
+watch(currentPage, () => {
+  void nextTick(() => applyCoReadInline(true))
+})
+watch(
+  () => props.coReadInline?.layoutRevision ?? 0,
+  () => {
+    void nextTick(() => applyCoReadInline(true))
+  },
 )
 
 function getPageText(): string {

@@ -615,7 +615,7 @@ function buildStatusContent(
 }
 
 function markerSvg(): string {
-  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/></svg>'
+  return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/></svg>'
 }
 
 /* ============ 模式 A：宿主 overlay（EPUB/MOBI iframe） ============ */
@@ -650,15 +650,17 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
   box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap;overflow:hidden;text-overflow:ellipsis
 }
 .co-read-status__retry{margin-left:8px;padding:0;border:none;background:none;color:${accent};font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;pointer-events:auto}
+.co-read-host{position:absolute;left:0;top:0;width:0;height:0;overflow:visible;pointer-events:none}
 .co-read-marker{
-  position:absolute;width:22px;height:22px;padding:0;border:none;border-radius:8px;
+  position:absolute;width:26px;height:26px;min-width:26px;min-height:26px;padding:0;border:none;border-radius:8px;
   display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
   background:linear-gradient(145deg,${dark ? "#3b82f6" : "#2563eb"},${dark ? "#6366f1" : "#4f46e5"});
   color:#fff;line-height:0;
   box-shadow:0 0 0 2px rgba(255,255,255,.35),0 2px 10px rgba(37,99,235,.55);
   transition:transform .12s;animation:co-read-marker-pulse 2.2s ease-in-out infinite
 }
-.co-read-marker svg{width:13px;height:13px;display:block;fill:currentColor}
+.co-read-marker svg{width:14px;height:14px;display:block;fill:currentColor;flex-shrink:0}
 .co-read-marker:hover{transform:scale(1.15);z-index:2}
 .co-read-hl{position:absolute;pointer-events:none;border-radius:2px;background:${dark ? "rgba(147,197,253,.28)" : "rgba(37,99,235,.18)"}}
 @keyframes co-read-marker-pulse{0%,100%{box-shadow:0 0 0 2px rgba(255,255,255,.3),0 2px 10px rgba(37,99,235,.45)}50%{box-shadow:0 0 0 5px rgba(96,165,250,.4),0 2px 14px rgba(37,99,235,.6)}}
@@ -1079,7 +1081,7 @@ function pinFromRange(range: Range, host: HTMLElement): PinPoint | null {
   return null
 }
 
-const MARKER_SIZE = 22
+const MARKER_SIZE = 26
 
 /** quote 右缘同一行是否还有后续文字（有则行内 icon 会挡住它） */
 function textFollowsOnSameLine(quoteRange: Range): boolean {
@@ -1294,9 +1296,12 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
 /* ============ 模式 B：段内行内（Markdown，无分页问题） ============ */
 
 function ensureInlineStyles(doc: Document, dark: boolean) {
-  if (doc.getElementById(INLINE_STYLE_ID)) return
-  const style = doc.createElement("style")
-  style.id = INLINE_STYLE_ID
+  let style = doc.getElementById(INLINE_STYLE_ID) as HTMLStyleElement | null
+  const existed = !!style
+  if (!style) {
+    style = doc.createElement("style")
+    style.id = INLINE_STYLE_ID
+  }
   const popBg = dark ? "rgba(15, 23, 42, 0.92)" : "rgba(255, 255, 255, 0.94)"
   const popBorder = dark ? "rgba(147, 197, 253, 0.45)" : "rgba(147, 197, 253, 0.9)"
   const text = dark ? "#e5e7eb" : "#1f2937"
@@ -1315,12 +1320,13 @@ function ensureInlineStyles(doc: Document, dark: boolean) {
 .co-read-inline-host{position:relative;display:inline;vertical-align:baseline;white-space:nowrap;margin:0 0 0 .15em;line-height:inherit}
 .co-read-inline-marker{
   display:inline-flex;align-items:center;justify-content:center;
-  width:1.35em;height:1.35em;padding:0;margin:0 0 0 .12em;border:none;border-radius:8px;
+  width:26px;height:26px;min-width:26px;min-height:26px;padding:0;margin:0 0 0 .12em;border:none;border-radius:8px;
   background:linear-gradient(145deg,${dark ? "#3b82f6" : "#2563eb"},${dark ? "#6366f1" : "#4f46e5"});
-  color:#fff;line-height:0;cursor:pointer;vertical-align:-0.15em;
-  box-shadow:0 0 0 2px ${dark ? "rgba(147,197,253,.35)" : "rgba(37,99,235,.25)"},0 2px 8px rgba(37,99,235,.45)
+  color:#fff;line-height:0;cursor:pointer;vertical-align:-0.2em;
+  box-shadow:0 0 0 2px ${dark ? "rgba(147,197,253,.35)" : "rgba(37,99,235,.25)"},0 2px 8px rgba(37,99,235,.45);
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation
 }
-.co-read-inline-marker svg{width:.85em;height:.85em;display:block;fill:currentColor}
+.co-read-inline-marker svg{width:14px;height:14px;display:block;fill:currentColor;flex-shrink:0}
 .co-read-inline-popover{
   visibility:hidden;opacity:0;pointer-events:none;
   position:absolute;left:0;bottom:calc(100% + 8px);z-index:10001;
@@ -1340,7 +1346,7 @@ function ensureInlineStyles(doc: Document, dark: boolean) {
 .co-read-inline-popover--below{bottom:auto;top:calc(100% + 8px)}
 ${coReadThreadStyleBlock(!!dark, text, muted)}
 `
-  doc.head.appendChild(style)
+  if (!existed) doc.head.appendChild(style)
 }
 
 function insertMarkerAtTextOffset(para: HTMLElement, endOffset: number, marker: HTMLElement): boolean {

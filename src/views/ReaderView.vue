@@ -442,8 +442,19 @@ watch(
   () => coReadStore.phase,
   (phase) => {
     if (phase === 'discussing') coReadChatOpen.value = true
+    bumpCoReadLayoutRevision()
   },
 )
+
+watch(coReadChromeVisible, () => {
+  if (coReadMode.value) bumpCoReadLayoutRevision()
+})
+watch(coReadChatOpen, () => {
+  if (coReadMode.value) bumpCoReadLayoutRevision()
+})
+watch(coReadMode, (on) => {
+  if (on) bumpCoReadLayoutRevision()
+})
 
 /** 批注卡片内「再聊一句」：对话追加在 icon 浮层内，不打开底部栏 */
 async function handleCoReadCardChat(annotationId: string, text: string) {
@@ -479,6 +490,7 @@ const coReadInlinePayload = computed(() => {
     labels: coReadInlineLabels.value,
     chatMessages: coReadStore.chatMessages,
     chatLoading: coReadChatLoading.value,
+    layoutRevision: coReadLayoutRevision.value,
     status: {
       loading: coReadStore.openingChapter && coReadChapterAnnotations.value.length === 0,
       intro: coReadStore.pageIntroText || undefined,
@@ -514,6 +526,11 @@ const mobileToolsOpen = ref(false)
 const coReadChromeVisible = ref(false)
 /** 沉浸共读的对话栏（记录/对话）显隐；进入讨论阶段自动展开，可手动关闭 */
 const coReadChatOpen = ref(false)
+/** 顶栏/底栏/对话条显隐后递增，供 EPUB/TXT 重算批注 icon 位置 */
+const coReadLayoutRevision = ref(0)
+function bumpCoReadLayoutRevision() {
+  coReadLayoutRevision.value += 1
+}
 const MOBILE_LAYOUT_MQ = '(max-width: 767px)'
 let mobileLayoutMq: MediaQueryList | null = null
 

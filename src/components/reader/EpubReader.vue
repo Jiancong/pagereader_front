@@ -63,6 +63,8 @@ const props = withDefaults(
       status?: CoReadInlineStatus
       chatMessages?: CoReadChatMessage[]
       chatLoading?: boolean
+      /** 沉浸顶栏显隐等布局变化时递增，触发 overlay 重算 */
+      layoutRevision?: number
     } | null
   }>(),
   { colorTheme: 'light', coReadInline: null },
@@ -512,8 +514,7 @@ function overlayHasInteraction(overlay: HTMLElement): boolean {
     const tag = (active.tagName || "").toLowerCase()
     if (tag === "textarea" || tag === "input") return true
   }
-  const focused = overlay.querySelector(".co-read-host:focus-within")
-  return Boolean(focused)
+  return false
 }
 
 /** 主动结束 overlay 交互（翻页/点书页空白处调用），让随后的重建/重排能正常进行 */
@@ -646,6 +647,27 @@ watch(
   { flush: 'post' },
 )
 
+watch(
+  () => props.coReadInline?.layoutRevision ?? 0,
+  () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => applyCoReadInline(true))
+    })
+  },
+  { flush: 'post' },
+)
+
+watch(
+  () => (props.coReadInline ? 1 : 0),
+  (on) => {
+    if (!on) return
+    void nextTick(() => {
+      requestAnimationFrame(() => applyCoReadInline(true))
+    })
+  },
+  { flush: 'post' },
+)
+
 onMounted(async () => {
   try {
     // iOS Safari 旧版本 File.arrayBuffer() 可能缺失，用 slice+FileReader 兜底
@@ -774,7 +796,13 @@ onMounted(async () => {
       if (sig) lastShellSig = sig
       if (w > 0) lastShellWidth = w
       // 移动端高度抖动（键盘/工具栏/伴读底栏）既不 resize 也不重算 overlay
-      if (isMobileViewport() && !widthChanged) return
+      if (isMobileViewport() && !widthChanged) {
+        // 移动端：顶栏/底栏收起只改变高度，仍需重算 overlay 批注 icon（不能 rendition.resize）
+        if (props.coReadInline) {
+          requestAnimationFrame(() => applyCoReadInline(true))
+        }
+        return
+      }
       applyFrameSize()
       requestAnimationFrame(() => applyCoReadInline())
     })
