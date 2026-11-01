@@ -279,6 +279,68 @@ function resetInlinePopoverLayout(pop: HTMLElement) {
   pop.style.maxHeight = ""
 }
 
+function resetOverlayPopoverLayout(pop: HTMLElement) {
+  pop.classList.remove("co-read-pop--below", "co-read-pop--fixed")
+  pop.style.position = ""
+  pop.style.top = ""
+  pop.style.bottom = ""
+  pop.style.left = ""
+  pop.style.right = ""
+  pop.style.width = ""
+  pop.style.maxHeight = ""
+}
+
+/** 打开时按 marker 真实屏幕位置排布 EPUB/MOBI overlay 气泡 */
+function positionOverlayPopoverNearMarker(
+  btn: HTMLElement,
+  pop: HTMLElement,
+  overlayHost: HTMLElement,
+) {
+  const view = btn.ownerDocument?.defaultView
+  if (!view) return
+  resetOverlayPopoverLayout(pop)
+  const btnRect = btn.getBoundingClientRect()
+  const hostRect = overlayHost.getBoundingClientRect()
+  const vw = view.innerWidth
+  const vh = view.innerHeight
+  const margin = 12
+  const popW = Math.min(320, vw - margin * 2)
+  const maxH = Math.min(380, Math.round(vh * 0.55))
+  const btnH = btnRect.height || MARKER_SIZE
+
+  if (isCoReadTouchViewport(view)) {
+    pop.classList.add("co-read-pop--fixed")
+    pop.style.position = "fixed"
+    pop.style.width = `${popW}px`
+    pop.style.left = `${Math.max(margin, Math.min(btnRect.left, vw - popW - margin))}px`
+    pop.style.bottom = "auto"
+    const spaceBelow = vh - btnRect.bottom - margin
+    const spaceAbove = btnRect.top - margin
+    if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
+      pop.style.top = `${Math.min(vh - margin, btnRect.bottom + 8)}px`
+      pop.style.maxHeight = `${Math.max(120, Math.min(maxH, spaceBelow - 8))}px`
+    } else {
+      pop.style.top = `${Math.max(margin, btnRect.top - maxH - 8)}px`
+      pop.style.maxHeight = `${Math.max(120, Math.min(maxH, spaceAbove - 8))}px`
+    }
+    return
+  }
+
+  const mx = btnRect.left - hostRect.left
+  const my = btnRect.top - hostRect.top
+  const hostW = overlayHost.clientWidth || hostRect.width
+  const hostH = overlayHost.clientHeight || hostRect.height
+  const popLeft = Math.max(4, Math.min(mx - 8, hostW - popW - 4))
+  if (my > hostH * 0.55) {
+    pop.style.bottom = `${Math.max(8, hostH - (my + btnH) + 8)}px`
+  } else {
+    pop.classList.add("co-read-pop--below")
+    pop.style.top = `${my + btnH + 8}px`
+  }
+  pop.style.left = `${popLeft}px`
+  pop.style.width = `${Math.min(320, hostW - 8)}px`
+}
+
 /** 移动端：fixed 定位，避免 scroll/overflow 裁切导致「点了但看不到」 */
 function positionInlinePopoverForMobile(btn: HTMLElement, pop: HTMLElement) {
   const view = btn.ownerDocument?.defaultView
@@ -337,8 +399,10 @@ function dismissCoReadHost(host: HTMLElement) {
     "co-read-inline-host--open",
     "co-read-inline-host--hover",
   )
-  const pop = host.querySelector(".co-read-inline-popover") as HTMLElement | null
-  if (pop) resetInlinePopoverLayout(pop)
+  const inlinePop = host.querySelector(".co-read-inline-popover") as HTMLElement | null
+  if (inlinePop) resetInlinePopoverLayout(inlinePop)
+  const overlayPop = host.querySelector(".co-read-pop") as HTMLElement | null
+  if (overlayPop) resetOverlayPopoverLayout(overlayPop)
   const active = host.ownerDocument?.activeElement
   if (active && host.contains(active) && active instanceof HTMLElement) {
     active.blur()
@@ -745,7 +809,8 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
   visibility:hidden;opacity:0;pointer-events:none;transition:opacity .15s ease,visibility .15s;z-index:3
 }
 .co-read-host--open > .co-read-pop,.co-read-host--hover > .co-read-pop{visibility:visible;opacity:1;pointer-events:auto}
-.co-read-pop--below{transform:translateY(10px)}
+.co-read-pop--below{}
+.co-read-pop--fixed{position:fixed !important;z-index:10002;bottom:auto !important}
 .co-read-pop__head{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${accent};margin:0 0 8px}
 .co-read-pop__head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .co-read-pop__close{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:none;border-radius:999px;background:transparent;color:${muted};cursor:pointer;line-height:0;flex-shrink:0}
@@ -1303,13 +1368,6 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     btn.innerHTML = markerSvg()
     btn.style.left = `${mx}px`
     btn.style.top = `${my}px`
-    bindCoReadMarkerTap(btn, () => {
-      const wasOpen = host.classList.contains("co-read-host--open")
-      root?.querySelectorAll(".co-read-host--open").forEach((el) => {
-        if (el !== host) el.classList.remove("co-read-host--open")
-      })
-      host.classList.toggle("co-read-host--open", !wasOpen)
-    })
     host.appendChild(btn)
 
     // 桌面端 hover 浮层：鼠标离开图标后延迟关闭（260ms 宽限），
@@ -1345,17 +1403,26 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
         dismissCoReadHost(host)
       },
     })
-    const popLeft = Math.max(4, Math.min(mx - 40, hostW - 324))
-    if (my > hostH * 0.55) {
-      pop.style.bottom = `${Math.max(8, hostH - (my + MARKER_SIZE) + 8)}px`
-    } else {
-      pop.classList.add("co-read-pop--below")
-      pop.style.top = `${my + MARKER_SIZE + 8}px`
-    }
-    pop.style.left = `${popLeft}px`
+    resetOverlayPopoverLayout(pop)
     pop.addEventListener("mouseenter", openByHover)
     pop.addEventListener("mouseleave", scheduleCloseByHover)
+    pop.addEventListener("touchstart", stopEvent, { passive: true })
+    pop.addEventListener("touchend", stopEvent, { passive: true })
     host.appendChild(pop)
+
+    bindCoReadMarkerTap(btn, () => {
+      const wasOpen = host.classList.contains("co-read-host--open")
+      root?.querySelectorAll(".co-read-host--open").forEach((el) => {
+        if (el !== host) el.classList.remove("co-read-host--open")
+      })
+      const nextOpen = !wasOpen
+      if (nextOpen) {
+        positionOverlayPopoverNearMarker(btn, pop, opts.host)
+      } else {
+        resetOverlayPopoverLayout(pop)
+      }
+      host.classList.toggle("co-read-host--open", nextOpen)
+    })
 
     root.appendChild(host)
   }

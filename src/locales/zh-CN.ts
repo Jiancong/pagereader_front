@@ -1332,6 +1332,7 @@ export default {
     chatPanelChat: "对话",
     chatPanelRecords: "记录",
     chatPanelClose: "收起对话栏",
+    closeCard: "关闭",
     chatPanelRecordsEmpty: "还没有留言记录。在批注气泡里写下你的想法并发送后，会保存在这里。",
     saveReply: "保存",
     savedReply: "已保存",
