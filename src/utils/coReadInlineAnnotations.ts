@@ -252,9 +252,11 @@ export function patchCoReadAnnotationThreads(
 
     listEl.textContent = ""
     for (const m of list) {
+      const cleaned = sanitizeThreadText(m.text)
+      if (!cleaned) continue
       const row = listEl.ownerDocument!.createElement("div")
       row.className = `co-read-pop__thread-row co-read-pop__thread-row--${m.role}`
-      row.textContent = sanitizeThreadText(m.text)
+      row.textContent = cleaned
       listEl.appendChild(row)
     }
     if (loadingTail) {
@@ -308,7 +310,7 @@ function applyOverlayPopoverLayoutFromPin(
   hostH: number,
 ) {
   resetOverlayPopoverLayout(pop)
-  const popW = Math.min(320, Math.max(160, hostW - 16))
+  const popW = Math.min(320, Math.max(240, hostW - 16))
   const popLeft = Math.max(4, Math.min(mx - 40, hostW - popW - 4))
   if (my > hostH * 0.55) {
     pop.style.bottom = `${Math.max(8, hostH - (my + MARKER_SIZE) + 8)}px`
@@ -317,6 +319,7 @@ function applyOverlayPopoverLayoutFromPin(
     pop.style.top = `${my + MARKER_SIZE + 8}px`
   }
   pop.style.left = `${popLeft}px`
+  pop.style.width = `${popW}px`
 }
 
 /** 仅移动端：fixed 贴 marker 屏幕位置，避免 overlay 坐标偏差与裁切 */
@@ -809,7 +812,7 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
   box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap;overflow:hidden;text-overflow:ellipsis
 }
 .co-read-status__retry{margin-left:8px;padding:0;border:none;background:none;color:${accent};font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;pointer-events:auto}
-.co-read-host{position:absolute;left:0;top:0;width:0;height:0;overflow:visible;pointer-events:none}
+.co-read-host{position:static}
 .co-read-marker{
   position:absolute;width:26px;height:26px;min-width:26px;min-height:26px;padding:0;border:none;border-radius:8px;
   display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;
