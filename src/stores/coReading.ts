@@ -149,6 +149,10 @@ export const useCoReadingStore = defineStore("co-reading", {
         /* ignore */
       }
     },
+    markReplySaved(annotationId: string) {
+      const ann = this.annotations.find((a) => a.id === annotationId)
+      if (ann) ann.replySaved = true
+    },
     clearPageOpenError() {
       this.pageOpenError = ""
     },

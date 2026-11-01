@@ -50,6 +50,11 @@ export interface CoReadInlineLabels {
   loading?: string
   generationFailed?: string
   retryPage?: string
+  /** 卡片内按钮文案 */
+  saveReply?: string
+  savedReply?: string
+  chatAbout?: string
+  closePanel?: string
 }
 
 export interface CoReadInlineStatus {
@@ -66,6 +71,10 @@ interface CommonOptions {
   dark?: boolean
   status?: CoReadInlineStatus
   onDraft: (annotationId: string, text: string) => void
+  /** 保存留言（持久化到服务端/本地） */
+  onSaveReply?: (annotationId: string, text: string) => void
+  /** 就这条批注发起与 AI 书友的对话 */
+  onChatAbout?: (annotationId: string, text: string) => void
 }
 
 function escapeRegExp(s: string): string {
@@ -177,16 +186,38 @@ function buildPopoverContent(
   ann: CoReadAnnotation,
   labels: CoReadInlineLabels,
   onDraft: (id: string, text: string) => void,
+  opts?: {
+    onSaveReply?: (id: string, text: string) => void
+    onChatAbout?: (id: string, text: string) => void
+    onClose?: () => void
+  },
 ): HTMLElement {
   const pop = doc.createElement("div")
   pop.className = "co-read-pop"
-  pop.setAttribute("role", "tooltip")
+  pop.setAttribute("role", "dialog")
 
+  // 头部：类型标签 + 关闭 X
   const head = doc.createElement("div")
   head.className = "co-read-pop__head"
   const label = kindLabel(labels, ann.kind)
-  head.textContent = label
-  if (ann.streaming) head.textContent += ` · ${labels.streaming}`
+  const headText = doc.createElement("span")
+  headText.textContent = ann.streaming ? `${label} · ${labels.streaming}` : label
+  head.appendChild(headText)
+
+  const closeBtn = doc.createElement("button")
+  closeBtn.type = "button"
+  closeBtn.className = "co-read-pop__close"
+  closeBtn.title = labels.closePanel || "Close"
+  closeBtn.setAttribute("aria-label", labels.closePanel || "Close")
+  closeBtn.innerHTML =
+    '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854z"/></svg>'
+  closeBtn.addEventListener("click", (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    opts?.onClose?.()
+  })
+  closeBtn.addEventListener("mousedown", stopEvent)
+  head.appendChild(closeBtn)
   pop.appendChild(head)
 
   if (ann.anchor.quote) {
@@ -216,6 +247,51 @@ function buildPopoverContent(
   ta.addEventListener("mousedown", stopEvent)
   ta.addEventListener("click", stopEvent)
   pop.appendChild(ta)
+
+  // 操作区：保存 / 再聊一句
+  const actions = doc.createElement("div")
+  actions.className = "co-read-pop__actions"
+
+  const saveBtn = doc.createElement("button")
+  saveBtn.type = "button"
+  saveBtn.className = "co-read-pop__btn co-read-pop__btn--primary"
+  const setSaveLabel = () => {
+    saveBtn.textContent = ann.replySaved ? labels.savedReply || "Saved" : labels.saveReply || "Save"
+  }
+  setSaveLabel()
+  saveBtn.disabled = !!ann.replySent && !String(ann.myReply || "").trim()
+  saveBtn.addEventListener("mousedown", stopEvent)
+  saveBtn.addEventListener("click", (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const text = String(ta.value || "").trim()
+    if (!text) {
+      ta.focus()
+      return
+    }
+    onDraft(ann.id, text)
+    opts?.onSaveReply?.(ann.id, text)
+    ann.replySaved = true
+    setSaveLabel()
+    saveBtn.classList.add("co-read-pop__btn--done")
+    window.setTimeout(() => saveBtn.classList.remove("co-read-pop__btn--done"), 1200)
+  })
+  actions.appendChild(saveBtn)
+
+  const chatBtn = doc.createElement("button")
+  chatBtn.type = "button"
+  chatBtn.className = "co-read-pop__btn"
+  chatBtn.textContent = labels.chatAbout || "Chat about this"
+  chatBtn.addEventListener("mousedown", stopEvent)
+  chatBtn.addEventListener("click", (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const text = String(ta.value || "").trim()
+    if (text) onDraft(ann.id, text)
+    opts?.onChatAbout?.(ann.id, text)
+  })
+  actions.appendChild(chatBtn)
+  pop.appendChild(actions)
 
   if (ann.replySent) {
     const sent = doc.createElement("p")
@@ -323,6 +399,15 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
 .co-read-host--open > .co-read-pop,.co-read-host--hover > .co-read-pop,.co-read-host:focus-within > .co-read-pop{visibility:visible;opacity:1;pointer-events:auto}
 .co-read-pop--below{transform:translateY(10px)}
 .co-read-pop__head{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${accent};margin:0 0 8px}
+.co-read-pop__head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.co-read-pop__close{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:none;border-radius:999px;background:transparent;color:${muted};cursor:pointer;line-height:0;flex-shrink:0}
+.co-read-pop__close:hover{background:${dark ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.06)"};color:${text}}
+.co-read-pop__actions{display:flex;align-items:center;gap:8px;margin:8px 0 0;flex-wrap:wrap}
+.co-read-pop__btn{flex:1 1 auto;min-width:88px;padding:7px 10px;border-radius:8px;border:1px solid ${dark ? "#374151" : "#d1d5db"};background:${dark ? "#111827" : "#fff"};color:${text};font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.co-read-pop__btn:hover{background:${dark ? "#1f2937" : "#f3f4f6"}}
+.co-read-pop__btn--primary{border-color:${accent};color:${accent}}
+.co-read-pop__btn--primary:hover{background:${dark ? "rgba(147,197,253,.15)" : "rgba(37,99,235,.08)"}}
+.co-read-pop__btn--done{border-color:#22c55e;color:#16a34a;background:${dark ? "rgba(34,197,94,.15)" : "rgba(34,197,94,.1)"}}
 .co-read-pop__quote{margin:0 0 8px;padding-left:10px;border-left:3px solid ${accent};font-size:12px;font-style:italic;color:${muted};word-wrap:break-word;overflow-wrap:anywhere}
 .co-read-pop__body{margin:0 0 8px;white-space:pre-wrap;font-size:13px;word-wrap:break-word;overflow-wrap:anywhere}
 .co-read-pop__reply-label{display:block;margin:8px 0 4px;font-size:10px;color:${muted}}
@@ -898,7 +983,13 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     btn.addEventListener("mouseenter", openByHover)
     btn.addEventListener("mouseleave", scheduleCloseByHover)
 
-    const pop = buildPopoverContent(hostDoc, ann, opts.labels, opts.onDraft)
+    const pop = buildPopoverContent(hostDoc, ann, opts.labels, opts.onDraft, {
+      onSaveReply: opts.onSaveReply,
+      onChatAbout: opts.onChatAbout,
+      onClose: () => {
+        host.classList.remove("co-read-host--open", "co-read-host--hover")
+      },
+    })
     const popLeft = Math.max(4, Math.min(mx - 40, hostW - 324))
     if (my > hostH * 0.55) {
       pop.style.bottom = `${Math.max(8, hostH - (my + MARKER_SIZE) + 8)}px`
@@ -1035,7 +1126,13 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: CommonOptio
     host.className = "co-read-inline-host"
     host.setAttribute(INLINE_ATTR, ann.id)
 
-    const pop = buildPopoverContent(doc, ann, opts.labels, opts.onDraft)
+    const pop = buildPopoverContent(doc, ann, opts.labels, opts.onDraft, {
+      onSaveReply: opts.onSaveReply,
+      onChatAbout: opts.onChatAbout,
+      onClose: () => {
+        host.classList.remove("co-read-inline-host--open", "co-read-inline-host--hover")
+      },
+    })
     pop.className = "co-read-inline-popover"
 
     const btn = doc.createElement("button")

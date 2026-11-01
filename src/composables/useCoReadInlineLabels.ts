@@ -19,6 +19,10 @@ export function useCoReadInlineLabels() {
       loading: t("coRead.loadingAnnotations"),
       generationFailed: t("coRead.generationFailed"),
       retryPage: t("coRead.retryPage"),
+      saveReply: t("coRead.saveReply"),
+      savedReply: t("coRead.savedReply"),
+      chatAbout: t("coRead.chatAbout"),
+      closePanel: t("coRead.chatPanelClose"),
     }),
   )
 }

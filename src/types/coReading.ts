@@ -37,6 +37,8 @@ export interface CoReadAnnotation {
   content: string
   myReply?: string
   replySent?: boolean
+  /** 已在卡片内点过「保存」（用于按钮回显） */
+  replySaved?: boolean
   /** SSE 流式未完结 */
   streaming?: boolean
 }

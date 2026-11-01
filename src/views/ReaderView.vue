@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div
     class="reader-view"
     :class="{
@@ -216,6 +216,8 @@
         @page-ready="onReaderPageReady"
         @zoom="applyZoomDelta"
         @co-read-draft="onCoReadDraft"
+        @co-read-save="handleCoReadCardSave"
+        @co-read-chat="handleCoReadCardChat"
       />
 
       <!-- MOBI 阅读器 -->
@@ -231,6 +233,8 @@
         @page-ready="onReaderPageReady"
         @zoom="applyZoomDelta"
         @co-read-draft="onCoReadDraft"
+        @co-read-save="handleCoReadCardSave"
+        @co-read-chat="handleCoReadCardChat"
       />
 
       <!-- XLSX 阅读器 -->
@@ -255,6 +259,8 @@
         @page-count="onPageCount"
         @page-ready="onReaderPageReady"
         @co-read-draft="onCoReadDraft"
+        @co-read-save="handleCoReadCardSave"
+        @co-read-chat="handleCoReadCardChat"
       />
 
       <CoReadAnnotationStrip
@@ -398,6 +404,8 @@ const {
   chapterOpenDone: coReadChapterOpenDone,
   chatLoading: coReadChatLoading,
   onDraft: onCoReadDraft,
+  saveAnnotationReply: onCoReadPersistReply,
+  chatAboutAnnotation: onCoReadChatAbout,
   reportReaderPage,
   hasReportedPage: hasCoReadReportedPage,
   startPageCoRead,
@@ -421,6 +429,17 @@ watch(
     if (phase === 'discussing') coReadChatOpen.value = true
   },
 )
+
+/** 批注卡片内「再聊一句」：发起与 AI 书友的对话并展开对话栏 */
+async function handleCoReadCardChat(annotationId: string, text: string) {
+  coReadChatOpen.value = true
+  await onCoReadChatAbout(annotationId, text)
+}
+
+/** 批注卡片内「保存」：落本地草稿并标记已保存 */
+async function handleCoReadCardSave(annotationId: string, text: string) {
+  await onCoReadPersistReply(annotationId, text)
+}
 const hasKnownReader = computed(
   () =>
     isPdf.value ||

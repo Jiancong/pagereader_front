@@ -1355,6 +1355,9 @@ export default {
     chatPanelRecords: "Records",
     chatPanelClose: "Collapse panel",
     chatPanelRecordsEmpty: "No notes yet. Write your thoughts in an annotation bubble and send them — they'll be saved here.",
+    saveReply: "Save",
+    savedReply: "Saved",
+    chatAbout: "Chat about this",
     readerMissingChapter: "Could not load this chapter",
     kind: {
       reaction: "Reaction",

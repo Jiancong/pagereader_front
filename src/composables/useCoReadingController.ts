@@ -365,6 +365,35 @@ export function useCoReadingController() {
     store.saveDraft(annotationId, store.currentChapterIndex, text)
   }
 
+  /** 卡片内「保存」：草稿落本地并标记已保存（服务端待 BFF 提供 /replies/draft 后自动上报） */
+  async function saveAnnotationReply(annotationId: string, text: string) {
+    const body = String(text || "").trim()
+    if (!annotationId || !body) return
+    store.saveDraft(annotationId, store.currentChapterIndex, body)
+    store.markReplySaved(annotationId)
+    store.persistChat()
+  }
+
+  /** 卡片内「再聊一句」：带着该批注上下文与当前留言发起 /chat，并展开对话栏 */
+  async function chatAboutAnnotation(annotationId: string, text: string) {
+    if (!store.sessionId) return
+    const ann = store.annotations.find((a) => a.id === annotationId)
+    const userText = String(text || "").trim()
+    const quote = String(ann?.anchor?.quote || "").trim()
+    if (userText) {
+      store.saveDraft(annotationId, store.currentChapterIndex, userText)
+      store.markReplySaved(annotationId)
+    }
+    const prompt = userText || quote || String(ann?.content || "").trim()
+    if (!prompt) return
+    // 让对话围绕这条批注：带上引文上下文
+    const composed = quote && userText && !userText.includes(quote)
+      ? `${userText}\n\n「${quote}」`
+      : prompt
+    store.phase = "discussing"
+    await onChatSend(composed)
+  }
+
   function clearPageAnnotations() {
     store.annotations = store.annotations.filter((a) => a.chapterIndex !== store.currentChapterIndex)
     store.chapterOpenDone = false
@@ -609,6 +638,8 @@ export function useCoReadingController() {
     replyDraftCount,
     onStartSession,
     onDraft,
+    saveAnnotationReply,
+    chatAboutAnnotation,
     reportReaderPage,
     startPageCoRead,
     stopPageCoRead,

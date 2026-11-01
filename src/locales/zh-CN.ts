@@ -1333,6 +1333,9 @@ export default {
     chatPanelRecords: "记录",
     chatPanelClose: "收起对话栏",
     chatPanelRecordsEmpty: "还没有留言记录。在批注气泡里写下你的想法并发送后，会保存在这里。",
+    saveReply: "保存",
+    savedReply: "已保存",
+    chatAbout: "再聊一句",
     readerMissingChapter: "无法加载本章内容",
     kind: {
       reaction: "有感而发",
