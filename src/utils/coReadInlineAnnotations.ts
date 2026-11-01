@@ -279,14 +279,38 @@ function buildPopoverContent(
 
   let editing = false
 
-  /** 只读模式：已保存的留言以列表形式展示（点击可继续编辑） */
+  /** 只读模式：已保存的留言以列表形式展示（点击可继续编辑，条目自带删除 ×） */
   const renderSavedView = () => {
     savedView.textContent = ""
     const text = String(ann.myReply || "").trim()
     const row = doc.createElement("div")
     row.className = "co-read-pop__saved-item"
-    row.textContent = text
     row.title = labels.editReply || "Edit"
+    const rowText = doc.createElement("span")
+    rowText.className = "co-read-pop__saved-text"
+    rowText.textContent = text
+    row.appendChild(rowText)
+
+    // 删除 ×：贴在这条留言上
+    const itemDelete = doc.createElement("button")
+    itemDelete.type = "button"
+    itemDelete.className = "co-read-pop__saved-delete"
+    itemDelete.title = labels.deleteReply || "Delete note"
+    itemDelete.setAttribute("aria-label", labels.deleteReply || "Delete note")
+    itemDelete.innerHTML =
+      '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path fill="currentColor" d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854z"/></svg>'
+    itemDelete.addEventListener("mousedown", stopEvent)
+    itemDelete.addEventListener("click", (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      ta.value = ""
+      onDraft(ann.id, "")
+      ann.replySaved = false
+      opts?.onDeleteReply?.(ann.id)
+      // 删除后回到编辑态（空输入框），可重新留言
+      applyMode(true)
+    })
+    row.appendChild(itemDelete)
     row.addEventListener("click", (e) => {
       e.preventDefault()
       e.stopPropagation()
@@ -331,7 +355,13 @@ function buildPopoverContent(
     e.preventDefault()
     e.stopPropagation()
     const text = String(ta.value || "").trim()
+    // 编辑态下清空后保存 = 删除这条留言
     if (!text) {
+      if (String(ann.myReply || "").trim() || ann.replySaved) {
+        onDraft(ann.id, "")
+        ann.replySaved = false
+        opts?.onDeleteReply?.(ann.id)
+      }
       applyMode(true)
       ta.focus()
       return
@@ -349,29 +379,6 @@ function buildPopoverContent(
     }, 700)
   })
   actions.appendChild(saveBtn)
-
-  // 删除留言：仅有内容时显示；清空文本并同步删除后端/本地记录
-  const deleteBtn = doc.createElement("button")
-  deleteBtn.type = "button"
-  deleteBtn.className = "co-read-pop__btn co-read-pop__btn--danger"
-  deleteBtn.textContent = labels.deleteReply || "Delete note"
-  deleteBtn.style.display = String(ann.myReply || "").trim() ? "" : "none"
-  deleteBtn.addEventListener("mousedown", stopEvent)
-  deleteBtn.addEventListener("click", (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    ta.value = ""
-    onDraft(ann.id, "")
-    ann.replySaved = false
-    opts?.onDeleteReply?.(ann.id)
-    applyMode(true)
-  })
-  actions.appendChild(deleteBtn)
-
-  const syncDeleteVisibility = () => {
-    deleteBtn.style.display = String(ta.value || ann.myReply || "").trim() ? "" : "none"
-  }
-  ta.addEventListener("input", syncDeleteVisibility)
 
   const chatBtn = doc.createElement("button")
   chatBtn.type = "button"
@@ -509,14 +516,15 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
 .co-read-pop__btn--primary{border-color:${accent};color:${accent}}
 .co-read-pop__btn--primary:hover{background:${dark ? "rgba(147,197,253,.15)" : "rgba(37,99,235,.08)"}}
 .co-read-pop__btn--done{border-color:#22c55e;color:#16a34a;background:${dark ? "rgba(34,197,94,.15)" : "rgba(34,197,94,.1)"}}
-.co-read-pop__btn--danger{border-color:${dark ? "#7f1d1d" : "#fecaca"};color:${dark ? "#f87171" : "#dc2626"}}
-.co-read-pop__btn--danger:hover{background:${dark ? "rgba(239,68,68,.15)" : "rgba(239,68,68,.08)"}}
 .co-read-pop__quote{margin:0 0 8px;padding-left:10px;border-left:3px solid ${accent};font-size:12px;font-style:italic;color:${muted};word-wrap:break-word;overflow-wrap:anywhere}
 .co-read-pop__body{margin:0 0 8px;white-space:pre-wrap;font-size:13px;word-wrap:break-word;overflow-wrap:anywhere}
 .co-read-pop__reply-label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 4px;font-size:10px;color:${muted}}
 .co-read-pop__edit{padding:0;border:none;background:none;color:${accent};font-size:10px;font-weight:600;cursor:pointer;text-decoration:underline}
 .co-read-pop__saved{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:8px;border:1px solid ${dark ? "#374151" : "#e5e7eb"};background:${dark ? "#0a0a0a" : "#f9fafb"}}
-.co-read-pop__saved-item{font-size:12px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;color:${text};cursor:text}
+.co-read-pop__saved-item{display:flex;align-items:flex-start;gap:6px;font-size:12px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;color:${text};cursor:text}
+.co-read-pop__saved-text{flex:1 1 auto;min-width:0}
+.co-read-pop__saved-delete{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:18px;height:18px;padding:0;border:none;border-radius:999px;background:transparent;color:${muted};cursor:pointer;line-height:0;opacity:.65;transition:all .15s}
+.co-read-pop__saved-delete:hover{opacity:1;background:${dark ? "rgba(239,68,68,.18)" : "rgba(239,68,68,.1)"};color:${dark ? "#f87171" : "#dc2626"}}
 .co-read-pop__saved-meta{font-size:10px;color:${muted}}.co-read-pop__reply{width:100%;box-sizing:border-box;border-radius:8px;border:1px solid ${dark ? "#374151" : "#d1d5db"};background:${dark ? "#0a0a0a" : "#fff"};color:${text};padding:8px 10px;font-size:12px;resize:vertical;min-height:48px;max-width:100%}
 .co-read-pop__reply:disabled{opacity:.55}
 .co-read-pop__sent{font-size:11px;color:#9ca3af;margin:4px 0 0}
