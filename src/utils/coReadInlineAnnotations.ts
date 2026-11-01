@@ -303,12 +303,29 @@ function buildPopoverContent(
     itemDelete.addEventListener("click", (e) => {
       e.preventDefault()
       e.stopPropagation()
+      // 本地 UI 与数据先行，回调（网络/后端）异常不得中断删除效果
       ta.value = ""
-      onDraft(ann.id, "")
+      try {
+        onDraft(ann.id, "")
+      } catch (err) {
+        try {
+          console.warn("[co-read] clear draft failed", err)
+        } catch {
+          /* ignore */
+        }
+      }
       ann.replySaved = false
-      opts?.onDeleteReply?.(ann.id)
       // 删除后回到编辑态（空输入框），可重新留言
       applyMode(true)
+      try {
+        opts?.onDeleteReply?.(ann.id)
+      } catch (err) {
+        try {
+          console.warn("[co-read] delete note callback failed", err)
+        } catch {
+          /* ignore */
+        }
+      }
     })
     row.appendChild(itemDelete)
     row.addEventListener("click", (e) => {
@@ -358,16 +375,39 @@ function buildPopoverContent(
     // 编辑态下清空后保存 = 删除这条留言
     if (!text) {
       if (String(ann.myReply || "").trim() || ann.replySaved) {
-        onDraft(ann.id, "")
+        try {
+          onDraft(ann.id, "")
+        } catch (err) {
+          try {
+            console.warn("[co-read] clear draft failed", err)
+          } catch {
+            /* ignore */
+          }
+        }
         ann.replySaved = false
-        opts?.onDeleteReply?.(ann.id)
+        try {
+          opts?.onDeleteReply?.(ann.id)
+        } catch (err) {
+          try {
+            console.warn("[co-read] delete note callback failed", err)
+          } catch {
+            /* ignore */
+          }
+        }
       }
       applyMode(true)
       ta.focus()
       return
     }
-    onDraft(ann.id, text)
-    opts?.onSaveReply?.(ann.id, text)
+    try {
+      onDraft(ann.id, text)
+    } catch (err) {
+      try {
+        console.warn("[co-read] save draft failed", err)
+      } catch {
+        /* ignore */
+      }
+    }
     ann.replySaved = true
     saveBtn.classList.add("co-read-pop__btn--done")
     saveBtn.textContent = labels.savedReply || "Saved"
@@ -377,6 +417,15 @@ function buildPopoverContent(
       // 保存成功后切回只读列表模式
       applyMode(false)
     }, 700)
+    try {
+      opts?.onSaveReply?.(ann.id, text)
+    } catch (err) {
+      try {
+        console.warn("[co-read] save note callback failed", err)
+      } catch {
+        /* ignore */
+      }
+    }
   })
   actions.appendChild(saveBtn)
 
@@ -390,8 +439,26 @@ function buildPopoverContent(
     e.stopPropagation()
     // list 态时用已保存的留言作为对话上下文
     const text = String(ta.value || ann.myReply || "").trim()
-    if (text) onDraft(ann.id, text)
-    opts?.onChatAbout?.(ann.id, text)
+    if (text) {
+      try {
+        onDraft(ann.id, text)
+      } catch (err) {
+        try {
+          console.warn("[co-read] save draft failed", err)
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    try {
+      opts?.onChatAbout?.(ann.id, text)
+    } catch (err) {
+      try {
+        console.warn("[co-read] chat callback failed", err)
+      } catch {
+        /* ignore */
+      }
+    }
   })
   actions.appendChild(chatBtn)
 
