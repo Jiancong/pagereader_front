@@ -30,7 +30,11 @@
         <BookHeart class="h-4 w-4" />
       </button>
       <button
-        v-if="coReadStore.phase === 'discussing' || coReadStore.chatMessages.length > 0"
+        v-if="
+          coReadChatOpen ||
+          coReadStore.phase === 'discussing' ||
+          coReadStore.chatMessages.length > 0
+        "
         type="button"
         class="reader-view__co-read-fab-btn"
         :title="t('coRead.chatPanelChat')"
@@ -343,16 +347,12 @@
 
     <template v-if="coReadMode && hasSource">
       <div
-        v-if="coReadStore.phase === 'reading' && coReadChapterOpenDone && (coReadReplyCount > 0 || coReadChromeVisible)"
+        v-if="
+          coReadChatOpen &&
+          (coReadStore.phase === 'reading' || coReadStore.phase === 'discussing')
+        "
         class="reader-view__co-read-tray"
       >
-        <CoReadReplyTray
-          :reply-count="coReadReplyCount"
-          :loading="coReadStore.repliesSending"
-          @send="onCoReadSendReplies"
-        />
-      </div>
-      <div v-else-if="coReadStore.phase === 'discussing' && coReadChatOpen" class="reader-view__co-read-tray">
         <CoReadChatPanel
           :messages="coReadStore.chatMessages"
           :chat-loading="coReadChatLoading"
@@ -360,6 +360,20 @@
           :kind-label="coReadInlineLabels.kind"
           @send="onCoReadChatSend"
           @close="coReadChatOpen = false"
+        />
+      </div>
+      <div
+        v-else-if="
+          coReadStore.phase === 'reading' &&
+          coReadChapterOpenDone &&
+          (coReadReplyCount > 0 || coReadChromeVisible)
+        "
+        class="reader-view__co-read-tray"
+      >
+        <CoReadReplyTray
+          :reply-count="coReadReplyCount"
+          :loading="coReadStore.repliesSending"
+          @send="onCoReadSendReplies"
         />
       </div>
     </template>

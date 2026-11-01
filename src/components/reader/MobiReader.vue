@@ -123,7 +123,7 @@ function applyCoReadInline() {
     status: props.coReadInline.status,
     onDraft: (id, text) => emit('co-read-draft', id, text),
     onSaveReply: (id, text) => emit('co-read-save', id, text),
-    onDeleteReply: () => emit('co-read-delete', id),
+    onDeleteReply: (id) => emit('co-read-delete', id),
     onChatAbout: (id, text) => emit('co-read-chat', id, text),
   })
 }

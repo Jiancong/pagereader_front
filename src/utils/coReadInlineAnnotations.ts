@@ -185,6 +185,20 @@ function stopEvent(e: Event) {
   e.stopPropagation()
 }
 
+/** 关闭批注浮层：去掉 open/hover 并 blur，避免 :focus-within 导致 X 点了仍不关 */
+function dismissCoReadHost(host: HTMLElement) {
+  host.classList.remove(
+    "co-read-host--open",
+    "co-read-host--hover",
+    "co-read-inline-host--open",
+    "co-read-inline-host--hover",
+  )
+  const active = host.ownerDocument?.activeElement
+  if (active && host.contains(active) && active instanceof HTMLElement) {
+    active.blur()
+  }
+}
+
 function buildPopoverContent(
   doc: Document,
   ann: CoReadAnnotation,
@@ -192,7 +206,7 @@ function buildPopoverContent(
   onDraft: (id: string, text: string) => void,
   opts?: {
     onSaveReply?: (id: string, text: string) => void
-    onDeleteReply?: () => void
+    onDeleteReply?: (id: string) => void
     onChatAbout?: (id: string, text: string) => void
     onClose?: () => void
   },
@@ -222,6 +236,7 @@ function buildPopoverContent(
     opts?.onClose?.()
   })
   closeBtn.addEventListener("mousedown", stopEvent)
+  closeBtn.addEventListener("touchstart", stopEvent, { passive: true })
   head.appendChild(closeBtn)
   pop.appendChild(head)
 
@@ -572,7 +587,7 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
   box-shadow:0 12px 40px rgba(0,0,0,.35);word-wrap:break-word;overflow-wrap:anywhere;
   visibility:hidden;opacity:0;pointer-events:none;transition:opacity .15s ease,visibility .15s;z-index:3
 }
-.co-read-host--open > .co-read-pop,.co-read-host--hover > .co-read-pop,.co-read-host:focus-within > .co-read-pop{visibility:visible;opacity:1;pointer-events:auto}
+.co-read-host--open > .co-read-pop,.co-read-host--hover > .co-read-pop{visibility:visible;opacity:1;pointer-events:auto}
 .co-read-pop--below{transform:translateY(10px)}
 .co-read-pop__head{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${accent};margin:0 0 8px}
 .co-read-pop__head{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -1170,7 +1185,7 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
       onDeleteReply: opts.onDeleteReply,
       onChatAbout: opts.onChatAbout,
       onClose: () => {
-        host.classList.remove("co-read-host--open", "co-read-host--hover")
+        dismissCoReadHost(host)
       },
     })
     const popLeft = Math.max(4, Math.min(mx - 40, hostW - 324))
@@ -1229,8 +1244,7 @@ function ensureInlineStyles(doc: Document, dark: boolean) {
   box-shadow:0 12px 40px rgba(0,0,0,.35);transition:opacity .15s ease,visibility .15s;
   word-wrap:break-word;overflow-wrap:anywhere
 }
-.co-read-inline-host--open .co-read-inline-popover,
-.co-read-inline-host:focus-within .co-read-inline-popover{
+.co-read-inline-host--open .co-read-inline-popover{
   visibility:visible;opacity:1;pointer-events:auto
 }
 .co-read-inline-host--hover .co-read-inline-popover{
@@ -1314,7 +1328,7 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: CommonOptio
       onDeleteReply: opts.onDeleteReply,
       onChatAbout: opts.onChatAbout,
       onClose: () => {
-        host.classList.remove("co-read-inline-host--open", "co-read-inline-host--hover")
+        dismissCoReadHost(host)
       },
     })
     pop.className = "co-read-inline-popover"
