@@ -431,7 +431,11 @@ let touchStartAt = 0
 
 function onTouchStart(e: TouchEvent) {
   const target = e.target as HTMLElement | null
-  if (!target?.closest('.co-read-inline-host')) {
+  if (
+    !target?.closest(
+      '.co-read-inline-host, .co-read-inline-marker, .co-read-inline-popover, .co-read-pop',
+    )
+  ) {
     releaseArticleInteraction()
   }
   const t0 = e.touches[0]
@@ -461,6 +465,14 @@ function onTouchEnd(e: TouchEvent) {
   const dy = touchLastY - touchStartY
   const dt = Date.now() - touchStartAt
   if (dt > SWIPE_MAX_MS || Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.6) return
+  const target = e.target as HTMLElement | null
+  if (
+    target?.closest(
+      '.co-read-inline-host, .co-read-inline-marker, .co-read-inline-popover, .co-read-pop',
+    )
+  ) {
+    return
+  }
   if (dx < 0) next()
   else prev()
 }

@@ -260,6 +260,76 @@ export function patchCoReadAnnotationThreads(
   })
 }
 
+function isCoReadTouchViewport(view: Window): boolean {
+  try {
+    return view.matchMedia("(max-width: 767px), (pointer: coarse)").matches
+  } catch {
+    return view.innerWidth <= 767
+  }
+}
+
+function resetInlinePopoverLayout(pop: HTMLElement) {
+  pop.classList.remove("co-read-inline-popover--fixed", "co-read-inline-popover--below")
+  pop.style.position = ""
+  pop.style.top = ""
+  pop.style.bottom = ""
+  pop.style.left = ""
+  pop.style.right = ""
+  pop.style.width = ""
+  pop.style.maxHeight = ""
+}
+
+/** 移动端：fixed 定位，避免 scroll/overflow 裁切导致「点了但看不到」 */
+function positionInlinePopoverForMobile(btn: HTMLElement, pop: HTMLElement) {
+  const view = btn.ownerDocument?.defaultView
+  if (!view || !isCoReadTouchViewport(view)) return
+  const r = btn.getBoundingClientRect()
+  const vw = view.innerWidth
+  const vh = view.innerHeight
+  const margin = 12
+  const popW = Math.min(320, vw - margin * 2)
+  const maxH = Math.min(380, Math.round(vh * 0.55))
+  pop.classList.add("co-read-inline-popover--fixed")
+  pop.style.width = `${popW}px`
+  pop.style.left = `${Math.max(margin, Math.min(r.left, vw - popW - margin))}px`
+  pop.style.bottom = "auto"
+  const spaceBelow = vh - r.bottom - margin
+  const spaceAbove = r.top - margin
+  if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
+    pop.classList.add("co-read-inline-popover--below")
+    pop.style.top = `${Math.min(vh - margin, r.bottom + 8)}px`
+    pop.style.maxHeight = `${Math.max(120, Math.min(maxH, spaceBelow - 8))}px`
+  } else {
+    pop.classList.remove("co-read-inline-popover--below")
+    const h = Math.max(120, Math.min(maxH, spaceAbove - 8))
+    pop.style.top = `${Math.max(margin, r.top - h - 8)}px`
+    pop.style.maxHeight = `${h}px`
+  }
+}
+
+/** 移动端合成 click 不可靠：touchend 为主，click 兜底桌面 */
+function bindCoReadMarkerTap(btn: HTMLElement, onActivate: (ev: Event) => void) {
+  let suppressClickUntil = 0
+  btn.addEventListener(
+    "touchend",
+    (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      suppressClickUntil = Date.now() + 450
+      onActivate(e)
+    },
+    { passive: false },
+  )
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (Date.now() < suppressClickUntil) return
+    onActivate(e)
+  })
+  btn.addEventListener("touchstart", stopEvent, { passive: true })
+  btn.addEventListener("mousedown", stopEvent)
+}
+
 function dismissCoReadHost(host: HTMLElement) {
   host.classList.remove(
     "co-read-host--open",
@@ -267,6 +337,8 @@ function dismissCoReadHost(host: HTMLElement) {
     "co-read-inline-host--open",
     "co-read-inline-host--hover",
   )
+  const pop = host.querySelector(".co-read-inline-popover") as HTMLElement | null
+  if (pop) resetInlinePopoverLayout(pop)
   const active = host.ownerDocument?.activeElement
   if (active && host.contains(active) && active instanceof HTMLElement) {
     active.blur()
@@ -1231,17 +1303,13 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     btn.innerHTML = markerSvg()
     btn.style.left = `${mx}px`
     btn.style.top = `${my}px`
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation()
-      e.preventDefault()
+    bindCoReadMarkerTap(btn, () => {
       const wasOpen = host.classList.contains("co-read-host--open")
       root?.querySelectorAll(".co-read-host--open").forEach((el) => {
         if (el !== host) el.classList.remove("co-read-host--open")
       })
       host.classList.toggle("co-read-host--open", !wasOpen)
     })
-    btn.addEventListener("mousedown", stopEvent)
-    btn.addEventListener("touchstart", stopEvent, { passive: true })
     host.appendChild(btn)
 
     // 桌面端 hover 浮层：鼠标离开图标后延迟关闭（260ms 宽限），
@@ -1344,6 +1412,7 @@ function ensureInlineStyles(doc: Document, dark: boolean) {
   visibility:visible;opacity:1;pointer-events:auto
 }
 .co-read-inline-popover--below{bottom:auto;top:calc(100% + 8px)}
+.co-read-inline-popover--fixed{position:fixed !important;right:auto !important;bottom:auto !important;z-index:10002}
 ${coReadThreadStyleBlock(!!dark, text, muted)}
 `
   if (!existed) doc.head.appendChild(style)
@@ -1436,26 +1505,30 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: CommonOptio
     btn.title = `${opts.labels.annotationTitle}: ${kindLabel(opts.labels, ann.kind)}`
     btn.setAttribute("aria-label", btn.title)
     btn.innerHTML = markerSvg()
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation()
-      e.preventDefault()
+    bindCoReadMarkerTap(btn, () => {
       const wasOpen = host.classList.contains("co-read-inline-host--open")
       body.querySelectorAll(".co-read-inline-host--open").forEach((el) => {
         if (el !== host) el.classList.remove("co-read-inline-host--open")
       })
-      if (!wasOpen) {
-        // 根据按钮屏幕坐标修正气泡水平与垂直方向，防止右侧/顶部溢出被裁切
-        const r = btn.getBoundingClientRect()
-        const vw = doc.defaultView?.innerWidth || 360
-        const popW = Math.min(320, vw - 24)
-        const overflowRight = r.left + popW - (vw - 12)
-        pop.style.left = overflowRight > 0 ? `${-Math.round(overflowRight)}px` : "0px"
-        pop.classList.toggle("co-read-inline-popover--below", r.top < 240)
+      const nextOpen = !wasOpen
+      if (nextOpen) {
+        resetInlinePopoverLayout(pop)
+        const view = doc.defaultView
+        if (view && isCoReadTouchViewport(view)) {
+          positionInlinePopoverForMobile(btn, pop)
+        } else {
+          const r = btn.getBoundingClientRect()
+          const vw = view?.innerWidth || 360
+          const popW = Math.min(320, vw - 24)
+          const overflowRight = r.left + popW - (vw - 12)
+          pop.style.left = overflowRight > 0 ? `${-Math.round(overflowRight)}px` : "0px"
+          pop.classList.toggle("co-read-inline-popover--below", r.top < 240)
+        }
+      } else {
+        resetInlinePopoverLayout(pop)
       }
-      host.classList.toggle("co-read-inline-host--open", !wasOpen)
+      host.classList.toggle("co-read-inline-host--open", nextOpen)
     })
-    btn.addEventListener("mousedown", stopEvent)
-    btn.addEventListener("touchstart", stopEvent, { passive: true })
     host.appendChild(btn)
 
     // 桌面端 hover 浮层：离开图标后延迟关闭，允许鼠标移入气泡写 note
@@ -1478,6 +1551,8 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: CommonOptio
     btn.addEventListener("mouseleave", closeByHoverInline)
     pop.addEventListener("mouseenter", openByHoverInline)
     pop.addEventListener("mouseleave", closeByHoverInline)
+    pop.addEventListener("touchstart", stopEvent, { passive: true })
+    pop.addEventListener("touchend", stopEvent, { passive: true })
 
     host.appendChild(pop)
 

@@ -188,8 +188,8 @@
       v-else-if="hasKnownReader"
       class="reader-view__content"
       :class="{ 'reader-view__content--co-read-pdf': coReadShowPdfSidePanel }"
-      @pointerdown.capture="mobileToolsOpen = false; coReadChromeVisible = false"
-      @touchstart.capture="mobileToolsOpen = false; coReadChromeVisible = false"
+      @pointerdown.capture="onReaderSurfacePointerDown"
+      @touchstart.capture="onReaderSurfaceTouchStart"
     >
       <!-- PDF 阅读器 -->
       <PdfReader
@@ -511,6 +511,26 @@ const coReadChatOpen = ref(false)
 const coReadLayoutRevision = ref(0)
 function bumpCoReadLayoutRevision() {
   coReadLayoutRevision.value += 1
+}
+
+const CO_READ_SURFACE_SELECTOR =
+  '.co-read-inline-host,.co-read-inline-marker,.co-read-inline-popover,.co-read-pop,.co-read-marker,.co-read-ovl-root,.reader-view__co-read-fab'
+
+function isCoReadSurfaceTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  return Boolean(el?.closest?.(CO_READ_SURFACE_SELECTOR))
+}
+
+function onReaderSurfaceTouchStart(e: TouchEvent) {
+  if (isCoReadSurfaceTarget(e.target)) return
+  mobileToolsOpen.value = false
+  coReadChromeVisible.value = false
+}
+
+function onReaderSurfacePointerDown(e: PointerEvent) {
+  if (isCoReadSurfaceTarget(e.target)) return
+  mobileToolsOpen.value = false
+  coReadChromeVisible.value = false
 }
 
 // 进入讨论阶段（发送留言后）自动展开对话栏；布局变化时重算批注 icon
