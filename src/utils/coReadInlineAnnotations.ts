@@ -4,7 +4,7 @@
 //   绝不改动阅读 iframe 的 DOM（epubjs 依赖原始 DOM 计算 CFI，插节点会导致 IndexSizeError）
 // @author hc @date 2026-10-16
 
-import type { CoReadAnnotation } from "@/types/coReading"
+import type { CoReadAnnotation, CoReadChatMessage } from "@/types/coReading"
 
 const INLINE_STYLE_ID = "co-read-inline-styles"
 const OVL_STYLE_ID = "co-read-ovl-styles"
@@ -186,6 +186,80 @@ function stopEvent(e: Event) {
 }
 
 /** 关闭批注浮层：去掉 open/hover 并 blur，避免 :focus-within 导致 X 点了仍不关 */
+function coReadThreadStyleBlock(dark: boolean, text: string, muted: string): string {
+  const userBg = dark ? "rgba(99,102,241,.35)" : "rgba(99,102,241,.15)"
+  const asstBg = dark ? "rgba(31,41,55,.85)" : "rgba(243,244,246,.95)"
+  return `
+.co-read-pop__thread{display:none;flex-direction:column;gap:6px;margin:10px 0 0;padding-top:8px;border-top:1px solid ${dark ? "#374151" : "#e5e7eb"};max-height:min(200px,38vh);overflow-y:auto}
+.co-read-pop__thread--active{display:flex}
+.co-read-pop__thread-list{display:flex;flex-direction:column;gap:6px}
+.co-read-pop__thread-row{max-width:92%;padding:6px 9px;border-radius:10px;font-size:12px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+.co-read-pop__thread-row--user{align-self:flex-end;background:${userBg};color:${text}}
+.co-read-pop__thread-row--assistant{align-self:flex-start;background:${asstBg};color:${text};border:1px solid ${dark ? "#374151" : "#e5e7eb"}}
+.co-read-pop__thread-loading{align-self:flex-start;font-size:11px;color:${muted};padding:2px 4px}
+`
+}
+
+function sanitizeThreadText(text: string): string {
+  return String(text || "")
+    .replace(/<CHAPTER_END>\s*/gi, "")
+    .trim()
+}
+
+/** 原地刷新各批注卡片内的对话线程（不重建浮层 DOM） */
+export function patchCoReadAnnotationThreads(
+  root: HTMLElement,
+  messages: CoReadChatMessage[],
+  opts?: { chatLoading?: boolean; loadingHint?: string },
+) {
+  const byAnn = new Map<string, CoReadChatMessage[]>()
+  for (const m of messages) {
+    const id = String(m.annotationId || "").trim()
+    if (!id) continue
+    const list = byAnn.get(id) || []
+    list.push(m)
+    byAnn.set(id, list)
+  }
+
+  root.querySelectorAll(`[${INLINE_ATTR}]`).forEach((node) => {
+    const host = node as HTMLElement
+    const annId = host.getAttribute(INLINE_ATTR)
+    if (!annId || annId === "status") return
+    const thread = host.querySelector(".co-read-pop__thread") as HTMLElement | null
+    const listEl = host.querySelector(".co-read-pop__thread-list") as HTMLElement | null
+    if (!thread || !listEl) return
+
+    const list = byAnn.get(annId) || []
+    const open = thread.dataset.open === "1"
+    const active = list.length > 0 || open
+    thread.classList.toggle("co-read-pop__thread--active", active)
+
+    const sig = list.map((m) => `${m.id}|${m.role}|${m.text.length}|${m.streaming ? 1 : 0}`).join(";")
+    const loadingTail =
+      opts?.chatLoading && list.length > 0 && list[list.length - 1]?.role === "user" ? "|loading" : ""
+    const fullSig = sig + loadingTail
+    if (thread.dataset.sig === fullSig) return
+    thread.dataset.sig = fullSig
+
+    listEl.textContent = ""
+    for (const m of list) {
+      const row = listEl.ownerDocument!.createElement("div")
+      row.className = `co-read-pop__thread-row co-read-pop__thread-row--${m.role}`
+      row.textContent = sanitizeThreadText(m.text)
+      listEl.appendChild(row)
+    }
+    if (loadingTail) {
+      const loading = listEl.ownerDocument!.createElement("div")
+      loading.className = "co-read-pop__thread-loading"
+      loading.textContent = opts?.loadingHint || "…"
+      listEl.appendChild(loading)
+    }
+    if (active) {
+      thread.scrollTop = thread.scrollHeight
+    }
+  })
+}
+
 function dismissCoReadHost(host: HTMLElement) {
   host.classList.remove(
     "co-read-host--open",
@@ -444,6 +518,12 @@ function buildPopoverContent(
   })
   actions.appendChild(saveBtn)
 
+  const threadWrap = doc.createElement("div")
+  threadWrap.className = "co-read-pop__thread"
+  const threadList = doc.createElement("div")
+  threadList.className = "co-read-pop__thread-list"
+  threadWrap.appendChild(threadList)
+
   const chatBtn = doc.createElement("button")
   chatBtn.type = "button"
   chatBtn.className = "co-read-pop__btn"
@@ -465,6 +545,8 @@ function buildPopoverContent(
         }
       }
     }
+    threadWrap.classList.add("co-read-pop__thread--active")
+    threadWrap.dataset.open = "1"
     try {
       opts?.onChatAbout?.(ann.id, text)
     } catch (err) {
@@ -477,7 +559,8 @@ function buildPopoverContent(
   })
   actions.appendChild(chatBtn)
 
-  // 操作区常驻在状态区之外，确保 list 态也能「再聊一句」
+  // 对话线程在操作按钮上方；点「再聊一句」后在此追加，不打开底部栏
+  pop.appendChild(threadWrap)
   pop.appendChild(actions)
 
   // ── 卡片内对话线程：点「再聊一句」后在这里继续，不跳底部面板 ──
@@ -611,6 +694,7 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
 .co-read-pop__saved-meta{font-size:10px;color:${muted}}.co-read-pop__reply{width:100%;box-sizing:border-box;border-radius:8px;border:1px solid ${dark ? "#374151" : "#d1d5db"};background:${dark ? "#0a0a0a" : "#fff"};color:${text};padding:8px 10px;font-size:12px;resize:vertical;min-height:48px;max-width:100%}
 .co-read-pop__reply:disabled{opacity:.55}
 .co-read-pop__sent{font-size:11px;color:#9ca3af;margin:4px 0 0}
+${coReadThreadStyleBlock(!!dark, text, muted)}
 `
   if (!existed) doc.head.appendChild(style)
 }
@@ -1183,7 +1267,10 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     const pop = buildPopoverContent(hostDoc, ann, opts.labels, opts.onDraft, {
       onSaveReply: opts.onSaveReply,
       onDeleteReply: opts.onDeleteReply,
-      onChatAbout: opts.onChatAbout,
+      onChatAbout: (id, text) => {
+        host.classList.add("co-read-host--open", "co-read-host--hover")
+        opts.onChatAbout?.(id, text)
+      },
       onClose: () => {
         dismissCoReadHost(host)
       },
@@ -1251,6 +1338,7 @@ function ensureInlineStyles(doc: Document, dark: boolean) {
   visibility:visible;opacity:1;pointer-events:auto
 }
 .co-read-inline-popover--below{bottom:auto;top:calc(100% + 8px)}
+${coReadThreadStyleBlock(!!dark, text, muted)}
 `
   doc.head.appendChild(style)
 }
@@ -1326,7 +1414,10 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: CommonOptio
     const pop = buildPopoverContent(doc, ann, opts.labels, opts.onDraft, {
       onSaveReply: opts.onSaveReply,
       onDeleteReply: opts.onDeleteReply,
-      onChatAbout: opts.onChatAbout,
+      onChatAbout: (id, text) => {
+        host.classList.add("co-read-inline-host--open", "co-read-inline-host--hover")
+        opts.onChatAbout?.(id, text)
+      },
       onClose: () => {
         dismissCoReadHost(host)
       },

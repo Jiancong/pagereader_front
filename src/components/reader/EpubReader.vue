@@ -39,14 +39,15 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
 import { useI18n } from 'vue-i18n'
 import ePub, { type Book, type Rendition } from 'epubjs'
-import type { CoReadAnnotation } from '@/types/coReading'
 import {
   pageTextFromBody,
   pageTextFromVisiblePage,
+  patchCoReadAnnotationThreads,
   syncCoReadOverlayAnnotations,
   type CoReadInlineLabels,
   type CoReadInlineStatus,
 } from '@/utils/coReadInlineAnnotations'
+import type { CoReadAnnotation, CoReadChatMessage } from '@/types/coReading'
 
 const props = withDefaults(
   defineProps<{
@@ -60,6 +61,8 @@ const props = withDefaults(
       annotations: CoReadAnnotation[]
       labels: CoReadInlineLabels
       status?: CoReadInlineStatus
+      chatMessages?: CoReadChatMessage[]
+      chatLoading?: boolean
     } | null
   }>(),
   { colorTheme: 'light', coReadInline: null },
@@ -551,6 +554,17 @@ function applyCoReadInline(force = false) {
     onDeleteReply: (id) => emit('co-read-delete', id),
     onChatAbout: (id, text) => emit('co-read-chat', id, text),
   })
+  patchCoReadThreads()
+}
+
+function patchCoReadThreads() {
+  const overlay = overlayRef.value
+  const payload = props.coReadInline
+  if (!overlay || !payload?.chatMessages) return
+  patchCoReadAnnotationThreads(overlay, payload.chatMessages, {
+    chatLoading: payload.chatLoading,
+    loadingHint: payload.labels.loading,
+  })
 }
 
 /**
@@ -616,6 +630,19 @@ watch(
   () => {
     patchCoReadText()
   },
+  { flush: 'post' },
+)
+
+watch(
+  () => {
+    const p = props.coReadInline
+    if (!p?.chatMessages) return ''
+    return p.chatMessages
+      .map((m) => `${m.id}|${m.text.length}|${m.streaming ? 1 : 0}|${m.annotationId ?? ''}`)
+      .join(';')
+      .concat(p.chatLoading ? '|loading' : '')
+  },
+  () => patchCoReadThreads(),
   { flush: 'post' },
 )
 

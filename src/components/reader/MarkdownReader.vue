@@ -45,9 +45,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
-import type { CoReadAnnotation } from '@/types/coReading'
+import type { CoReadAnnotation, CoReadChatMessage } from '@/types/coReading'
 import {
   pageTextFromBody,
+  patchCoReadAnnotationThreads,
   syncCoReadInlineAnnotations,
   type CoReadInlineLabels,
   type CoReadInlineStatus,
@@ -66,6 +67,8 @@ const props = withDefaults(
       annotations: CoReadAnnotation[]
       labels: CoReadInlineLabels
       status?: CoReadInlineStatus
+      chatMessages?: CoReadChatMessage[]
+      chatLoading?: boolean
     } | null
   }>(),
   { colorTheme: 'light', coReadInline: null },
@@ -243,6 +246,17 @@ function applyCoReadInline(force = false) {
     onDeleteReply: (id) => emit('co-read-delete', id),
     onChatAbout: (id, text) => emit('co-read-chat', id, text),
   })
+  patchCoReadThreads()
+}
+
+function patchCoReadThreads() {
+  const root = articleRef.value
+  const payload = props.coReadInline
+  if (!root || !payload?.chatMessages) return
+  patchCoReadAnnotationThreads(root, payload.chatMessages, {
+    chatLoading: payload.chatLoading,
+    loadingHint: payload.labels.loading,
+  })
 }
 
 function coReadPayloadSignature(): string {
@@ -289,6 +303,18 @@ watch(
     return `${n}|${p.status?.intro?.length ?? 0}`
   },
   () => patchCoReadText(),
+  { flush: 'post' },
+)
+watch(
+  () => {
+    const p = props.coReadInline
+    if (!p?.chatMessages) return ''
+    return p.chatMessages
+      .map((m) => `${m.id}|${m.text.length}|${m.streaming ? 1 : 0}|${m.annotationId ?? ''}`)
+      .join(';')
+      .concat(p.chatLoading ? '|loading' : '')
+  },
+  () => patchCoReadThreads(),
   { flush: 'post' },
 )
 watch(

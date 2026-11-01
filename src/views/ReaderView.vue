@@ -30,11 +30,7 @@
         <BookHeart class="h-4 w-4" />
       </button>
       <button
-        v-if="
-          coReadChatOpen ||
-          coReadStore.phase === 'discussing' ||
-          coReadStore.chatMessages.length > 0
-        "
+        v-if="coReadStore.phase === 'discussing' || coReadStore.chatMessages.length > 0"
         type="button"
         class="reader-view__co-read-fab-btn"
         :title="t('coRead.chatPanelChat')"
@@ -347,23 +343,8 @@
 
     <template v-if="coReadMode && hasSource">
       <div
-        v-if="
-          coReadChatOpen &&
-          (coReadStore.phase === 'reading' || coReadStore.phase === 'discussing')
-        "
-        class="reader-view__co-read-tray"
-      >
-        <CoReadChatPanel
-          :messages="coReadStore.chatMessages"
-          :chat-loading="coReadChatLoading"
-          :replies="coReadReplyRecords"
-          :kind-label="coReadInlineLabels.kind"
-          @send="onCoReadChatSend"
-          @close="coReadChatOpen = false"
-        />
-      </div>
       <div
-        v-else-if="
+        v-if="
           coReadStore.phase === 'reading' &&
           coReadChapterOpenDone &&
           (coReadReplyCount > 0 || coReadChromeVisible)
@@ -374,6 +355,16 @@
           :reply-count="coReadReplyCount"
           :loading="coReadStore.repliesSending"
           @send="onCoReadSendReplies"
+        />
+      </div>
+      <div v-else-if="coReadStore.phase === 'discussing' && coReadChatOpen" class="reader-view__co-read-tray">
+        <CoReadChatPanel
+          :messages="coReadStore.chatMessages"
+          :chat-loading="coReadChatLoading"
+          :replies="coReadReplyRecords"
+          :kind-label="coReadInlineLabels.kind"
+          @send="onCoReadChatSend"
+          @close="coReadChatOpen = false"
         />
       </div>
     </template>
@@ -454,9 +445,8 @@ watch(
   },
 )
 
-/** 批注卡片内「再聊一句」：打开底部对话栏继续（上下文跟随该批注） */
+/** 批注卡片内「再聊一句」：对话追加在 icon 浮层内，不打开底部栏 */
 async function handleCoReadCardChat(annotationId: string, text: string) {
-  coReadChatOpen.value = true
   await onCoReadChatAbout(annotationId, text)
 }
 
@@ -487,6 +477,8 @@ const coReadInlinePayload = computed(() => {
   return {
     annotations: coReadChapterAnnotations.value,
     labels: coReadInlineLabels.value,
+    chatMessages: coReadStore.chatMessages,
+    chatLoading: coReadChatLoading.value,
     status: {
       loading: coReadStore.openingChapter && coReadChapterAnnotations.value.length === 0,
       intro: coReadStore.pageIntroText || undefined,
