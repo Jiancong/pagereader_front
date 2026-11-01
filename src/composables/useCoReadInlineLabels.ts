@@ -24,6 +24,8 @@ export function useCoReadInlineLabels() {
       chatAbout: t("coRead.chatAbout"),
       editReply: t("coRead.editReply"),
       deleteReply: t("coRead.deleteReply"),
+      threadInput: t("coRead.threadInput"),
+      threadSend: t("coRead.chatSend"),
       closePanel: t("coRead.chatPanelClose"),
     }),
   )

@@ -17,11 +17,12 @@ import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
 import { applyReaderDocColorTheme } from '@/utils/readerNightDocStyle'
 import { useI18n } from 'vue-i18n'
 import 'foliate-js/view.js'
-import type { CoReadAnnotation } from '@/types/coReading'
+import type { CoReadAnnotation, CoReadChatMessage } from '@/types/coReading'
 import {
   pageTextFromBody,
   pageTextFromVisiblePage,
   syncCoReadOverlayAnnotations,
+  patchCoReadThreads,
   type CoReadInlineLabels,
   type CoReadInlineStatus,
 } from '@/utils/coReadInlineAnnotations'
@@ -35,6 +36,7 @@ const props = withDefaults(
       annotations: CoReadAnnotation[]
       labels: CoReadInlineLabels
       status?: CoReadInlineStatus
+      threads?: CoReadChatMessage[]
     } | null
   }>(),
   { colorTheme: 'light', coReadInline: null },
@@ -121,6 +123,7 @@ function applyCoReadInline() {
     labels: props.coReadInline.labels,
     dark: props.colorTheme === 'dark',
     status: props.coReadInline.status,
+    threads: props.coReadInline.threads,
     onDraft: (id, text) => emit('co-read-draft', id, text),
     onSaveReply: (id, text) => emit('co-read-save', id, text),
     onDeleteReply: () => emit('co-read-delete', id),
@@ -138,10 +141,47 @@ function onLoad(e: Event) {
   emit('page-ready')
 }
 
+// 仅在批注定位结构变化时重建；流式内容/线程消息走原地 patch，避免移动端重建循环
+function coReadSignature(): string {
+  const p = props.coReadInline
+  if (!p) return ""
+  const parts = p.annotations.map(
+    (a) => `${a.id}|${a.kind}|${a.anchor?.paragraphIndex ?? 0}|${a.anchor?.quote ?? ""}`,
+  )
+  const s = p.status
+  parts.push(`status:${s?.loading ? 1 : 0}|${s?.errorCode ?? ""}|${s?.emptyHint ? 1 : 0}`)
+  return parts.join("~")
+}
+
+watch(coReadSignature, () => applyCoReadInline(), { flush: 'post' })
+
+// 流式批注正文 / 卡片内对话线程：原地更新
 watch(
-  () => props.coReadInline,
-  () => applyCoReadInline(),
-  { deep: true },
+  () => {
+    const p = props.coReadInline
+    if (!p) return ""
+    let n = 0
+    for (const a of p.annotations) n += (a.content || "").length
+    const t = (p.threads || []).map((m) => `${m.id}:${m.text.length}`).join(",")
+    return `${n}|${p.status?.intro?.length ?? 0}|${t}`
+  },
+  () => {
+    const overlay = overlayRef.value
+    const p = props.coReadInline
+    if (!overlay || !p) return
+    // 批注正文原地更新
+    for (const a of p.annotations) {
+      const hostEl = overlay.querySelector(`[data-co-read-inline-root="${a.id}"]`)
+      if (!hostEl) continue
+      const bodyEl = hostEl.querySelector(".co-read-pop__body")
+      if (bodyEl && bodyEl.textContent !== (a.content || "")) {
+        bodyEl.textContent = a.content || ""
+      }
+    }
+    // 线程 patch
+    if (p.threads?.length) patchCoReadThreads(overlay, p.threads)
+  },
+  { flush: 'post' },
 )
 
 watch(

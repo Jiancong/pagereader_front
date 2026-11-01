@@ -39,11 +39,12 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
 import { useI18n } from 'vue-i18n'
 import ePub, { type Book, type Rendition } from 'epubjs'
-import type { CoReadAnnotation } from '@/types/coReading'
+import type { CoReadAnnotation, CoReadChatMessage } from '@/types/coReading'
 import {
   pageTextFromBody,
   pageTextFromVisiblePage,
   syncCoReadOverlayAnnotations,
+  patchCoReadThreads,
   type CoReadInlineLabels,
   type CoReadInlineStatus,
 } from '@/utils/coReadInlineAnnotations'
@@ -60,6 +61,7 @@ const props = withDefaults(
       annotations: CoReadAnnotation[]
       labels: CoReadInlineLabels
       status?: CoReadInlineStatus
+      threads?: CoReadChatMessage[]
     } | null
   }>(),
   { colorTheme: 'light', coReadInline: null },
@@ -546,6 +548,7 @@ function applyCoReadInline(force = false) {
     labels: props.coReadInline.labels,
     dark: props.colorTheme === 'dark',
     status: props.coReadInline.status,
+    threads: props.coReadInline.threads,
     onDraft: (id, text) => emit('co-read-draft', id, text),
     onSaveReply: (id, text) => emit('co-read-save', id, text),
     onDeleteReply: () => emit('co-read-delete', id),
@@ -615,6 +618,17 @@ watch(
   },
   () => {
     patchCoReadText()
+  },
+  { flush: 'post' },
+)
+
+// 卡片内对话线程流式更新：只 patch 消息列表，不重建 DOM、不打断输入
+watch(
+  () => (props.coReadInline?.threads || []).map((m) => `${m.id}:${m.text.length}`).join("|"),
+  () => {
+    const overlay = overlayRef.value
+    const threads = props.coReadInline?.threads
+    if (overlay && threads?.length) patchCoReadThreads(overlay, threads)
   },
   { flush: 'post' },
 )

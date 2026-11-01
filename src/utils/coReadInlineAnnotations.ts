@@ -4,7 +4,7 @@
 //   绝不改动阅读 iframe 的 DOM（epubjs 依赖原始 DOM 计算 CFI，插节点会导致 IndexSizeError）
 // @author hc @date 2026-10-16
 
-import type { CoReadAnnotation } from "@/types/coReading"
+import type { CoReadAnnotation, CoReadChatMessage } from "@/types/coReading"
 
 const INLINE_STYLE_ID = "co-read-inline-styles"
 const OVL_STYLE_ID = "co-read-ovl-styles"
@@ -56,6 +56,8 @@ export interface CoReadInlineLabels {
   chatAbout?: string
   editReply?: string
   deleteReply?: string
+  threadInput?: string
+  threadSend?: string
   closePanel?: string
 }
 
@@ -79,6 +81,8 @@ interface CommonOptions {
   onDeleteReply?: (annotationId: string) => void
   /** 就这条批注发起与 AI 书友的对话 */
   onChatAbout?: (annotationId: string, text: string) => void
+  /** 按批注归组的对话线程（卡片内继续聊） */
+  threads?: CoReadChatMessage[]
 }
 
 function escapeRegExp(s: string): string {
@@ -195,6 +199,8 @@ function buildPopoverContent(
     onDeleteReply?: () => void
     onChatAbout?: (id: string, text: string) => void
     onClose?: () => void
+    /** 该批注的对话线程（卡片内继续聊） */
+    thread?: CoReadChatMessage[]
   },
 ): HTMLElement {
   const pop = doc.createElement("div")
@@ -465,6 +471,76 @@ function buildPopoverContent(
   // 操作区常驻在状态区之外，确保 list 态也能「再聊一句」
   pop.appendChild(actions)
 
+  // ── 卡片内对话线程：点「再聊一句」后在这里继续，不跳底部面板 ──
+  const thread = (opts?.thread || []).filter((m) => (m.text || "").trim())
+  const threadWrap = doc.createElement("div")
+  threadWrap.className = "co-read-thread"
+  threadWrap.setAttribute("data-co-read-thread", ann.id)
+  threadWrap.style.display = thread.length ? "" : "none"
+  const threadList = doc.createElement("div")
+  threadList.className = "co-read-thread__list"
+  for (const m of thread) {
+    const row = doc.createElement("div")
+    row.className = `co-read-thread__row co-read-thread__row--${m.role === "user" ? "user" : "assistant"}`
+    const bubble = doc.createElement("div")
+    bubble.className = "co-read-thread__bubble"
+    bubble.textContent = m.text
+    row.appendChild(bubble)
+    threadList.appendChild(row)
+  }
+  threadWrap.appendChild(threadList)
+
+  const threadInputRow = doc.createElement("div")
+  threadInputRow.className = "co-read-thread__inputrow"
+  const threadInput = doc.createElement("input")
+  threadInput.type = "text"
+  threadInput.className = "co-read-thread__input"
+  threadInput.placeholder = labels.threadInput || "Reply…"
+  threadInput.addEventListener("mousedown", stopEvent)
+  threadInput.addEventListener("click", stopEvent)
+  threadInput.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return
+    e.preventDefault()
+    e.stopPropagation()
+    const text = threadInput.value.trim()
+    if (!text) return
+    threadInput.value = ""
+    try {
+      opts?.onChatAbout?.(ann.id, text)
+    } catch (err) {
+      try {
+        console.warn("[co-read] thread send failed", err)
+      } catch {
+        /* ignore */
+      }
+    }
+  })
+  threadInputRow.appendChild(threadInput)
+  const threadSend = doc.createElement("button")
+  threadSend.type = "button"
+  threadSend.className = "co-read-thread__send"
+  threadSend.textContent = labels.threadSend || "Send"
+  threadSend.addEventListener("mousedown", stopEvent)
+  threadSend.addEventListener("click", (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const text = threadInput.value.trim()
+    if (!text) return
+    threadInput.value = ""
+    try {
+      opts?.onChatAbout?.(ann.id, text)
+    } catch (err) {
+      try {
+        console.warn("[co-read] thread send failed", err)
+      } catch {
+        /* ignore */
+      }
+    }
+  })
+  threadInputRow.appendChild(threadSend)
+  threadWrap.appendChild(threadInputRow)
+  pop.appendChild(threadWrap)
+
   // 初始状态：已保存过留言 → 直接 list 模式；否则编辑模式
   applyMode(false)
 
@@ -595,6 +671,18 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
 .co-read-pop__saved-meta{font-size:10px;color:${muted}}.co-read-pop__reply{width:100%;box-sizing:border-box;border-radius:8px;border:1px solid ${dark ? "#374151" : "#d1d5db"};background:${dark ? "#0a0a0a" : "#fff"};color:${text};padding:8px 10px;font-size:12px;resize:vertical;min-height:48px;max-width:100%}
 .co-read-pop__reply:disabled{opacity:.55}
 .co-read-pop__sent{font-size:11px;color:#9ca3af;margin:4px 0 0}
+.co-read-thread{margin:10px 0 0;border-top:1px dashed ${dark ? "#374151" : "#e5e7eb"};padding-top:8px}
+.co-read-thread__list{display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;padding-right:2px}
+.co-read-thread__row{display:flex}
+.co-read-thread__row--user{justify-content:flex-end}
+.co-read-thread__row--assistant{justify-content:flex-start}
+.co-read-thread__bubble{max-width:88%;border-radius:10px;padding:6px 9px;font-size:12px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;border:1px solid ${dark ? "#374151" : "#e5e7eb"};background:${dark ? "#111827" : "#f9fafb"};color:${text}}
+.co-read-thread__row--user .co-read-thread__bubble{background:${dark ? "rgba(99,102,241,.2)" : "rgba(99,102,241,.1)"};border-color:${dark ? "#4338ca" : "#c7d2fe"}}
+.co-read-thread__inputrow{display:flex;gap:6px;margin-top:8px}
+.co-read-thread__input{flex:1 1 auto;min-width:0;box-sizing:border-box;border-radius:8px;border:1px solid ${dark ? "#374151" : "#d1d5db"};background:${dark ? "#0a0a0a" : "#fff"};color:${text};padding:6px 9px;font-size:12px;outline:none}
+.co-read-thread__input:focus{border-color:${accent}}
+.co-read-thread__send{flex:0 0 auto;padding:6px 10px;border-radius:8px;border:1px solid ${accent};background:transparent;color:${accent};font-size:12px;cursor:pointer}
+.co-read-thread__send:hover{background:${dark ? "rgba(147,197,253,.15)" : "rgba(37,99,235,.08)"}}
 `
   if (!existed) doc.head.appendChild(style)
 }
@@ -1171,6 +1259,7 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
       onClose: () => {
         host.classList.remove("co-read-host--open", "co-read-host--hover")
       },
+      thread: (opts.threads || []).filter((m) => m.annotationId === ann.id),
     })
     const popLeft = Math.max(4, Math.min(mx - 40, hostW - 324))
     if (my > hostH * 0.55) {
@@ -1186,6 +1275,32 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
 
     root.appendChild(host)
   }
+}
+
+/**
+ * 流式更新打开中的批注卡片线程：只重建消息列表（不碰输入框/不打断焦点），
+ * 由阅读器在对话消息变化时调用。
+ */
+export function patchCoReadThreads(host: HTMLElement, threads: CoReadChatMessage[]) {
+  const containers = host.querySelectorAll<HTMLElement>("[data-co-read-thread]")
+  containers.forEach((container) => {
+    const annId = container.getAttribute("data-co-read-thread") || ""
+    const rows = threads.filter((m) => m.annotationId === annId && (m.text || "").trim())
+    const list = container.querySelector(".co-read-thread__list")
+    if (!list) return
+    list.textContent = ""
+    for (const m of rows) {
+      const row = list.ownerDocument.createElement("div")
+      row.className = `co-read-thread__row co-read-thread__row--${m.role === "user" ? "user" : "assistant"}`
+      const bubble = list.ownerDocument.createElement("div")
+      bubble.className = "co-read-thread__bubble"
+      bubble.textContent = m.text
+      row.appendChild(bubble)
+      list.appendChild(row)
+    }
+    container.style.display = rows.length ? "" : "none"
+    list.scrollTop = list.scrollHeight
+  })
 }
 
 /* ============ 模式 B：段内行内（Markdown，无分页问题） ============ */
@@ -1315,6 +1430,7 @@ export function syncCoReadInlineAnnotations(body: HTMLElement, opts: CommonOptio
       onClose: () => {
         host.classList.remove("co-read-inline-host--open", "co-read-inline-host--hover")
       },
+      thread: (opts.threads || []).filter((m) => m.annotationId === ann.id),
     })
     pop.className = "co-read-inline-popover"
 

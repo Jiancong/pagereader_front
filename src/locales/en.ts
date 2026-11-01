@@ -1360,6 +1360,7 @@ export default {
     chatAbout: "Chat about this",
     editReply: "Edit",
     deleteReply: "Delete note",
+    threadInput: "Keep chatting about this…",
     readerMissingChapter: "Could not load this chapter",
     kind: {
       reaction: "Reaction",

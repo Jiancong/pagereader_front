@@ -408,24 +408,26 @@ export function useCoReadingController() {
     }
   }
 
-  /** 卡片内「再聊一句」：带着该批注上下文与当前留言发起 /chat，并展开对话栏 */
+  /** 卡片内「再聊一句」：在该批注的卡片线程内继续对话（不跳底部面板、不切阶段） */
   async function chatAboutAnnotation(annotationId: string, text: string) {
     if (!store.sessionId) return
     const ann = store.annotations.find((a) => a.id === annotationId)
     const userText = String(text || "").trim()
-    const quote = String(ann?.anchor?.quote || "").trim()
     if (userText) {
       store.saveDraft(annotationId, store.currentChapterIndex, userText)
       store.markReplySaved(annotationId)
     }
-    const prompt = userText || quote || String(ann?.content || "").trim()
+    // 该批注已有线程 → 追加追问（纯文本）；首轮 → 带引文上下文
+    const hasThread = store.chatMessages.some((m) => m.annotationId === annotationId)
+    const quote = String(ann?.anchor?.quote || "").trim()
+    const fallback = String(ann?.content || "").trim()
+    const prompt = hasThread ? userText : userText || quote || fallback
     if (!prompt) return
-    // 让对话围绕这条批注：带上引文上下文
-    const composed = quote && userText && !userText.includes(quote)
-      ? `${userText}\n\n「${quote}」`
-      : prompt
-    // 已在讨论中就不要再重置 phase，保持对话栏与历史连续
-    if (store.phase !== "discussing") store.phase = "discussing"
+    const composed =
+      !hasThread && quote && userText && !userText.includes(quote)
+        ? `${userText}\n\n「${quote}」`
+        : prompt
+    // 保持 reading 阶段：沉浸模式与卡片不动，对话直接发生在卡片线程里
     await onChatSend(composed, { annotationId })
   }
 
@@ -587,14 +589,18 @@ export function useCoReadingController() {
   async function onChatSend(text: string, opts?: { annotationId?: string }) {
     if (!store.sessionId) return
     chatLoading.value = true
-    store.addUserChatMessage(text)
+    store.addUserChatMessage(text, { annotationId: opts?.annotationId })
     const messageId = `assistant-chat-${Date.now()}`
     try {
       await coReadingApi.sendChat(
         store.sessionId,
         text,
         {
-          onChatDelta: (data) => store.appendChatDelta("assistant", data.delta, { messageId }),
+          onChatDelta: (data) =>
+            store.appendChatDelta("assistant", data.delta, {
+              messageId,
+              annotationId: opts?.annotationId,
+            }),
           onError: (msg) => ElMessage.error(msg),
         },
         undefined,

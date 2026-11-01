@@ -372,11 +372,12 @@ export const useCoReadingStore = defineStore("co-reading", {
       if (msg) msg.streaming = false
       this.persistChat()
     },
-    addUserChatMessage(text: string) {
+    addUserChatMessage(text: string, opts?: { annotationId?: string }) {
       this.chatMessages.push({
         id: `user-${Date.now()}`,
         role: "user",
         text,
+        annotationId: opts?.annotationId,
       })
       this.persistChat()
     },
