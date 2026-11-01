@@ -24,7 +24,8 @@ export function useCoReadInlineLabels() {
       chatAbout: t("coRead.chatAbout"),
       editReply: t("coRead.editReply"),
       deleteReply: t("coRead.deleteReply"),
-      closePanel: t("coRead.closeCard"),
+      closePanel:
+        t("coRead.closeCard") !== "coRead.closeCard" ? t("coRead.closeCard") : "Close",
     }),
   )
 }

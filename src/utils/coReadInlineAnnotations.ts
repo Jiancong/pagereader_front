@@ -203,6 +203,8 @@ function coReadThreadStyleBlock(dark: boolean, text: string, muted: string): str
 function sanitizeThreadText(text: string): string {
   return String(text || "")
     .replace(/<CHAPTER_END>\s*/gi, "")
+    .replace(/<ANNOTATION>[\s\S]*?<\/ANNOTATION>/gi, "")
+    .replace(/<ANNOTATION[\s\S]*$/gi, "")
     .trim()
 }
 
@@ -229,7 +231,14 @@ export function patchCoReadAnnotationThreads(
     const listEl = host.querySelector(".co-read-pop__thread-list") as HTMLElement | null
     if (!thread || !listEl) return
 
-    const list = byAnn.get(annId) || []
+    const rawList = byAnn.get(annId) || []
+    const seenIds = new Set<string>()
+    const list = rawList.filter((m) => {
+      const id = String(m.id || "").trim()
+      if (!id || seenIds.has(id)) return false
+      seenIds.add(id)
+      return true
+    })
     const open = thread.dataset.open === "1"
     const active = list.length > 0 || open
     thread.classList.toggle("co-read-pop__thread--active", active)
@@ -290,55 +299,65 @@ function resetOverlayPopoverLayout(pop: HTMLElement) {
   pop.style.maxHeight = ""
 }
 
-/** 打开时按 marker 真实屏幕位置排布 EPUB/MOBI overlay 气泡 */
-function positionOverlayPopoverNearMarker(
-  btn: HTMLElement,
+/** PC/桌面：overlay 内按 pin 算出的 mx/my 排气泡（与 marker 同一坐标系） */
+function applyOverlayPopoverLayoutFromPin(
   pop: HTMLElement,
-  overlayHost: HTMLElement,
+  mx: number,
+  my: number,
+  hostW: number,
+  hostH: number,
 ) {
+  resetOverlayPopoverLayout(pop)
+  const popW = Math.min(320, Math.max(160, hostW - 16))
+  const popLeft = Math.max(4, Math.min(mx - 40, hostW - popW - 4))
+  if (my > hostH * 0.55) {
+    pop.style.bottom = `${Math.max(8, hostH - (my + MARKER_SIZE) + 8)}px`
+  } else {
+    pop.classList.add("co-read-pop--below")
+    pop.style.top = `${my + MARKER_SIZE + 8}px`
+  }
+  pop.style.left = `${popLeft}px`
+}
+
+/** 仅移动端：fixed 贴 marker 屏幕位置，避免 overlay 坐标偏差与裁切 */
+function positionOverlayPopoverFixedMobile(btn: HTMLElement, pop: HTMLElement): boolean {
   const view = btn.ownerDocument?.defaultView
-  if (!view) return
+  if (!view || !isCoReadTouchViewport(view)) return false
   resetOverlayPopoverLayout(pop)
   const btnRect = btn.getBoundingClientRect()
-  const hostRect = overlayHost.getBoundingClientRect()
   const vw = view.innerWidth
   const vh = view.innerHeight
   const margin = 12
   const popW = Math.min(320, vw - margin * 2)
   const maxH = Math.min(380, Math.round(vh * 0.55))
-  const btnH = btnRect.height || MARKER_SIZE
-
-  if (isCoReadTouchViewport(view)) {
-    pop.classList.add("co-read-pop--fixed")
-    pop.style.position = "fixed"
-    pop.style.width = `${popW}px`
-    pop.style.left = `${Math.max(margin, Math.min(btnRect.left, vw - popW - margin))}px`
-    pop.style.bottom = "auto"
-    const spaceBelow = vh - btnRect.bottom - margin
-    const spaceAbove = btnRect.top - margin
-    if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
-      pop.style.top = `${Math.min(vh - margin, btnRect.bottom + 8)}px`
-      pop.style.maxHeight = `${Math.max(120, Math.min(maxH, spaceBelow - 8))}px`
-    } else {
-      pop.style.top = `${Math.max(margin, btnRect.top - maxH - 8)}px`
-      pop.style.maxHeight = `${Math.max(120, Math.min(maxH, spaceAbove - 8))}px`
-    }
-    return
-  }
-
-  const mx = btnRect.left - hostRect.left
-  const my = btnRect.top - hostRect.top
-  const hostW = overlayHost.clientWidth || hostRect.width
-  const hostH = overlayHost.clientHeight || hostRect.height
-  const popLeft = Math.max(4, Math.min(mx - 8, hostW - popW - 4))
-  if (my > hostH * 0.55) {
-    pop.style.bottom = `${Math.max(8, hostH - (my + btnH) + 8)}px`
+  pop.classList.add("co-read-pop--fixed")
+  pop.style.position = "fixed"
+  pop.style.width = `${popW}px`
+  pop.style.left = `${Math.max(margin, Math.min(btnRect.left, vw - popW - margin))}px`
+  pop.style.bottom = "auto"
+  const spaceBelow = vh - btnRect.bottom - margin
+  const spaceAbove = btnRect.top - margin
+  if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
+    pop.style.top = `${Math.min(vh - margin, btnRect.bottom + 8)}px`
+    pop.style.maxHeight = `${Math.max(120, Math.min(maxH, spaceBelow - 8))}px`
   } else {
-    pop.classList.add("co-read-pop--below")
-    pop.style.top = `${my + btnH + 8}px`
+    pop.style.top = `${Math.max(margin, btnRect.top - maxH - 8)}px`
+    pop.style.maxHeight = `${Math.max(120, Math.min(maxH, spaceAbove - 8))}px`
   }
-  pop.style.left = `${popLeft}px`
-  pop.style.width = `${Math.min(320, hostW - 8)}px`
+  return true
+}
+
+function openOverlayPopoverLayout(
+  btn: HTMLElement,
+  pop: HTMLElement,
+  mx: number,
+  my: number,
+  hostW: number,
+  hostH: number,
+) {
+  if (!positionOverlayPopoverFixedMobile(btn, pop)) {
+    applyOverlayPopoverLayoutFromPin(pop, mx, my, hostW, hostH)
+  }
 }
 
 /** 移动端：fixed 定位，避免 scroll/overflow 裁切导致「点了但看不到」 */
@@ -664,11 +683,13 @@ function buildPopoverContent(
   chatBtn.type = "button"
   chatBtn.className = "co-read-pop__btn"
   chatBtn.textContent = labels.chatAbout || "Chat about this"
-  chatBtn.addEventListener("mousedown", stopEvent)
-  chatBtn.addEventListener("click", (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    // list 态时用已保存的留言作为对话上下文
+  let chatBusy = false
+  const runChatAbout = () => {
+    if (chatBusy) return
+    chatBusy = true
+    window.setTimeout(() => {
+      chatBusy = false
+    }, 900)
     const text = String(ta.value || ann.myReply || "").trim()
     if (text) {
       try {
@@ -692,7 +713,9 @@ function buildPopoverContent(
         /* ignore */
       }
     }
-  })
+  }
+  chatBtn.addEventListener("mousedown", stopEvent)
+  bindCoReadMarkerTap(chatBtn, () => runChatAbout())
   actions.appendChild(chatBtn)
 
   // 对话线程在操作按钮上方；点「再聊一句」后在此追加，不打开底部栏
@@ -1370,6 +1393,19 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     btn.style.top = `${my}px`
     host.appendChild(btn)
 
+    const pop = buildPopoverContent(hostDoc, ann, opts.labels, opts.onDraft, {
+      onSaveReply: opts.onSaveReply,
+      onDeleteReply: opts.onDeleteReply,
+      onChatAbout: (id, text) => {
+        host.classList.add("co-read-host--open", "co-read-host--hover")
+        opts.onChatAbout?.(id, text)
+      },
+      onClose: () => {
+        dismissCoReadHost(host)
+      },
+    })
+    applyOverlayPopoverLayoutFromPin(pop, mx, my, hostW, hostH)
+
     // 桌面端 hover 浮层：鼠标离开图标后延迟关闭（260ms 宽限），
     // 让指针能移入气泡内点击 note 输入框；期间移入气泡则取消关闭。
     let hoverCloseTimer = 0
@@ -1377,6 +1413,7 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
       const view = hostDoc.defaultView
       if (hoverCloseTimer && view) view.clearTimeout(hoverCloseTimer)
       hoverCloseTimer = 0
+      openOverlayPopoverLayout(btn, pop, mx, my, hostW, hostH)
       host.classList.add("co-read-host--hover")
     }
     const scheduleCloseByHover = () => {
@@ -1391,19 +1428,6 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
     }
     btn.addEventListener("mouseenter", openByHover)
     btn.addEventListener("mouseleave", scheduleCloseByHover)
-
-    const pop = buildPopoverContent(hostDoc, ann, opts.labels, opts.onDraft, {
-      onSaveReply: opts.onSaveReply,
-      onDeleteReply: opts.onDeleteReply,
-      onChatAbout: (id, text) => {
-        host.classList.add("co-read-host--open", "co-read-host--hover")
-        opts.onChatAbout?.(id, text)
-      },
-      onClose: () => {
-        dismissCoReadHost(host)
-      },
-    })
-    resetOverlayPopoverLayout(pop)
     pop.addEventListener("mouseenter", openByHover)
     pop.addEventListener("mouseleave", scheduleCloseByHover)
     pop.addEventListener("touchstart", stopEvent, { passive: true })
@@ -1417,9 +1441,10 @@ export function syncCoReadOverlayAnnotations(opts: CoReadOverlayOptions) {
       })
       const nextOpen = !wasOpen
       if (nextOpen) {
-        positionOverlayPopoverNearMarker(btn, pop, opts.host)
+        openOverlayPopoverLayout(btn, pop, mx, my, hostW, hostH)
       } else {
         resetOverlayPopoverLayout(pop)
+        applyOverlayPopoverLayoutFromPin(pop, mx, my, hostW, hostH)
       }
       host.classList.toggle("co-read-host--open", nextOpen)
     })
