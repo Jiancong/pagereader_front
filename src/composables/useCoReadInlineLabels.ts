@@ -22,6 +22,7 @@ export function useCoReadInlineLabels() {
       saveReply: t("coRead.saveReply"),
       savedReply: t("coRead.savedReply"),
       chatAbout: t("coRead.chatAbout"),
+      editReply: t("coRead.editReply"),
       closePanel: t("coRead.chatPanelClose"),
     }),
   )

@@ -25,6 +25,12 @@ function chatCacheKey(sessionId: string) {
   return `${CHAT_CACHE_PREFIX}${sessionId}`
 }
 
+const SAVED_REPLY_PREFIX = "page2top.coReading.savedReplies."
+
+function savedReplyKey(sessionId: string) {
+  return `${SAVED_REPLY_PREFIX}${sessionId}`
+}
+
 interface PersistedChatEntry {
   id: string
   chapterIndex: number
@@ -133,6 +139,8 @@ export const useCoReadingStore = defineStore("co-reading", {
       } catch {
         /* ignore */
       }
+      // 恢复「已保存」标记：重开卡片时直接进 list 模式
+      this.hydrateSavedReplies()
     },
     saveDraft(annotationId: string, chapterIndex: number, text: string) {
       if (!this.sessionId) return
@@ -152,6 +160,31 @@ export const useCoReadingStore = defineStore("co-reading", {
     markReplySaved(annotationId: string) {
       const ann = this.annotations.find((a) => a.id === annotationId)
       if (ann) ann.replySaved = true
+      if (!this.sessionId) return
+      try {
+        const raw = localStorage.getItem(savedReplyKey(this.sessionId))
+        const list = raw ? (JSON.parse(raw) as string[]) : []
+        if (!list.includes(annotationId)) list.push(annotationId)
+        localStorage.setItem(savedReplyKey(this.sessionId), JSON.stringify(list.slice(-500)))
+      } catch {
+        /* ignore */
+      }
+    },
+    /** 从本地恢复「哪些留言已保存」，决定卡片重开时是 list 还是编辑态 */
+    hydrateSavedReplies() {
+      if (!this.sessionId) return
+      try {
+        const raw = localStorage.getItem(savedReplyKey(this.sessionId))
+        if (!raw) return
+        const list = JSON.parse(raw) as string[]
+        if (!Array.isArray(list)) return
+        const set = new Set(list)
+        this.annotations = this.annotations.map((a) =>
+          set.has(a.id) ? { ...a, replySaved: true } : a,
+        )
+      } catch {
+        /* ignore */
+      }
     },
     clearPageOpenError() {
       this.pageOpenError = ""
@@ -303,6 +336,8 @@ export const useCoReadingStore = defineStore("co-reading", {
       this.chatMessages = hist.map((m) => ({ ...m, streaming: false }))
       // 合并本地持久化的对话（跨次打开都在）；本地为主、服务端补缺
       this.loadPersistedChat()
+      // 恢复已保存留言标记（决定卡片以 list 还是编辑态打开）
+      this.hydrateSavedReplies()
       this.phase = "reading"
     },
     annotationsForParagraph(chapterIndex: number, paragraphIndex: number) {

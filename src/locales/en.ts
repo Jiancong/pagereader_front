@@ -1358,6 +1358,7 @@ export default {
     saveReply: "Save",
     savedReply: "Saved",
     chatAbout: "Chat about this",
+    editReply: "Edit",
     readerMissingChapter: "Could not load this chapter",
     kind: {
       reaction: "Reaction",

@@ -54,6 +54,7 @@ export interface CoReadInlineLabels {
   saveReply?: string
   savedReply?: string
   chatAbout?: string
+  editReply?: string
   closePanel?: string
 }
 
@@ -232,10 +233,30 @@ function buildPopoverContent(
   body.textContent = ann.content || ""
   pop.appendChild(body)
 
-  const replyLabel = doc.createElement("label")
+  // ── 我的留言：已保存则显示只读列表（list 模式），点「编辑」才回到输入框 ──
+  const replyLabel = doc.createElement("div")
   replyLabel.className = "co-read-pop__reply-label"
-  replyLabel.textContent = labels.myReply
+  const replyLabelText = doc.createElement("span")
+  replyLabelText.textContent = labels.myReply
+  replyLabel.appendChild(replyLabelText)
+
+  const editBtn = doc.createElement("button")
+  editBtn.type = "button"
+  editBtn.className = "co-read-pop__edit"
+  editBtn.textContent = labels.editReply || "Edit"
+  editBtn.addEventListener("mousedown", stopEvent)
+  replyLabel.appendChild(editBtn)
   pop.appendChild(replyLabel)
+
+  // 只读展示区
+  const savedView = doc.createElement("div")
+  savedView.className = "co-read-pop__saved"
+  pop.appendChild(savedView)
+
+  // 编辑区（textarea + 操作按钮）
+  const editorWrap = doc.createElement("div")
+  editorWrap.className = "co-read-pop__editor"
+  pop.appendChild(editorWrap)
 
   const ta = doc.createElement("textarea")
   ta.className = "co-read-pop__reply"
@@ -246,19 +267,55 @@ function buildPopoverContent(
   ta.addEventListener("input", () => onDraft(ann.id, ta.value))
   ta.addEventListener("mousedown", stopEvent)
   ta.addEventListener("click", stopEvent)
-  pop.appendChild(ta)
+  editorWrap.appendChild(ta)
 
   // 操作区：保存 / 再聊一句
   const actions = doc.createElement("div")
   actions.className = "co-read-pop__actions"
+  editorWrap.appendChild(actions)
+
+  let editing = false
+
+  /** 只读模式：已保存的留言以列表形式展示 */
+  const renderSavedView = () => {
+    savedView.textContent = ""
+    const text = String(ann.myReply || "").trim()
+    const row = doc.createElement("div")
+    row.className = "co-read-pop__saved-item"
+    row.textContent = text
+    savedView.appendChild(row)
+    const meta = doc.createElement("div")
+    meta.className = "co-read-pop__saved-meta"
+    meta.textContent = ann.replySent
+      ? labels.replySent
+      : labels.savedReply || "Saved"
+    savedView.appendChild(meta)
+  }
+
+  /** 切换 编辑 / 只读 两种状态 */
+  const applyMode = (nextEditing: boolean) => {
+    editing = nextEditing
+    const hasSaved = !!String(ann.myReply || "").trim() && (!!ann.replySaved || !!ann.replySent)
+    const showEditor = editing || !hasSaved
+    editorWrap.style.display = showEditor ? "" : "none"
+    savedView.style.display = showEditor ? "none" : ""
+    editBtn.style.display = showEditor ? "none" : ""
+    replyLabelText.classList.toggle("co-read-pop__reply-label--saved", !showEditor)
+    if (!showEditor) renderSavedView()
+  }
+
+  editBtn.addEventListener("click", (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    ta.value = ann.myReply || ""
+    applyMode(true)
+    ta.focus()
+  })
 
   const saveBtn = doc.createElement("button")
   saveBtn.type = "button"
   saveBtn.className = "co-read-pop__btn co-read-pop__btn--primary"
-  const setSaveLabel = () => {
-    saveBtn.textContent = ann.replySaved ? labels.savedReply || "Saved" : labels.saveReply || "Save"
-  }
-  setSaveLabel()
+  saveBtn.textContent = labels.saveReply || "Save"
   saveBtn.disabled = !!ann.replySent && !String(ann.myReply || "").trim()
   saveBtn.addEventListener("mousedown", stopEvent)
   saveBtn.addEventListener("click", (e) => {
@@ -272,9 +329,14 @@ function buildPopoverContent(
     onDraft(ann.id, text)
     opts?.onSaveReply?.(ann.id, text)
     ann.replySaved = true
-    setSaveLabel()
     saveBtn.classList.add("co-read-pop__btn--done")
-    window.setTimeout(() => saveBtn.classList.remove("co-read-pop__btn--done"), 1200)
+    saveBtn.textContent = labels.savedReply || "Saved"
+    window.setTimeout(() => {
+      saveBtn.classList.remove("co-read-pop__btn--done")
+      saveBtn.textContent = labels.saveReply || "Save"
+      // 保存成功后切回只读列表模式
+      applyMode(false)
+    }, 700)
   })
   actions.appendChild(saveBtn)
 
@@ -286,12 +348,14 @@ function buildPopoverContent(
   chatBtn.addEventListener("click", (e) => {
     e.preventDefault()
     e.stopPropagation()
-    const text = String(ta.value || "").trim()
+    const text = String(ta.value || ann.myReply || "").trim()
     if (text) onDraft(ann.id, text)
     opts?.onChatAbout?.(ann.id, text)
   })
   actions.appendChild(chatBtn)
-  pop.appendChild(actions)
+
+  // 初始状态：已保存过留言 → 直接 list 模式；否则编辑模式
+  applyMode(false)
 
   if (ann.replySent) {
     const sent = doc.createElement("p")
@@ -410,8 +474,11 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
 .co-read-pop__btn--done{border-color:#22c55e;color:#16a34a;background:${dark ? "rgba(34,197,94,.15)" : "rgba(34,197,94,.1)"}}
 .co-read-pop__quote{margin:0 0 8px;padding-left:10px;border-left:3px solid ${accent};font-size:12px;font-style:italic;color:${muted};word-wrap:break-word;overflow-wrap:anywhere}
 .co-read-pop__body{margin:0 0 8px;white-space:pre-wrap;font-size:13px;word-wrap:break-word;overflow-wrap:anywhere}
-.co-read-pop__reply-label{display:block;margin:8px 0 4px;font-size:10px;color:${muted}}
-.co-read-pop__reply{width:100%;box-sizing:border-box;border-radius:8px;border:1px solid ${dark ? "#374151" : "#d1d5db"};background:${dark ? "#0a0a0a" : "#fff"};color:${text};padding:8px 10px;font-size:12px;resize:vertical;min-height:48px;max-width:100%}
+.co-read-pop__reply-label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 4px;font-size:10px;color:${muted}}
+.co-read-pop__edit{padding:0;border:none;background:none;color:${accent};font-size:10px;font-weight:600;cursor:pointer;text-decoration:underline}
+.co-read-pop__saved{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:8px;border:1px solid ${dark ? "#374151" : "#e5e7eb"};background:${dark ? "#0a0a0a" : "#f9fafb"}}
+.co-read-pop__saved-item{font-size:12px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;color:${text}}
+.co-read-pop__saved-meta{font-size:10px;color:${muted}}.co-read-pop__reply{width:100%;box-sizing:border-box;border-radius:8px;border:1px solid ${dark ? "#374151" : "#d1d5db"};background:${dark ? "#0a0a0a" : "#fff"};color:${text};padding:8px 10px;font-size:12px;resize:vertical;min-height:48px;max-width:100%}
 .co-read-pop__reply:disabled{opacity:.55}
 .co-read-pop__sent{font-size:11px;color:#9ca3af;margin:4px 0 0}
 `
