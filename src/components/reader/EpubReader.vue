@@ -813,10 +813,12 @@ onMounted(async () => {
         }
         return
       }
-      applyFrameSize()
-      requestAnimationFrame(() => applyCoReadInline())
+      // 宽度显著变化（如横竖屏旋转）：强制 resize 重排多栏，不能被 800ms 冷却或 interaction 拦截
+      applyFrameSize(widthChanged)
+      requestAnimationFrame(() => applyCoReadInline(true))
     })
     if (viewerShellRef.value) resizeObserver.observe(viewerShellRef.value)
+    window.addEventListener('orientationchange', onOrientationChange)
   } catch (e) {
     uninstallUnloadShim()
     loadError.value = e instanceof Error ? e.message : String(e)
@@ -831,7 +833,27 @@ if (typeof ResizeObserver === 'undefined') {
   })
 }
 
+let orientationSettleTimer: number | null = null
+function onOrientationChange() {
+  releaseOverlayInteraction()
+  if (orientationSettleTimer) {
+    window.clearTimeout(orientationSettleTimer)
+    orientationSettleTimer = null
+  }
+  // 华为等手机转屏动画约 200~350ms，动画结束后再按最终视口强制重排一轮
+  orientationSettleTimer = window.setTimeout(() => {
+    orientationSettleTimer = null
+    applyFrameSize(true)
+    requestAnimationFrame(() => applyCoReadInline(true))
+  }, 320)
+}
+
 onBeforeUnmount(() => {
+  if (orientationSettleTimer) {
+    window.clearTimeout(orientationSettleTimer)
+    orientationSettleTimer = null
+  }
+  window.removeEventListener('orientationchange', onOrientationChange)
   uninstallUnloadShim()
   for (const doc of trackedDocs) detachFromDoc(doc)
   trackedDocs.clear()
@@ -1020,23 +1042,35 @@ function performFrameResize() {
   resizing = true
   rendition.resize(size.width, size.height)
   dbg('resize DONE (epub re-anchored)')
-  // resize 是同步重新分页 + display，下一帧把位置按新页宽还原
+  // resize 是同步重新分页 + display，必须双帧修复多栏 stride 并对齐整栏，
+  // 否则横屏→竖屏后 scrollLeft 停在旧横屏栏宽位置，画面会卡在两栏中间（左右各半栏）
   requestAnimationFrame(() => {
-    resizing = false
-    const m = managerBox()
-    const c = m?.container
-    if (!c) return
-    const delta = Number(m?.layout?.delta || m?.layout?.pageWidth || 0)
-    if (delta > 8) {
-      const target = savedPage > 0 ? savedPage * delta : Math.min(savedLeft, c.scrollWidth - delta)
-      if (Math.abs(target - c.scrollLeft) > 2) {
-        dbg('resize RESTORE', { from: c.scrollLeft, to: target })
-        m?.scrollTo?.(Math.max(0, target), 0)
+    requestAnimationFrame(() => {
+      resizing = false
+      try {
+        const views = rendition?.views()
+        const activeView: any = Array.isArray(views) ? views[0] : (views as any)?._views?.[0]
+        if (activeView) repairPaginatedColumns(activeView)
+      } catch {
+        /* ignore */
+      }
+      const m = managerBox()
+      const c = m?.container
+      if (!c) return
+      const delta = Number(m?.layout?.delta || m?.layout?.pageWidth || c.clientWidth || 0)
+      if (delta > 8) {
+        const maxLeft = Math.max(0, c.scrollWidth - delta)
+        const rawTarget = savedPage > 0 ? savedPage * delta : Math.min(savedLeft, maxLeft)
+        const snappedTarget = Math.min(maxLeft, Math.max(0, Math.round(rawTarget / delta) * delta))
+        if (Math.abs(snappedTarget - c.scrollLeft) > 1) {
+          dbg('resize RESTORE', { from: c.scrollLeft, to: snappedTarget })
+          m?.scrollTo?.(snappedTarget, 0)
+        }
         ;(rendition as { reportLocation?: () => void } | null)?.reportLocation?.()
       }
-    }
-    syncEnds()
-    applyCoReadInline()
+      syncEnds()
+      applyCoReadInline(true)
+    })
   })
 }
 
