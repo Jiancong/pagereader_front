@@ -262,12 +262,13 @@ export async function sendChat(
   text: string,
   cb: ChatSseCallbacks = {},
   signal?: AbortSignal,
+  opts?: { annotationId?: string },
 ): Promise<void> {
   const res = await fetch(buildUrl(`/co-reading/sessions/${sessionId}/chat`), {
     method: "POST",
     credentials: "include",
     headers: buildAuthStreamHeaders(),
-    body: JSON.stringify({ text, ...localeFields() }),
+    body: JSON.stringify({ text, annotationId: opts?.annotationId, ...localeFields() }),
     signal,
   })
   await consumeFetchSse(

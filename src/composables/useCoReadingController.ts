@@ -426,7 +426,7 @@ export function useCoReadingController() {
       : prompt
     // 已在讨论中就不要再重置 phase，保持对话栏与历史连续
     if (store.phase !== "discussing") store.phase = "discussing"
-    await onChatSend(composed)
+    await onChatSend(composed, { annotationId })
   }
 
   function clearPageAnnotations() {
@@ -584,16 +584,22 @@ export function useCoReadingController() {
     }
   }
 
-  async function onChatSend(text: string) {
+  async function onChatSend(text: string, opts?: { annotationId?: string }) {
     if (!store.sessionId) return
     chatLoading.value = true
     store.addUserChatMessage(text)
     const messageId = `assistant-chat-${Date.now()}`
     try {
-      await coReadingApi.sendChat(store.sessionId, text, {
-        onChatDelta: (data) => store.appendChatDelta("assistant", data.delta, { messageId }),
-        onError: (msg) => ElMessage.error(msg),
-      })
+      await coReadingApi.sendChat(
+        store.sessionId,
+        text,
+        {
+          onChatDelta: (data) => store.appendChatDelta("assistant", data.delta, { messageId }),
+          onError: (msg) => ElMessage.error(msg),
+        },
+        undefined,
+        { annotationId: opts?.annotationId },
+      )
       store.finalizeChatStream(messageId)
     } catch (e) {
       ElMessage.error(e instanceof ApiError ? e.message : t("coRead.chatFailed"))

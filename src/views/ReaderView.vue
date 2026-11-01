@@ -396,7 +396,13 @@ const route = useRoute()
 const { t } = useI18n()
 const store = useReaderFileStore()
 const coReadStore = useCoReadingStore()
-const coReadMode = computed(() => coReadStore.phase === 'reading' && Boolean(coReadStore.sessionId))
+// reading / discussing 两个阶段都视为「伴读中」：讨论阶段仍保持沉浸模式与批注层，
+// 否则点「再聊一句」会瞬间退出沉浸伴读（工具栏弹回、批注层卸载）
+const coReadMode = computed(
+  () =>
+    Boolean(coReadStore.sessionId) &&
+    (coReadStore.phase === 'reading' || coReadStore.phase === 'discussing'),
+)
 const coReadBusy = ref(false)
 const canToggleCoRead = computed(
   () => hasSource.value && (isPdf.value || isEpub.value || isMobi.value || isMarkdown.value),
@@ -461,7 +467,9 @@ const coReadShowPdfSidePanel = computed(
   () => coReadMode.value && isPdf.value && coReadStore.phase === 'reading',
 )
 const coReadInlinePayload = computed(() => {
-  if (!coReadMode.value || coReadStore.phase !== 'reading' || isPdf.value) return null
+  // discussing（对话/留言讨论）阶段同样保留批注层：用户可能正点着卡片继续聊
+  if (!coReadMode.value || isPdf.value) return null
+  if (coReadStore.phase !== 'reading' && coReadStore.phase !== 'discussing') return null
   return {
     annotations: coReadChapterAnnotations.value,
     labels: coReadInlineLabels.value,
