@@ -263,8 +263,27 @@ export default {
     heroDemo: "观看演示",
     heroCarouselLabel: "产品亮点",
     heroCarouselDots: "切换亮点",
+    heroCarouselSlideCoRead: "AI 阅读伴侣",
     heroCarouselSlideBookExpert: "直接问书",
     heroCarouselSlideDeck: "AI 演示生成",
+    coReadingHero: {
+      badge: "沉浸式 AI 阅读伴侣",
+      title: "如果读书时，有一位懂你的书友就坐在身旁？",
+      subtitle:
+        "边读边批注、随页给反馈——不是读完才看的干瘪摘要，而是与你同频呼吸、随时接话的沉浸式共读体验。",
+      scenariosAria: "AI 阅读伴侣如何陪你共读",
+      pointTimelyTitle: "随翻随读，反馈就在字里行间",
+      pointTimelyDesc:
+        "翻开每一页，AI 伴侣都会对当下段落即时留下批注、提问与惊叹，读到哪就回应到哪，绝不剧透。",
+      pointDialogTitle: "批注气泡里，随时「再聊一句」",
+      pointDialogDesc:
+        "写下此刻的批注感悟并保存，或直接在段落旁与 AI 追问推敲，把单向阅读变成双向的思想碰撞。",
+      pointWarmthTitle: "有温度、有记忆的陪伴式精读",
+      pointWarmthDesc:
+        "记住你在每一页留下的思考痕迹，串联全书脉络，让独自啃书变成一场有回应、不孤单的深度漫游。",
+      ctaStart: "上传电子书，开启伴读",
+      ctaSecondary: "了解书籍专家",
+    },
     trustedBy: {
       tag: "受到全球研究者、分析师、创作者与深度思考者的信赖",
     },

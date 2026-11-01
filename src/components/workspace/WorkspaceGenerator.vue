@@ -1247,15 +1247,17 @@ const startReading = async () => {
 }
 
 function importReaderBookFromQuery() {
-  const fromReader = String(route.query.fromReader || "") === "1"
   const tab = String(route.query.tab || "")
-  if (!fromReader || tab !== "read" || !readerFileStore.file) return
+  if (tab !== "read") return
   if (!onlineReadEnabled.value) {
     router.replace({ name: "workspace" })
     return
   }
   activeTab.value = "read"
-  selectedReaderFile.value = readerFileStore.file
+  const fromReader = String(route.query.fromReader || "") === "1"
+  if (fromReader && readerFileStore.file) {
+    selectedReaderFile.value = readerFileStore.file
+  }
   router.replace({ name: "workspace" })
 }
 
@@ -1269,7 +1271,7 @@ watch(debugEnabled, () => {
 })
 
 watch(
-  () => route.query.fromReader,
+  () => [route.query.fromReader, route.query.tab],
   () => {
     importReaderBookFromQuery()
   },

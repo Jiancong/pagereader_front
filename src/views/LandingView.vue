@@ -9,6 +9,7 @@
     />
     <main class="pt-16">
       <HeroSection
+        @co-read-start="onCoReadPromo"
         @expert-create="onExpertPromo('create')"
         @expert-explore="onExpertPromo('explore')"
       />
@@ -94,6 +95,16 @@ const onLoginSuccess = () => {
   const query = pendingWorkspaceQuery.value
   pendingWorkspaceQuery.value = null
   router.push(query ? { path: '/workspace', query } : '/workspace')
+}
+
+const onCoReadPromo = () => {
+  const query = { tab: 'read' }
+  if (isLoggedIn()) {
+    router.push({ path: '/workspace', query })
+    return
+  }
+  pendingWorkspaceQuery.value = query
+  openLogin('signup', 'landing_co_read_start')
 }
 
 const onExpertPromo = (action) => {

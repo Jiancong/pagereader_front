@@ -266,8 +266,27 @@ export default {
     heroDemo: "Watch demo",
     heroCarouselLabel: "Product highlights",
     heroCarouselDots: "Choose highlight",
+    heroCarouselSlideCoRead: "AI Reading Companion",
     heroCarouselSlideBookExpert: "Ask the book",
     heroCarouselSlideDeck: "AI presentation generation",
+    coReadingHero: {
+      badge: "Immersive AI Reading Companion",
+      title: "What if a thoughtful reading companion sat beside you on every page?",
+      subtitle:
+        "Live margin notes and instant reactions as you turn each page—not a dry summary after the fact, but a warm, interactive co-reading experience.",
+      scenariosAria: "How the AI reading companion reads with you",
+      pointTimelyTitle: "Page-by-page feedback, right in the margins",
+      pointTimelyDesc:
+        "As you read each page, your AI companion leaves timely reactions, questions, and insights anchored to the exact passage—never spoiling what's ahead.",
+      pointDialogTitle: "Save your thoughts or chat right inside the note",
+      pointDialogDesc:
+        "Jot down margin notes to keep forever, or tap “Chat about this” to debate a passage on the spot—turning solo reading into a live dialogue.",
+      pointWarmthTitle: "A warm, responsive way to read deeply",
+      pointWarmthDesc:
+        "Your notes and conversations stay with the book on every page, making even the densest classics feel engaging, personal, and alive.",
+      ctaStart: "Open a book & co-read",
+      ctaSecondary: "Explore book experts",
+    },
     trustedBy: {
       tag: "Trusted by researchers, analysts, creators, and deep thinkers around the world",
     },

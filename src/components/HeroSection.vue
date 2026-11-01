@@ -20,6 +20,81 @@
           <Transition :name="reduceMotion ? '' : 'hero-carousel-fade'" mode="out-in">
             <article
               v-if="activeSlide === 0"
+              key="co-reading"
+              class="hero-carousel-panel"
+            >
+              <div
+                id="co-reading-hero"
+                class="flex h-full min-h-[28rem] flex-col rounded-2xl border-0 bg-gradient-to-br from-primary/10 via-card to-accent/5 p-6 shadow-none sm:min-h-[26rem] sm:p-8 lg:min-h-[24rem]"
+              >
+                <div
+                  class="mb-5 inline-flex self-start items-center gap-2 rounded-full border border-primary/25 bg-background/70 px-3 py-1.5 text-xs font-medium text-primary sm:text-sm"
+                >
+                  <Sparkles class="h-4 w-4" />
+                  {{ t('landing.coReadingHero.badge') }}
+                </div>
+
+                <div class="flex items-start gap-4">
+                  <div
+                    class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent sm:h-14 sm:w-14"
+                  >
+                    <BookHeart class="h-6 w-6 sm:h-7 sm:w-7" />
+                  </div>
+                  <div>
+                    <h2 class="text-2xl font-bold leading-tight text-foreground sm:text-3xl lg:text-4xl">
+                      {{ t('landing.coReadingHero.title') }}
+                    </h2>
+                    <p class="mt-2 text-base leading-relaxed text-muted-foreground sm:text-lg">
+                      {{ t('landing.coReadingHero.subtitle') }}
+                    </p>
+                  </div>
+                </div>
+
+                <ul class="my-6 space-y-4 sm:my-8" :aria-label="t('landing.coReadingHero.scenariosAria')">
+                  <li
+                    v-for="item in coReadingHighlights"
+                    :key="item.title"
+                    class="flex items-center gap-4"
+                  >
+                    <span
+                      class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-background/70 text-primary sm:h-11 sm:w-11"
+                    >
+                      <component :is="item.icon" class="h-5 w-5" />
+                    </span>
+                    <span class="min-w-0 text-left">
+                      <span class="block text-base font-semibold leading-snug text-foreground sm:text-lg">
+                        {{ item.title }}
+                      </span>
+                      <span class="mt-1 block text-sm leading-snug text-muted-foreground sm:text-base">
+                        {{ item.desc }}
+                      </span>
+                    </span>
+                  </li>
+                </ul>
+
+                <div class="mt-auto grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:text-base"
+                    @click="emit('co-read-start')"
+                  >
+                    <BookOpen class="h-4 w-4" />
+                    {{ t('landing.coReadingHero.ctaStart') }}
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background/80 px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/40 sm:text-base"
+                    @click="emit('expert-explore')"
+                  >
+                    <Compass class="h-4 w-4" />
+                    {{ t('landing.coReadingHero.ctaSecondary') }}
+                  </button>
+                </div>
+              </div>
+            </article>
+
+            <article
+              v-else-if="activeSlide === 1"
               key="book-expert"
               class="hero-carousel-panel"
             >
@@ -192,6 +267,9 @@ import {
   Play,
   Headphones,
   BookOpen,
+  BookHeart,
+  MessageSquareHeart,
+  HeartHandshake,
   Upload,
   Compass,
   TrendingUp,
@@ -201,11 +279,11 @@ import {
 import { useI18n } from 'vue-i18n'
 import { gtmCtaClick, gtmDemoClick, LANDING_WATCH_DEMO_EVENT } from '@/composables/useGtmDataLayer'
 
-const emit = defineEmits(['expert-create', 'expert-explore'])
+const emit = defineEmits(['expert-create', 'expert-explore', 'co-read-start'])
 
 const { t } = useI18n()
 
-const HERO_SLIDE_COUNT = 2
+const HERO_SLIDE_COUNT = 3
 const AUTOPLAY_MS = 7000
 
 const activeSlide = ref(0)
@@ -214,8 +292,27 @@ const reduceMotion = ref(false)
 let autoplayTimer = null
 
 const slideDots = computed(() => [
+  { id: 'co-reading', dotLabel: t('landing.heroCarouselSlideCoRead') },
   { id: 'book-expert', dotLabel: t('landing.heroCarouselSlideBookExpert') },
   { id: 'deck', dotLabel: t('landing.heroCarouselSlideDeck') },
+])
+
+const coReadingHighlights = computed(() => [
+  {
+    icon: markRaw(Sparkles),
+    title: t('landing.coReadingHero.pointTimelyTitle'),
+    desc: t('landing.coReadingHero.pointTimelyDesc'),
+  },
+  {
+    icon: markRaw(MessageSquareHeart),
+    title: t('landing.coReadingHero.pointDialogTitle'),
+    desc: t('landing.coReadingHero.pointDialogDesc'),
+  },
+  {
+    icon: markRaw(HeartHandshake),
+    title: t('landing.coReadingHero.pointWarmthTitle'),
+    desc: t('landing.coReadingHero.pointWarmthDesc'),
+  },
 ])
 
 const scenarioExamples = computed(() => [
