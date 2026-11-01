@@ -10,10 +10,6 @@
         class="hero-carousel"
         role="region"
         :aria-label="t('landing.heroCarouselLabel')"
-        @mouseenter="pauseAutoplay"
-        @mouseleave="resumeAutoplay"
-        @focusin="pauseAutoplay"
-        @focusout="onCarouselFocusOut"
       >
         <div class="hero-carousel-shell overflow-hidden rounded-2xl border border-border/60 bg-card/20 shadow-lg">
           <div class="hero-carousel-viewport">
@@ -269,10 +265,9 @@ const emit = defineEmits(['expert-create', 'expert-explore', 'co-read-start'])
 const { t } = useI18n()
 
 const HERO_SLIDE_COUNT = 3
-const AUTOPLAY_MS = 7000
+const AUTOPLAY_MS = 5000
 
 const activeSlide = ref(0)
-const autoplayPaused = ref(false)
 const reduceMotion = ref(false)
 let autoplayTimer = null
 
@@ -341,26 +336,7 @@ function clearAutoplay() {
 
 function startAutoplay() {
   clearAutoplay()
-  if (reduceMotion.value || autoplayPaused.value) return
   autoplayTimer = setInterval(nextSlide, AUTOPLAY_MS)
-}
-
-function pauseAutoplay() {
-  autoplayPaused.value = true
-  clearAutoplay()
-}
-
-function resumeAutoplay() {
-  autoplayPaused.value = false
-  startAutoplay()
-}
-
-function onCarouselFocusOut(e) {
-  const current = e.currentTarget
-  if (current instanceof HTMLElement && e.relatedTarget instanceof Node && current.contains(e.relatedTarget)) {
-    return
-  }
-  resumeAutoplay()
 }
 
 const scrollToGenerator = () => {
@@ -405,26 +381,29 @@ onBeforeUnmount(() => {
 .hero-carousel-dot-pill {
   display: block;
   flex-shrink: 0;
-  height: 0.55rem;
-  width: 0.55rem;
+  height: 0.625rem;
+  width: 0.625rem;
   border-radius: 9999px;
-  background: hsl(var(--muted-foreground) / 0.45);
-  transition: width 0.22s ease, height 0.22s ease, background-color 0.22s ease, box-shadow 0.22s ease;
+  background-color: rgba(231, 233, 234, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  transition: width 0.25s ease, height 0.25s ease, background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .hero-carousel-dot:hover .hero-carousel-dot-pill:not(.hero-carousel-dot-pill--active) {
-  background: hsl(var(--muted-foreground) / 0.75);
+  background-color: rgba(231, 233, 234, 0.78);
+  border-color: rgba(255, 255, 255, 0.65);
 }
 
 .hero-carousel-dot-pill--active {
-  width: 2rem;
-  height: 0.7rem;
-  background: hsl(var(--primary));
-  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.28);
+  width: 2.25rem;
+  height: 0.75rem;
+  background-color: #1d9bf0;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(29, 155, 240, 0.35), 0 0 12px rgba(29, 155, 240, 0.65);
 }
 
 .hero-carousel-dot:focus-visible {
-  outline: 2px solid hsl(var(--primary));
+  outline: 2px solid #1d9bf0;
   outline-offset: 2px;
 }
 
