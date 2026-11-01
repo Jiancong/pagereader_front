@@ -68,7 +68,7 @@
                   </li>
                 </ul>
 
-                <div class="mt-auto flex justify-center">
+                <div class="mt-auto flex justify-start">
                   <button
                     type="button"
                     class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto sm:min-w-[16rem] sm:text-base"
@@ -197,7 +197,7 @@
                   </div>
                 </div>
 
-                <div class="flex justify-center">
+                <div class="flex justify-start">
                   <button
                     type="button"
                     class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 sm:w-auto sm:min-w-[16rem] sm:text-base"
