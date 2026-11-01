@@ -201,22 +201,14 @@
                   </div>
                 </div>
 
-                <div class="flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+                <div class="flex justify-center">
                   <button
                     type="button"
-                    class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 sm:w-auto sm:px-7"
+                    class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 sm:w-auto sm:min-w-[16rem] sm:text-base"
                     @click="scrollToGenerator"
                   >
                     <Zap class="h-4 w-4" />
                     {{ t('landing.heroCta') }}
-                  </button>
-                  <button
-                    type="button"
-                    class="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card/50 px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-card sm:w-auto sm:px-7"
-                    @click="watchDemo"
-                  >
-                    <Play class="h-4 w-4" />
-                    {{ t('landing.heroDemo') }}
                   </button>
                 </div>
               </div>
