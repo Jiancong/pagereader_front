@@ -269,30 +269,35 @@ function buildPopoverContent(
   ta.addEventListener("click", stopEvent)
   editorWrap.appendChild(ta)
 
-  // 操作区：保存 / 再聊一句
+  // 操作区：常驻显示（list / edit 两态都能继续操作）
   const actions = doc.createElement("div")
   actions.className = "co-read-pop__actions"
-  editorWrap.appendChild(actions)
 
   let editing = false
 
-  /** 只读模式：已保存的留言以列表形式展示 */
+  /** 只读模式：已保存的留言以列表形式展示（点击可继续编辑） */
   const renderSavedView = () => {
     savedView.textContent = ""
     const text = String(ann.myReply || "").trim()
     const row = doc.createElement("div")
     row.className = "co-read-pop__saved-item"
     row.textContent = text
+    row.title = labels.editReply || "Edit"
+    row.addEventListener("click", (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      ta.value = ann.myReply || ""
+      applyMode(true)
+      ta.focus()
+    })
     savedView.appendChild(row)
     const meta = doc.createElement("div")
     meta.className = "co-read-pop__saved-meta"
-    meta.textContent = ann.replySent
-      ? labels.replySent
-      : labels.savedReply || "Saved"
+    meta.textContent = ann.replySent ? labels.replySent : labels.savedReply || "Saved"
     savedView.appendChild(meta)
   }
 
-  /** 切换 编辑 / 只读 两种状态 */
+  /** 切换 编辑 / 只读 两种状态（操作按钮始终保留） */
   const applyMode = (nextEditing: boolean) => {
     editing = nextEditing
     const hasSaved = !!String(ann.myReply || "").trim() && (!!ann.replySaved || !!ann.replySent)
@@ -323,6 +328,7 @@ function buildPopoverContent(
     e.stopPropagation()
     const text = String(ta.value || "").trim()
     if (!text) {
+      applyMode(true)
       ta.focus()
       return
     }
@@ -348,11 +354,15 @@ function buildPopoverContent(
   chatBtn.addEventListener("click", (e) => {
     e.preventDefault()
     e.stopPropagation()
+    // list 态时用已保存的留言作为对话上下文
     const text = String(ta.value || ann.myReply || "").trim()
     if (text) onDraft(ann.id, text)
     opts?.onChatAbout?.(ann.id, text)
   })
   actions.appendChild(chatBtn)
+
+  // 操作区常驻在状态区之外，确保 list 态也能「再聊一句」
+  pop.appendChild(actions)
 
   // 初始状态：已保存过留言 → 直接 list 模式；否则编辑模式
   applyMode(false)
@@ -477,7 +487,7 @@ function ensureOverlayStyles(doc: Document, dark: boolean) {
 .co-read-pop__reply-label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 4px;font-size:10px;color:${muted}}
 .co-read-pop__edit{padding:0;border:none;background:none;color:${accent};font-size:10px;font-weight:600;cursor:pointer;text-decoration:underline}
 .co-read-pop__saved{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:8px;border:1px solid ${dark ? "#374151" : "#e5e7eb"};background:${dark ? "#0a0a0a" : "#f9fafb"}}
-.co-read-pop__saved-item{font-size:12px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;color:${text}}
+.co-read-pop__saved-item{font-size:12px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;color:${text};cursor:text}
 .co-read-pop__saved-meta{font-size:10px;color:${muted}}.co-read-pop__reply{width:100%;box-sizing:border-box;border-radius:8px;border:1px solid ${dark ? "#374151" : "#d1d5db"};background:${dark ? "#0a0a0a" : "#fff"};color:${text};padding:8px 10px;font-size:12px;resize:vertical;min-height:48px;max-width:100%}
 .co-read-pop__reply:disabled{opacity:.55}
 .co-read-pop__sent{font-size:11px;color:#9ca3af;margin:4px 0 0}

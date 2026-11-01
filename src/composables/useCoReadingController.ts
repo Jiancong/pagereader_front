@@ -390,7 +390,8 @@ export function useCoReadingController() {
     const composed = quote && userText && !userText.includes(quote)
       ? `${userText}\n\n「${quote}」`
       : prompt
-    store.phase = "discussing"
+    // 已在讨论中就不要再重置 phase，保持对话栏与历史连续
+    if (store.phase !== "discussing") store.phase = "discussing"
     await onChatSend(composed)
   }
 
