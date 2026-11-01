@@ -356,12 +356,14 @@
             </div>
 
             <button
-              :disabled="!selectedReaderFile"
+              type="button"
+              :disabled="!selectedReaderFile || readerStartLoading"
               class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               @click="startReading()"
             >
-              <BookOpen class="h-5 w-5" />
-              {{ t('landing.readStart') }}
+              <Loader2 v-if="readerStartLoading" class="h-5 w-5 animate-spin" />
+              <BookOpen v-else class="h-5 w-5" />
+              {{ readerStartLoading ? t('reader.loading') : t('landing.readStart') }}
             </button>
           </div>
         </div>
@@ -375,7 +377,7 @@
 import { ref, computed, watch, markRaw, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages, Globe, BookOpen } from 'lucide-vue-next'
+import { Sparkles, Upload, FileText, FileSearch, X, MessageSquare, Youtube, Languages, Globe, BookOpen, Loader2 } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import {
   gtmGenerateIntent,
@@ -415,6 +417,7 @@ const translateMode = ref<'pdf' | 'url'>('pdf')
 const translateUrl = ref('')
 const showDemoVideo = ref(false)
 const selectedReaderFile = ref<File | null>(null)
+const readerStartLoading = ref(false)
 
 const readFileAccept =
   '.pdf,.epub,.mobi,.azw,.azw3,.xlsx,.xls,.txt,.md,.markdown,.mdown,.mkd,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/markdown,text/plain'
@@ -629,11 +632,16 @@ const clearReaderFile = () => {
   if (readerFileInput.value) readerFileInput.value.value = ''
 }
 
-const startReading = () => {
-  if (!selectedReaderFile.value) return
-  readerFileStore.setFile(selectedReaderFile.value)
-  readerFileStore.setReturnNavigation('workspace')
-  router.push({ name: 'reader-open', query: { returnTo: 'workspace' } })
+const startReading = async () => {
+  if (!selectedReaderFile.value || readerStartLoading.value) return
+  readerStartLoading.value = true
+  try {
+    readerFileStore.setFile(selectedReaderFile.value)
+    readerFileStore.setReturnNavigation('workspace')
+    await router.push({ name: 'reader-open', query: { returnTo: 'workspace' } })
+  } catch {
+    readerStartLoading.value = false
+  }
 }
 
 const selectQuickExample = (example: { id: string; prompt: string }) => {

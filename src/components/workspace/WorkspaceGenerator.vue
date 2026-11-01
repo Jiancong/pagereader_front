@@ -390,12 +390,13 @@
 
           <button
             type="button"
-            :disabled="!selectedReaderFile"
+            :disabled="!selectedReaderFile || readerStartLoading"
             class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             @click="startReading()"
           >
-            <BookOpen class="h-5 w-5" />
-            {{ t('workspace.readStart') }}
+            <Loader2 v-if="readerStartLoading" class="h-5 w-5 animate-spin" />
+            <BookOpen v-else class="h-5 w-5" />
+            {{ readerStartLoading ? t('reader.loading') : t('workspace.readStart') }}
           </button>
         </div>
 
@@ -713,6 +714,7 @@ const translateError = ref("")
 const translateMode = ref<"pdf" | "url">("pdf")
 const translateUrl = ref("")
 const selectedReaderFile = ref<File | null>(null)
+const readerStartLoading = ref(false)
 const readerFileInput = ref<HTMLInputElement | null>(null)
 const isDraggingReader = ref(false)
 const uploadPrompt = ref("")
@@ -1229,14 +1231,19 @@ const clearReaderFile = () => {
   if (readerFileInput.value) readerFileInput.value.value = ""
 }
 
-const startReading = () => {
-  if (!selectedReaderFile.value) return
-  readerFileStore.setFile(selectedReaderFile.value)
-  readerFileStore.setReturnNavigation("workspace")
-  router.push({
-    name: "reader-open",
-    query: { returnTo: "workspace" },
-  })
+const startReading = async () => {
+  if (!selectedReaderFile.value || readerStartLoading.value) return
+  readerStartLoading.value = true
+  try {
+    readerFileStore.setFile(selectedReaderFile.value)
+    readerFileStore.setReturnNavigation("workspace")
+    await router.push({
+      name: "reader-open",
+      query: { returnTo: "workspace" },
+    })
+  } catch {
+    readerStartLoading.value = false
+  }
 }
 
 function importReaderBookFromQuery() {
