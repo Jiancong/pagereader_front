@@ -1338,7 +1338,6 @@ export default {
     chatAbout: "再聊一句",
     editReply: "编辑",
     deleteReply: "删除留言",
-    threadInput: "继续和 AI 书友聊这条…",
     readerMissingChapter: "无法加载本章内容",
     kind: {
       reaction: "有感而发",

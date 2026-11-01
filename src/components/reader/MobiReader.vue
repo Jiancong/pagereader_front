@@ -17,12 +17,11 @@ import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
 import { applyReaderDocColorTheme } from '@/utils/readerNightDocStyle'
 import { useI18n } from 'vue-i18n'
 import 'foliate-js/view.js'
-import type { CoReadAnnotation, CoReadChatMessage } from '@/types/coReading'
+import type { CoReadAnnotation } from '@/types/coReading'
 import {
   pageTextFromBody,
   pageTextFromVisiblePage,
   syncCoReadOverlayAnnotations,
-  patchCoReadThreads,
   type CoReadInlineLabels,
   type CoReadInlineStatus,
 } from '@/utils/coReadInlineAnnotations'
@@ -36,7 +35,6 @@ const props = withDefaults(
       annotations: CoReadAnnotation[]
       labels: CoReadInlineLabels
       status?: CoReadInlineStatus
-      threads?: CoReadChatMessage[]
     } | null
   }>(),
   { colorTheme: 'light', coReadInline: null },
@@ -123,7 +121,6 @@ function applyCoReadInline() {
     labels: props.coReadInline.labels,
     dark: props.colorTheme === 'dark',
     status: props.coReadInline.status,
-    threads: props.coReadInline.threads,
     onDraft: (id, text) => emit('co-read-draft', id, text),
     onSaveReply: (id, text) => emit('co-read-save', id, text),
     onDeleteReply: () => emit('co-read-delete', id),
@@ -162,8 +159,7 @@ watch(
     if (!p) return ""
     let n = 0
     for (const a of p.annotations) n += (a.content || "").length
-    const t = (p.threads || []).map((m) => `${m.id}:${m.text.length}`).join(",")
-    return `${n}|${p.status?.intro?.length ?? 0}|${t}`
+    return `${n}|${p.status?.intro?.length ?? 0}`
   },
   () => {
     const overlay = overlayRef.value
@@ -178,8 +174,6 @@ watch(
         bodyEl.textContent = a.content || ""
       }
     }
-    // 线程 patch
-    if (p.threads?.length) patchCoReadThreads(overlay, p.threads)
   },
   { flush: 'post' },
 )

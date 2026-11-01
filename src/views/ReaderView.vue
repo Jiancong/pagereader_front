@@ -440,8 +440,9 @@ watch(
   },
 )
 
-/** 批注卡片内「再聊一句」：对话直接发生在卡片线程里，不跳底部面板 */
+/** 批注卡片内「再聊一句」：打开底部对话栏继续（上下文跟随该批注） */
 async function handleCoReadCardChat(annotationId: string, text: string) {
+  coReadChatOpen.value = true
   await onCoReadChatAbout(annotationId, text)
 }
 
@@ -472,8 +473,6 @@ const coReadInlinePayload = computed(() => {
   return {
     annotations: coReadChapterAnnotations.value,
     labels: coReadInlineLabels.value,
-    // 按批注归组的对话线程（卡片内继续聊）
-    threads: coReadStore.chatMessages.filter((m) => Boolean(m.annotationId)),
     status: {
       loading: coReadStore.openingChapter && coReadChapterAnnotations.value.length === 0,
       intro: coReadStore.pageIntroText || undefined,
