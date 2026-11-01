@@ -437,25 +437,6 @@ const coReadReplyRecords = computed(() =>
     .filter((a) => String(a.myReply || '').trim())
     .map((a) => ({ id: a.id, kind: a.kind, myReply: String(a.myReply || ''), replySent: a.replySent })),
 )
-// 进入讨论阶段（发送留言后）自动展开对话栏
-watch(
-  () => coReadStore.phase,
-  (phase) => {
-    if (phase === 'discussing') coReadChatOpen.value = true
-    bumpCoReadLayoutRevision()
-  },
-)
-
-watch(coReadChromeVisible, () => {
-  if (coReadMode.value) bumpCoReadLayoutRevision()
-})
-watch(coReadChatOpen, () => {
-  if (coReadMode.value) bumpCoReadLayoutRevision()
-})
-watch(coReadMode, (on) => {
-  if (on) bumpCoReadLayoutRevision()
-})
-
 /** 批注卡片内「再聊一句」：对话追加在 icon 浮层内，不打开底部栏 */
 async function handleCoReadCardChat(annotationId: string, text: string) {
   await onCoReadChatAbout(annotationId, text)
@@ -531,6 +512,25 @@ const coReadLayoutRevision = ref(0)
 function bumpCoReadLayoutRevision() {
   coReadLayoutRevision.value += 1
 }
+
+// 进入讨论阶段（发送留言后）自动展开对话栏；布局变化时重算批注 icon
+watch(
+  () => coReadStore.phase,
+  (phase) => {
+    if (phase === 'discussing') coReadChatOpen.value = true
+    bumpCoReadLayoutRevision()
+  },
+)
+watch(coReadChromeVisible, () => {
+  if (coReadMode.value) bumpCoReadLayoutRevision()
+})
+watch(coReadChatOpen, () => {
+  if (coReadMode.value) bumpCoReadLayoutRevision()
+})
+watch(coReadMode, (on) => {
+  if (on) bumpCoReadLayoutRevision()
+})
+
 const MOBILE_LAYOUT_MQ = '(max-width: 767px)'
 let mobileLayoutMq: MediaQueryList | null = null
 
