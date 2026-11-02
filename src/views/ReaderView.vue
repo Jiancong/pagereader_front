@@ -8,7 +8,6 @@
       'reader-view--night': isDark,
       'reader-view--co-read-immersive': coReadMode && !coReadChromeVisible,
     }"
-    @contextmenu="onContextMenu"
     @wheel="onWheel"
   >
     <!-- 沉浸共读模式下的右上角轻量悬浮唤醒丸（不占布局高度，点击可临时呼出工具栏或退出伴读） -->
@@ -219,6 +218,32 @@
       @select="goToEpubSearchIndex"
     />
 
+    <PptContextMenu
+      v-if="selectionAskEnabled"
+      :show="readerContextMenuOpen"
+      :x="readerContextMenuX"
+      :y="readerContextMenuY"
+      :selection-text="readerContextSelection"
+      :annotate-enabled="false"
+      @related-search="onReaderSelectionAsk"
+      @custom-search="onReaderSelectionCustomAsk"
+      @close="closeReaderContextMenu"
+    />
+    <PptRelatedSearchPanel
+      v-if="selectionAskEnabled"
+      :visible="selectionChatState.visible"
+      :term="selectionChatState.term"
+      :content="selectionChatState.content"
+      :image-results="selectionChatState.imageResults"
+      :loading="selectionChatState.loading"
+      :error="selectionChatState.error"
+      :is-rag-response="selectionChatState.isRagResponse"
+      :knowledge-based="selectionChatState.knowledgeBased"
+      :is-search-response="selectionChatState.isSearchResponse"
+      :search-context="selectionChatContext"
+      @close="closeSelectionChatPanel"
+    />
+
     <!-- 无文件：回阅读中心 -->
     <div v-if="!hasSource" class="reader-view__empty">
       <p>{{ t('reader.noFile') }}</p>
@@ -260,6 +285,7 @@
         @co-read-save="handleCoReadCardSave"
         @co-read-delete="handleCoReadCardDelete"
         @co-read-chat="handleCoReadCardChat"
+        @selection-contextmenu="onReaderSelectionContextMenu"
       />
 
       <!-- MOBI 阅读器 -->
@@ -278,6 +304,7 @@
         @co-read-save="handleCoReadCardSave"
         @co-read-delete="handleCoReadCardDelete"
         @co-read-chat="handleCoReadCardChat"
+        @selection-contextmenu="onReaderSelectionContextMenu"
       />
 
       <!-- XLSX 阅读器 -->
@@ -305,6 +332,7 @@
         @co-read-save="handleCoReadCardSave"
         @co-read-delete="handleCoReadCardDelete"
         @co-read-chat="handleCoReadCardChat"
+        @selection-contextmenu="onReaderSelectionContextMenu"
       />
 
       <CoReadAnnotationStrip
@@ -434,6 +462,9 @@ import { useReaderFileStore } from '@/stores/reader'
 import { useBrowserTts } from '@/composables/useBrowserTts'
 import { isLoggedIn } from '@/api'
 import { navigateAfterReaderClose } from '@/utils/readerReturnRoute'
+import PptContextMenu from '@/components/editor/chat/PptContextMenu.vue'
+import PptRelatedSearchPanel from '@/components/editor/chat/PptRelatedSearchPanel.vue'
+import { useReaderSelectionChat } from '@/composables/useReaderSelectionChat'
 
 const XlsxReader = defineAsyncComponent(() => import('@/components/reader/XlsxReader.vue'))
 const MarkdownReader = defineAsyncComponent(() => import('@/components/reader/MarkdownReader.vue'))
@@ -542,6 +573,32 @@ const isXlsx = computed(() => store.format === 'xlsx')
 const isMarkdown = computed(() => store.format === 'markdown')
 const hasSource = computed(() => Boolean(store.file))
 const headerTitle = computed(() => store.file?.name ?? '')
+
+const selectionAskEnabled = computed(() => isEpub.value || isMobi.value || isMarkdown.value)
+const readerContextMenuOpen = ref(false)
+const readerContextMenuX = ref(0)
+const readerContextMenuY = ref(0)
+const readerContextSelection = ref('')
+const readerSelectionSnippet = ref('')
+
+function readerPageContextText(): string {
+  if (isEpub.value) return epubReaderRef.value?.getPageText?.() ?? ''
+  if (isMobi.value) return mobiReaderRef.value?.getPageText?.() ?? ''
+  if (isMarkdown.value) return markdownReaderRef.value?.getPageText?.() ?? ''
+  return ''
+}
+
+const {
+  selectionChatState,
+  selectionChatContext,
+  askAboutTerm,
+  closeSelectionChatPanel,
+  closeSelectionChatStream,
+} = useReaderSelectionChat({
+  bookTitle: () => headerTitle.value,
+  pageContext: readerPageContextText,
+  selectionSnippet: () => readerSelectionSnippet.value,
+})
 
 const scale = ref(1.2)
 const mobileToolsOpen = ref(false)
@@ -1037,9 +1094,45 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
-function onContextMenu(e: MouseEvent) {
-  e.preventDefault()
-  nextPage()
+function onReaderSelectionContextMenu(payload: { selection: string; clientX: number; clientY: number }) {
+  if (!selectionAskEnabled.value) return
+  readerContextSelection.value = payload.selection
+  readerContextMenuX.value = payload.clientX
+  readerContextMenuY.value = payload.clientY
+  readerContextMenuOpen.value = true
+}
+
+function closeReaderContextMenu() {
+  readerContextMenuOpen.value = false
+}
+
+function onReaderContextMenuPointerDown(event: PointerEvent) {
+  if (!readerContextMenuOpen.value) return
+  const target = event.target as Element | null
+  if (target?.closest?.('.ppt-context-menu')) return
+  closeReaderContextMenu()
+}
+
+async function onReaderSelectionAsk() {
+  const sel = readerContextSelection.value.trim()
+  if (!sel) {
+    ElMessage.warning(t('agent.pptRelatedSearchSelectText'))
+    return
+  }
+  readerSelectionSnippet.value = sel
+  closeReaderContextMenu()
+  await askAboutTerm(t('reader.selectionAskDefaultQuestion'))
+}
+
+async function onReaderSelectionCustomAsk(term: string) {
+  const sel = readerContextSelection.value.trim()
+  if (!sel) {
+    ElMessage.warning(t('agent.pptRelatedSearchSelectText'))
+    return
+  }
+  readerSelectionSnippet.value = sel
+  closeReaderContextMenu()
+  await askAboutTerm(term)
 }
 
 function goBack() {
@@ -1067,11 +1160,14 @@ onMounted(() => {
   mobileLayoutMq = window.matchMedia(MOBILE_LAYOUT_MQ)
   mobileLayoutMq.addEventListener('change', onMobileLayoutChange)
   window.addEventListener('keydown', onKeyDown)
+  document.addEventListener('pointerdown', onReaderContextMenuPointerDown)
 })
 
 onBeforeUnmount(() => {
   epubSearchAbort?.abort()
   closeEpubSearch()
+  closeSelectionChatStream()
+  document.removeEventListener('pointerdown', onReaderContextMenuPointerDown)
   mobileLayoutMq?.removeEventListener('change', onMobileLayoutChange)
   window.removeEventListener('keydown', onKeyDown)
   ttsAdvanceToken++

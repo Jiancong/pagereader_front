@@ -18,6 +18,7 @@ import { applyReaderDocColorTheme } from '@/utils/readerNightDocStyle'
 import { useI18n } from 'vue-i18n'
 import 'foliate-js/view.js'
 import type { CoReadAnnotation, CoReadChatMessage } from '@/types/coReading'
+import { mapIframeClientPointToViewport, resolveDocumentSelectionText } from '@/utils/pptContextSelection'
 import {
   pageTextFromBody,
   pageTextFromVisiblePage,
@@ -53,6 +54,7 @@ const emit = defineEmits<{
   'co-read-save': [annotationId: string, text: string]
   'co-read-delete': [annotationId: string]
   'co-read-chat': [annotationId: string, text: string]
+  'selection-contextmenu': [payload: { selection: string; clientX: number; clientY: number }]
 }>()
 
 const { t } = useI18n()
@@ -79,7 +81,12 @@ function onDocKeyDown(e: KeyboardEvent) {
 }
 function onDocContextMenu(e: MouseEvent) {
   e.preventDefault()
-  next()
+  e.stopPropagation()
+  const doc = (e.currentTarget as Document | null) ?? activeDoc()
+  if (!doc) return
+  const selection = resolveDocumentSelectionText(doc, e)
+  const { clientX, clientY } = mapIframeClientPointToViewport(doc, e)
+  emit('selection-contextmenu', { selection, clientX, clientY })
 }
 function onDocWheel(e: WheelEvent) {
   if (!e.ctrlKey && !e.metaKey) return

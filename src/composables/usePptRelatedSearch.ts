@@ -53,6 +53,9 @@ export interface PptRelatedSearchOptions {
   buildMessage: (term: string, pptTitle?: string) => string;
   /** When false, stream runs without opening the floating result panel */
   showPanel?: boolean;
+  /** 默认 ppt_related_search；阅读器划词等场景可覆盖 */
+  intent?: string;
+  sessionIdPrefix?: string;
 }
 
 function extractKnowledgeText(data: Record<string, unknown> | null | undefined): string {
@@ -220,8 +223,10 @@ export function usePptRelatedSearch() {
     const pptTitle = String(options.pptTitle || "").trim() || undefined;
     const pptDataUrl = String(options.pptDataUrl || "").trim() || undefined;
     const source: PptRelatedSearchSource = options.source ?? "MANUAL_SELECTION";
+    const intent = options.intent?.trim() || PPT_RELATED_SEARCH_INTENT;
+    const sessionPrefix = options.sessionIdPrefix?.trim() || "ppt-related";
     const extraBody: Record<string, unknown> = {
-      intent: PPT_RELATED_SEARCH_INTENT,
+      intent,
       term,
       source,
     };
@@ -237,9 +242,9 @@ export function usePptRelatedSearch() {
           message,
           userId,
           projectId: options.projectId || undefined,
-          sessionId: `ppt-related-${Date.now()}`,
+          sessionId: `${sessionPrefix}-${Date.now()}`,
           isAgent: true,
-          intent: PPT_RELATED_SEARCH_INTENT,
+          intent,
           locale: resolveApiLocale(),
           extra_body: extraBody,
           uploaded_documents: uploadedDocs.length ? uploadedDocs : undefined,

@@ -24,6 +24,7 @@
           ref="articleRef"
           class="markdown-reader__article"
           v-html="currentPageHtml"
+          @contextmenu.prevent="onArticleContextMenu"
         ></article>
       </div>
     </div>
@@ -54,6 +55,7 @@ import {
   type CoReadInlineStatus,
 } from '@/utils/coReadInlineAnnotations'
 import { useI18n } from 'vue-i18n'
+import { resolveDocumentSelectionText } from '@/utils/pptContextSelection'
 import { marked } from 'marked'
 
 import type { ReaderColorTheme } from '@/composables/useReaderColorTheme'
@@ -82,6 +84,7 @@ const emit = defineEmits<{
   'co-read-save': [annotationId: string, text: string]
   'co-read-delete': [annotationId: string]
   'co-read-chat': [annotationId: string, text: string]
+  'selection-contextmenu': [payload: { selection: string; clientX: number; clientY: number }]
 }>()
 
 const { t } = useI18n()
@@ -417,6 +420,14 @@ function goToPage(page: number) {
   if (clamped === currentPage.value) return
   const dir = clamped > currentPage.value ? 'next' : 'prev'
   withPageFlip(dir, () => commitPage(clamped))
+}
+
+function onArticleContextMenu(e: MouseEvent) {
+  emit('selection-contextmenu', {
+    selection: resolveDocumentSelectionText(document, e),
+    clientX: e.clientX,
+    clientY: e.clientY,
+  })
 }
 
 function onKeyDown(e: KeyboardEvent) {
