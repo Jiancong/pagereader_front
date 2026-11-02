@@ -59,6 +59,70 @@ const searchHighlightStyles = {
     'mix-blend-mode': 'multiply',
   },
 }
+const EPUB_COLOR_THEME_NAME = 'page2-theme'
+const LEGACY_EPUB_THEME_STYLE_IDS = ['epubjs-inserted-css-page2-light', 'epubjs-inserted-css-page2-dark']
+const EPUB_TEXT_SELECTORS =
+  'p, div, span, li, td, th, pre, blockquote, dd, dt, figcaption, em, strong, i, b, u, small, label, cite, q, h1, h2, h3, h4, h5, h6'
+
+function epubMediaRules() {
+  return {
+    'img, svg, video': {
+      'max-width': '100% !important',
+      'max-height': '95vh !important',
+      width: 'auto !important',
+      height: 'auto !important',
+    },
+  }
+}
+
+function buildEpubColorThemeRules(mode: ReaderColorTheme) {
+  const dark = mode === 'dark'
+  const fg = dark ? '#e5e5e5' : '#1f2937'
+  const bg = dark ? '#0a0a0a' : '#ffffff'
+  const link = dark ? '#93c5fd' : '#2563eb'
+  return {
+    ...epubMediaRules(),
+    ...searchHighlightStyles,
+    body: {
+      color: `${fg} !important`,
+      background: `${bg} !important`,
+    },
+    [EPUB_TEXT_SELECTORS]: {
+      color: `${fg} !important`,
+      background: 'transparent !important',
+    },
+    a: { color: `${link} !important` },
+  }
+}
+
+function themeRulesToCss(rules: Record<string, Record<string, string>>): string {
+  return Object.entries(rules)
+    .map(([selector, decl]) => {
+      const block = Object.entries(decl)
+        .map(([prop, val]) => `${prop}:${val}`)
+        .join(';')
+      return `${selector}{${block}}`
+    })
+    .join('\n')
+}
+
+function purgeLegacyEpubThemeStyles(doc: Document | null | undefined) {
+  if (!doc) return
+  for (const id of LEGACY_EPUB_THEME_STYLE_IDS) {
+    doc.getElementById(id)?.remove()
+  }
+}
+
+function syncEpubColorThemeStylesheet() {
+  if (!rendition) return
+  const rules = buildEpubColorThemeRules(props.colorTheme)
+  const css = themeRulesToCss(rules)
+  const contents = rendition.getContents() as Array<{ document?: Document; addStylesheetCss?: (css: string, key: string) => void }>
+  contents.forEach((content) => {
+    purgeLegacyEpubThemeStyles(content.document)
+    content.addStylesheetCss?.(css, EPUB_COLOR_THEME_NAME)
+  })
+}
 
 const props = withDefaults(
   defineProps<{
@@ -417,34 +481,11 @@ function uninstallUnloadShim() {
 
 function applyEpubColorTheme() {
   if (!rendition) return
-  const mediaRules = {
-    'img, svg, video': {
-      'max-width': '100% !important',
-      'max-height': '95vh !important',
-      width: 'auto !important',
-      height: 'auto !important',
-    },
-  }
-  rendition.themes.register('page2-light', {
-    ...mediaRules,
-    ...searchHighlightStyles,
-    body: {
-      color: '#1f2937 !important',
-      background: '#ffffff !important',
-    },
-    a: { color: '#2563eb !important' },
-  })
-  rendition.themes.register('page2-dark', {
-    ...mediaRules,
-    ...searchHighlightStyles,
-    body: {
-      color: '#e5e5e5 !important',
-      background: '#0a0a0a !important',
-    },
-    p: { color: '#e5e5e5 !important' },
-    a: { color: '#93c5fd !important' },
-  })
-  rendition.themes.select(props.colorTheme === 'dark' ? 'page2-dark' : 'page2-light')
+  const rules = buildEpubColorThemeRules(props.colorTheme)
+  // 单一主题 + replace 整段 CSS，避免 light/dark 两套样式叠在 iframe 里导致日间模式仍沿用夜间字色
+  rendition.themes.register(EPUB_COLOR_THEME_NAME, rules)
+  rendition.themes.select(EPUB_COLOR_THEME_NAME)
+  syncEpubColorThemeStylesheet()
 }
 
 watch(
@@ -780,6 +821,8 @@ onMounted(async () => {
             }
             ;(rendition as { reportLocation?: () => void } | null)?.reportLocation?.()
             syncEnds()
+            purgeLegacyEpubThemeStyles(doc)
+            syncEpubColorThemeStylesheet()
             applyCoReadInline()
           })
         })
