@@ -48,6 +48,17 @@ import {
   type CoReadInlineStatus,
 } from '@/utils/coReadInlineAnnotations'
 import type { CoReadAnnotation, CoReadChatMessage } from '@/types/coReading'
+import type { EpubSearchHit, EpubSearchProgress } from '@/types/epubSearch'
+
+const MAX_EPUB_SEARCH_HITS = 400
+const SEARCH_HIGHLIGHT_CLASS = 'epub-search-hl'
+const searchHighlightStyles = {
+  [`.${SEARCH_HIGHLIGHT_CLASS}`]: {
+    fill: '#fbbf24',
+    'fill-opacity': '0.45',
+    'mix-blend-mode': 'multiply',
+  },
+}
 
 const props = withDefaults(
   defineProps<{
@@ -416,6 +427,7 @@ function applyEpubColorTheme() {
   }
   rendition.themes.register('page2-light', {
     ...mediaRules,
+    ...searchHighlightStyles,
     body: {
       color: '#1f2937 !important',
       background: '#ffffff !important',
@@ -424,6 +436,7 @@ function applyEpubColorTheme() {
   })
   rendition.themes.register('page2-dark', {
     ...mediaRules,
+    ...searchHighlightStyles,
     body: {
       color: '#e5e5e5 !important',
       background: '#0a0a0a !important',
@@ -731,6 +744,7 @@ onMounted(async () => {
         width: 'auto !important',
         height: 'auto !important',
       },
+      ...searchHighlightStyles,
     })
     applyEpubColorTheme()
 
@@ -849,6 +863,7 @@ function onOrientationChange() {
 }
 
 onBeforeUnmount(() => {
+  clearSearchHighlights()
   if (orientationSettleTimer) {
     window.clearTimeout(orientationSettleTimer)
     orientationSettleTimer = null
@@ -1224,7 +1239,137 @@ function getActiveViewDocument(): Document | null {
   }
 }
 
-defineExpose({ next, prev, goToPage, getPageText, isAtEnd: () => atEnd.value })
+let searchHighlightCfis: string[] = []
+
+function chapterLabelForSection(section: { href?: string; idref?: string } | null | undefined): string {
+  if (!book || !section) return ''
+  const href = String(section.href || '').split('#')[0]
+  if (href && book.navigation) {
+    const navItem = book.navigation.get(href) as { label?: string } | undefined
+    if (navItem?.label) return navItem.label
+  }
+  return section.idref || href || ''
+}
+
+function pageHintFromCfi(cfi: string): number | null {
+  if (!book || book.locations.length() === 0 || !cfi) return null
+  const loc = Number(book.locations.locationFromCfi(cfi))
+  if (!Number.isFinite(loc) || loc < 0) return null
+  return loc + 1
+}
+
+async function searchInBook(
+  query: string,
+  options?: {
+    signal?: AbortSignal
+    onProgress?: (progress: EpubSearchProgress) => void
+  },
+): Promise<EpubSearchHit[]> {
+  const q = query.trim()
+  if (!book || !q) return []
+  await book.ready
+  await book.loaded.spine
+  await ensureLocationIndex()
+
+  const spine = book.spine as { length?: number; get: (i: number) => any }
+  const spineLen = spine.length ?? 0
+  const hits: EpubSearchHit[] = []
+
+  for (let spineIndex = 0; spineIndex < spineLen; spineIndex++) {
+    if (options?.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+    options?.onProgress?.({ sectionIndex: spineIndex, sectionTotal: spineLen, hitsSoFar: hits.length })
+
+    const section = spine.get(spineIndex)
+    if (!section) continue
+    await section.load(book.load.bind(book))
+    if (options?.signal?.aborted) {
+      section.unload()
+      throw new DOMException('Aborted', 'AbortError')
+    }
+
+    const rawMatches: Array<{ cfi?: string; excerpt?: string }> =
+      typeof section.search === 'function' ? section.search(q) : section.find(q)
+
+    for (const match of rawMatches) {
+      if (!match?.cfi) continue
+      hits.push({
+        cfi: match.cfi,
+        excerpt: (match.excerpt || '').replace(/\s+/g, ' ').trim(),
+        spineIndex,
+        chapterLabel: chapterLabelForSection(section),
+        pageHint: pageHintFromCfi(match.cfi),
+        pageDisplay: null,
+      })
+      if (hits.length >= MAX_EPUB_SEARCH_HITS) break
+    }
+
+    section.unload()
+    if (hits.length >= MAX_EPUB_SEARCH_HITS) break
+  }
+
+  return hits
+}
+
+async function ensureLocationIndex() {
+  if (!book || book.locations.length() > 0) return
+  await book.locations.generate(200)
+}
+
+function clearSearchHighlights() {
+  if (!rendition) return
+  for (const cfi of searchHighlightCfis) {
+    try {
+      rendition.annotations.remove(cfi, 'highlight')
+    } catch {
+      /* ignore stale cfi */
+    }
+  }
+  searchHighlightCfis = []
+}
+
+function waitForRelocated(timeoutMs = 1200): Promise<void> {
+  if (!rendition) return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      rendition?.off('relocated', onRelocated)
+      resolve()
+    }
+    const onRelocated = () => finish()
+    rendition.on('relocated', onRelocated)
+    window.setTimeout(finish, timeoutMs)
+  })
+}
+
+async function goToSearchHit(hit: EpubSearchHit): Promise<number> {
+  if (!rendition || !hit.cfi) return currentPage.value
+  clearSearchHighlights()
+  markFlipActivity()
+  await rendition.display(hit.cfi)
+  await waitForRelocated()
+  try {
+    rendition.annotations.highlight(hit.cfi, { kind: 'search' }, undefined, SEARCH_HIGHLIGHT_CLASS)
+    searchHighlightCfis.push(hit.cfi)
+  } catch {
+    /* highlight may fail on image-only sections */
+  }
+  ;(rendition as { reportLocation?: () => void }).reportLocation?.()
+  syncEnds()
+  return currentPage.value
+}
+
+defineExpose({
+  next,
+  prev,
+  goToPage,
+  getPageText,
+  isAtEnd: () => atEnd.value,
+  searchInBook,
+  goToSearchHit,
+  clearSearchHighlights,
+})
 </script>
 
 <style scoped>

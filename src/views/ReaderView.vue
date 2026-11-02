@@ -52,6 +52,18 @@
           </div>
         </div>
         <button
+          v-if="isEpub && hasSource"
+          type="button"
+          class="rv-btn rv-btn--sm rv-btn--search"
+          :class="{ 'rv-btn--search-on': epubSearchOpen }"
+          :title="t('reader.epubSearchTitle')"
+          :aria-label="t('reader.epubSearchTitle')"
+          :aria-expanded="epubSearchOpen"
+          @click.stop="toggleEpubSearch"
+        >
+          <Search class="h-4 w-4" />
+        </button>
+        <button
           v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown)"
           type="button"
           class="rv-btn rv-btn--sm rv-btn--mobile-tools"
@@ -88,6 +100,19 @@
           <span class="rv-zoom-value">{{ Math.round(scale * 100) }}%</span>
           <button class="rv-btn rv-btn--sm" @click="zoomIn" :disabled="scale >= 3">+</button>
         </div>
+
+        <button
+          v-if="isEpub && hasSource"
+          type="button"
+          class="rv-btn rv-btn--sm rv-btn--search"
+          :class="{ 'rv-btn--search-on': epubSearchOpen }"
+          :title="t('reader.epubSearchTitle')"
+          :aria-label="t('reader.epubSearchTitle')"
+          @click.stop="toggleEpubSearch"
+        >
+          <Search class="h-4 w-4" />
+          <span class="rv-btn--search-label">{{ t('reader.epubSearchTitle') }}</span>
+        </button>
 
         <button
           v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown)"
@@ -177,6 +202,22 @@
         </button>
       </div>
     </header>
+
+    <ReaderEpubSearchPanel
+      v-if="isEpub && hasSource && epubSearchOpen"
+      v-model:query="epubSearchQuery"
+      :hits="epubSearchHits"
+      :active-index="epubSearchActiveIndex"
+      :loading="epubSearchLoading"
+      :searched="epubSearchSearched"
+      :progress="epubSearchProgress"
+      class="reader-view__epub-search"
+      @search="runEpubSearch"
+      @close="closeEpubSearch"
+      @prev="goPrevEpubSearchHit"
+      @next="goNextEpubSearchHit"
+      @select="goToEpubSearchIndex"
+    />
 
     <!-- 无文件：回阅读中心 -->
     <div v-if="!hasSource" class="reader-view__empty">
@@ -343,7 +384,6 @@
 
     <template v-if="coReadMode && hasSource">
       <div
-      <div
         v-if="
           coReadStore.phase === 'reading' &&
           coReadChapterOpenDone &&
@@ -376,7 +416,9 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, BookHeart, MoreHorizontal, MessageCircle } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, BookHeart, MoreHorizontal, MessageCircle, Search } from 'lucide-vue-next'
+import ReaderEpubSearchPanel from '@/components/reader/ReaderEpubSearchPanel.vue'
+import type { EpubSearchHit, EpubSearchProgress } from '@/types/epubSearch'
 import CoReadAnnotationStrip from '@/components/coReading/CoReadAnnotationStrip.vue'
 import CoReadReplyTray from '@/components/coReading/CoReadReplyTray.vue'
 import CoReadChatPanel from '@/components/coReading/CoReadChatPanel.vue'
@@ -503,6 +545,14 @@ const headerTitle = computed(() => store.file?.name ?? '')
 
 const scale = ref(1.2)
 const mobileToolsOpen = ref(false)
+const epubSearchOpen = ref(false)
+const epubSearchQuery = ref('')
+const epubSearchHits = ref<EpubSearchHit[]>([])
+const epubSearchActiveIndex = ref(0)
+const epubSearchLoading = ref(false)
+const epubSearchSearched = ref(false)
+const epubSearchProgress = ref<EpubSearchProgress | null>(null)
+let epubSearchAbort: AbortController | null = null
 /** 沉浸共读模式下默认隐藏上下工具栏，点击右上角悬浮唤醒钮才临时展开 */
 const coReadChromeVisible = ref(false)
 /** 沉浸共读的对话栏（记录/对话）显隐；进入讨论阶段自动展开，可手动关闭 */
@@ -888,7 +938,93 @@ function prevPage() {
   }
 }
 
+function toggleEpubSearch() {
+  if (!isEpub.value) return
+  epubSearchOpen.value = !epubSearchOpen.value
+  if (!epubSearchOpen.value) closeEpubSearch()
+}
+
+function closeEpubSearch() {
+  epubSearchOpen.value = false
+  epubSearchAbort?.abort()
+  epubSearchAbort = null
+  epubSearchLoading.value = false
+  epubSearchProgress.value = null
+  epubReaderRef.value?.clearSearchHighlights()
+}
+
+async function runEpubSearch() {
+  const q = epubSearchQuery.value.trim()
+  if (!isEpub.value || !q) return
+  epubSearchAbort?.abort()
+  const ac = new AbortController()
+  epubSearchAbort = ac
+  epubSearchLoading.value = true
+  epubSearchSearched.value = false
+  epubSearchProgress.value = null
+  epubSearchHits.value = []
+  epubSearchActiveIndex.value = 0
+  try {
+    const hits = await epubReaderRef.value?.searchInBook(q, {
+      signal: ac.signal,
+      onProgress: (p) => {
+        epubSearchProgress.value = p
+      },
+    })
+    if (ac.signal.aborted) return
+    epubSearchHits.value = hits ?? []
+    epubSearchSearched.value = true
+    if (epubSearchHits.value.length > 0) {
+      await goToEpubSearchIndex(0)
+    }
+  } catch (err) {
+    if (ac.signal.aborted) return
+    ElMessage.error(t('reader.epubSearchFailed'))
+    console.error(err)
+  } finally {
+    if (epubSearchAbort === ac) {
+      epubSearchLoading.value = false
+      epubSearchProgress.value = null
+      epubSearchAbort = null
+    }
+  }
+}
+
+async function goToEpubSearchIndex(index: number) {
+  if (!epubSearchHits.value.length) return
+  const clamped = Math.min(Math.max(index, 0), epubSearchHits.value.length - 1)
+  epubSearchActiveIndex.value = clamped
+  const hit = epubSearchHits.value[clamped]
+  const page = await epubReaderRef.value?.goToSearchHit(hit)
+  if (page != null && page > 0) {
+    epubSearchHits.value[clamped] = { ...hit, pageDisplay: page }
+  }
+}
+
+function goNextEpubSearchHit() {
+  if (!epubSearchHits.value.length) return
+  const next = (epubSearchActiveIndex.value + 1) % epubSearchHits.value.length
+  void goToEpubSearchIndex(next)
+}
+
+function goPrevEpubSearchHit() {
+  if (!epubSearchHits.value.length) return
+  const n = epubSearchHits.value.length
+  const prev = (epubSearchActiveIndex.value - 1 + n) % n
+  void goToEpubSearchIndex(prev)
+}
+
 function onKeyDown(e: KeyboardEvent) {
+  if (isEpub.value && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+    e.preventDefault()
+    epubSearchOpen.value = true
+    return
+  }
+  if (epubSearchOpen.value && e.key === 'Escape') {
+    e.preventDefault()
+    closeEpubSearch()
+    return
+  }
   // XLSX uses arrow keys for in-cell cursor and cell navigation while editing.
   if (isXlsx.value) return
 
@@ -934,6 +1070,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  epubSearchAbort?.abort()
+  closeEpubSearch()
   mobileLayoutMq?.removeEventListener('change', onMobileLayoutChange)
   window.removeEventListener('keydown', onKeyDown)
   ttsAdvanceToken++
@@ -1030,6 +1168,23 @@ onBeforeUnmount(() => {
   display: contents;
 }
 .rv-btn--mobile-tools {
+  display: none;
+}
+.rv-btn--search {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.rv-btn--search-on {
+  border-color: #6366f1;
+  color: #a5b4fc;
+  background: #1e1b4b;
+}
+.reader-view__epub-search {
+  flex-shrink: 0;
+  z-index: 12;
+}
+.reader-view__toolbar-row > .rv-btn--search {
   display: none;
 }
 .reader-view__head {
@@ -1430,6 +1585,20 @@ onBeforeUnmount(() => {
     min-height: 40px;
     justify-content: center;
     padding: 8px;
+  }
+  .reader-view__toolbar-row .rv-btn--search {
+    display: inline-flex;
+    flex-shrink: 0;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 8px;
+    justify-content: center;
+  }
+  .reader-view__controls .rv-btn--search {
+    display: none;
+  }
+  .rv-btn--search-label {
+    display: none;
   }
   .reader-view__head {
     flex: 1;
