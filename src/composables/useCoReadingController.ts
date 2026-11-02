@@ -408,6 +408,20 @@ export function useCoReadingController() {
     }
   }
 
+  /** 阅读器划词右键：针对选中片段与 AI 书友对话（独立线程，走共读 sendChat） */
+  async function chatAboutReaderSelection(threadId: string, quote: string, userText: string) {
+    if (!store.sessionId || !threadId) return
+    const user = String(userText || "").trim()
+    const q = String(quote || "").trim()
+    if (!user && !q) return
+    const hasThread = store.chatMessages.some((m) => m.annotationId === threadId)
+    const prompt = hasThread ? user : user || q
+    if (!prompt) return
+    const composed =
+      !hasThread && q && user && !user.includes(q) ? `${user}\n\n「${q}」` : prompt
+    await onChatSend(composed, { annotationId: threadId })
+  }
+
   /** 卡片内「再聊一句」：在该批注的卡片线程内继续对话（不跳底部面板、不切阶段） */
   async function chatAboutAnnotation(annotationId: string, text: string) {
     if (!store.sessionId) return
@@ -688,6 +702,7 @@ export function useCoReadingController() {
     saveAnnotationReply,
     deleteAnnotationReply,
     chatAboutAnnotation,
+    chatAboutReaderSelection,
     reportReaderPage,
     startPageCoRead,
     stopPageCoRead,

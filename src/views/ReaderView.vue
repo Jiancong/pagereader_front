@@ -225,23 +225,10 @@
       :y="readerContextMenuY"
       :selection-text="readerContextSelection"
       :annotate-enabled="false"
+      menu-variant="reader-chat"
       @related-search="onReaderSelectionAsk"
       @custom-search="onReaderSelectionCustomAsk"
       @close="closeReaderContextMenu"
-    />
-    <PptRelatedSearchPanel
-      v-if="selectionAskEnabled"
-      :visible="selectionChatState.visible"
-      :term="selectionChatState.term"
-      :content="selectionChatState.content"
-      :image-results="selectionChatState.imageResults"
-      :loading="selectionChatState.loading"
-      :error="selectionChatState.error"
-      :is-rag-response="selectionChatState.isRagResponse"
-      :knowledge-based="selectionChatState.knowledgeBased"
-      :is-search-response="selectionChatState.isSearchResponse"
-      :search-context="selectionChatContext"
-      @close="closeSelectionChatPanel"
     />
 
     <!-- 无文件：回阅读中心 -->
@@ -412,7 +399,23 @@
 
     <template v-if="coReadMode && hasSource">
       <div
-        v-if="
+        v-if="readerSelectionChatOpen && readerSelectionThreadId"
+        class="reader-view__co-read-tray reader-view__co-read-tray--selection"
+      >
+        <p v-if="readerSelectionQuote" class="reader-view__selection-chat-quote">
+          {{ readerSelectionQuote }}
+        </p>
+        <CoReadChatPanel
+          :messages="readerSelectionChatMessages"
+          :chat-loading="coReadChatLoading"
+          :replies="[]"
+          :kind-label="coReadInlineLabels.kind"
+          @send="onReaderSelectionChatSend"
+          @close="closeReaderSelectionChat"
+        />
+      </div>
+      <div
+        v-else-if="
           coReadStore.phase === 'reading' &&
           coReadChapterOpenDone &&
           (coReadReplyCount > 0 || coReadChromeVisible)
@@ -463,8 +466,6 @@ import { useBrowserTts } from '@/composables/useBrowserTts'
 import { isLoggedIn } from '@/api'
 import { navigateAfterReaderClose } from '@/utils/readerReturnRoute'
 import PptContextMenu from '@/components/editor/chat/PptContextMenu.vue'
-import PptRelatedSearchPanel from '@/components/editor/chat/PptRelatedSearchPanel.vue'
-import { useReaderSelectionChat } from '@/composables/useReaderSelectionChat'
 
 const XlsxReader = defineAsyncComponent(() => import('@/components/reader/XlsxReader.vue'))
 const MarkdownReader = defineAsyncComponent(() => import('@/components/reader/MarkdownReader.vue'))
@@ -494,6 +495,7 @@ const {
   saveAnnotationReply: onCoReadPersistReply,
   deleteAnnotationReply: onCoReadDeleteReply,
   chatAboutAnnotation: onCoReadChatAbout,
+  chatAboutReaderSelection: onCoReadChatAboutSelection,
   reportReaderPage,
   hasReportedPage: hasCoReadReportedPage,
   startPageCoRead,
@@ -579,25 +581,14 @@ const readerContextMenuOpen = ref(false)
 const readerContextMenuX = ref(0)
 const readerContextMenuY = ref(0)
 const readerContextSelection = ref('')
-const readerSelectionSnippet = ref('')
+const readerSelectionQuote = ref('')
+const readerSelectionThreadId = ref('')
+const readerSelectionChatOpen = ref(false)
 
-function readerPageContextText(): string {
-  if (isEpub.value) return epubReaderRef.value?.getPageText?.() ?? ''
-  if (isMobi.value) return mobiReaderRef.value?.getPageText?.() ?? ''
-  if (isMarkdown.value) return markdownReaderRef.value?.getPageText?.() ?? ''
-  return ''
-}
-
-const {
-  selectionChatState,
-  selectionChatContext,
-  askAboutTerm,
-  closeSelectionChatPanel,
-  closeSelectionChatStream,
-} = useReaderSelectionChat({
-  bookTitle: () => headerTitle.value,
-  pageContext: readerPageContextText,
-  selectionSnippet: () => readerSelectionSnippet.value,
+const readerSelectionChatMessages = computed(() => {
+  const id = readerSelectionThreadId.value
+  if (!id) return []
+  return coReadStore.chatMessages.filter((m) => m.annotationId === id)
 })
 
 const scale = ref(1.2)
@@ -1097,6 +1088,7 @@ function onKeyDown(e: KeyboardEvent) {
 function onReaderSelectionContextMenu(payload: { selection: string; clientX: number; clientY: number }) {
   if (!selectionAskEnabled.value) return
   readerContextSelection.value = payload.selection
+  readerSelectionThreadId.value = `reader-sel-${Date.now()}`
   readerContextMenuX.value = payload.clientX
   readerContextMenuY.value = payload.clientY
   readerContextMenuOpen.value = true
@@ -1113,26 +1105,64 @@ function onReaderContextMenuPointerDown(event: PointerEvent) {
   closeReaderContextMenu()
 }
 
-async function onReaderSelectionAsk() {
+async function ensureCoReadForSelectionAsk(): Promise<boolean> {
+  if (coReadMode.value) return true
+  const current = file.value
+  if (!current) return false
+  if (!isLoggedIn()) {
+    ElMessage.warning(t('reader.coReadLoginRequired'))
+    return false
+  }
+  if (coReadBusy.value) return false
+  coReadBusy.value = true
+  try {
+    await startPageCoRead(current, store.format || 'epub')
+    await reportVisibleCoReadPage(currentPage.value)
+    return Boolean(coReadStore.sessionId)
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : t('coRead.sessionFailed'))
+    return false
+  } finally {
+    coReadBusy.value = false
+  }
+}
+
+function closeReaderSelectionChat() {
+  readerSelectionChatOpen.value = false
+}
+
+async function beginReaderSelectionChat(question: string) {
   const sel = readerContextSelection.value.trim()
+  const q = question.trim()
   if (!sel) {
     ElMessage.warning(t('agent.pptRelatedSearchSelectText'))
     return
   }
-  readerSelectionSnippet.value = sel
+  if (!q) return
+  if (!(await ensureCoReadForSelectionAsk())) return
+  const threadId = readerSelectionThreadId.value
+  if (!threadId) return
+  readerSelectionQuote.value = sel
   closeReaderContextMenu()
-  await askAboutTerm(t('reader.selectionAskDefaultQuestion'))
+  readerSelectionChatOpen.value = true
+  coReadChatOpen.value = false
+  bumpCoReadLayoutRevision()
+  await onCoReadChatAboutSelection(threadId, sel, q)
+}
+
+async function onReaderSelectionAsk() {
+  await beginReaderSelectionChat(t('reader.selectionAskDefaultQuestion'))
 }
 
 async function onReaderSelectionCustomAsk(term: string) {
-  const sel = readerContextSelection.value.trim()
-  if (!sel) {
-    ElMessage.warning(t('agent.pptRelatedSearchSelectText'))
-    return
-  }
-  readerSelectionSnippet.value = sel
-  closeReaderContextMenu()
-  await askAboutTerm(term)
+  await beginReaderSelectionChat(term)
+}
+
+async function onReaderSelectionChatSend(text: string) {
+  const threadId = readerSelectionThreadId.value
+  const quote = readerSelectionQuote.value.trim()
+  if (!threadId || !text.trim()) return
+  await onCoReadChatAboutSelection(threadId, quote, text)
 }
 
 function goBack() {
@@ -1166,7 +1196,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   epubSearchAbort?.abort()
   closeEpubSearch()
-  closeSelectionChatStream()
   document.removeEventListener('pointerdown', onReaderContextMenuPointerDown)
   mobileLayoutMq?.removeEventListener('change', onMobileLayoutChange)
   window.removeEventListener('keydown', onKeyDown)
@@ -1342,6 +1371,19 @@ onBeforeUnmount(() => {
 .reader-view--night .reader-view__co-read-tray {
   background: #0a0a0a;
   border-top-color: #111827;
+}
+.reader-view__selection-chat-quote {
+  margin: 0;
+  padding: 10px 16px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #6b7280;
+  border-bottom: 1px solid #f3f4f6;
+  padding-bottom: 8px;
+}
+.reader-view--night .reader-view__selection-chat-quote {
+  color: #9ca3af;
+  border-bottom-color: #111827;
 }
 .reader-view--night .reader-view__co-read-side {
   border-left-color: #111827;

@@ -45,7 +45,9 @@
         <circle cx="11" cy="11" r="8" />
         <path d="m21 21-4.3-4.3" />
       </svg>
-      <span>{{ t("agent.pptRelatedSearch") }}</span>
+      <span>{{
+        menuVariant === "reader-chat" ? t("reader.selectionAskMenu") : t("agent.pptRelatedSearch")
+      }}</span>
     </div>
     <div v-if="selectionText" class="ppt-context-menu-selection">
       「{{ selectionPreview }}」
@@ -59,7 +61,11 @@
         v-model="queryText"
         type="text"
         class="ppt-context-menu-input"
-        :placeholder="t('agent.pptRelatedSearchInputPlaceholder')"
+        :placeholder="
+          menuVariant === 'reader-chat'
+            ? t('reader.selectionAskInputPlaceholder')
+            : t('agent.pptRelatedSearchInputPlaceholder')
+        "
         @keydown.enter.prevent="onCustomSearch"
         @keydown.stop
         @keyup.stop
@@ -68,8 +74,16 @@
       <button
         type="button"
         class="ppt-context-menu-submit"
-        :aria-label="t('agent.pptRelatedSearchSubmit')"
-        :title="t('agent.pptRelatedSearchSubmit')"
+        :aria-label="
+          menuVariant === 'reader-chat'
+            ? t('reader.selectionAskSubmit')
+            : t('agent.pptRelatedSearchSubmit')
+        "
+        :title="
+          menuVariant === 'reader-chat'
+            ? t('reader.selectionAskSubmit')
+            : t('agent.pptRelatedSearchSubmit')
+        "
         @click="onCustomSearch"
       >
         <svg
@@ -129,8 +143,10 @@ const props = withDefaults(
     selectionText: string;
     annotateEnabled?: boolean;
     zIndex?: number;
+    /** reader-chat：沉浸式共读划词对话；默认 ppt 相关追问 */
+    menuVariant?: "ppt-search" | "reader-chat";
   }>(),
-  { annotateEnabled: false, zIndex: 12050 }
+  { annotateEnabled: false, zIndex: 12050, menuVariant: "ppt-search" }
 );
 
 const emit = defineEmits<{
