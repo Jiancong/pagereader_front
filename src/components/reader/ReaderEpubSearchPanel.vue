@@ -255,8 +255,12 @@ function displayPage(hit: EpubSearchHit): number | null {
 }
 .epub-search-panel__hit-excerpt {
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
   word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 @media (max-width: 767px) {
   .epub-search-panel {

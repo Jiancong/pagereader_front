@@ -49,6 +49,7 @@ import {
 } from '@/utils/coReadInlineAnnotations'
 import type { CoReadAnnotation, CoReadChatMessage } from '@/types/coReading'
 import type { EpubSearchHit, EpubSearchProgress } from '@/types/epubSearch'
+import { buildEpubSearchContextExcerpt } from '@/utils/epubSearchExcerpt'
 
 const MAX_EPUB_SEARCH_HITS = 400
 const SEARCH_HIGHLIGHT_CLASS = 'epub-search-hl'
@@ -1333,11 +1334,18 @@ async function searchInBook(
     const rawMatches: Array<{ cfi?: string; excerpt?: string }> =
       typeof section.search === 'function' ? section.search(q) : section.find(q)
 
+    const sectionDoc = section.document as Document | undefined
     for (const match of rawMatches) {
       if (!match?.cfi) continue
+      const excerpt = buildEpubSearchContextExcerpt(
+        sectionDoc,
+        match.cfi,
+        q,
+        match.excerpt || '',
+      )
       hits.push({
         cfi: match.cfi,
-        excerpt: (match.excerpt || '').replace(/\s+/g, ' ').trim(),
+        excerpt,
         spineIndex,
         chapterLabel: chapterLabelForSection(section),
         pageHint: pageHintFromCfi(match.cfi),
