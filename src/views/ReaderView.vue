@@ -51,6 +51,31 @@
             <div class="reader-view__title" :title="headerTitle">{{ headerTitle }}</div>
           </div>
         </div>
+        <div
+          v-if="showReaderZoom"
+          class="rv-field rv-field--font-size rv-field--font-size--toolbar"
+          :aria-label="t('reader.fontSize')"
+        >
+          <button
+            type="button"
+            class="rv-btn rv-btn--sm rv-btn--font-size"
+            :disabled="scale <= 0.5"
+            :aria-label="t('reader.fontSizeSmaller')"
+            @click.stop="zoomOut"
+          >
+            <Minus class="h-4 w-4" />
+          </button>
+          <span class="rv-font-size-value">{{ fontSizePercent }}%</span>
+          <button
+            type="button"
+            class="rv-btn rv-btn--sm rv-btn--font-size"
+            :disabled="scale >= 3"
+            :aria-label="t('reader.fontSizeLarger')"
+            @click.stop="zoomIn"
+          >
+            <Plus class="h-4 w-4" />
+          </button>
+        </div>
         <button
           v-if="hasSource && (isPdf || isEpub || isMobi || isMarkdown)"
           type="button"
@@ -83,10 +108,10 @@
           <button class="rv-btn rv-btn--sm" :disabled="!pageCount || currentPage >= pageCount" @click="goToPage(currentPage + 1)">›</button>
         </div>
 
-        <div v-if="hasSource && (isPdf || isEpub || isMobi || isXlsx || isMarkdown)" class="rv-field rv-field--zoom">
-          <button class="rv-btn rv-btn--sm" @click="zoomOut" :disabled="scale <= 0.5">−</button>
-          <span class="rv-zoom-value">{{ Math.round(scale * 100) }}%</span>
-          <button class="rv-btn rv-btn--sm" @click="zoomIn" :disabled="scale >= 3">+</button>
+        <div v-if="showReaderZoom" class="rv-field rv-field--zoom">
+          <button class="rv-btn rv-btn--sm" @click="zoomOut" :disabled="scale <= 0.5" :aria-label="t('reader.fontSizeSmaller')">−</button>
+          <span class="rv-zoom-value" :title="t('reader.fontSize')">{{ fontSizePercent }}%</span>
+          <button class="rv-btn rv-btn--sm" @click="zoomIn" :disabled="scale >= 3" :aria-label="t('reader.fontSizeLarger')">+</button>
         </div>
 
         <button
@@ -343,7 +368,6 @@
 
     <template v-if="coReadMode && hasSource">
       <div
-      <div
         v-if="
           coReadStore.phase === 'reading' &&
           coReadChapterOpenDone &&
@@ -376,7 +400,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, BookHeart, MoreHorizontal, MessageCircle } from 'lucide-vue-next'
+import { FileWarning, Volume2, Pause, Play, Loader2, FolderInput, Repeat, Moon, Sun, BookHeart, MoreHorizontal, MessageCircle, Minus, Plus } from 'lucide-vue-next'
 import CoReadAnnotationStrip from '@/components/coReading/CoReadAnnotationStrip.vue'
 import CoReadReplyTray from '@/components/coReading/CoReadReplyTray.vue'
 import CoReadChatPanel from '@/components/coReading/CoReadChatPanel.vue'
@@ -384,6 +408,7 @@ import { useCoReadingController } from '@/composables/useCoReadingController'
 import { useCoReadInlineLabels } from '@/composables/useCoReadInlineLabels'
 import { useCoReadingStore } from '@/stores/coReading'
 import { useReaderColorTheme } from '@/composables/useReaderColorTheme'
+import { useReaderTextScale } from '@/composables/useReaderTextScale'
 import { ElMessage } from 'element-plus'
 import PdfReader from '@/components/reader/PdfReader.vue'
 import EpubReader from '@/components/reader/EpubReader.vue'
@@ -501,8 +526,11 @@ const isMarkdown = computed(() => store.format === 'markdown')
 const hasSource = computed(() => Boolean(store.file))
 const headerTitle = computed(() => store.file?.name ?? '')
 
-const scale = ref(1.2)
+const { scale, fontSizePercent, zoomIn, zoomOut, applyZoomDelta } = useReaderTextScale()
 const mobileToolsOpen = ref(false)
+const showReaderZoom = computed(
+  () => hasSource.value && (isPdf.value || isEpub.value || isMobi.value || isXlsx.value || isMarkdown.value),
+)
 /** 沉浸共读模式下默认隐藏上下工具栏，点击右上角悬浮唤醒钮才临时展开 */
 const coReadChromeVisible = ref(false)
 /** 沉浸共读的对话栏（记录/对话）显隐；进入讨论阶段自动展开，可手动关闭 */
@@ -554,15 +582,7 @@ watch(coReadMode, (on) => {
 const MOBILE_LAYOUT_MQ = '(max-width: 767px)'
 let mobileLayoutMq: MediaQueryList | null = null
 
-function applyMobileScalePreference() {
-  if (typeof window === 'undefined') return
-  if (window.matchMedia(MOBILE_LAYOUT_MQ).matches) {
-    scale.value = 1
-  }
-}
-
 function onMobileLayoutChange() {
-  applyMobileScalePreference()
   if (!mobileLayoutMq?.matches) mobileToolsOpen.value = false
 }
 const pdfReaderRef = ref<InstanceType<typeof PdfReader> | null>(null)
@@ -799,18 +819,6 @@ function onSaveToWorkspace() {
   router.push({ name: 'workspace', query: { tab: 'read', fromReader: '1' } })
 }
 
-function clampScale(value: number) {
-  return Math.min(3, Math.max(0.5, +value.toFixed(2)))
-}
-function zoomIn() {
-  scale.value = clampScale(scale.value + 0.2)
-}
-function zoomOut() {
-  scale.value = clampScale(scale.value - 0.2)
-}
-function applyZoomDelta(delta: number) {
-  scale.value = clampScale(scale.value + delta)
-}
 function onWheel(e: WheelEvent) {
   if (!e.ctrlKey && !e.metaKey) return
   if (!isPdf.value && !isEpub.value && !isMobi.value && !isXlsx.value && !isMarkdown.value) return
@@ -927,7 +935,6 @@ onMounted(() => {
     store.clearReturnNavigation()
     return
   }
-  applyMobileScalePreference()
   mobileLayoutMq = window.matchMedia(MOBILE_LAYOUT_MQ)
   mobileLayoutMq.addEventListener('change', onMobileLayoutChange)
   window.addEventListener('keydown', onKeyDown)
@@ -1112,6 +1119,25 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   font-size: 12px;
+}
+.rv-field--font-size--toolbar {
+  display: none;
+}
+.rv-field--font-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.rv-font-size-value {
+  min-width: 2.5rem;
+  text-align: center;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #9ca3af;
+  user-select: none;
+}
+.rv-btn--font-size {
+  padding: 6px 8px;
 }
 .rv-field--zoom {
   gap: 4px;
@@ -1484,6 +1510,20 @@ onBeforeUnmount(() => {
   }
   /* 移动端底部已有统一翻页栏，顶部隐藏重复页码控件 */
   .rv-field--pages {
+    display: none;
+  }
+  .rv-field--font-size--toolbar {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+  .rv-btn--font-size {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 6px;
+    justify-content: center;
+  }
+  /* 顶栏已有字号控件，「更多工具」里不再重复缩放条 */
+  .reader-view__controls .rv-field--zoom {
     display: none;
   }
   .rv-btn--theme-label,
